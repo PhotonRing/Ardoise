@@ -310,9 +310,36 @@ function applyTheme() {
   navLayout();
   document.title = curTitle();
 }
-var navSpyFn = null;
+var navSpyFn = null, lastNav = '', derivedT = 0;
+function refreshDerived() {
+  // après une saisie : met à jour ce qui découle du contenu sans tout redessiner (le curseur et le clic en cours sont préservés)
+  clearTimeout(derivedT); derivedT = 0;
+  if (!doc) return;
+  var nh = navHTML(doc, mode === 'edit', false);
+  if (nh !== lastNav && !$('.pnav-in', app)) {
+    var side = $('.pnav-side', app), st = side ? side.scrollTop : 0, tmp = document.createElement('div');
+    tmp.innerHTML = nh;
+    var nt = tmp.querySelector('.pnav-tabs'), ns = tmp.querySelector('.pnav-side'), ot = $('.pnav-tabs', app);
+    if (ot && nt) ot.replaceWith(nt);
+    if (side && ns) { side.replaceWith(ns); ns.scrollTop = st; }
+    lastNav = nh;
+    if (navSpyFn) navSpyFn();
+  }
+  // numérotation automatique des étapes (pastilles vides qui affichent le numéro calculé)
+  var counter = 0;
+  doc.blocks.forEach(function (b) {
+    if (b.type !== 'step' || b.nonum) return;
+    var n = String(b.num || '').trim(), num;
+    if (n) { num = n; var m = n.match(/(\d+)\D*$/); if (m) counter = +m[1]; } else { counter++; num = String(counter); }
+    var badge = $('.blk[data-id="' + b.id + '"] .num', app); if (badge && badge.getAttribute('data-ph') !== num) badge.setAttribute('data-ph', num);
+  });
+  var ct = curTitle(); if (document.title !== ct) document.title = ct;
+  var dn = $('#ui .doc-name'); if (dn && dn.textContent !== ct) dn.textContent = ct;
+}
+function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }
 function render(focus) {
-  app.innerHTML = navHTML(doc, mode === 'edit', false) + renderPage(doc, mode === 'edit');
+  lastNav = navHTML(doc, mode === 'edit', false);
+  app.innerHTML = lastNav + renderPage(doc, mode === 'edit');
   applyTheme();
   if (navSpyFn) navSpyFn();
   if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });

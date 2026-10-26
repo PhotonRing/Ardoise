@@ -1,4 +1,5 @@
 /* ---------- Saisie ---------- */
+var tlTimers = {};
 app.addEventListener('input', function (e) {
   var el = e.target;
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); markDirty(); } return; }
@@ -19,8 +20,8 @@ app.addEventListener('input', function (e) {
     $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { x.textContent = ct; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
-  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(bl._tlT); bl._tlT = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' && el.dataset.k === 'num') { /* la numérotation automatique se met à jour au prochain rendu */ }
+  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
+  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header') refreshDerivedSoon();
   markDirty();
 });
 app.addEventListener('change', function (e) {
@@ -50,6 +51,7 @@ app.addEventListener('change', function (e) {
 });
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
 app.addEventListener('focusout', function (e) {
+  if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
   if (e.target.matches && e.target.matches('.map-q')) { var res = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); }
 });
 app.addEventListener('focusin', function (e) {
