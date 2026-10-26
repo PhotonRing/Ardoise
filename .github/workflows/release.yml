@@ -1,0 +1,51 @@
+name: Release
+
+# À chaque push sur main : assemble dist/ardoise.html, puis, si la version de package.json
+# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec le fichier en pièce jointe.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Assembler ardoise.html
+        run: node build.mjs
+
+      - name: Vérifier le fichier assemblé
+        run: node scripts/check.mjs
+
+      - name: Lire la version
+        id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Créer le tag et la release si la version est nouvelle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Le tag $TAG existe déjà : pas de nouvelle release (augmentez la version dans package.json)."
+            exit 0
+          fi
+          gh release create "$TAG" dist/ardoise.html \
+            --target "$GITHUB_SHA" \
+            --title "Ardoise $TAG" \
+            --generate-notes

@@ -1,0 +1,15 @@
+{
+  "name": "ardoise",
+  "version": "1.0.0",
+  "description": "Éditeur de pages WYSIWYG autonome : un seul fichier HTML qui s'enregistre lui-même.",
+  "private": true,
+  "license": "Unlicense",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
