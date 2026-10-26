@@ -236,7 +236,13 @@ function wrapEdit(b, inner) {
     '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div>' + inner + '</div>';
 }
 
-function pageTitle(pg, i) { return (pg.title || '').trim() || 'Page ' + (i + 1); }
+function pageHeader(pg) { return pg.blocks.filter(function (b) { return b.type === 'header'; })[0] || null; }
+function pageTitle(pg, i) {
+  // le nom d'une page est le grand titre de son en-tête ; à défaut, le nom saisi ; sinon « Page N »
+  var h = pageHeader(pg), t = h ? textOf(h.title) : '';
+  return t || (pg.title || '').trim() || 'Page ' + (i + 1);
+}
+function curTitle() { return pageTitle(doc.pages[doc.cur], doc.cur); }
 function sectionsOf(pg) {
   var out = [], counter = 0;
   pg.blocks.forEach(function (b) {
@@ -256,7 +262,7 @@ function navHTML(d, edit, all) {
   var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + pages.map(function (pg, i) {
     return '<span class="ptab-w' + (i === cur ? ' on' : '') + '"><button type="button" class="ptab" data-pg="' + i + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pg, i)) + '</button>' + more(i) + '</span>';
   }).join('') + (edit ? '<button type="button" class="ptab-add" data-pgadd title="Ajouter une page">+ Page</button>' : '') + '</div></nav>';
-  var side = '<aside class="pnav-side" aria-label="Sommaire"><div class="toc-h">' + esc(docTitle()) + '</div><ol class="toc">' + pages.map(function (pg, i) {
+  var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + pages.map(function (pg, i) {
     var secs = (all || i === cur) ? sectionsOf(pg) : [];
     return '<li class="toc-p' + (i === cur ? ' on' : '') + '"><div class="toc-pr"><button type="button" class="toc-pb" data-pg="' + i + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pg, i)) + '</button>' + more(i) + '</div>' +
       (secs.length ? '<ol class="toc-s">' + secs.map(function (x) {
@@ -302,7 +308,7 @@ function applyTheme() {
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
   navLayout();
-  document.title = docTitle();
+  document.title = curTitle();
 }
 var navSpyFn = null;
 function render(focus) {

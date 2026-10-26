@@ -69,7 +69,7 @@ function viewScript() {
     function sel() { var r = document.createRange(); r.selectNodeContents(pre); var s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Sélectionné : Ctrl+C'); }
     try { navigator.clipboard.writeText(t).then(function () { done('Copié ✓'); }, sel); } catch (_) { sel(); }
   });
-  var K = 'bp:' + document.title + ':';
+  var K = 'bp:' + (document.documentElement.getAttribute('data-docid') || document.title) + ':';
   Array.prototype.forEach.call(document.querySelectorAll('ul.check input'), function (c) {
     try { var v = localStorage.getItem(K + c.id); if (v !== null) c.checked = v === '1'; } catch (_) {}
     c.addEventListener('change', function () { try { localStorage.setItem(K + c.id, c.checked ? '1' : '0'); } catch (_) {} });
@@ -83,7 +83,7 @@ function exportPages() {
     pages.forEach(function (p, k) { p.hidden = k !== i; });
     Array.prototype.forEach.call(document.querySelectorAll('[data-pg]'), function (b) {
       var on = +b.getAttribute('data-pg') === i, w = b.closest('.ptab-w,.toc-p');
-      if (w) w.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+      if (w) w.classList.toggle('on', on); if (on) { b.setAttribute('aria-current', 'page'); document.title = b.textContent; } else b.removeAttribute('aria-current');
     });
     if (typeof tlFit === 'function') tlFit(pages[i]);
     window.dispatchEvent(new Event('resize'));
@@ -102,7 +102,7 @@ function exportStatic() {
   if (htimer) snapshot();
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
-    ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
+    ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
     $$('link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
       var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;

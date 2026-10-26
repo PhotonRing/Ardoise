@@ -5,7 +5,7 @@ var pop = null, popClose = null;
 function renderChrome() {
   if (mode === 'edit') {
     chrome.innerHTML = '<div class="tb" role="toolbar">' +
-      '<span class="logo"><i></i><span class="lbl">Ardoise</span></span><span class="doc-name">' + esc(docTitle()) + '</span><span class="grow"></span>' +
+      '<span class="logo"><i></i><span class="lbl">Ardoise</span></span><span class="doc-name">' + esc(curTitle()) + '</span><span class="grow"></span>' +
       '<button class="ub" data-ui="undo" title="Annuler (Ctrl+Z)">↶</button><button class="ub" data-ui="redo" title="Rétablir (Ctrl+Maj+Z)">↷</button><span class="vsep"></span>' +
       '<button class="ub" data-ui="add" title="Insérer un bloc">+ <span class="lbl">Bloc</span></button>' +
       '<button class="ub" data-ui="style" title="Couleurs, typographie, largeur, thème">◐ <span class="lbl">Style</span></button>' +

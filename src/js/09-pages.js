@@ -15,8 +15,10 @@ function addPage(after) {
   scrollTo(0, 0); pageHash(at); renamePage(at);
 }
 function dupPage(i) {
-  var c = JSON.parse(JSON.stringify(doc.pages[i])); c.id = uid(); c.title = pageTitle(doc.pages[i], i) + ' (copie)';
+  var c = JSON.parse(JSON.stringify(doc.pages[i])); c.id = uid();
   c.blocks.forEach(function (b) { b.id = uid(); });
+  var ch = pageHeader(c), nm = pageTitle(doc.pages[i], i) + ' (copie)';
+  if (ch && textOf(ch.title)) ch.title = esc(nm); else c.title = nm;
   change(function () { doc.pages.splice(i + 1, 0, c); doc.cur = i + 1; }); scrollTo(0, 0); pageHash(i + 1);
 }
 function delPage(i) {
@@ -32,13 +34,15 @@ function renamePage(i) {
   // champ de saisie à la place du nom de la page (onglet ou sommaire)
   var btn = $('.pnav-tabs [data-pg="' + i + '"]', app), side = $('.pnav-side [data-pg="' + i + '"]', app);
   var host = (side && side.offsetParent !== null) ? side : btn; if (!host) return;
-  var inp = document.createElement('input'); inp.className = 'pnav-in'; inp.value = doc.pages[i].title || ''; inp.placeholder = 'Page ' + (i + 1);
+  // renommer une page change le grand titre de son en-tête (ou, sans en-tête, son nom)
+  var pg = doc.pages[i], hd = pageHeader(pg), before = hd ? textOf(hd.title) : (pg.title || '');
+  var inp = document.createElement('input'); inp.className = 'pnav-in'; inp.value = before; inp.placeholder = 'Page ' + (i + 1);
   host.replaceWith(inp); inp.focus(); inp.select();
   var done = false;
   function commit(ok) {
     if (done) return; done = true;
     var v = inp.value.trim();
-    if (ok && v !== (doc.pages[i].title || '')) change(function () { doc.pages[i].title = v; }); else render();
+    if (ok && v !== before) change(function () { if (hd) hd.title = esc(v); else pg.title = v; }); else render();
   }
   inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); commit(false); } });
   inp.addEventListener('blur', function () { commit(true); });
