@@ -23,8 +23,16 @@ function setStatus(state, text) {
 }
 var handleGranted = false;
 function serializeFile() {
+  // renvoie une promesse du fichier complet ; chiffré si le document le demande
   doc.savedAt = new Date().toISOString();
   doc.title = docTitle();
+  var json = JSON.stringify(doc);
+  return (isSealed() ? sealJSON(json).then(function (env) {
+    return JSON.stringify({ v: VERSION, id: doc.id, palette: doc.palette, typo: doc.typo, theme: doc.theme, enc: env });
+  }) : Promise.resolve(json)).then(function (stored) { return buildFile(stored); });
+}
+function buildFile(stored) {
+  var sealedFile = isSealed();
   var root = document.documentElement.cloneNode(true);
   root.classList.remove('is-edit', 'nav-none', 'nav-side', 'nav-tabs', 'nav-push'); root.style.removeProperty('--navw'); if (!root.getAttribute('style')) root.removeAttribute('style'); if (!root.className) root.removeAttribute('class');
   var liveHead = document.head.children, cloneHead = root.querySelector('head');
@@ -32,9 +40,9 @@ function serializeFile() {
   var body = root.querySelector('body');
   Array.prototype.slice.call(body.children).forEach(function (n) { if (['ardoise-doc', 'app', 'ardoise-geo', 'ardoise-app'].indexOf(n.id) < 0) n.remove(); });
   Array.prototype.slice.call(body.attributes).forEach(function (a) { body.removeAttribute(a.name); });
-  root.querySelector('title').textContent = docTitle();
-  root.querySelector('#ardoise-doc').textContent = JSON.stringify(doc).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, function (c) { return c === '\u2028' ? '\\u2028' : '\\u2029'; });
-  root.querySelector('#app').innerHTML = navHTML(doc, false, false) + renderPage(doc, false);
+  root.querySelector('title').textContent = sealedFile ? 'Document protégé' : docTitle();
+  root.querySelector('#ardoise-doc').textContent = stored.replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, function (c) { return c === '\u2028' ? '\\u2028' : '\\u2029'; });
+  root.querySelector('#app').innerHTML = sealedFile ? '<div class="wrap"><p>Document chiffré : ouvrez ce fichier dans un navigateur et saisissez le mot de passe.</p></div>' : navHTML(doc, false, false) + renderPage(doc, false);
   return '<!doctype html>\n' + root.outerHTML;
 }
 // Poignées de fichier conservées par document (IndexedDB), pour l'auto-save après réouverture
@@ -66,10 +74,12 @@ function afterSave(where) {
   if (mode === 'view') renderChrome(); else setStatus();
   if (where) toast(where);
 }
+function saveFailed(e) { saving = false; setStatus(); toast('Enregistrement impossible : ' + (e && e.message || e), 5000); }
 function save(as) {
+  if (!doc) return Promise.resolve();
   if (htimer) snapshot();
   clearTimeout(saveTimer);
-  var html = serializeFile();
+  var dl = function () { return serializeFile().then(function (html) { download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci'); }); };
   if (window.showSaveFilePicker && !downloadMode) {
     var chain = as ? Promise.resolve(null) : Promise.resolve(fileHandle);
     saving = true; setStatus();
@@ -79,15 +89,14 @@ function save(as) {
     }).then(function (h) {
       if (!h) { saving = false; setStatus(); return; }
       fileHandle = h; handleGranted = true;
-      return writeTo(h, html).then(function () { putHandle(h); afterSave('Enregistré dans ' + h.name + (autosaveOn ? ' · auto-save actif' : '')); });
+      return serializeFile().then(function (html) { return writeTo(h, html); }).then(function () { putHandle(h); afterSave('Enregistré dans ' + h.name + (autosaveOn ? ' · auto-save actif' : '')); }, saveFailed);
     }).catch(function (err) {
       saving = false;
       if (err && err.name === 'AbortError') { setStatus(); return; }
-      downloadMode = true; download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci');
+      downloadMode = true; return dl().catch(saveFailed);
     });
   }
-  download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci');
-  return Promise.resolve();
+  return dl().catch(saveFailed);
 }
 function pickNew() {
   return window.showSaveFilePicker({ suggestedName: fileHandle ? fileHandle.name : fileName(), types: [{ description: 'Page HTML', accept: { 'text/html': ['.html', '.htm'] } }] });
@@ -99,7 +108,7 @@ function autoSave() {
     if (!ok) { setStatus(); return; }
     if (htimer) snapshot();
     saving = true; setStatus();
-    writeTo(fileHandle, serializeFile()).then(function () { afterSave(); }).catch(function () { saving = false; handleGranted = false; setStatus(); });
+    serializeFile().then(function (html) { return writeTo(fileHandle, html).then(function () { afterSave(); }, function () { saving = false; handleGranted = false; setStatus(); }); }, saveFailed);
   });
 }
 function download(text, name) {
@@ -107,10 +116,11 @@ function download(text, name) {
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/html' })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
-function saveDraft() { if (!dirty) return; try { localStorage.setItem(LS + 'draft:' + doc.id, JSON.stringify({ t: Date.now(), json: JSON.stringify(doc) })); } catch (_) {} }
+function saveDraft() { if (!dirty || !doc) return; if (isSealed()) { forgetDraft(); return; } try { localStorage.setItem(LS + 'draft:' + doc.id, JSON.stringify({ t: Date.now(), json: JSON.stringify(doc) })); } catch (_) {} }
 var bannerEl = null;
 function hideBanner() { if (bannerEl) { bannerEl.remove(); bannerEl = null; } }
 function checkDraft() {
+  if (isSealed()) { forgetDraft(); return; }
   var d; try { d = JSON.parse(localStorage.getItem(LS + 'draft:' + doc.id) || 'null'); } catch (_) { d = null; }
   if (!d) return;
   var savedT = doc.savedAt ? Date.parse(doc.savedAt) : 0;

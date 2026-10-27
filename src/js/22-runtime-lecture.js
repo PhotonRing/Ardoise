@@ -99,6 +99,7 @@ function exportPages() {
   navLayout(); show(m ? +m[1] - 1 : 0, true);
 }
 function exportStatic() {
+  if (isSealed() && !confirm('L’export statique n’est pas chiffré : la page exportée sera lisible par toute personne qui obtient le fichier. Continuer ?')) return;
   if (htimer) snapshot();
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +

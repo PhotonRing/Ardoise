@@ -122,8 +122,10 @@ function openFile(anchor) {
     '<div class="hr"></div>' +
     mi('json-copy', '{ }', 'Copier le JSON', 'Pour le faire modifier par une IA') + mi('json-import', '⇥', 'Importer du JSON…', 'Remplace le contenu de la page') +
     '<div class="hr"></div>' +
-    (doc.lock ? mi('pw-set', '🔒', 'Changer le mot de passe', 'L’édition est protégée') + mi('pw-lock', '⏻', 'Verrouiller maintenant', 'Repasse en lecture') + mi('pw-del', '🔓', 'Retirer la protection')
-              : mi('pw-set', '🔒', 'Protéger l’édition par mot de passe…', 'Demandé pour passer en édition')) +
+    (doc.lock ? mi('pw-set', '🔒', 'Changer le mot de passe', isSealed() ? 'Édition protégée · contenu chiffré' : 'L’édition est protégée') +
+                (isSealed() ? mi('pw-unseal', '🔓', 'Ne plus chiffrer le contenu', 'Le document redevient lisible sans mot de passe') : mi('pw-seal', '🔐', 'Chiffrer le contenu…', 'Mot de passe demandé pour ouvrir le document')) +
+                mi('pw-lock', '⏻', 'Verrouiller maintenant', 'Repasse en lecture') + mi('pw-del', '✕', 'Retirer la protection')
+              : mi('pw-set', '🔒', 'Protéger par mot de passe…', 'Édition protégée, contenu chiffré en option')) +
     mi('help', '⌨', 'Raccourcis clavier');
   function mi(k, ic, label, sub, kbd) { return '<button class="mi" type="button" data-f="' + k + '"><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (kbd ? '<kbd>' + kbd + '</kbd>' : '') + '</button>'; }
   p.addEventListener('click', function (e) {
@@ -138,6 +140,8 @@ function openFile(anchor) {
     else if (k === 'help') showHelp();
     else if (k === 'pw-set') setPassword();
     else if (k === 'pw-del') removePassword();
+    else if (k === 'pw-seal') sealExisting();
+    else if (k === 'pw-unseal') unsealExisting();
     else if (k === 'pw-lock') lockNow();
   });
   placePop(p, anchor);

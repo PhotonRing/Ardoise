@@ -1,5 +1,6 @@
 /* ---------- Raccourcis globaux ---------- */
 document.addEventListener('keydown', function (e) {
+  if (!doc) return;
   var mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (mod && k === 's') { e.preventDefault(); save(e.shiftKey); return; }
   if (mod && k === 'e' && !e.shiftKey) { e.preventDefault(); toggleMode(); return; }

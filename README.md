@@ -18,7 +18,8 @@
 - **Chronologies** verticales ou horizontales (titres inclinés), styles et libellés des liens, bulles de description.
 - **Cartes géographiques** : fond simplifié intégré utilisable hors ligne, plan et satellite en ligne ; points, zones, cercles, itinéraires avec distances (km et milles nautiques), étiquettes déplaçables.
 - **Plusieurs pages** par document, avec sommaire à gauche ou onglets selon la place disponible.
-- **Protection de l'édition** par mot de passe, **export en page statique** (lecture seule), **import / export JSON** (pour faire rédiger une page par une IA).
+- **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
+- **Export en page statique** (lecture seule, non chiffrée), **import / export JSON** (pour faire rédiger une page par une IA).
 
 ## Organisation du dépôt
 

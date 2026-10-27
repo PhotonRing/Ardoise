@@ -25,12 +25,18 @@ function normalize(d) {
   if (!out.pages.length) out.pages.push({ id: uid(), title: '', blocks: [] });
   attach(out);
   if (d.mapKey) out.mapKey = String(d.mapKey);
-  if (d.lock && d.lock.hash && d.lock.salt) out.lock = { salt: d.lock.salt, hash: d.lock.hash, iter: +d.lock.iter || 210000 };
+  if (d.lock && d.lock.hash && d.lock.salt) {
+    out.lock = { salt: d.lock.salt, hash: d.lock.hash, iter: +d.lock.iter || 210000 };
+    if (d.lock.enc && d.lock.encSalt) { out.lock.enc = true; out.lock.encSalt = d.lock.encSalt; out.lock.encIter = +d.lock.encIter || ENC_ITER; }
+  }
   return out;
 }
+var sealed = null;   // fichier chiffré en attente du mot de passe
 function loadInitial() {
-  var raw = $('#ardoise-doc').textContent.trim(), d = null;
-  try { d = normalize(JSON.parse(raw)); } catch (e) { d = null; }
+  var raw = $('#ardoise-doc').textContent.trim(), d = null, j = null;
+  try { j = JSON.parse(raw); } catch (e) { j = null; }
+  if (j && j.enc && j.enc.ct) { sealed = j; return null; }
+  try { d = normalize(j); } catch (e) { d = null; }
   if (!d) { d = normalize(TEMPLATES.tour()); d.id = uid() + uid(); freshDoc = true; }
   return d;
 }

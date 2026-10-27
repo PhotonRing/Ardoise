@@ -311,19 +311,34 @@ function applyTheme() {
   document.title = curTitle();
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
+var pointerBusy = false, navPending = false;
+document.addEventListener('pointerdown', function () { pointerBusy = true; }, true);
+document.addEventListener('pointerup', function () { setTimeout(function () { pointerBusy = false; if (navPending) { navPending = false; refreshDerived(); } }, 0); }, true);
 function refreshDerived() {
   // après une saisie : met à jour ce qui découle du contenu sans tout redessiner (le curseur et le clic en cours sont préservés)
   clearTimeout(derivedT); derivedT = 0;
   if (!doc) return;
   var nh = navHTML(doc, mode === 'edit', false);
   if (nh !== lastNav && !$('.pnav-in', app)) {
-    var side = $('.pnav-side', app), st = side ? side.scrollTop : 0, tmp = document.createElement('div');
-    tmp.innerHTML = nh;
-    var nt = tmp.querySelector('.pnav-tabs'), ns = tmp.querySelector('.pnav-side'), ot = $('.pnav-tabs', app);
-    if (ot && nt) ot.replaceWith(nt);
-    if (side && ns) { side.replaceWith(ns); ns.scrollTop = st; }
-    lastNav = nh;
-    if (navSpyFn) navSpyFn();
+    var tmp = document.createElement('div'); tmp.innerHTML = nh;
+    var side = $('.pnav-side', app), ns = tmp.querySelector('.pnav-side'), ot = $('.pnav-tabs', app), nt = tmp.querySelector('.pnav-tabs');
+    var shape = function (root) { return root ? $$('[data-pg],a[data-sec]', root).map(function (x) { return x.getAttribute('data-pg') || x.getAttribute('data-sec'); }).join('|') : ''; };
+    if (side && ns && ot && nt && shape(side) === shape(ns) && shape(ot) === shape(nt)) {
+      // même structure : mise à jour du texte en place (un clic en cours sur le sommaire n'est pas perdu)
+      [[ot, nt], [side, ns]].forEach(function (pr) {
+        var oldE = $$('[data-pg],a[data-sec]', pr[0]), newE = $$('[data-pg],a[data-sec]', pr[1]);
+        oldE.forEach(function (o, k) { if (o.innerHTML !== newE[k].innerHTML) o.innerHTML = newE[k].innerHTML; });
+      });
+      lastNav = nh;
+    } else if (pointerBusy) {
+      navPending = true;   // structure changée pendant un clic : reconstruction juste après le clic
+    } else {
+      var st = side ? side.scrollTop : 0;
+      if (ot && nt) ot.replaceWith(nt);
+      if (side && ns) { side.replaceWith(ns); ns.scrollTop = st; }
+      lastNav = nh;
+      if (navSpyFn) navSpyFn();
+    }
   }
   // numérotation automatique des étapes (pastilles vides qui affichent le numéro calculé)
   var counter = 0;

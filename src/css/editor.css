@@ -200,4 +200,15 @@ button.tl-dot:hover{transform:scale(1.2)}
 .tl-v-date.fld{display:block;min-height:1.4em}
 .tl-seg-sel{height:24px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--muted);font:12px var(--f-body);padding:0 4px}
 .tl-seg-lbl{font:italic 12.5px/1.3 var(--f-body);color:var(--muted);min-width:12ch}
+.pw-enc{display:flex;gap:10px;align-items:flex-start;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+.pw-enc input{margin-top:3px;accent-color:var(--accent);width:15px;height:15px;flex:none}
+.pw-enc small{display:block;color:var(--muted);margin-top:2px;line-height:1.4}
+.lockscr{min-height:70vh;justify-content:center;align-items:center}
+.lock-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;display:flex;flex-direction:column;gap:12px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.08)}
+.lock-card h1{font-size:26px}
+.lock-card .lede{font-size:14px}
+.lock-ic{font-size:30px}
+.lock-card .menu-q{height:42px;font-size:15px;text-align:center}
+.lock-card .ub{justify-content:center;height:40px;font-size:14px}
+.lock-err{min-height:1.3em;color:var(--bad);font-size:13px}
 @media print{#ui{display:none!important}html.is-edit body{padding-top:0}}
