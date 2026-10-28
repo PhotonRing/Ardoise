@@ -4,6 +4,8 @@
 
 > Ardoise est inspirée de [**Bento**](https://github.com/nyblnet/bento) (nyblnet), « la suite bureautique qui tient dans un fichier » : même idée d'un document HTML autonome qui embarque son propre éditeur et s'enregistre lui-même, et même organisation du dépôt — des sources lisibles, assemblées en un fichier unique au moment de la release. Ardoise ne contient pas de code de Bento.
 
+![La visite guidée intégrée, en mode lecture](docs/visite-guidee.png)
+
 ## Télécharger et utiliser
 
 1. Récupérez `ardoise.html` dans la [dernière release](../../releases/latest).
