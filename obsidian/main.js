@@ -8,6 +8,21 @@ const VIEW_TYPE = 'ardoise';
 const TEMPLATE = __ARDOISE_TEMPLATE__;   // dist/ardoise.html (document vierge)
 
 const isArdoise = (html) => /<script id="ardoise-app"/.test(html);
+const versionOf = (html) => { const m = String(html).match(/<meta name="generator" content="Ardoise ([\d.]+)"/); return m ? m[1] : ''; };
+const newerThan = (a, b) => {
+  a = String(a).split('.'); b = String(b).split('.');
+  for (let i = 0; i < 3; i++) { const x = +a[i] || 0, y = +b[i] || 0; if (x !== y) return x > y; }
+  return false;
+};
+const LATEST = versionOf(TEMPLATE);
+// Même greffe que dans Ardoise (src/js/20-enregistrement.js) : l'éditeur du modèle, le contenu du document.
+// Les données restent telles quelles, chiffrées ou non : pas besoin du mot de passe.
+function graftFile(tpl, cur) {
+  [/<html[^>]*>/i, /<title>[\s\S]*?<\/title>/i, /<script id="ardoise-doc"[^>]*>[\s\S]*?<\/script>/, /<div id="app">[\s\S]*?(?=<script id="ardoise-geo")/].forEach((re) => {
+    const m = cur.match(re); if (m && re.test(tpl)) tpl = tpl.replace(re, () => m[0]);
+  });
+  return tpl;
+}
 
 /* Script injecté dans le document, exécuté avant Ardoise dans l'iframe isolée.
    Ardoise enregistre avec l'API File System Access : on lui fournit une « poignée de fichier »
@@ -17,16 +32,16 @@ const isArdoise = (html) => /<script id="ardoise-app"/.test(html);
    Fonctionne aussi avec les documents créés par des versions antérieures d'Ardoise. */
 function hostShim(name) {
   var pending = {}, seq = 0;
-  function call(type, payload) {
+  function call(type, payload, path) {
     return new Promise(function (res, rej) {
       var id = ++seq; pending[id] = [res, rej];
-      parent.postMessage({ ardoise: true, id: id, type: type, payload: payload }, '*');
+      parent.postMessage({ ardoise: true, id: id, type: type, payload: payload, path: path }, '*');
     });
   }
   addEventListener('message', function (e) {
     if (e.source !== parent || !e.data || !e.data.ardoise) return;
     var d = e.data;
-    if (d.type === 'reply' && pending[d.id]) { pending[d.id][d.ok ? 0 : 1](d.ok ? undefined : new Error(d.error)); delete pending[d.id]; }
+    if (d.type === 'reply' && pending[d.id]) { pending[d.id][d.ok ? 0 : 1](d.ok ? d.result : new Error(d.error)); delete pending[d.id]; }
     if (d.type === 'flush') {
       // onglet fermé : enregistrer les modifications que l'auto-save n'a pas encore écrites
       var st = document.getElementById('st'), pendingChanges = st && /\b(warn|busy)\b/.test(st.className);
@@ -34,19 +49,28 @@ function hostShim(name) {
         .then(function () { parent.postMessage({ ardoise: true, type: 'flushed', id: d.id }, '*'); });
     }
   });
-  var handle = {
-    kind: 'file', name: name,
-    queryPermission: function () { return Promise.resolve('granted'); },
-    requestPermission: function () { return Promise.resolve('granted'); },
-    createWritable: function () {
-      var parts = [];
-      return Promise.resolve({
-        write: function (d) { parts.push(String(d)); return Promise.resolve(); },
-        close: function () { return call('save', parts.join('')); }
-      });
-    }
+  // path : fichier du coffre visé ; null pour le fichier ouvert dans l'onglet
+  function fileHandle(name, path) {
+    return {
+      kind: 'file', name: name,
+      queryPermission: function () { return Promise.resolve('granted'); },
+      requestPermission: function () { return Promise.resolve('granted'); },
+      createWritable: function () {
+        var parts = [];
+        return Promise.resolve({
+          write: function (d) { parts.push(String(d)); return Promise.resolve(); },
+          close: function () { return call('save', parts.join(''), path); }
+        });
+      }
+    };
+  }
+  var handle = fileHandle(name, null);
+  // Ardoise ne demande un fichier que pour « Enregistrer sous » ou un nouveau document (Fichier → Nouveau) :
+  // le plugin réserve alors un nouveau fichier à côté, au lieu d'écraser celui de l'onglet
+  window.showSaveFilePicker = function (o) {
+    return call('pick', o && o.suggestedName || 'page.html').then(function (r) { return fileHandle(r.name, r.path); });
   };
-  window.showSaveFilePicker = function () { return Promise.resolve(handle); };
+  window.ardoiseHost = { app: 'obsidian' };
   var later = function (fn) { setTimeout(fn, 0); };
   var db = {
     transaction: function () {
@@ -82,6 +106,12 @@ class ArdoiseView extends TextFileView {
     // Pas de « allow-same-origin » : le document ne peut atteindre ni Obsidian ni le coffre,
     // il ne communique qu'avec la vue, par messages.
     if (isArdoise(data)) {
+      const v = versionOf(data);
+      if (v && newerThan(LATEST, v)) {
+        const bar = this.contentEl.createDiv({ cls: 'ardoise-note ardoise-update' });
+        bar.createSpan({ text: `Ce document utilise Ardoise ${v}. ` });
+        bar.createEl('button', { text: `Mettre à jour vers ${LATEST}`, cls: 'mod-cta' }).addEventListener('click', () => this.update());
+      }
       frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-forms allow-downloads');
       const shim = '<script id="ardoise-host">(' + hostShim.toString() + ')(' + JSON.stringify(this.file ? this.file.name : 'page.html').replace(/</g, '\\u003c') + ');<\/script>';
       frame.srcdoc = /<body[^>]*>/i.test(data) ? data.replace(/<body[^>]*>/i, (m) => m + shim) : shim + data;
@@ -98,18 +128,61 @@ class ArdoiseView extends TextFileView {
   onMessage(e) {
     if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data || !e.data.ardoise) return;
     const d = e.data;
-    if (d.type === 'save' && typeof d.payload === 'string') {
+    if (d.type === 'pick') {
+      const name = this.freePath(String(d.payload || 'page.html'));
+      this.reply(d.id, true, null, { name: name.split('/').pop(), path: name });
+    } else if (d.type === 'save' && typeof d.payload === 'string' && d.path && (!this.file || d.path !== this.file.path)) {
+      this.saveOther(d);
+    } else if (d.type === 'save' && typeof d.payload === 'string') {
+      const before = versionOf(this.data);
       this.data = d.payload;
       Promise.resolve(this.save(false)).then(
-        () => this.reply(d.id, true),
+        () => {
+          this.reply(d.id, true);
+          // le document vient de remplacer son éditeur (Fichier → Mettre à jour Ardoise) : on le recharge
+          if (versionOf(d.payload) !== before) this.setViewData(d.payload, false);
+        },
         (err) => { new Notice('Ardoise : enregistrement impossible — ' + (err && err.message || err)); this.reply(d.id, false, String(err && err.message || err)); }
       );
     } else if (d.type === 'flushed' && this.flushes[d.id]) {
       this.flushes[d.id](); delete this.flushes[d.id];
     }
   }
-  reply(id, ok, error) {
-    if (this.iframe && this.iframe.contentWindow) this.iframe.contentWindow.postMessage({ ardoise: true, type: 'reply', id: id, ok: ok, error: error }, '*');
+  reply(id, ok, error, result) {
+    if (this.iframe && this.iframe.contentWindow) this.iframe.contentWindow.postMessage({ ardoise: true, type: 'reply', id: id, ok: ok, error: error, result: result }, '*');
+  }
+  // Chemin libre à côté du fichier ouvert : « Nom.html », sinon « Nom 2.html », « Nom 3.html »…
+  freePath(suggested) {
+    const dir = this.file && this.file.parent && !this.file.parent.isRoot() ? this.file.parent.path + '/' : '';
+    const base = suggested.replace(/\.html?$/i, '').replace(/[\\/:*?"<>|#^[\]]+/g, '-') || 'page';
+    this.reserved = this.reserved || new Set();
+    let path, n = 1;
+    do { path = normalizePath(dir + base + (n > 1 ? ' ' + n : '') + '.html'); n++; }
+    while (this.app.vault.getAbstractFileByPath(path) || this.reserved.has(path));
+    this.reserved.add(path);
+    return path;
+  }
+  // Écriture dans un autre fichier que celui de l'onglet (nouveau document, « Enregistrer sous ») :
+  // le fichier est créé, puis l'onglet passe dessus
+  async saveOther(d) {
+    try {
+      const existing = this.app.vault.getAbstractFileByPath(d.path);
+      if (existing) await this.app.vault.modify(existing, d.payload);
+      const file = existing || await this.app.vault.create(d.path, d.payload);
+      this.reply(d.id, true);
+      if (!existing) { new Notice('Ardoise : ' + file.name + ' créé'); await this.leaf.openFile(file); }
+    } catch (err) {
+      new Notice('Ardoise : enregistrement impossible — ' + (err && err.message || err));
+      this.reply(d.id, false, String(err && err.message || err));
+    }
+  }
+  async update() {
+    await this.flush();
+    const html = graftFile(TEMPLATE, this.data);
+    this.data = html;
+    await this.save(false);
+    this.setViewData(html, false);
+    new Notice(`Ardoise ${LATEST} : document mis à jour`);
   }
   // Avant de quitter le fichier : laisse au document le temps d'écrire ses dernières modifications
   flush() {

@@ -85,13 +85,22 @@ function exportPages() {
       var on = +b.getAttribute('data-pg') === i, w = b.closest('.ptab-w,.toc-p');
       if (w) w.classList.toggle('on', on); if (on) { b.setAttribute('aria-current', 'page'); document.title = b.textContent; } else b.removeAttribute('aria-current');
     });
+    // sous-page : onglet du groupe surligné, rangée de ses sous-pages visible, groupe déplié dans le sommaire
+    var cb = document.querySelector('[data-pg="' + i + '"]'), g = cb ? cb.getAttribute('data-pgg') : String(i);
+    var gt = document.querySelector('.tabs-in [data-pg="' + g + '"]'); if (gt) gt.closest('.ptab-w').classList.add('on');
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs-sub'), function (r) { r.hidden = r.getAttribute('data-grp') !== g; });
+    var gf = document.querySelector('.toc-p[data-pgi="' + g + '"] > .toc-pr [data-pgfold]'); if (gf) tocFold(gf, true);
     if (typeof tlFit === 'function') tlFit(pages[i]);
     window.dispatchEvent(new Event('resize'));
     if (!noScroll) scrollTo(0, 0);
     spy();
   }
   document.addEventListener('click', function (e) {
-    var b = e.target.closest && e.target.closest('[data-pg]'); if (!b) return;
+    if (!e.target.closest) return;
+    var a = e.target.closest('a[href^="#pg-"]');
+    if (a) { e.preventDefault(); var t = document.querySelector('.pg[data-pgid="' + a.getAttribute('href').slice(4) + '"]'); if (t) { show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {} } return; }
+    var f = e.target.closest('[data-pgfold]'); if (f) { tocFold(f); return; }
+    var b = e.target.closest('[data-pg]'); if (!b) return;
     e.preventDefault(); var i = +b.getAttribute('data-pg'); show(i);
     try { history.replaceState(null, '', '#p' + (i + 1)); } catch (_) {}
   });
@@ -106,8 +115,8 @@ function exportStatic() {
     ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
     $$('link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
-      var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
-    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
+      var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
+    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
     (doc.pages.some(function (pg) { return pg.blocks.some(function (b) { return b.type === 'map'; }); }) ?
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +
@@ -119,7 +128,7 @@ function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render()
 function copyJSON() {
   if (htimer) snapshot();
   var base = { title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
-  if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { return { title: pg.title, blocks: pg.blocks }; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }
+  if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.sub) o.sub = true; return o; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }
   var t = JSON.stringify(base, null, 2);
   try { navigator.clipboard.writeText(t).then(function () { toast('JSON copié dans le presse-papiers'); }, function () { showJSON(t); }); } catch (_) { showJSON(t); }
 }

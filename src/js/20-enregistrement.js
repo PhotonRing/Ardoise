@@ -136,6 +136,73 @@ function checkDraft() {
   });
   ui.appendChild(bannerEl);
 }
+/* ---------- Mise à jour de l'éditeur embarqué ---------- */
+// Chaque document transporte son éditeur : la mise à jour greffe le contenu du document dans un ardoise.html
+// plus récent. La CI publie la dernière version sur la branche « latest », que raw.githubusercontent.com
+// permet de lire depuis une page (les pièces jointes des releases, elles, ne le permettent pas).
+var UPDATE_URL = 'https://raw.githubusercontent.com/PhotonRing/Ardoise/latest/ardoise.html';
+function versionOf(html) { var m = String(html).match(/<meta name="generator" content="Ardoise ([\d.]+)"/); return m ? m[1] : ''; }
+function myVersion() { var m = $('meta[name=generator]'); return m ? m.getAttribute('content').replace(/^Ardoise\s*/, '') : ''; }
+function newerThan(a, b) {
+  a = String(a).split('.'); b = String(b).split('.');
+  for (var i = 0; i < 3; i++) { var x = +a[i] || 0, y = +b[i] || 0; if (x !== y) return x > y; }
+  return false;
+}
+function isArdoiseFile(html) { return /<script id="ardoise-app"/.test(html) && /<script id="ardoise-doc"/.test(html); }
+function graftFile(tpl, cur) {
+  // reprend du fichier actuel : attributs de <html>, titre, données (#ardoise-doc) et rendu pour la lecture sans script (#app)
+  [/<html[^>]*>/i, /<title>[\s\S]*?<\/title>/i, /<script id="ardoise-doc"[^>]*>[\s\S]*?<\/script>/, /<div id="app">[\s\S]*?(?=<script id="ardoise-geo")/].forEach(function (re) {
+    var m = cur.match(re); if (m && re.test(tpl)) tpl = tpl.replace(re, function () { return m[0]; });
+  });
+  return tpl;
+}
+function openUpdate() {
+  if (doc.lock && !unlocked) { toast('Déverrouillez l’édition pour mettre à jour l’éditeur'); return; }
+  var cur = myVersion(), latest = null;
+  var m = modal('Mettre à jour Ardoise', '<p>Ce document utilise <b>Ardoise ' + esc(cur || '?') + '</b>. La mise à jour remplace l’éditeur qu’il embarque par une version plus récente ; le contenu, le mot de passe et le chiffrement sont conservés.</p>' +
+    '<p class="muted" id="upd-st">Recherche de la dernière version…</p><input type="file" accept=".html,.htm,text/html" hidden>', [
+    { label: 'Fermer' },
+    { label: 'Choisir un fichier…', fn: function (bg) { $('input[type=file]', bg).click(); return false; } },
+    { label: 'Mettre à jour', primary: true, fn: function () { if (!latest) return false; applyUpdate(latest); } }
+  ]);
+  var st = $('#upd-st', m), go = $('[data-m="2"]', m); go.disabled = true;
+  function offer(html, from) {
+    var v = versionOf(html);
+    latest = html; go.disabled = false;
+    st.innerHTML = from + ' : Ardoise <b>' + esc(v || '?') + '</b>' + (v && !newerThan(v, cur) ? ' (pas plus récente que celle de ce document)' : '') + '.';
+  }
+  fetch(UPDATE_URL, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }).then(function (html) {
+    if (latest) return;
+    if (!isArdoiseFile(html) || !versionOf(html)) throw new Error('fichier inattendu');
+    if (newerThan(versionOf(html), cur)) offer(html, 'Disponible');
+    else st.textContent = 'Ce document est à jour (dernière version publiée : ' + versionOf(html) + ').';
+  }).catch(function (e) {
+    if (!latest) st.textContent = 'Impossible de joindre GitHub (' + (e && e.message || e) + '). Vous pouvez choisir un fichier ardoise.html téléchargé depuis les releases.';
+  });
+  $('input[type=file]', m).addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    f.text().then(function (html) { if (isArdoiseFile(html)) offer(html, 'Fichier choisi'); else st.textContent = 'Ce fichier n’est pas un fichier Ardoise.'; });
+  });
+}
+function applyUpdate(tpl) {
+  if (htimer) snapshot();
+  clearTimeout(saveTimer);
+  var target = fileHandle ? perm(fileHandle, true).then(function (ok) { return ok ? fileHandle : null; })
+    : (window.showSaveFilePicker && !downloadMode ? pickNew().catch(function (e) { return e && e.name === 'AbortError' ? false : null; }) : Promise.resolve(null));
+  return target.then(function (h) {
+    if (h === false) return;
+    return serializeFile().then(function (curFile) {
+      var html = graftFile(tpl, curFile);
+      if (!h) { download(html, fileName()); afterSave(); toast('Document mis à jour téléchargé : remplacez l’ancien fichier par celui-ci, puis rouvrez-le', 6000); return; }
+      fileHandle = h;
+      return writeTo(h, html).then(function () { return putHandle(h); }).then(function () {
+        afterSave(); toast('Ardoise ' + versionOf(html) + ' installée · rechargement…');
+        // dans Obsidian, le plugin recharge lui-même le document mis à jour
+        if (!window.ardoiseHost) setTimeout(function () { location.reload(); }, 800);
+      });
+    });
+  }).catch(saveFailed);
+}
 window.addEventListener('beforeunload', function (e) {
   if (dirty) { saveDraft(); e.preventDefault(); e.returnValue = ''; }
 });

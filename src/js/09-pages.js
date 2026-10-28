@@ -11,6 +11,7 @@ function goPage(i, keepScroll) {
 }
 function addPage(after) {
   var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('p', {})] }, at = after == null ? doc.pages.length : after + 1;
+  if (doc.pages[at] && doc.pages[at].sub) pg.sub = true;   // insérée au milieu d'un groupe : sous-page elle aussi
   change(function () { doc.pages.splice(at, 0, pg); doc.cur = at; });
   scrollTo(0, 0); pageHash(at); renamePage(at);
 }
@@ -29,6 +30,14 @@ function delPage(i) {
 function movePage(i, d) {
   var j = i + d; if (j < 0 || j >= doc.pages.length) return;
   change(function () { var p = doc.pages.splice(i, 1)[0]; doc.pages.splice(j, 0, p); doc.cur = j; }); pageHash(j);
+}
+function toggleSub(i) {
+  if (i < 1) return;
+  change(function () { var pg = doc.pages[i]; if (pg.sub) delete pg.sub; else pg.sub = true; navFold[doc.pages[pageParent(doc.pages, i)].id] = true; });
+}
+function goPageId(id) {
+  for (var i = 0; i < doc.pages.length; i++) if (doc.pages[i].id === id) { goPage(i); return; }
+  toast('Page introuvable : elle a sans doute été supprimée');
 }
 function renamePage(i) {
   // champ de saisie à la place du nom de la page (onglet ou sommaire)
@@ -52,18 +61,25 @@ function openPageMenu(anchor, i) {
   var p = document.createElement('div'); p.className = 'pop'; pop = p;
   var n = doc.pages.length;
   function mi(k, ic, label, dis) { return '<button class="mi" type="button" data-pa="' + k + '"' + (dis ? ' disabled style="opacity:.4"' : '') + '><span class="ic">' + ic + '</span><span>' + label + '</span></button>'; }
+  var sub = i > 0 && doc.pages[i].sub;
   p.innerHTML = '<h4>' + esc(pageTitle(doc.pages[i], i)) + '</h4>' + mi('ren', '✎', 'Renommer') + mi('add', '+', 'Nouvelle page après') + mi('dup', '⧉', 'Dupliquer la page') +
+    mi('sub', sub ? '↰' : '↳', sub ? 'Remonter au premier niveau' : 'Mettre en sous-page de « ' + esc(pageTitle(doc.pages[pageParent(doc.pages, Math.max(0, i - 1))], pageParent(doc.pages, Math.max(0, i - 1)))) + ' »', i === 0) +
     mi('up', '←', 'Déplacer avant', i === 0) + mi('down', '→', 'Déplacer après', i === n - 1) + '<div class="hr"></div>' + mi('del', '✕', 'Supprimer la page', n < 2);
   p.addEventListener('click', function (e) {
     var b = e.target.closest('[data-pa]'); if (!b || b.disabled) return; closePop();
     var k = b.dataset.pa;
     if (k === 'ren') renamePage(i); else if (k === 'add') addPage(i); else if (k === 'dup') dupPage(i);
+    else if (k === 'sub') toggleSub(i);
     else if (k === 'up') movePage(i, -1); else if (k === 'down') movePage(i, 1); else if (k === 'del') delPage(i);
   });
   placePop(p, anchor);
 }
 app.addEventListener('click', function (e) {
   var t = e.target;
+  var lk = t.closest('a[href^="#pg-"]');
+  if (lk && (mode === 'view' || e.ctrlKey || e.metaKey)) { e.preventDefault(); goPageId(lk.getAttribute('href').slice(4)); return; }
+  var fb = t.closest('[data-pgfold]');
+  if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = tocFold(fb); return; }
   var pg = t.closest('[data-pg]'); if (pg && !t.closest('.pnav-in')) { e.preventDefault(); goPage(+pg.dataset.pg); return; }
   if (t.closest('[data-pgadd]') && mode === 'edit') { addPage(doc.cur); return; }
   var pm = t.closest('[data-pgm]'); if (pm && mode === 'edit') { openPageMenu(pm, +pm.dataset.pgm); return; }

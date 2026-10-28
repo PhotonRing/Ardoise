@@ -4,6 +4,8 @@
 
 > Ardoise est inspirée de [**Bento**](https://github.com/nyblnet/bento) (nyblnet), « la suite bureautique qui tient dans un fichier » : même idée d'un document HTML autonome qui embarque son propre éditeur et s'enregistre lui-même, et même organisation du dépôt — des sources lisibles, assemblées en un fichier unique au moment de la release. Ardoise ne contient pas de code de Bento.
 
+![La visite guidée intégrée, en mode lecture](docs/visite-guidee.png)
+
 ## Télécharger et utiliser
 
 1. Récupérez `ardoise.html` dans la [dernière release](../../releases/latest).
@@ -17,9 +19,12 @@
 - **Code** : trois styles (sombre, boîte avec nom de fichier et numéros de ligne, commande), coloration Bash, Python, PowerShell, JavaScript, JSON, YAML, SQL, HTML, C/Java/Go/Rust, détectée automatiquement.
 - **Chronologies** verticales ou horizontales (titres inclinés), styles et libellés des liens, bulles de description.
 - **Cartes géographiques** : fond simplifié intégré utilisable hors ligne, plan et satellite en ligne ; points, zones, cercles, itinéraires avec distances (km et milles nautiques), étiquettes déplaçables.
-- **Plusieurs pages** par document, avec sommaire à gauche ou onglets selon la place disponible.
+- **Plusieurs pages** par document, avec sommaire à gauche ou onglets selon la place disponible. Une page peut être rangée en **sous-page** de la précédente (menu ⋯ de la page) : groupes repliables dans le sommaire, seconde rangée d'onglets sur petit écran.
+- **Liens entre pages** : `Ctrl+K` (ou « Lien » sur la sélection) propose une adresse web ou une autre page du document ; le lien suit la page si elle est renommée ou déplacée.
+- **En-tête** : surtitre et chapeau s'affichent ou se masquent indépendamment (le texte masqué est conservé).
 - **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
 - **Export en page statique** (lecture seule, non chiffrée), **import / export JSON** (pour faire rédiger une page par une IA).
+- **Mise à jour de l'éditeur** : chaque document embarque l'éditeur de la version qui l'a créé. *Fichier → Mettre à jour Ardoise* le remplace par la dernière version publiée (ou par un `ardoise.html` choisi sur le disque) en conservant le contenu, le mot de passe et le chiffrement.
 
 ## Plugin Obsidian
 
@@ -28,6 +33,7 @@ Le plugin **Ardoise pour Obsidian** ouvre les documents Ardoise du coffre dans u
 - **Installation** : dans la [dernière release](../../releases/latest), récupérez `main.js`, `manifest.json` et `styles.css` (ou `ardoise-obsidian.zip`) et placez-les dans `<coffre>/.obsidian/plugins/ardoise/`, puis activez « Ardoise » dans *Paramètres → Plugins communautaires*.
 - **Ouvrir** : un clic sur un fichier `.html` du coffre l'ouvre dans Ardoise (menu contextuel « Ouvrir dans Ardoise » et commande « Ouvrir le fichier courant dans Ardoise » si un autre plugin gère déjà les `.html`). Les autres fichiers HTML s'affichent en aperçu, en lecture seule.
 - **Créer** : icône du ruban, commande « Ardoise : Nouveau document » ou « Nouveau document Ardoise » dans le menu d'un dossier.
+- **Mettre à jour** : un document créé avec une version plus ancienne que le plugin affiche un bandeau « Mettre à jour » (sans réseau ni mot de passe : seul l'éditeur embarqué est remplacé).
 - Le document s'exécute dans une iframe isolée (sans accès à Obsidian ni au coffre) et ne communique avec le plugin que pour enregistrer. Le plugin fonctionne aussi avec les documents créés par des versions antérieures d'Ardoise, qui embarquent leur propre éditeur.
 - Dans Obsidian, les brouillons de secours du navigateur (`localStorage`) ne sont pas disponibles : l'auto-save, actif par défaut, écrit dans le coffre environ une seconde après chaque modification, et les modifications en attente sont enregistrées à la fermeture de l'onglet.
 
@@ -63,7 +69,8 @@ Node.js 18 ou plus récent, aucune dépendance à installer.
 Les releases ne se font pas à la main : le workflow [`release.yml`](.github/workflows/release.yml) s'en charge.
 
 - À chaque push sur `main`, il assemble et vérifie `dist/ardoise.html`.
-- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et les fichiers du plugin Obsidian en pièces jointes et des notes générées à partir des commits.
+- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et les fichiers du plugin Obsidian en pièces jointes et des notes générées à partir des commits ; il publie aussi `ardoise.html` sur la branche `latest`, d'où les documents se mettent à jour (les pièces jointes des releases ne peuvent pas être téléchargées depuis une page web).
+- Une fois la release publiée, il supprime les branches dont la pull request a été fusionnée dans `main` (sauf si elles ont reçu des commits depuis la fusion).
 - Pour publier une nouvelle version : augmentez `version` dans `package.json` et poussez sur `main`.
 
 Le workflow [`ci.yml`](.github/workflows/ci.yml) assemble et vérifie le fichier sur les pull requests et les autres branches, et le met à disposition comme artefact.
