@@ -1,11 +1,17 @@
 name: Release
 
 # À chaque push sur main : assemble dist/ardoise.html, puis, si la version de package.json
-# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec ardoise.html et le plugin Obsidian en pièces jointes.
+# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec ardoise.html et le plugin Obsidian (zip) en pièces jointes.
+# Lancé à la main avec un tag (ex. v1.3.0) : reconstruit ce tag et remplace les fichiers joints de sa release.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Republier les fichiers d'une release existante (ex. v1.3.0) ; laisser vide pour une release normale"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -22,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -37,7 +44,24 @@ jobs:
         id: version
         run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Préparer le zip du plugin Obsidian
+        run: (cd dist/obsidian && zip -q ../ardoise-obsidian.zip main.js manifest.json styles.css)
+
+      - name: Republier les fichiers de la release ${{ inputs.tag }}
+        if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release upload "$TAG" dist/ardoise.html dist/ardoise-obsidian.zip --clobber
+          # retire les autres fichiers joints (anciennes versions qui joignaient aussi le contenu du zip)
+          gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r name; do
+            case "$name" in ardoise.html|ardoise-obsidian.zip) ;; *) gh release delete-asset "$TAG" "$name" --yes && echo "Retiré : $name" ;; esac
+          done
+
       - name: Créer le tag et la release si la version est nouvelle
+        if: inputs.tag == ''
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,9 +71,7 @@ jobs:
             echo "Le tag $TAG existe déjà : pas de nouvelle release (augmentez la version dans package.json)."
             exit 0
           fi
-          (cd dist/obsidian && zip -q ../ardoise-obsidian.zip main.js manifest.json styles.css)
-          gh release create "$TAG" dist/ardoise.html \
-            dist/obsidian/main.js dist/obsidian/manifest.json dist/obsidian/styles.css dist/ardoise-obsidian.zip \
+          gh release create "$TAG" dist/ardoise.html dist/ardoise-obsidian.zip \
             --target "$GITHUB_SHA" \
             --title "Ardoise $TAG" \
             --generate-notes
