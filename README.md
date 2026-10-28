@@ -68,6 +68,7 @@ Les releases ne se font pas à la main : le workflow [`release.yml`](.github/wor
 
 - À chaque push sur `main`, il assemble et vérifie `dist/ardoise.html`.
 - Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et les fichiers du plugin Obsidian en pièces jointes et des notes générées à partir des commits ; il publie aussi `ardoise.html` sur la branche `latest`, d'où les documents se mettent à jour (les pièces jointes des releases ne peuvent pas être téléchargées depuis une page web).
+- Une fois la release publiée, il supprime les branches dont la pull request a été fusionnée dans `main` (sauf si elles ont reçu des commits depuis la fusion).
 - Pour publier une nouvelle version : augmentez `version` dans `package.json` et poussez sur `main`.
 
 Le workflow [`ci.yml`](.github/workflows/ci.yml) assemble et vérifie le fichier sur les pull requests et les autres branches, et le met à disposition comme artefact.

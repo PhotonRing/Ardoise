@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: release
@@ -37,6 +38,7 @@ jobs:
         run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Créer le tag et la release si la version est nouvelle
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -59,3 +61,25 @@ jobs:
           git -C "$latest" add ardoise.html
           git -C "$latest" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Ardoise $TAG"
           git -C "$latest" push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" latest
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      # Après une release : supprime les branches dont la pull request a été fusionnée dans main.
+      # Les fusions se font en squash (git ne voit pas ces branches comme fusionnées) : on part donc des
+      # pull requests fusionnées, et une branche n'est supprimée que si elle n'a pas bougé depuis la fusion.
+      - name: Supprimer les branches fusionnées
+        if: steps.release.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh pr list --state merged --base main --limit 300 --json headRefName,headRefOid,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository | not) | "\(.headRefName) \(.headRefOid)"' | sort -u |
+          while read -r branch sha; do
+            case "$branch" in main|latest) continue ;; esac
+            head=$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq .object.sha 2>/dev/null) || continue
+            if [ "$head" = "$sha" ]; then
+              gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch" && echo "Supprimée : $branch"
+            else
+              echo "Conservée (nouveaux commits depuis la fusion) : $branch"
+            fi
+          done
