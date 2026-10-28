@@ -1,7 +1,7 @@
 name: Release
 
 # À chaque push sur main : assemble dist/ardoise.html, puis, si la version de package.json
-# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec le fichier en pièce jointe.
+# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec ardoise.html et le plugin Obsidian en pièces jointes.
 on:
   push:
     branches: [main]
@@ -45,7 +45,9 @@ jobs:
             echo "Le tag $TAG existe déjà : pas de nouvelle release (augmentez la version dans package.json)."
             exit 0
           fi
+          (cd dist/obsidian && zip -q ../ardoise-obsidian.zip main.js manifest.json styles.css)
           gh release create "$TAG" dist/ardoise.html \
+            dist/obsidian/main.js dist/obsidian/manifest.json dist/obsidian/styles.css dist/ardoise-obsidian.zip \
             --target "$GITHUB_SHA" \
             --title "Ardoise $TAG" \
             --generate-notes

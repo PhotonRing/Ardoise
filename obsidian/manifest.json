@@ -1,0 +1,10 @@
+{
+  "id": "ardoise",
+  "name": "Ardoise",
+  "version": "{{version}}",
+  "minAppVersion": "1.4.0",
+  "description": "Ouvre et modifie les documents Ardoise (.html) dans Obsidian ; les modifications sont enregistrées dans le coffre.",
+  "author": "PhotonRing",
+  "authorUrl": "https://github.com/photonring/ardoise",
+  "isDesktopOnly": false
+}
