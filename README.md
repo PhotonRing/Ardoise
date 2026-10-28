@@ -21,6 +21,16 @@
 - **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
 - **Export en page statique** (lecture seule, non chiffrée), **import / export JSON** (pour faire rédiger une page par une IA).
 
+## Plugin Obsidian
+
+Le plugin **Ardoise pour Obsidian** ouvre les documents Ardoise du coffre dans un onglet d'Obsidian : lecture, édition, `Ctrl+S` et auto-save fonctionnent comme dans le navigateur, mais l'enregistrement va directement dans le fichier du coffre, sans boîte de dialogue.
+
+- **Installation** : dans la [dernière release](../../releases/latest), récupérez `main.js`, `manifest.json` et `styles.css` (ou `ardoise-obsidian.zip`) et placez-les dans `<coffre>/.obsidian/plugins/ardoise/`, puis activez « Ardoise » dans *Paramètres → Plugins communautaires*.
+- **Ouvrir** : un clic sur un fichier `.html` du coffre l'ouvre dans Ardoise (menu contextuel « Ouvrir dans Ardoise » et commande « Ouvrir le fichier courant dans Ardoise » si un autre plugin gère déjà les `.html`). Les autres fichiers HTML s'affichent en aperçu, en lecture seule.
+- **Créer** : icône du ruban, commande « Ardoise : Nouveau document » ou « Nouveau document Ardoise » dans le menu d'un dossier.
+- Le document s'exécute dans une iframe isolée (sans accès à Obsidian ni au coffre) et ne communique avec le plugin que pour enregistrer. Le plugin fonctionne aussi avec les documents créés par des versions antérieures d'Ardoise, qui embarquent leur propre éditeur.
+- Dans Obsidian, les brouillons de secours du navigateur (`localStorage`) ne sont pas disponibles : l'auto-save, actif par défaut, écrit dans le coffre environ une seconde après chaque modification, et les modifications en attente sont enregistrées à la fermeture de l'onglet.
+
 ## Organisation du dépôt
 
 ```
@@ -30,7 +40,8 @@ src/
   css/editor.css    styles de l'éditeur
   js/NN-*.js        code de l'application, concaténé dans l'ordre des numéros
   data/geo.json     fond de carte simplifié, villes et ports (généré, voir plus bas)
-build.mjs           assemble src/ en dist/ardoise.html (Node.js, sans dépendance)
+obsidian/           plugin Obsidian (main.js, manifest.json, styles.css)
+build.mjs           assemble src/ en dist/ardoise.html et le plugin dans dist/obsidian/ (Node.js, sans dépendance)
 scripts/check.mjs   vérifications du fichier assemblé
 scripts/geo/        génération de src/data/geo.json depuis Natural Earth
 .github/workflows/  CI et publication des releases
@@ -41,7 +52,7 @@ Le code JavaScript est un seul module découpé en fichiers par thème (rendu, s
 ## Assembler localement
 
 ```bash
-node build.mjs          # → dist/ardoise.html
+node build.mjs          # → dist/ardoise.html et dist/obsidian/
 node scripts/check.mjs  # vérifie la syntaxe et la structure du fichier produit
 ```
 
@@ -52,7 +63,7 @@ Node.js 18 ou plus récent, aucune dépendance à installer.
 Les releases ne se font pas à la main : le workflow [`release.yml`](.github/workflows/release.yml) s'en charge.
 
 - À chaque push sur `main`, il assemble et vérifie `dist/ardoise.html`.
-- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` en pièce jointe et des notes générées à partir des commits.
+- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et les fichiers du plugin Obsidian en pièces jointes et des notes générées à partir des commits.
 - Pour publier une nouvelle version : augmentez `version` dans `package.json` et poussez sur `main`.
 
 Le workflow [`ci.yml`](.github/workflows/ci.yml) assemble et vérifie le fichier sur les pull requests et les autres branches, et le met à disposition comme artefact.

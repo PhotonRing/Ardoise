@@ -21,3 +21,7 @@ jobs:
         with:
           name: ardoise-html
           path: dist/ardoise.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ardoise-obsidian
+          path: dist/obsidian/

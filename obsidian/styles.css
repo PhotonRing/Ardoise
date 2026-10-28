@@ -1,0 +1,18 @@
+.workspace-leaf-content[data-type="ardoise"] .view-content.ardoise-view {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ardoise-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+.ardoise-note {
+  padding: 6px 12px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
