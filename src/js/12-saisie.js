@@ -12,6 +12,10 @@ app.addEventListener('input', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img')) el.innerHTML = '';
   var bl = byId(el.dataset.b); if (!bl) return;
+  if (bl.type === 'p' && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
+    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
+    slashMenu(el, bl); el.innerHTML = ''; return;
+  }
   setPath(bl, el.dataset.k, fieldValue(el));
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
@@ -23,6 +27,12 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header') refreshDerivedSoon();
   markDirty();
+});
+// annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
+// d'Ardoise, sinon les deux mécanismes se mélangent et le texte se défait lettre par lettre ou se duplique
+app.addEventListener('beforeinput', function (e) {
+  if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
+  e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
 app.addEventListener('change', function (e) {
   var el = e.target;
@@ -101,7 +111,7 @@ app.addEventListener('keydown', function (e) {
       insertAt(idx(b) + 1, 'p', { html: tail }); return;
     }
     if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'step'].indexOf(b.type) >= 0) {
-      if (b.type === 'header' && k !== 'lede') { nextField(el, 1); return; }
+      if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
       insertAt(idx(b) + 1, 'p', {}); return;
     }
     nextField(el, 1); return;
@@ -124,10 +134,7 @@ app.addEventListener('keydown', function (e) {
       }
     }
   }
-  if (e.key === '/' && b.type === 'p' && el.textContent === '') {
-    e.preventDefault(); openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); });
-    return;
-  }
+  if (e.key === '/' && b.type === 'p' && el.textContent === '') { e.preventDefault(); slashMenu(el, b); return; }
   if (e.key === 'Tab' && el.hasAttribute('data-cell')) { e.preventDefault(); nextField(el, e.shiftKey ? -1 : 1); return; }
   if (e.key === 'ArrowUp' && caretAtStart(el) && !e.shiftKey) { e.preventDefault(); nextField(el, -1); return; }
   if (e.key === 'ArrowDown' && caretAtEnd(el) && !e.shiftKey) { e.preventDefault(); nextField(el, 1); return; }
@@ -138,6 +145,7 @@ app.addEventListener('keydown', function (e) {
     else if (e.key === '`' || kk === 'j') { e.preventDefault(); inlineAction('code'); }
   }
 });
+function slashMenu(el, b) { openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
 function splitItem(b, k, el) {
   var lp = listParts(k), arr = getPath(b, lp.base);
