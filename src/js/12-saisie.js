@@ -12,6 +12,10 @@ app.addEventListener('input', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img')) el.innerHTML = '';
   var bl = byId(el.dataset.b); if (!bl) return;
+  if (bl.type === 'p' && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
+    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
+    slashMenu(el, bl); el.innerHTML = ''; return;
+  }
   setPath(bl, el.dataset.k, fieldValue(el));
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
@@ -130,10 +134,7 @@ app.addEventListener('keydown', function (e) {
       }
     }
   }
-  if (e.key === '/' && b.type === 'p' && el.textContent === '') {
-    e.preventDefault(); openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); });
-    return;
-  }
+  if (e.key === '/' && b.type === 'p' && el.textContent === '') { e.preventDefault(); slashMenu(el, b); return; }
   if (e.key === 'Tab' && el.hasAttribute('data-cell')) { e.preventDefault(); nextField(el, e.shiftKey ? -1 : 1); return; }
   if (e.key === 'ArrowUp' && caretAtStart(el) && !e.shiftKey) { e.preventDefault(); nextField(el, -1); return; }
   if (e.key === 'ArrowDown' && caretAtEnd(el) && !e.shiftKey) { e.preventDefault(); nextField(el, 1); return; }
@@ -144,6 +145,7 @@ app.addEventListener('keydown', function (e) {
     else if (e.key === '`' || kk === 'j') { e.preventDefault(); inlineAction('code'); }
   }
 });
+function slashMenu(el, b) { openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
 function splitItem(b, k, el) {
   var lp = listParts(k), arr = getPath(b, lp.base);
