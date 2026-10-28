@@ -27,3 +27,13 @@ const html = src('index.html').replace(/\{\{([\w./-]+)\}\}/g, (m, k) => {
 mkdirSync(join(root, 'dist'), { recursive: true });
 writeFileSync(join(root, 'dist', 'ardoise.html'), html);
 console.log(`dist/ardoise.html — Ardoise ${version} — ${(html.length / 1024).toFixed(0)} Ko, ${jsFiles.length} fichiers JS`);
+
+// Plugin Obsidian : dist/obsidian/{main.js, manifest.json, styles.css}, avec le document vierge embarqué
+const obs = (p) => readFileSync(join(root, 'obsidian', p), 'utf8');
+const plugin = obs('main.js');
+if (!plugin.includes('__ARDOISE_TEMPLATE__')) throw new Error('obsidian/main.js : marqueur __ARDOISE_TEMPLATE__ absent');
+mkdirSync(join(root, 'dist', 'obsidian'), { recursive: true });
+writeFileSync(join(root, 'dist', 'obsidian', 'main.js'), plugin.replace('__ARDOISE_TEMPLATE__', () => JSON.stringify(html)));
+writeFileSync(join(root, 'dist', 'obsidian', 'manifest.json'), obs('manifest.json').replace('{{version}}', version));
+writeFileSync(join(root, 'dist', 'obsidian', 'styles.css'), obs('styles.css'));
+console.log(`dist/obsidian/ — plugin Obsidian ${version}`);
