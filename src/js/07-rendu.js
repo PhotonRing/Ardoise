@@ -47,9 +47,9 @@ function renderBlock(b, e, num) {
   switch (b.type) {
     case 'header':
       return '<header class="b-header">' +
-        ((e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { rich: false, ph: 'Surtitre', nl: 1 }) : '') +
+        (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { rich: false, ph: 'Surtitre', nl: 1 }) : '') +
         f('h1', '', 'title', b.title, { ph: 'Titre de la page', nl: 1 }) +
-        ((e || !isBlank(b.lede)) ? f('p', 'lede', 'lede', b.lede, { ph: 'Chapeau : une ou deux phrases qui résument la page', nl: 1 }) : '') + '</header>';
+        (!b.noLede && (e || !isBlank(b.lede)) ? f('p', 'lede', 'lede', b.lede, { ph: 'Chapeau : une ou deux phrases qui résument la page', nl: 1 }) : '') + '</header>';
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
     case 'p': return f('p', '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1 });
@@ -205,6 +205,7 @@ function tog(prop, on, label, title) { return '<button type="button" data-act="t
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
 function settings(b) {
   switch (b.type) {
+    case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
     case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
     case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
@@ -255,21 +256,57 @@ function sectionsOf(pg) {
   });
   return out;
 }
+function pageParent(pages, i) { while (i > 0 && pages[i].sub) i--; return i; }   // page de premier niveau du groupe
+function pageKids(pages, g) { var out = []; for (var j = g + 1; j < pages.length && pages[j].sub; j++) out.push(j); return out; }
+var navFold = {};   // groupes de sous-pages dépliés / repliés à la main (par id de page), le temps de la session
 function navHTML(d, edit, all) {
   // all : export statique, toutes les pages sont présentes et le script bascule de l'une à l'autre
-  var pages = d.pages, cur = d.cur, w = +d.width || 820;
+  var pages = d.pages, cur = d.cur, w = +d.width || 820, curG = pageParent(pages, cur);
+  var groups = pages.map(function (pg, i) { return i; }).filter(function (i) { return i === 0 || !pages[i].sub; });
+  var anySub = groups.length < pages.length;
   var more = function (i) { return edit && i === cur ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
-  var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + pages.map(function (pg, i) {
-    return '<span class="ptab-w' + (i === cur ? ' on' : '') + '"><button type="button" class="ptab" data-pg="' + i + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pg, i)) + '</button>' + more(i) + '</span>';
-  }).join('') + (edit ? '<button type="button" class="ptab-add" data-pgadd title="Ajouter une page">+ Page</button>' : '') + '</div></nav>';
-  var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + pages.map(function (pg, i) {
-    var secs = (all || i === cur) ? sectionsOf(pg) : [];
-    return '<li class="toc-p' + (i === cur ? ' on' : '') + '"><div class="toc-pr"><button type="button" class="toc-pb" data-pg="' + i + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pg, i)) + '</button>' + more(i) + '</div>' +
+  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageParent(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
+  var tab = function (i) { return '<span class="ptab-w' + (i === cur || (i === curG && !all) ? ' on' : '') + '">' + pgBtn('ptab', i) + more(i) + '</span>'; };
+  // onglets : pages de premier niveau, puis une seconde rangée avec les sous-pages du groupe affiché
+  var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + groups.map(tab).join('') +
+    (edit ? '<button type="button" class="ptab-add" data-pgadd title="Ajouter une page">+ Page</button>' : '') + '</div>' +
+    groups.map(function (g) {
+      var kids = pageKids(pages, g); if (!kids.length || (!all && g !== curG)) return '';
+      return '<div class="tabs-sub" data-grp="' + g + '" style="max-width:' + w + 'px"' + (g === curG ? '' : ' hidden') + '>' + kids.map(tab).join('') + '</div>';
+    }).join('') + '</nav>';
+  var entry = function (i, kids) {
+    var secs = (all || i === cur) ? sectionsOf(pages[i]) : [];
+    var fold = '';
+    if (anySub && !(i && pages[i].sub)) {
+      var open = kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : i === curG);
+      fold = kids.length ? '<button type="button" class="toc-f" data-pgfold aria-expanded="' + !!open + '" title="Afficher / masquer les sous-pages">›</button>' : '<span class="toc-f"></span>';
+    }
+    return '<li class="toc-p' + (i === cur ? ' on' : '') + (i && pages[i].sub ? ' sub' : '') + (kids.length ? ' has-kids' + (open ? ' open' : '') : '') + '" data-pgi="' + i + '"><div class="toc-pr">' + fold + pgBtn('toc-pb', i) + more(i) + '</div>' +
       (secs.length ? '<ol class="toc-s">' + secs.map(function (x) {
         return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + esc(x.t) + '</span></a></li>';
-      }).join('') + '</ol>' : '') + '</li>';
-  }).join('') + '</ol>' + (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
+      }).join('') + '</ol>' : '') +
+      (kids.length ? '<ol class="toc-c">' + kids.map(function (j) { return entry(j, []); }).join('') + '</ol>' : '') + '</li>';
+  };
+  var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + groups.map(function (g) { return entry(g, pageKids(pages, g)); }).join('') + '</ol>' +
+    (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
   return tabs + side;
+}
+function tocFold(btn, open) {
+  // déplie / replie un groupe de sous-pages du sommaire (repris tel quel dans l'export statique)
+  var li = btn.closest('.toc-p'); if (open == null) open = !li.classList.contains('open');
+  li.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
+  return open;
+}
+function navReveal(keep) {
+  // garde visible la page affichée dans le sommaire (qui défile) et dans les onglets
+  var side = $('.pnav-side', app), tabs = $('.pnav-tabs .tabs-in', app), sub = $('.pnav-tabs .tabs-sub:not([hidden])', app);
+  if (keep) { if (side) side.scrollTop = keep.side; if (tabs) tabs.scrollLeft = keep.tabs; }
+  [[side, '.toc-p.on > .toc-pr', 'y'], [tabs, '.ptab-w.on', 'x'], [sub, '.ptab-w.on', 'x']].forEach(function (z) {
+    var box = z[0], el = box && $(z[1], box); if (!el || box.offsetParent === null) return;
+    var r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
+    if (z[2] === 'y' && (r.top < br.top || r.bottom > br.bottom)) box.scrollTop += r.top - br.top - br.height / 3;
+    if (z[2] === 'x' && (r.left < br.left || r.right > br.right)) box.scrollLeft += r.left - br.left - 24;
+  });
 }
 function navLayout() {
   // sommaire à gauche s'il y a la place à côté de la colonne, sinon onglets ; réglage forcé dans Style
@@ -353,6 +390,7 @@ function refreshDerived() {
 }
 function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }
 function render(focus) {
+  var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
   lastNav = navHTML(doc, mode === 'edit', false);
   app.innerHTML = lastNav + renderPage(doc, mode === 'edit');
   applyTheme();
@@ -362,6 +400,7 @@ function render(focus) {
   tlFit(app);
   renderChrome();
   updateCheat();
+  navReveal(keep);
   if (focus) focusField(focus.b, focus.k, focus.end !== false);
 }
 var panelMin = false;

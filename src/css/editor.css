@@ -212,3 +212,5 @@ button.tl-dot:hover{transform:scale(1.2)}
 .lock-card .ub{justify-content:center;height:40px;font-size:14px}
 .lock-err{min-height:1.3em;color:var(--bad);font-size:13px}
 @media print{#ui{display:none!important}html.is-edit body{padding-top:0}}
+.link-url{display:flex;gap:6px;padding:0 8px 8px;min-width:260px}
+.link-url .menu-q{flex:1;margin:0}

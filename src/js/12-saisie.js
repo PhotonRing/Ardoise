@@ -24,6 +24,12 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header') refreshDerivedSoon();
   markDirty();
 });
+// annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
+// d'Ardoise, sinon les deux mécanismes se mélangent et le texte se défait lettre par lettre ou se duplique
+app.addEventListener('beforeinput', function (e) {
+  if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
+  e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
+});
 app.addEventListener('change', function (e) {
   var el = e.target;
   if (el.matches('input[type=checkbox][data-k]')) {
@@ -101,7 +107,7 @@ app.addEventListener('keydown', function (e) {
       insertAt(idx(b) + 1, 'p', { html: tail }); return;
     }
     if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'step'].indexOf(b.type) >= 0) {
-      if (b.type === 'header' && k !== 'lede') { nextField(el, 1); return; }
+      if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
       insertAt(idx(b) + 1, 'p', {}); return;
     }
     nextField(el, 1); return;

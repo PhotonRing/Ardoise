@@ -126,6 +126,7 @@ function openFile(anchor) {
                 (isSealed() ? mi('pw-unseal', '🔓', 'Ne plus chiffrer le contenu', 'Le document redevient lisible sans mot de passe') : mi('pw-seal', '🔐', 'Chiffrer le contenu…', 'Mot de passe demandé pour ouvrir le document')) +
                 mi('pw-lock', '⏻', 'Verrouiller maintenant', 'Repasse en lecture') + mi('pw-del', '✕', 'Retirer la protection')
               : mi('pw-set', '🔒', 'Protéger par mot de passe…', 'Édition protégée, contenu chiffré en option')) +
+    '<div class="hr"></div>' + mi('update', '⟳', 'Mettre à jour Ardoise…', 'Version ' + (myVersion() || '?') + ' · garde le contenu') +
     mi('help', '⌨', 'Raccourcis clavier');
   function mi(k, ic, label, sub, kbd) { return '<button class="mi" type="button" data-f="' + k + '"><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (kbd ? '<kbd>' + kbd + '</kbd>' : '') + '</button>'; }
   p.addEventListener('click', function (e) {
@@ -138,6 +139,7 @@ function openFile(anchor) {
     else if (k === 'json-copy') copyJSON();
     else if (k === 'json-import') importJSON();
     else if (k === 'help') showHelp();
+    else if (k === 'update') openUpdate();
     else if (k === 'pw-set') setPassword();
     else if (k === 'pw-del') removePassword();
     else if (k === 'pw-seal') sealExisting();
@@ -196,8 +198,40 @@ function inlineAction(kind) {
     fire(fld); return;
   }
   if (s.isCollapsed) return;
-  var href = null;
-  if (tag === 'a') { href = prompt('Adresse du lien :', 'https://'); if (!href || href === 'https://') return; if (!/^(https?:|mailto:|#)/i.test(href)) href = 'https://' + href; }
+  if (tag === 'a') { openLinkPop(r.cloneRange(), fld); return; }
+  wrapInline(tag, cls, null, fld);
+}
+function openLinkPop(range, fld) {
+  // lien vers une adresse, ou vers une autre page du document (#pg-<id> : suit la page si elle est déplacée ou renommée)
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop'; pop = p;
+  p.innerHTML = '<h4>Lien vers une adresse</h4><div class="link-url"><input class="menu-q" data-url placeholder="https://…" spellcheck="false" autocomplete="off" inputmode="url"><button class="ub primary" type="button" data-url-ok>OK</button></div>' +
+    (doc.pages.length > 1 ? '<div class="hr"></div><h4>Lien vers une page</h4><div class="menu-list">' + doc.pages.map(function (pg, i) {
+      return i === doc.cur ? '' : '<button class="mi" type="button" data-pid="' + esc(pg.id) + '"><span class="ic">' + (i && pg.sub ? '↳' : '▤') + '</span><span>' + esc(pageTitle(pg, i)) + '</span></button>';
+    }).join('') + '</div>' : '');
+  var url = $('[data-url]', p);
+  function apply(href) {
+    popClose = null; closePop();
+    fld.focus({ preventScroll: true }); var s = getSelection(); s.removeAllRanges(); s.addRange(range);
+    wrapInline('a', '', href, fld);
+  }
+  function applyUrl() {
+    var h = url.value.trim(); if (!h) return;
+    if (!/^(https?:|mailto:|#)/i.test(h)) h = (/^[^\s@]+@[^\s@]+$/.test(h) ? 'mailto:' : 'https://') + h;
+    apply(h);
+  }
+  url.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyUrl(); } });
+  p.addEventListener('click', function (e) {
+    if (e.target.closest('[data-url-ok]')) { applyUrl(); return; }
+    var b = e.target.closest('[data-pid]'); if (b) apply('#pg-' + b.dataset.pid);
+  });
+  placePop(p, itb.style.display !== 'none' ? itb : fld);
+  popClose = function () { fld.focus({ preventScroll: true }); var s = getSelection(); s.removeAllRanges(); s.addRange(range); };
+  url.focus();
+}
+function wrapInline(tag, cls, href, fld) {
+  var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
+  var r = s.getRangeAt(0);
   var el = document.createElement(tag); if (cls) el.className = cls; if (href) el.setAttribute('href', href);
   el.appendChild(r.extractContents());
   $$(tag === 'span' ? 'span.pill,span.alert' : tag, el).forEach(unwrap);

@@ -21,7 +21,12 @@ function normalize(d) {
   var out = { v: VERSION, id: d.id || uid() + uid(), title: d.title || '', palette: (d.palette === 'ardoise' ? 'graphite' : d.palette) || 'ambre', typo: d.typo || 'display',
     width: +d.width || 820, theme: d.theme || 'auto', savedAt: d.savedAt || null, nav: d.nav || 'auto', pages: [] };
   var src = Array.isArray(d.pages) ? d.pages : [{ title: d.pageTitle || '', blocks: d.blocks }];
-  src.forEach(function (pg) { if (pg && Array.isArray(pg.blocks)) out.pages.push({ id: pg.id || uid(), title: String(pg.title || ''), blocks: normBlocks(pg.blocks) }); });
+  src.forEach(function (pg) {
+    if (!pg || !Array.isArray(pg.blocks)) return;
+    var np = { id: pg.id || uid(), title: String(pg.title || ''), blocks: normBlocks(pg.blocks) };
+    if (pg.sub && out.pages.length) np.sub = true;   // sous-page de la page de premier niveau qui la précède
+    out.pages.push(np);
+  });
   if (!out.pages.length) out.pages.push({ id: uid(), title: '', blocks: [] });
   attach(out);
   if (d.mapKey) out.mapKey = String(d.mapKey);

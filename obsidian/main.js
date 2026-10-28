@@ -8,6 +8,21 @@ const VIEW_TYPE = 'ardoise';
 const TEMPLATE = __ARDOISE_TEMPLATE__;   // dist/ardoise.html (document vierge)
 
 const isArdoise = (html) => /<script id="ardoise-app"/.test(html);
+const versionOf = (html) => { const m = String(html).match(/<meta name="generator" content="Ardoise ([\d.]+)"/); return m ? m[1] : ''; };
+const newerThan = (a, b) => {
+  a = String(a).split('.'); b = String(b).split('.');
+  for (let i = 0; i < 3; i++) { const x = +a[i] || 0, y = +b[i] || 0; if (x !== y) return x > y; }
+  return false;
+};
+const LATEST = versionOf(TEMPLATE);
+// Même greffe que dans Ardoise (src/js/20-enregistrement.js) : l'éditeur du modèle, le contenu du document.
+// Les données restent telles quelles, chiffrées ou non : pas besoin du mot de passe.
+function graftFile(tpl, cur) {
+  [/<html[^>]*>/i, /<title>[\s\S]*?<\/title>/i, /<script id="ardoise-doc"[^>]*>[\s\S]*?<\/script>/, /<div id="app">[\s\S]*?(?=<script id="ardoise-geo")/].forEach((re) => {
+    const m = cur.match(re); if (m && re.test(tpl)) tpl = tpl.replace(re, () => m[0]);
+  });
+  return tpl;
+}
 
 /* Script injecté dans le document, exécuté avant Ardoise dans l'iframe isolée.
    Ardoise enregistre avec l'API File System Access : on lui fournit une « poignée de fichier »
@@ -47,6 +62,7 @@ function hostShim(name) {
     }
   };
   window.showSaveFilePicker = function () { return Promise.resolve(handle); };
+  window.ardoiseHost = { app: 'obsidian' };
   var later = function (fn) { setTimeout(fn, 0); };
   var db = {
     transaction: function () {
@@ -82,6 +98,12 @@ class ArdoiseView extends TextFileView {
     // Pas de « allow-same-origin » : le document ne peut atteindre ni Obsidian ni le coffre,
     // il ne communique qu'avec la vue, par messages.
     if (isArdoise(data)) {
+      const v = versionOf(data);
+      if (v && newerThan(LATEST, v)) {
+        const bar = this.contentEl.createDiv({ cls: 'ardoise-note ardoise-update' });
+        bar.createSpan({ text: `Ce document utilise Ardoise ${v}. ` });
+        bar.createEl('button', { text: `Mettre à jour vers ${LATEST}`, cls: 'mod-cta' }).addEventListener('click', () => this.update());
+      }
       frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-forms allow-downloads');
       const shim = '<script id="ardoise-host">(' + hostShim.toString() + ')(' + JSON.stringify(this.file ? this.file.name : 'page.html').replace(/</g, '\\u003c') + ');<\/script>';
       frame.srcdoc = /<body[^>]*>/i.test(data) ? data.replace(/<body[^>]*>/i, (m) => m + shim) : shim + data;
@@ -99,9 +121,14 @@ class ArdoiseView extends TextFileView {
     if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data || !e.data.ardoise) return;
     const d = e.data;
     if (d.type === 'save' && typeof d.payload === 'string') {
+      const before = versionOf(this.data);
       this.data = d.payload;
       Promise.resolve(this.save(false)).then(
-        () => this.reply(d.id, true),
+        () => {
+          this.reply(d.id, true);
+          // le document vient de remplacer son éditeur (Fichier → Mettre à jour Ardoise) : on le recharge
+          if (versionOf(d.payload) !== before) this.setViewData(d.payload, false);
+        },
         (err) => { new Notice('Ardoise : enregistrement impossible — ' + (err && err.message || err)); this.reply(d.id, false, String(err && err.message || err)); }
       );
     } else if (d.type === 'flushed' && this.flushes[d.id]) {
@@ -110,6 +137,14 @@ class ArdoiseView extends TextFileView {
   }
   reply(id, ok, error) {
     if (this.iframe && this.iframe.contentWindow) this.iframe.contentWindow.postMessage({ ardoise: true, type: 'reply', id: id, ok: ok, error: error }, '*');
+  }
+  async update() {
+    await this.flush();
+    const html = graftFile(TEMPLATE, this.data);
+    this.data = html;
+    await this.save(false);
+    this.setViewData(html, false);
+    new Notice(`Ardoise ${LATEST} : document mis à jour`);
   }
   // Avant de quitter le fichier : laisse au document le temps d'écrire ses dernières modifications
   flush() {

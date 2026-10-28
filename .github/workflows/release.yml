@@ -51,3 +51,11 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Ardoise $TAG" \
             --generate-notes
+
+          # Dernière version lisible depuis une page (raw.githubusercontent.com) : Fichier → Mettre à jour Ardoise
+          latest="$RUNNER_TEMP/latest"
+          mkdir -p "$latest" && cp dist/ardoise.html "$latest/"
+          git -C "$latest" init -q -b latest
+          git -C "$latest" add ardoise.html
+          git -C "$latest" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Ardoise $TAG"
+          git -C "$latest" push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" latest
