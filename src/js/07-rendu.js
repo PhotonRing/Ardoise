@@ -4,8 +4,9 @@ function hlLine(line) {
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
 function renderPage(d, edit) {
-  var out = [], open = false, counter = 0;
+  var out = [], open = false, counter = 0, fi = edit ? foldInfo(d.blocks) : null;
   d.blocks.forEach(function (b) {
+    if (fi && fi.hidden[b.id]) return;   // dans une section pliée (édition)
     if (b.type === 'step' || b.type === 'footer') { if (open) out.push('</section>'); open = false; }
     if (b.type === 'step') { out.push('<section class="step">'); open = true; }
     var num = null;
@@ -16,7 +17,7 @@ function renderPage(d, edit) {
     }
     var inner = renderBlock(b, edit, num);
     if (!edit && (b.type === 'step' || b.type === 'h2' || b.type === 'h3')) inner = inner.replace(/^<(\w+)/, '<$1 id="b-' + b.id + '"');
-    out.push(edit ? wrapEdit(b, inner) : inner);
+    out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0) : inner);
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
@@ -47,16 +48,22 @@ function renderBlock(b, e, num) {
   switch (b.type) {
     case 'header':
       return '<header class="b-header">' +
-        (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { rich: false, ph: 'Surtitre', nl: 1 }) : '') +
+        (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { ph: 'Surtitre', nl: 1 }) : '') +
         f('h1', '', 'title', b.title, { ph: 'Titre de la page', nl: 1 }) +
         (!b.noLede && (e || !isBlank(b.lede)) ? f('p', 'lede', 'lede', b.lede, { ph: 'Chapeau : une ou deux phrases qui résument la page', nl: 1 }) : '') + '</header>';
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
-    case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'p': return f('p', '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1 });
+    case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
+    case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
+    case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1 });
     case 'step':
       var badge = '';
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
       return '<div class="step-head">' + badge + f('h2', '', 'title', b.title, { ph: 'Titre de l’étape', nl: 1 }) + '</div>';
+    case 'summary':
+      var sl = summaryList(b, doc.cur);
+      if (!e && !sl) return '';
+      return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -100,7 +107,9 @@ function renderBlock(b, e, num) {
       if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
       return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
     case 'image':
-      if (!b.src) return e ? '<div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' : '';
+      if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
+        '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
+        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div></div>' : '';
       return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
         ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
     case 'map':
@@ -200,6 +209,29 @@ function renderBlock(b, e, num) {
   }
   return '';
 }
+function summaryItems(b, pi) {
+  // entrées du bloc sommaire : [{ t, n, href, kids }]
+  var pg = doc.pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [];
+  if (b.src === 'pages') {
+    out = (pg.sub ? [] : pageKids(doc.pages, pi)).map(function (j) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: [] }; });
+  } else {
+    sectionsOf(pg).forEach(function (x) {
+      var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
+      if (x.lv === 1 || !out.length) out.push(it); else if (b.deep !== false) out[out.length - 1].kids.push(it);
+    });
+  }
+  if (b.sort === 'alpha') { out.sort(cmp); out.forEach(function (it) { it.kids.sort(cmp); }); }
+  return out;
+}
+function summaryList(b, pi) {
+  var items = summaryItems(b, pi);
+  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + esc(it.t) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
+  return items.length ? ol(items) : '';
+}
+function summaryEmpty(b) {
+  return '<p class="muted toc-blk-e">' + (b.src === 'pages' ? (doc.pages[doc.cur].sub ? 'Une sous-page n’a pas elle-même de sous-pages.' : 'Cette page n’a pas encore de sous-pages (menu ⋯ d’une page → « Mettre en sous-page »).')
+    : 'Aucune section dans cette page : ajoutez des titres de section, des étapes ou des sous-sections.') + '</p>';
+}
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
@@ -207,6 +239,9 @@ function settings(b) {
   switch (b.type) {
     case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
+    case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
+      '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
+      (b.src !== 'pages' ? tog('deep', b.deep !== false, 'Sous-sections', 'Afficher aussi les sous-sections') : '');
     case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
     case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
     case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher');
@@ -224,17 +259,36 @@ function settings(b) {
       '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
       tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
       tog('lock', b.lock, 'Figée', 'Lecture : empêcher de déplacer et de zoomer la carte') + tog('hideBg', b.hideBg, 'Fond fixe', 'Lecture : masquer le bouton de changement de fond');
-    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image') + act('img-alt', 'Alt', 'Texte alternatif') : '';
+    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
   }
   return '';
 }
-function wrapEdit(b, inner) {
-  var s = settings(b);
-  return '<div class="blk" data-id="' + b.id + '" data-type="' + b.type + '">' +
+function foldLevel(b) { return b.type === 'step' || b.type === 'h2' ? 1 : b.type === 'h3' ? 2 : b.type === 'header' || b.type === 'footer' ? 0 : -1; }
+function foldInfo(blocks) {
+  // blocs masqués par une section pliée : jusqu'au prochain titre de même niveau ou de niveau supérieur
+  // hidden : id du bloc → id du titre plié qui le masque ; count : nombre de blocs masqués par titre
+  var hidden = {}, count = {}, cur = null;
+  blocks.forEach(function (b) {
+    var lv = foldLevel(b);
+    if (cur && lv >= 0 && lv <= cur.lv) cur = null;
+    if (cur) { hidden[b.id] = cur.id; count[cur.id] = (count[cur.id] || 0) + 1; return; }
+    if (lv > 0 && b.folded) cur = { lv: lv, id: b.id };
+  });
+  return { hidden: hidden, count: count };
+}
+function revealBlock(id) {
+  // déplie les sections qui masquent ce bloc
+  for (var n = 0; n < 20; n++) { var h = foldInfo(doc.blocks).hidden[id], hb = h && byId(h); if (!hb) return; delete hb.folded; }
+}
+function wrapEdit(b, inner, nHidden) {
+  var s = settings(b), fl = foldLevel(b) > 0;
+  return '<div class="blk' + (b.id === barHold ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
+    (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
     act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') +
-    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div>' + inner + '</div>';
+    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div>' + inner +
+    (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
 
 function pageHeader(pg) { return pg.blocks.filter(function (b) { return b.type === 'header'; })[0] || null; }
@@ -344,7 +398,7 @@ function applyTheme() {
   if (doc.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', doc.theme);
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
-  navLayout();
+  navLayout(); paintFavicon();
   document.title = curTitle();
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
@@ -377,6 +431,12 @@ function refreshDerived() {
       if (navSpyFn) navSpyFn();
     }
   }
+  // blocs sommaire de la page : la liste suit les titres saisis
+  doc.blocks.forEach(function (b) {
+    if (b.type !== 'summary') return;
+    var box = $('.blk[data-id="' + b.id + '"] .toc-blk-l', app); if (!box) return;
+    var h = summaryList(b, doc.cur) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
+  });
   // numérotation automatique des étapes (pastilles vides qui affichent le numéro calculé)
   var counter = 0;
   doc.blocks.forEach(function (b) {

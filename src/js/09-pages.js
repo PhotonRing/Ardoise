@@ -77,7 +77,9 @@ function openPageMenu(anchor, i) {
 app.addEventListener('click', function (e) {
   var t = e.target;
   var lk = t.closest('a[href^="#pg-"]');
-  if (lk && (mode === 'view' || e.ctrlKey || e.metaKey)) { e.preventDefault(); goPageId(lk.getAttribute('href').slice(4)); return; }
+  if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
+  var sec = t.closest('a[data-sec]');
+  if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; change(function () { revealBlock(sid); }); }
   var fb = t.closest('[data-pgfold]');
   if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = tocFold(fb); return; }
   var pg = t.closest('[data-pg]'); if (pg && !t.closest('.pnav-in')) { e.preventDefault(); goPage(+pg.dataset.pg); return; }

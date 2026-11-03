@@ -4,14 +4,16 @@ app.addEventListener('click', function (e) {
   if (cp && mode === 'view') { copyCode(cp); return; }
   var a = e.target.closest('[data-act]'); if (!a || mode !== 'edit') return;
   var blkEl = a.closest('.blk'), b = blkEl ? byId(blkEl.dataset.id) : null, i = +a.dataset.i;
+  if (b && a.closest('.blk-bar') && ['del', 'add-after'].indexOf(a.dataset.act) < 0) holdBar(b.id);
   switch (a.dataset.act) {
     case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }); break;
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
+    case 'fold': change(function () { if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;
     case 'down': moveBlock(b, 1); break;
     case 'dup': dupBlock(b); break;
     case 'del': deleteBlock(b, false); break;
-    case 'toggle': keepView(b); change(function () { var pr = a.dataset.prop; b[pr] = pr === 'cities' ? b[pr] === false : !b[pr]; }); break;
+    case 'toggle': keepView(b); change(function () { var pr = a.dataset.prop; b[pr] = pr === 'cities' || pr === 'deep' ? b[pr] === false : !b[pr]; }); break;
     case 'tl-add': change(function () { b.items.push({ date: '', title: '', text: '', color: 'accent' }); }, { b: b.id, k: 'items.' + b.items.length + '.date' }); break;
     case 'tl-ins': change(function () { b.items.splice(i + 1, 0, { date: '', title: '', text: '', color: (b.items[i] || {}).color || 'accent' }); }, { b: b.id, k: 'items.' + (i + 1) + '.date' }); break;
     case 'tl-del': change(function () { b.items.splice(i, 1); }); break;
@@ -32,6 +34,7 @@ app.addEventListener('click', function (e) {
     case 'row-del': tableOp(b, 'row-del'); break;
     case 'col-del': tableOp(b, 'col-del'); break;
     case 'img-pick': pickImage(b); break;
+    case 'img-url': imageUrlAction(b, a); break;
     case 'map-addmode': var ma = mapOf(b.id), on = a.getAttribute('aria-pressed') !== 'true'; a.setAttribute('aria-pressed', on ? 'true' : 'false'); mapUi.add = on ? b.id : null; mapUi.draw = null; cheatBlock = b.id; setTimeout(updateCheat); $$('.blk[data-id="' + b.id + '"] [data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (ma) { ma.setDrawMode(null); ma.setAddMode(on); } break;
     case 'mk-del': keepView(b); change(function () { b.markers.splice(i, 1); }); break;
     case 'map-draw':
@@ -65,6 +68,24 @@ app.addEventListener('click', function (e) {
     case 'img-alt': var v = prompt('Texte alternatif de l’image :', b.alt || ''); if (v !== null) change(function () { b.alt = v; }); break;
   }
 });
+function imageUrlAction(b, btn) {
+  var inp = btn.parentNode.querySelector('.img-url-in'), v = inp ? inp.value : prompt('Adresse de l’image (elle sera téléchargée et intégrée au document) :', '');
+  if (!v || !v.trim()) { if (inp) inp.focus(); return; }
+  imageFromUrl(v, function (src) { if (byId(b.id)) change(function () { b.src = src; }); });
+}
+var barHold = null;
+function holdBar(id) {
+  // le bloc est redessiné après l'action : sa barre reste affichée (wrapEdit) tant que la souris ne quitte
+  // pas le bloc et qu'on ne clique pas ailleurs, pour enchaîner plusieurs ajouts, déplacements ou réglages
+  barHold = id;
+}
+function releaseBar() { barHold = null; $$('.blk.bar-on', app).forEach(function (x) { x.classList.remove('bar-on'); }); }
+app.addEventListener('mouseout', function (e) {
+  if (!barHold) return;
+  var el = e.target.closest && e.target.closest('.blk.bar-on');
+  if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) releaseBar();
+});
+document.addEventListener('mousedown', function (e) { if (barHold && !(e.target.closest && e.target.closest('.blk.bar-on'))) releaseBar(); }, true);
 function tableOp(b, op) {
   var rows = b.rows, cols = rows[0].length;
   var cur = lastCell && lastCell.b === b.id ? lastCell : { r: rows.length - 1, c: cols - 1 };
@@ -74,7 +95,8 @@ function tableOp(b, op) {
     if (op === 'row-del' && rows.length > 2 && cur.r > 0) rows.splice(cur.r, 1);
     if (op === 'col-del' && cols > 1) rows.forEach(function (r) { r.splice(cur.c, 1); });
   });
-  lastCell = null;
+  var nr = rows.length, nc = rows[0].length;
+  lastCell = { b: b.id, r: Math.min(nr - 1, op === 'row-add' ? cur.r + 1 : cur.r), c: Math.min(nc - 1, op === 'col-add' ? cur.c + 1 : cur.c) };
 }
 function copyCode(btn) {
   var box = btn.closest('.code, .codebox'), pre = box && box.querySelector('pre'); if (!pre) return;

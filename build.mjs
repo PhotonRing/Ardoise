@@ -18,7 +18,12 @@ if (/<\/script/i.test(js)) throw new Error('src/js contient « </script> » : é
 JSON.parse(geo);
 if (/<\/script/i.test(geo)) throw new Error('src/data/geo.json contient « </script> ».');
 
-const parts = { 'css/page.css': src('css/page.css'), 'css/editor.css': src('css/editor.css'), 'data/geo.json': geo, js, version };
+// Icône d'Ardoise (src/assets/ardoise.svg) : favicon du fichier, reprise aussi dans la barre de l'éditeur
+const logo = src('assets/ardoise.svg').trim();
+if (!/^<svg[\s\S]*<\/svg>$/.test(logo) || !logo.includes('class="bg"')) throw new Error('src/assets/ardoise.svg : SVG attendu, avec un fond class="bg"');
+const favicon = 'data:image/svg+xml,' + encodeURIComponent(logo);
+
+const parts = { favicon, 'css/page.css': src('css/page.css'), 'css/editor.css': src('css/editor.css'), 'data/geo.json': geo, js, version };
 const html = src('index.html').replace(/\{\{([\w./-]+)\}\}/g, (m, k) => {
   if (!(k in parts)) throw new Error('Gabarit : inconnu ' + m);
   return parts[k];

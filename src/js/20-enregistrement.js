@@ -77,6 +77,7 @@ function afterSave(where) {
 function saveFailed(e) { saving = false; setStatus(); toast('Enregistrement impossible : ' + (e && e.message || e), 5000); }
 function save(as) {
   if (!doc) return Promise.resolve();
+  if (doc.newer) { newerNotice(true); return Promise.resolve(); }   // l'enregistrer ici perdrait ce que cet éditeur ne connaît pas
   if (htimer) snapshot();
   clearTimeout(saveTimer);
   var dl = function () { return serializeFile().then(function (html) { download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci'); }); };
@@ -130,9 +131,22 @@ function checkDraft() {
     '<button class="ub primary" data-d="1">Restaurer</button><button class="ub out" data-d="0">Ignorer</button>';
   bannerEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]'); if (!b) return;
-    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd) { doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
+    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
     else { try { localStorage.removeItem(LS + 'draft:' + doc.id); } catch (_) {} }
     hideBanner();
+  });
+  ui.appendChild(bannerEl);
+}
+function newerNotice(explicit) {
+  // document d'un format plus récent que cet éditeur : bandeau en lecture seule, avec la mise à jour
+  if (explicit) toast('Lecture seule : ce document vient d’une version plus récente d’Ardoise', 3500);
+  if (bannerEl) return;
+  bannerEl = document.createElement('div'); bannerEl.className = 'banner';
+  bannerEl.innerHTML = '<span>Ce document a été enregistré par une version plus récente d’Ardoise (format ' + doc.newer + ' ; cet éditeur lit jusqu’au format ' + VERSION + '). ' +
+    'Il s’affiche <b>en lecture seule</b> pour ne rien perdre : mettez Ardoise à jour pour le modifier.</span><button class="ub primary" data-n="1">Mettre à jour…</button><button class="ub out" data-n="0">Fermer</button>';
+  bannerEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-n]'); if (!b) return;
+    hideBanner(); if (b.dataset.n === '1') openUpdate();
   });
   ui.appendChild(bannerEl);
 }
@@ -191,7 +205,8 @@ function applyUpdate(tpl) {
     : (window.showSaveFilePicker && !downloadMode ? pickNew().catch(function (e) { return e && e.name === 'AbortError' ? false : null; }) : Promise.resolve(null));
   return target.then(function (h) {
     if (h === false) return;
-    return serializeFile().then(function (curFile) {
+    // format plus récent : on greffe le fichier tel qu'il a été ouvert, sans passer par cet éditeur
+    return (doc.newer ? Promise.resolve(buildFile(origStored)) : serializeFile()).then(function (curFile) {
       var html = graftFile(tpl, curFile);
       if (!h) { download(html, fileName()); afterSave(); toast('Document mis à jour téléchargé : remplacez l’ancien fichier par celui-ci, puis rouvrez-le', 6000); return; }
       fileHandle = h;

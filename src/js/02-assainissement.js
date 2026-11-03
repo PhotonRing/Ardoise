@@ -4,7 +4,7 @@ var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;
 var sanCache = new Map();
 function sanitize(html) {
-  html = String(html == null ? '' : html);
+  html = String(html == null ? '' : html).replace(/\u200B/g, '');   // espaces sans chasse posés pour sortir d'une pastille
   if (!/[<&]/.test(html)) return html;
   if (sanCache.has(html)) return sanCache.get(html);
   var t = document.createElement('template'); t.innerHTML = html;

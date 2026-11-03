@@ -16,12 +16,33 @@ function caretTo(el, atEnd) {
 function caretAtStart(el) {
   var s = getSelection(); if (!s.rangeCount || !s.isCollapsed) return false;
   var r = document.createRange(); r.selectNodeContents(el); r.setEnd(s.anchorNode, s.anchorOffset);
-  return r.toString() === '' && !r.cloneContents().querySelector('br');
+  return r.toString().replace(/\u200B/g, '') === '' && !r.cloneContents().querySelector('br');
 }
 function caretAtEnd(el) {
   var s = getSelection(); if (!s.rangeCount || !s.isCollapsed) return false;
   var r = document.createRange(); r.selectNodeContents(el); r.setStart(s.anchorNode, s.anchorOffset);
-  return r.toString() === '';
+  return r.toString().replace(/\u200B/g, '') === '';
+}
+// Sortir d'une mise en forme en ligne (pastille, code, lien, texte rouge) : flèche au bord de l'élément,
+// ou clic à côté de lui. Le curseur est posé sur un espace sans chasse placé contre l'élément, sinon le
+// navigateur le laisse à l'intérieur (notamment quand l'élément est seul sur sa ligne)
+var INLINE_SEL = 'span.pill, span.alert, code, a';
+function inlineEdge(fld, dir) {
+  // élément en ligne dont le curseur (ou la fin de la sélection) touche le bord, dans le sens dir
+  var s = getSelection(); if (!s.rangeCount) return null;
+  var r = s.getRangeAt(0), node = dir > 0 ? r.endContainer : r.startContainer, off = dir > 0 ? r.endOffset : r.startOffset;
+  var host = node.nodeType === 1 ? node : node.parentNode, il = host && host.closest ? host.closest(INLINE_SEL) : null;
+  if (!il || il === fld || !fld.contains(il)) return null;
+  var t = document.createRange(); t.selectNodeContents(il);
+  if (dir > 0) t.setStart(node, off); else t.setEnd(node, off);
+  return t.toString().replace(/\u200B/g, '') === '' ? il : null;
+}
+function exitInline(il, dir) {
+  var sib = dir > 0 ? il.nextSibling : il.previousSibling, tn;
+  if (sib && sib.nodeType === 3 && sib.nodeValue.charAt(dir > 0 ? 0 : sib.nodeValue.length - 1) === '\u200B') tn = sib;
+  else { tn = document.createTextNode('\u200B'); il.parentNode.insertBefore(tn, dir > 0 ? il.nextSibling : il); }
+  var r = document.createRange(); r.setStart(tn, dir > 0 ? 1 : tn.nodeValue.length - 1); r.collapse(true);
+  var s = getSelection(); s.removeAllRanges(); s.addRange(r);
 }
 function extractTail(el) {
   var s = getSelection(); var r0 = s.getRangeAt(0); r0.deleteContents();

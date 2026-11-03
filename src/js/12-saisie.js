@@ -56,7 +56,7 @@ app.addEventListener('change', function (e) {
   }
   if (el.matches('select[data-act=set]')) {
     var blk = byId(el.closest('.blk').dataset.id), prop = el.dataset.prop, v = el.value;
-    keepView(blk); change(function () { blk[prop] = (prop === 'min' || prop === 'height') ? +v : v; }, { b: blk.id });
+    holdBar(blk.id); keepView(blk); change(function () { blk[prop] = (prop === 'min' || prop === 'height') ? +v : v; }, { b: blk.id });
   }
 });
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
@@ -95,6 +95,7 @@ app.addEventListener('keydown', function (e) {
     return;
   }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
+  if (el.matches('.img-url-in')) { if (e.key === 'Enter') { e.preventDefault(); var bi = byId(el.dataset.b); if (bi) imageUrlAction(bi, el); } return; }
   if (!el.classList || !el.classList.contains('fld')) return;
   var b = byId(el.dataset.b), k = el.dataset.k;
   if (!b) return;
@@ -105,17 +106,26 @@ app.addEventListener('keydown', function (e) {
     if (e.shiftKey || el.hasAttribute('data-ml')) { e.preventDefault(); if (rich) document.execCommand('insertLineBreak'); return; }
     e.preventDefault();
     if (el.hasAttribute('data-li')) { splitItem(b, k, el); return; }
-    if (el.hasAttribute('data-cell')) { var m = k.split('.'); var below = $('[data-b="' + b.id + '"][data-k="rows.' + (+m[1] + 1) + '.' + m[2] + '"]', app); if (below) { below.focus(); caretTo(below, true); } return; }
+    if (el.hasAttribute('data-cell')) {
+      // cellule du dessous ; sur la dernière ligne : cellule suivante, ou nouvelle ligne depuis la fin de la dernière cellule
+      var m = k.split('.'), cr = +m[1], cc = +m[2];
+      if (cellAt(b, cr + 1, cc)) { focusCell(b, cr + 1, cc, true); return; }
+      if (cc < b.rows[0].length - 1) { focusCell(b, cr, cc + 1, true); return; }
+      if (caretAtEnd(el)) addRowAfter(b, cr);
+      return;
+    }
     if (b.type === 'p') {
       var tail = extractTail(el); b.html = sanitize(el.innerHTML);
-      insertAt(idx(b) + 1, 'p', { html: tail }); return;
+      insertAt(idx(b) + 1, 'p', b.indent > 0 ? { html: tail, indent: b.indent } : { html: tail }); return;
     }
-    if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'step'].indexOf(b.type) >= 0) {
+    if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'subtitle', 'step'].indexOf(b.type) >= 0) {
       if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
       insertAt(idx(b) + 1, 'p', {}); return;
     }
     nextField(el, 1); return;
   }
+  if (e.key === 'Tab' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); indentPara(b, el, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Backspace' && b.type === 'p' && b.indent > 0 && caretAtStart(el)) { e.preventDefault(); indentPara(b, el, -1); return; }
   if (e.key === 'Backspace' && caretAtStart(el)) {
     if (el.hasAttribute('data-li')) {
       var lp = listParts(k), arr = getPath(b, lp.base);
@@ -128,14 +138,23 @@ app.addEventListener('keydown', function (e) {
     if (b.type === 'p') {
       var i = idx(b), pb = doc.blocks[i - 1];
       if (el.textContent === '' && doc.blocks.length > 1) { e.preventDefault(); deleteBlock(b, true); return; }
-      if (pb && ['p', 'h2', 'h3'].indexOf(pb.type) >= 0) {
+      if (pb && ['p', 'h2', 'h3', 'subtitle'].indexOf(pb.type) >= 0) {
         e.preventDefault(); var html = sanitize(el.innerHTML);
         change(function () { pb.html = pb.html + html; doc.blocks.splice(i, 1); }, { b: pb.id, end: true }); return;
       }
     }
   }
   if (e.key === '/' && b.type === 'p' && el.textContent === '') { e.preventDefault(); slashMenu(el, b); return; }
-  if (e.key === 'Tab' && el.hasAttribute('data-cell')) { e.preventDefault(); nextField(el, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Tab' && el.hasAttribute('data-cell')) {
+    e.preventDefault(); var tm = k.split('.');
+    if (!e.shiftKey && +tm[1] === b.rows.length - 1 && +tm[2] === b.rows[0].length - 1) { addRowAfter(b, +tm[1]); return; }
+    nextField(el, e.shiftKey ? -1 : 1); return;
+  }
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && el.hasAttribute('data-rich')) {
+    var dir = e.key === 'ArrowRight' ? 1 : -1, il = inlineEdge(el, dir);
+    if (il) { e.preventDefault(); exitInline(il, dir); return; }
+  }
+  if (el.hasAttribute('data-cell') && /^Arrow/.test(e.key) && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && cellArrow(e, el, b, k)) return;
   if (e.key === 'ArrowUp' && caretAtStart(el) && !e.shiftKey) { e.preventDefault(); nextField(el, -1); return; }
   if (e.key === 'ArrowDown' && caretAtEnd(el) && !e.shiftKey) { e.preventDefault(); nextField(el, 1); return; }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && el.hasAttribute('data-rich')) {
@@ -145,6 +164,62 @@ app.addEventListener('keydown', function (e) {
     else if (e.key === '`' || kk === 'j') { e.preventDefault(); inlineAction('code'); }
   }
 });
+app.addEventListener('mouseup', function (e) {
+  // clic à droite (ou à gauche) d'une pastille en bord de ligne : curseur hors de la pastille
+  if (mode !== 'edit' || e.button !== 0) return;
+  var fld = e.target.closest && e.target.closest('.fld[data-rich]'); if (!fld) return;
+  // (le curseur est déjà posé au relâchement : traité tout de suite, avant toute frappe)
+  var s = getSelection(); if (!s.rangeCount || !s.isCollapsed || !fld.contains(s.anchorNode)) return;
+  [1, -1].some(function (dir) {
+    var il = inlineEdge(fld, dir), rs = il && il.getClientRects(); if (!rs || !rs.length) return false;
+    var rc = dir > 0 ? rs[rs.length - 1] : rs[0];
+    if (dir > 0 ? e.clientX > rc.right : e.clientX < rc.left) { exitInline(il, dir); return true; }
+    return false;
+  });
+});
+function cellAt(b, r, c) { return $('[data-b="' + b.id + '"][data-k="rows.' + r + '.' + c + '"]', app); }
+function focusCell(b, r, c, atEnd) { var x = cellAt(b, r, c); if (!x) return false; x.focus({ preventScroll: true }); caretTo(x, atEnd); x.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true; }
+function addRowAfter(b, r) {
+  change(function () { b.rows.splice(r + 1, 0, b.rows[0].map(function () { return ''; })); }, { b: b.id, k: 'rows.' + (r + 1) + '.0', end: false });
+  lastCell = { b: b.id, r: r + 1, c: 0 };
+}
+function caretLine(el, dir) {
+  // le curseur est-il sur la première (dir < 0) ou la dernière (dir > 0) ligne du champ ?
+  var s = getSelection(); if (!s.rangeCount) return true;
+  var r = s.getRangeAt(0).cloneRange(); r.collapse(dir < 0);
+  var rc = r.getClientRects()[0] || r.getBoundingClientRect();
+  var er = el.getBoundingClientRect(), cs = getComputedStyle(el), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 20;
+  if (!rc || (!rc.height && !rc.top)) {
+    // curseur posé sur le champ lui-même (pas dans un texte) : champ d'une seule ligne, ou début / fin du texte
+    if (er.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) < lh * 1.5) return true;
+    return dir < 0 ? caretAtStart(el) : caretAtEnd(el);
+  }
+  return dir < 0 ? rc.top < er.top + parseFloat(cs.paddingTop) + lh * 0.75 : rc.bottom > er.bottom - parseFloat(cs.paddingBottom) - lh * 0.75;
+}
+function leaveTable(el, b, dir) {
+  // premier champ avant le tableau, ou après lui
+  var all = $$('.fld, textarea.code-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
+  if (!cells.length) return;
+  var n = all[all.indexOf(cells[dir < 0 ? 0 : cells.length - 1]) + dir]; if (!n) return;
+  n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0);
+}
+function cellArrow(e, el, b, k) {
+  // flèches au bord d'une cellule : cellule voisine (gauche / droite en début / fin de texte, haut / bas sur la première / dernière ligne)
+  var m = k.split('.'), r = +m[1], c = +m[2], nr = b.rows.length, nc = b.rows[0].length;
+  if (e.key === 'ArrowLeft' && caretAtStart(el)) { e.preventDefault(); if (!(c > 0 ? focusCell(b, r, c - 1, true) : r > 0 && focusCell(b, r - 1, nc - 1, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowRight' && caretAtEnd(el)) { e.preventDefault(); if (!(c < nc - 1 ? focusCell(b, r, c + 1, false) : r < nr - 1 && focusCell(b, r + 1, 0, false))) leaveTable(el, b, 1); return true; }
+  if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(r > 0 && focusCell(b, r - 1, c, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(r < nr - 1 && focusCell(b, r + 1, c, false))) leaveTable(el, b, 1); return true; }
+  return false;
+}
+function indentPara(b, el, d) {
+  // retrait du paragraphe, appliqué en place pour garder le curseur où il est
+  var n = Math.max(0, Math.min(6, (+b.indent || 0) + d));
+  if (n === (+b.indent || 0)) return;
+  if (n) b.indent = n; else delete b.indent;
+  for (var i = 1; i <= 6; i++) el.classList.toggle('ind-' + i, i === n);
+  snapshot(); markDirty(true);
+}
 function slashMenu(el, b) { openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
 function splitItem(b, k, el) {

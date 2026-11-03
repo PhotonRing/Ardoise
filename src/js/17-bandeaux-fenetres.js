@@ -20,7 +20,7 @@ function modal(title, bodyHTML, buttons) {
 function showHelp() {
   var rows = [['Ctrl+E', 'Basculer lecture / édition'], ['Ctrl+S', 'Enregistrer'], ['Ctrl+Z / Ctrl+Maj+Z', 'Annuler / rétablir'], ['/', 'Dans un paragraphe vide : insérer un bloc'],
     ['Entrée', 'Nouveau paragraphe, nouvel élément de liste'], ['Maj+Entrée', 'Saut de ligne'], ['Entrée sur élément vide', 'Sortir de la liste'], ['Alt+↑ / Alt+↓', 'Déplacer le bloc'],
-    ['Ctrl+B, Ctrl+I', 'Gras, italique'], ['Ctrl+J, Ctrl+K', 'Code, lien (adresse ou autre page)'], ['Ctrl+clic sur un lien de page', 'Ouvrir la page liée en édition'], ['Tab (code)', 'Indenter de 2 espaces'], ['Alt+Page↓ / Alt+Page↑', 'Page suivante / précédente'], ['Double-clic sur un onglet', 'Renommer la page']];
+    ['Ctrl+B, Ctrl+I', 'Gras, italique'], ['Ctrl+J, Ctrl+K', 'Code, lien vers une adresse (bouton « Page » : page ou section)'], ['Curseur dans un lien', 'Bulle : ouvrir, modifier, retirer'], ['Ctrl+clic sur un lien de page', 'Ouvrir la page ou la section liée'], ['Tab / Maj+Tab (paragraphe)', 'Ajouter / retirer un retrait'], ['→ / ← au bord d’une pastille', 'Sortir de la pastille (aussi : code, lien)'], ['Tab (code)', 'Indenter de 2 espaces'], ['Flèches, Entrée, Tab (tableau)', 'Changer de cellule ; en fin de tableau : nouvelle ligne'], ['Poignées au survol (tableau)', 'Glisser une ligne ou une colonne · Échap annule'], ['Alt+Page↓ / Alt+Page↑', 'Page suivante / précédente'], ['Double-clic sur un onglet', 'Renommer la page']];
   modal('Raccourcis clavier', '<div class="tablewrap"><table style="min-width:0"><tbody>' + rows.map(function (r) { return '<tr><td><code>' + esc(r[0]) + '</code></td><td>' + esc(r[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>', [{ label: 'Fermer', primary: true }]);
 }
 

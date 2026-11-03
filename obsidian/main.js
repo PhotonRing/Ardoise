@@ -2,7 +2,7 @@
 // et enregistre les modifications directement dans le fichier du coffre.
 // JavaScript sans compilation : build.mjs y insère le document vierge (constante TEMPLATE) et écrit dist/obsidian/main.js.
 'use strict';
-const { Plugin, TextFileView, TFolder, Notice, normalizePath } = require('obsidian');
+const { Plugin, TextFileView, TFolder, Notice, Modal, normalizePath, requestUrl, arrayBufferToBase64 } = require('obsidian');
 
 const VIEW_TYPE = 'ardoise';
 const TEMPLATE = __ARDOISE_TEMPLATE__;   // dist/ardoise.html (document vierge)
@@ -70,7 +70,7 @@ function hostShim(name) {
   window.showSaveFilePicker = function (o) {
     return call('pick', o && o.suggestedName || 'page.html').then(function (r) { return fileHandle(r.name, r.path); });
   };
-  window.ardoiseHost = { app: 'obsidian' };
+  window.ardoiseHost = { app: 'obsidian', fetchImage: function (url) { return call('fetch-image', String(url)); } };
   var later = function (fn) { setTimeout(fn, 0); };
   var db = {
     transaction: function () {
@@ -83,6 +83,19 @@ function hostShim(name) {
   };
   var idb = { open: function () { var rq = {}; later(function () { rq.result = db; if (rq.onsuccess) rq.onsuccess(); }); return rq; } };
   try { Object.defineProperty(window, 'indexedDB', { value: idb, configurable: true }); } catch (_) {}
+}
+
+class ConfirmModal extends Modal {
+  constructor(app, title, text, detail, cta, done) { super(app); this.t = title; this.x = text; this.d = detail; this.c = cta; this.done = done; this.answered = false; }
+  onOpen() {
+    this.titleEl.setText(this.t);
+    this.contentEl.createEl('p', { text: this.x });
+    this.contentEl.createEl('p', { text: this.d, cls: 'ardoise-url' });
+    const row = this.contentEl.createDiv({ cls: 'modal-button-container' });
+    row.createEl('button', { text: 'Annuler' }).addEventListener('click', () => this.close());
+    row.createEl('button', { text: this.c, cls: 'mod-cta' }).addEventListener('click', () => { this.answered = true; this.close(); this.done(true); });
+  }
+  onClose() { this.contentEl.empty(); if (!this.answered) this.done(false); }
 }
 
 class ArdoiseView extends TextFileView {
@@ -144,9 +157,27 @@ class ArdoiseView extends TextFileView {
         },
         (err) => { new Notice('Ardoise : enregistrement impossible — ' + (err && err.message || err)); this.reply(d.id, false, String(err && err.message || err)); }
       );
+    } else if (d.type === 'fetch-image') {
+      this.fetchImage(d);
     } else if (d.type === 'flushed' && this.flushes[d.id]) {
       this.flushes[d.id](); delete this.flushes[d.id];
     }
+  }
+  // Image en ligne demandée par le document (le site n'autorise pas son téléchargement depuis la page) :
+  // Obsidian la télécharge après accord explicite, et ne renvoie que des images
+  fetchImage(d) {
+    const url = String(d.payload || '');
+    if (!/^https?:\/\//i.test(url)) { this.reply(d.id, false, 'adresse non prise en charge'); return; }
+    new ConfirmModal(this.app, 'Télécharger une image', 'Le document demande à intégrer l’image :', url, 'Télécharger', (ok) => {
+      if (!ok) { this.reply(d.id, false, 'refusé'); return; }
+      requestUrl({ url, throw: false }).then((r) => {
+        const ct = String((r.headers && (r.headers['content-type'] || r.headers['Content-Type'])) || '').split(';')[0].trim().toLowerCase();
+        if (r.status >= 400) throw new Error('HTTP ' + r.status);
+        if (!/^image\//.test(ct)) throw new Error('not-image');
+        if (r.arrayBuffer.byteLength > 30 * 1024 * 1024) throw new Error('image trop lourde');
+        this.reply(d.id, true, null, 'data:' + ct + ';base64,' + arrayBufferToBase64(r.arrayBuffer));
+      }).catch((err) => this.reply(d.id, false, String(err && err.message || err)));
+    }).open();
   }
   reply(id, ok, error, result) {
     if (this.iframe && this.iframe.contentWindow) this.iframe.contentWindow.postMessage({ ardoise: true, type: 'reply', id: id, ok: ok, error: error, result: result }, '*');

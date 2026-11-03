@@ -98,7 +98,15 @@ function exportPages() {
   document.addEventListener('click', function (e) {
     if (!e.target.closest) return;
     var a = e.target.closest('a[href^="#pg-"]');
-    if (a) { e.preventDefault(); var t = document.querySelector('.pg[data-pgid="' + a.getAttribute('href').slice(4) + '"]'); if (t) { show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {} } return; }
+    if (a) {
+      // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>)
+      e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), t = document.querySelector('.pg[data-pgid="' + h[0] + '"]');
+      if (t) {
+        show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {}
+        var sec = h[1] && document.getElementById('b-' + h[1]); if (sec) sec.scrollIntoView({ block: 'start' });
+      }
+      return;
+    }
     var f = e.target.closest('[data-pgfold]'); if (f) { tocFold(f); return; }
     var b = e.target.closest('[data-pg]'); if (!b) return;
     e.preventDefault(); var i = +b.getAttribute('data-pg'); show(i);
@@ -113,7 +121,7 @@ function exportStatic() {
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
     ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
-    $$('link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
+    $$('link[rel=icon], link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
       var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
     }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
@@ -127,7 +135,7 @@ function exportStatic() {
 function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render(); } setTimeout(function () { window.print(); if (m === 'edit') { mode = 'edit'; render(); } }, 50); }
 function copyJSON() {
   if (htimer) snapshot();
-  var base = { title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
+  var base = { v: VERSION, title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
   if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.sub) o.sub = true; return o; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }
   var t = JSON.stringify(base, null, 2);
   try { navigator.clipboard.writeText(t).then(function () { toast('JSON copié dans le presse-papiers'); }, function () { showJSON(t); }); } catch (_) { showJSON(t); }
@@ -140,7 +148,9 @@ function importJSON() {
       var raw = $('textarea', bg).value, d;
       try { d = JSON.parse(raw); } catch (e) { $('#jerr', bg).textContent = 'JSON invalide : ' + e.message; return false; }
       if (Array.isArray(d)) d = { blocks: d };
-      var nd = normalize(d); if (!nd) { $('#jerr', bg).textContent = 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
+      var nd; try { nd = normalize(d); } catch (e) { $('#jerr', bg).textContent = 'Conversion impossible : ' + e.message; return false; }
+      if (!nd) { $('#jerr', bg).textContent = 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
+      if (nd.newer) { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + nd.newer + ') : mettez d’abord Ardoise à jour.'; return false; }
       nd.id = doc.id; nd.savedAt = doc.savedAt; if (doc.mapKey) nd.mapKey = doc.mapKey; else delete nd.mapKey; if (doc.lock) nd.lock = doc.lock; else delete nd.lock;
       var seen = {}, nb = 0; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (seen[b.id]) b.id = uid(); seen[b.id] = 1; nb++; }); });
       change(function () { doc = nd; }); pageHash(0);

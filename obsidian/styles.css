@@ -26,3 +26,4 @@
   padding: 2px 10px;
   height: auto;
 }
+.ardoise-url{word-break:break-all;font-family:var(--font-monospace);font-size:var(--font-ui-smaller);color:var(--text-muted)}

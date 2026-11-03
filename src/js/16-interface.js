@@ -2,10 +2,20 @@
 var ui = document.createElement('div'); ui.id = 'ui'; ui.setAttribute('data-ephemeral', ''); document.body.appendChild(ui);
 var chrome = document.createElement('div'); ui.appendChild(chrome);
 var pop = null, popClose = null;
+// icône d'Ardoise : le favicon embarqué (src/assets/ardoise.svg), repris dans la barre et teinté selon la couleur d'accent
+var faviconEl = $('link[rel=icon]');
+var LOGO_SRC = (function () { try { return decodeURIComponent(faviconEl.getAttribute('href').replace(/^data:image\/svg\+xml,/, '')); } catch (_) { return ''; } })();
+var LOGO_SVG = /^<svg/.test(LOGO_SRC) ? LOGO_SRC.replace(/^<svg/, '<svg aria-hidden="true" focusable="false"') : '';
+function paintFavicon() {
+  if (!faviconEl || !LOGO_SVG) return;
+  var c = (PALETTES.filter(function (x) { return x[0] === doc.palette; })[0] || PALETTES[0])[1];
+  var href = 'data:image/svg+xml,' + encodeURIComponent(LOGO_SRC.replace(/(class="bg"[^>]*?fill=")[^"]*/, '$1' + c));
+  if (faviconEl.getAttribute('href') !== href) faviconEl.setAttribute('href', href);
+}
 function renderChrome() {
   if (mode === 'edit') {
     chrome.innerHTML = '<div class="tb" role="toolbar">' +
-      '<span class="logo"><i></i><span class="lbl">Ardoise</span></span><span class="doc-name">' + esc(curTitle()) + '</span><span class="grow"></span>' +
+      '<span class="logo">' + LOGO_SVG + '<span class="lbl">Ardoise</span></span><span class="doc-name">' + esc(curTitle()) + '</span><span class="grow"></span>' +
       '<button class="ub" data-ui="undo" title="Annuler (Ctrl+Z)">↶</button><button class="ub" data-ui="redo" title="Rétablir (Ctrl+Maj+Z)">↷</button><span class="vsep"></span>' +
       '<button class="ub" data-ui="add" title="Insérer un bloc">+ <span class="lbl">Bloc</span></button>' +
       '<button class="ub" data-ui="style" title="Couleurs, typographie, largeur, thème">◐ <span class="lbl">Style</span></button>' +
@@ -82,7 +92,7 @@ function openStyle(anchor) {
   var p = document.createElement('div'); p.className = 'pop'; pop = p;
   function draw() {
     p.innerHTML = '<h4>Couleur d’accent</h4><div class="sw">' + PALETTES.map(function (x) { return '<button type="button" data-set="palette" data-v="' + x[0] + '" title="' + x[2] + '" style="background:' + x[1] + '" aria-pressed="' + (doc.palette === x[0]) + '"></button>'; }).join('') + '</div>' +
-      '<h4>Typographie</h4>' + seg('typo', doc.typo, [['display', 'Affiche (runbook)'], ['sobre', 'Sobre (fiche outil)']]) +
+      '<h4>Typographie</h4>' + seg('typo', doc.typo, [['display', 'Affiche'], ['sobre', 'Sobre']]) +
       '<h4>Largeur</h4>' + seg('width', doc.width, [[720, 'Étroite'], [820, 'Normale'], [960, 'Large'], [1200, 'Très large']]) +
       '<h4>Thème</h4>' + seg('theme', doc.theme, [['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']]) +
       '<h4>Navigation entre pages</h4>' + seg('nav', doc.nav || 'auto', [['auto', 'Auto'], ['tabs', 'Onglets'], ['side', 'Sommaire']]) +
@@ -152,7 +162,7 @@ function openFile(anchor) {
 /* Barre de mise en forme du texte sélectionné */
 var itb = document.createElement('div'); itb.className = 'itb'; itb.style.display = 'none';
 itb.innerHTML = '<button data-i="bold" title="Gras (Ctrl+B)"><b>G</b></button><button data-i="italic" title="Italique (Ctrl+I)"><i>I</i></button>' +
-  '<button data-i="code" title="Code (Ctrl+J)" style="font-family:var(--f-mono)!important">&lt;/&gt;</button><button data-i="link" title="Lien (Ctrl+K)">Lien</button><span class="vsep"></span>' +
+  '<button data-i="code" title="Code (Ctrl+J)" style="font-family:var(--f-mono)!important">&lt;/&gt;</button><button data-i="link" title="Lien vers une adresse (Ctrl+K)">Lien</button><button data-i="pagelink" title="Lien vers une page ou une section du document">Page</button><span class="vsep"></span>' +
   '<button data-i="p-ok" title="Pastille verte"><span class="dot" style="background:#5fd09a"></span></button><button data-i="p-bad" title="Pastille rouge"><span class="dot" style="background:#ff8a80"></span></button>' +
   '<button data-i="p-warn" title="Pastille orange"><span class="dot" style="background:#f2c35b"></span></button><button data-i="p-info" title="Pastille bleue"><span class="dot" style="background:#8cc3f2"></span></button>' +
   '<button data-i="alert" title="Texte rouge" style="color:#ff8a80!important">A</button><span class="vsep"></span><button data-i="clear" title="Effacer la mise en forme">⌫</button>';
@@ -184,7 +194,7 @@ function inlineAction(kind) {
   }
   var tag = 'span', cls = '';
   if (kind === 'code') tag = 'code';
-  else if (kind === 'link') tag = 'a';
+  else if (kind === 'link' || kind === 'pagelink') tag = 'a';
   else if (kind === 'alert') cls = 'alert';
   else cls = 'pill ' + kind;
   var existing = ancestor(function (n) {
@@ -193,42 +203,147 @@ function inlineAction(kind) {
     if (kind === 'alert') return n.tagName === 'SPAN' && n.classList.contains('alert');
     return n.tagName === 'SPAN' && n.classList.contains('pill');
   });
+  if (existing && tag === 'a') {
+    // déjà un lien : on le modifie (sans le défaire)
+    openLinkPop(kind === 'pagelink' || parseLink(existing.getAttribute('href')).page ? 'page' : 'url', null, fld, existing); return;
+  }
   if (existing) {
     if (cls.indexOf('pill') === 0 && !existing.classList.contains(kind)) existing.className = cls; else unwrap(existing);
     fire(fld); return;
   }
   if (s.isCollapsed) return;
-  if (tag === 'a') { openLinkPop(r.cloneRange(), fld); return; }
+  if (tag === 'a') { openLinkPop(kind === 'pagelink' ? 'page' : 'url', r.cloneRange(), fld, null); return; }
   wrapInline(tag, cls, null, fld);
 }
-function openLinkPop(range, fld) {
-  // lien vers une adresse, ou vers une autre page du document (#pg-<id> : suit la page si elle est déplacée ou renommée)
-  closePop();
-  var p = document.createElement('div'); p.className = 'pop'; pop = p;
-  p.innerHTML = '<h4>Lien vers une adresse</h4><div class="link-url"><input class="menu-q" data-url placeholder="https://…" spellcheck="false" autocomplete="off" inputmode="url"><button class="ub primary" type="button" data-url-ok>OK</button></div>' +
-    (doc.pages.length > 1 ? '<div class="hr"></div><h4>Lien vers une page</h4><div class="menu-list">' + doc.pages.map(function (pg, i) {
-      return i === doc.cur ? '' : '<button class="mi" type="button" data-pid="' + esc(pg.id) + '"><span class="ic">' + (i && pg.sub ? '↳' : '▤') + '</span><span>' + esc(pageTitle(pg, i)) + '</span></button>';
-    }).join('') + '</div>' : '');
-  var url = $('[data-url]', p);
+/* Liens. Adresse : https://…, mailto:… ; page du document : #pg-<page> ; section : #pg-<page>/<bloc>
+   (le lien suit la page ou la section si elle est déplacée ou renommée) */
+function parseLink(href) {
+  var m = String(href || '').match(/^#pg-([^/]+)(?:\/(.+))?$/);
+  return m ? { page: true, pid: m[1], bid: m[2] || '' } : { page: false, url: String(href || '') };
+}
+function pageIndex(pid) { for (var i = 0; i < doc.pages.length; i++) if (doc.pages[i].id === pid) return i; return -1; }
+function linkLabel(href) {
+  var L = parseLink(href); if (!L.page) return L.url.replace(/^mailto:/i, '');
+  var i = pageIndex(L.pid); if (i < 0) return 'Page introuvable';
+  var t = pageTitle(doc.pages[i], i);
+  if (L.bid) { var x = sectionsOf(doc.pages[i]).filter(function (y) { return y.id === L.bid; })[0]; t += ' › ' + (x ? x.t : 'section introuvable'); }
+  return t;
+}
+function goLink(href) {
+  // ouvre la page liée, puis fait défiler jusqu'à la section (dépliée au besoin en édition)
+  var L = parseLink(href); if (!L.page) return;
+  var i = pageIndex(L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
+  var moved = i !== doc.cur; if (moved) goPage(i);
+  if (!L.bid) return;
+  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) change(function () { revealBlock(L.bid); });
+  var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
+  if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');
+}
+function openLinkPop(kind, range, fld, a) {
+  // kind : 'url' (adresse) ou 'page' (page ou section) ; a : lien existant à modifier, sinon range : texte à lier
+  closePop(); hideLinkTip();
+  var p = document.createElement('div'); p.className = 'pop link-pop'; pop = p;
+  var cur = a ? a.getAttribute('href') || '' : '', L = parseLink(cur);
+  function mi(k, ic, label) { return '<button class="mi" type="button" data-lk="' + k + '"><span class="ic">' + ic + '</span><span>' + label + '</span></button>'; }
+  var foot = '<div class="hr"></div>' + (kind === 'url' ? mi('to-page', '▤', 'Lien vers une page ou une section…') : mi('to-url', '↗', 'Lien vers une adresse…')) + (a ? mi('unlink', '✕', 'Retirer le lien') : '');
+  var shown = [], curI = 0, q = null, list = null, url = null;
+  if (kind === 'url') {
+    p.innerHTML = '<h4>' + (a ? 'Modifier le lien' : 'Lien vers une adresse') + '</h4><div class="link-url"><input class="menu-q" data-url placeholder="https://…" spellcheck="false" autocomplete="off" inputmode="url" value="' + esc(L.page ? '' : L.url) + '"><button class="ub primary" type="button" data-url-ok>OK</button></div>' + foot;
+    url = $('[data-url]', p);
+    url.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyUrl(); } else if (e.key === 'Escape') { e.preventDefault(); closePop(); } });
+  } else {
+    p.innerHTML = '<h4>' + (a ? 'Modifier le lien' : 'Lien vers une page ou une section') + '</h4><input class="menu-q" data-q placeholder="Rechercher une page ou une section…" spellcheck="false" autocomplete="off"><div class="menu-list"></div>' + foot;
+    q = $('[data-q]', p); list = $('.menu-list', p);
+    var items = [];
+    doc.pages.forEach(function (pg, i) {
+      var pt = pageTitle(pg, i);
+      items.push({ href: '#pg-' + pg.id, t: pt, ic: i && pg.sub ? '↳' : '▤', lv: 0, here: i === doc.cur, pt: pt });
+      sectionsOf(pg).forEach(function (x) { items.push({ href: '#pg-' + pg.id + '/' + x.id, t: (x.n ? x.n + ' · ' : '') + x.t, ic: '§', lv: x.lv, pt: pt }); });
+    });
+    var draw = function () {
+      var s = norm(q.value.trim());
+      shown = items.filter(function (it) { return !s || norm(it.t + ' ' + it.pt).indexOf(s) >= 0; });
+      curI = Math.min(curI, Math.max(0, shown.length - 1));
+      list.innerHTML = shown.length ? shown.map(function (it, k) {
+        return '<button class="mi lk-lv' + it.lv + (k === curI ? ' act' : '') + (it.href === cur ? ' on' : '') + '" type="button" data-k="' + k + '"><span class="ic">' + it.ic + '</span><span>' + esc(it.t) +
+          (it.lv ? (s ? '<small>' + esc(it.pt) + '</small>' : '') : (it.here ? '<small>Page affichée</small>' : '')) + '</span></button>';
+      }).join('') : '<div class="menu-empty">Aucune page ni section</div>';
+    };
+    var scrollAct = function () { var x = $('.mi.act', list); if (x) x.scrollIntoView({ block: 'nearest' }); };
+    q.addEventListener('input', function () { curI = 0; draw(); });
+    q.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); curI = Math.min(shown.length - 1, curI + 1); draw(); scrollAct(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); curI = Math.max(0, curI - 1); draw(); scrollAct(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (shown[curI]) apply(shown[curI].href); }
+      else if (e.key === 'Escape') { e.preventDefault(); closePop(); }
+    });
+    for (var j = 0; j < items.length; j++) if (items[j].href === cur) { curI = j; break; }
+    draw();
+  }
+  function restore() {
+    fld.focus({ preventScroll: true });
+    var s = getSelection(), r2 = range;
+    if (a && fld.contains(a)) { r2 = document.createRange(); r2.selectNodeContents(a); r2.collapse(false); }
+    if (r2) { s.removeAllRanges(); s.addRange(r2); }
+  }
   function apply(href) {
     popClose = null; closePop();
-    fld.focus({ preventScroll: true }); var s = getSelection(); s.removeAllRanges(); s.addRange(range);
-    wrapInline('a', '', href, fld);
+    if (a) {
+      if (!fld.contains(a)) { toast('Le lien a changé entre-temps : sélectionnez-le à nouveau'); return; }
+      a.setAttribute('href', href); restore(); fire(fld); return;
+    }
+    restore(); wrapInline('a', '', href, fld);
   }
   function applyUrl() {
     var h = url.value.trim(); if (!h) return;
     if (!/^(https?:|mailto:|#)/i.test(h)) h = (/^[^\s@]+@[^\s@]+$/.test(h) ? 'mailto:' : 'https://') + h;
     apply(h);
   }
-  url.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyUrl(); } });
   p.addEventListener('click', function (e) {
     if (e.target.closest('[data-url-ok]')) { applyUrl(); return; }
-    var b = e.target.closest('[data-pid]'); if (b) apply('#pg-' + b.dataset.pid);
+    var it = e.target.closest('[data-k]'); if (it && list) { apply(shown[+it.dataset.k].href); return; }
+    var b = e.target.closest('[data-lk]'); if (!b) return;
+    var k = b.dataset.lk;
+    if (k === 'to-page' || k === 'to-url') { popClose = null; closePop(); openLinkPop(k === 'to-page' ? 'page' : 'url', range, fld, a); return; }
+    if (k === 'unlink') { popClose = null; closePop(); if (a && fld.contains(a)) { unwrap(a); fld.focus({ preventScroll: true }); fire(fld); } return; }
   });
-  placePop(p, itb.style.display !== 'none' ? itb : fld);
-  popClose = function () { fld.focus({ preventScroll: true }); var s = getSelection(); s.removeAllRanges(); s.addRange(range); };
-  url.focus();
+  var anchor = a && fld.contains(a) ? a : (itb.style.display !== 'none' ? itb : fld);
+  placePop(p, anchor);
+  popClose = restore;
+  (url || q).focus();
 }
+/* Bulle d'un lien (édition) : le curseur dans un lien affiche sa cible, avec ouvrir / modifier / retirer */
+var ltip = document.createElement('div'); ltip.className = 'ltip'; ltip.style.display = 'none'; ui.appendChild(ltip);
+var tipA = null;
+function hideLinkTip() { if (tipA || ltip.style.display !== 'none') { ltip.style.display = 'none'; tipA = null; } }
+function showLinkTip(a) {
+  if (tipA === a && ltip.style.display !== 'none') return;
+  tipA = a;
+  var href = a.getAttribute('href') || '', L = parseLink(href);
+  ltip.innerHTML = '<span class="ltip-t" title="' + esc(href) + '">' + (L.page ? '▤ ' : '↗ ') + esc(linkLabel(href)) + '</span><span class="vsep"></span>' +
+    '<button type="button" data-l="open" title="' + (L.page ? 'Aller à la page' : 'Ouvrir dans un nouvel onglet') + '">Ouvrir</button><button type="button" data-l="edit">Modifier</button><button type="button" data-l="del">Retirer</button>';
+  ltip.style.display = 'flex';
+  var rs = a.getClientRects(), r = rs.length ? rs[rs.length - 1] : a.getBoundingClientRect(), w = ltip.offsetWidth, h = ltip.offsetHeight;
+  var top = r.bottom + 6; if (top + h > innerHeight - 8) top = r.top - h - 6;
+  ltip.style.left = Math.min(Math.max(8, r.left), innerWidth - w - 8) + 'px'; ltip.style.top = Math.max(8, top) + 'px';
+}
+ltip.addEventListener('mousedown', function (e) { e.preventDefault(); });
+ltip.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-l]'), a = tipA, fld = a && fieldOf(a); if (!b || !a || !fld) return;
+  var href = a.getAttribute('href') || '', k = b.dataset.l;
+  if (k === 'open') { hideLinkTip(); if (parseLink(href).page) goLink(href); else window.open(href, '_blank', 'noopener'); }
+  else if (k === 'edit') openLinkPop(parseLink(href).page ? 'page' : 'url', null, fld, a);
+  else if (k === 'del') { hideLinkTip(); unwrap(a); fire(fld); }
+});
+window.addEventListener('scroll', hideLinkTip, { passive: true });
+document.addEventListener('selectionchange', function () {
+  var s = getSelection(), a = null;
+  if (mode === 'edit' && !pop && s.rangeCount && s.isCollapsed) {
+    var f = fieldOf(s.anchorNode), n = s.anchorNode;
+    if (f && f.hasAttribute('data-rich')) { a = (n.nodeType === 1 ? n : n.parentNode).closest('a'); if (a && !f.contains(a)) a = null; }
+  }
+  if (a) showLinkTip(a); else hideLinkTip();
+});
 function wrapInline(tag, cls, href, fld) {
   var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
   var r = s.getRangeAt(0);
