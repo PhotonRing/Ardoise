@@ -1,7 +1,7 @@
 /* ---------- Bloc requête ---------- */
 // Recherche dans le document, sans syntaxe : les fiches de faits, les lignes de tableaux ou les cases à cocher
 // d'une portée (document, page, page et sous-pages, section), filtrées par pastilles ; vue tableau, liste ou nombre.
-var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'] };
+var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'], kanban: ['Cartes de kanban', 'carte', 'cartes'] };
 function pillKeys(html) {
   // noms des pastilles d'un texte enrichi
   var out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g, m;
@@ -64,22 +64,32 @@ function queryRecords(b, pi, noTags) {
         add(it, 'items.' + i + '.done', par);
       });
       else bl.cards.forEach(function (c, ci) { var t = textOf(c.title); (c.checks || []).forEach(function (it, j) { add(it, 'cards.' + ci + '.checks.' + j + '.done', t); }); });
+    } else if (b.src === 'kanban' && bl.type === 'kanban') {
+      (bl.cols || []).forEach(function (c, ci) {
+        (c.cards || []).forEach(function (k) {
+          recs.push({ x: x, kb: k, late: kbLate(k.due, ci === bl.cols.length - 1), col: tagKey(c.title || ''), colName: String(c.title || '').trim() || 'Colonne ' + (ci + 1), tags: pillKeys((k.title || '') + ' ' + (k.html || '')),
+            cells: [{ k: 'Titre', v: k.title }, { k: 'Colonne', v: esc(c.title || '') }, { k: 'Échéance', v: k.due ? kbDate(k.due) : '' }, { k: 'Responsable', v: esc(k.who || '') }] });
+        });
+      });
     } else if ((b.src || 'facts') === 'facts' && bl.type === 'facts') {
       recs.push({ x: x, cells: bl.items.map(function (it) { return { k: String(it.k || '').trim() || 'Clé', v: it.v, alert: it.alert }; }), tags: pillKeys(bl.items.map(function (it) { return it.v; }).join(' ')) });
     }
   });
+  // kanban : une colonne
+  if (b.src === 'kanban' && b.col) recs = recs.filter(function (r) { return r.col === b.col; });
   // cases à cocher : toutes, cochées ou non cochées
   if (b.src === 'check' && (b.state === 'done' || b.state === 'todo')) recs = recs.filter(function (r) { return b.state === 'done' ? r.done : !r.done; });
   var want = noTags ? [] : b.tags || [];
   if (want.length) recs = recs.filter(function (r) { return b.match === 'all' ? want.every(function (t) { return r.tags.indexOf(t) >= 0; }) : want.some(function (t) { return r.tags.indexOf(t) >= 0; }); });
   return recs;
 }
-function filterRecs(recs, tags, match, state) {
+function filterRecs(recs, tags, match, state, col) {
   // pastilles (au moins une / toutes) et, pour les cases à cocher, état (cochées / non cochées)
   tags = tags || [];
   return recs.filter(function (r) {
     if (state === 'done' && !r.done) return false;
     if (state === 'todo' && r.done) return false;
+    if (col && r.col !== col) return false;
     if (!tags.length) return true;
     return match === 'all' ? tags.every(function (t) { return r.tags.indexOf(t) >= 0; }) : tags.some(function (t) { return r.tags.indexOf(t) >= 0; });
   });
@@ -90,6 +100,20 @@ function scopeTags(b, pi, recs) {
   docTags().forEach(function (t) { names[t.key] = t.name; });
   (recs || queryRecords(b, pi, true)).forEach(function (r) { r.tags.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); });
   return out.map(function (k) { return { key: k, name: names[k] || k }; });
+}
+function kbColumns(b, pi) {
+  // colonnes des kanbans de la portée (vides comprises) : [{ key, name }] dans l'ordre d'apparition
+  var seen = {}, out = [];
+  queryBlocks(b, pi).forEach(function (x) {
+    if (x.blk.type !== 'kanban') return;
+    (x.blk.cols || []).forEach(function (c, ci) { var k = tagKey(c.title || ''); if (!seen[k]) { seen[k] = 1; out.push({ key: k, name: String(c.title || '').trim() || 'Colonne ' + (ci + 1) }); } });
+  });
+  return out;
+}
+function qColSel(b, prop, cur, cols) {
+  var o = function (v, label) { return '<option value="' + esc(v) + '"' + ((cur || '') === v ? ' selected' : '') + '>' + label + '</option>'; };
+  var list = cols.slice(); if (cur && !list.some(function (x) { return x.key === cur; })) list.push({ key: cur, name: cur });
+  return '<select data-act="set" data-prop="' + prop + '" title="Colonne du kanban">' + o('', 'toutes les colonnes') + list.map(function (x) { return o(x.key, 'en « ' + esc(x.name) + ' »'); }).join('') + '</select>';
 }
 function qChips(act, i, avail, want, title) {
   // pastilles cliquables d'un filtre ; une pastille choisie mais absente de la portée reste affichée (barrée)
@@ -109,7 +133,7 @@ function qScopeHref(b) {
 function qDefCard(b) { return b.src === 'check' ? { label: '', tags: [], match: 'any', state: 'done', total: 'all' } : { label: '', tags: [], match: 'any', state: 'all', total: 'none' }; }
 function qCardLabel(b, c, names) {
   // texte par défaut d'une carte (remplacé par le texte saisi)
-  var src = b.src || 'facts', base = src === 'check' ? (c.state === 'done' ? 'cases cochées' : c.state === 'todo' ? 'cases à cocher restantes' : 'cases à cocher') : src === 'table' ? 'lignes de tableaux' : 'fiches de faits';
+  var src = b.src || 'facts', base = src === 'check' ? (c.state === 'done' ? 'cases cochées' : c.state === 'todo' ? 'cases à cocher restantes' : 'cases à cocher') : src === 'table' ? 'lignes de tableaux' : src === 'kanban' ? 'cartes' + (c.col ? ' en ' + (names['\u0000col:' + c.col] || c.col) : '') : 'fiches de faits';
   var t = (c.tags || []).map(function (k) { return names[k] || k; });
   return base + (t.length ? ' · ' + t.join(c.match === 'all' ? ' + ' : ' ou ') : '');
 }
@@ -117,12 +141,13 @@ function qCards(b, pi, e, recs) {
   // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui ont ses
   // propres pastilles (et, pour les cases, leur état), éventuellement rapportés à un total
   var names = {}; docTags().forEach(function (t) { names[t.key] = t.name; });
-  var avail = e ? scopeTags(b, pi, recs) : null, cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], chk = b.src === 'check';
+  var avail = e ? scopeTags(b, pi, recs) : null, cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], chk = b.src === 'check', kbc = b.src === 'kanban' ? kbColumns(b, pi) : [];
+  kbc.forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
   var o = function (v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
-  var stSel = function (p, cur) { return chk ? '<select data-act="set" data-prop="' + p + '">' + o('all', cur || 'all', 'toutes') + o('done', cur, 'cochées') + o('todo', cur, 'non cochées') + '</select>' : ''; };
+  var stSel = function (p, cur) { if (kbc.length || b.src === 'kanban') return qColSel(b, p.replace(/state$/, 'col'), (function () { var m = p.match(/^cards\.(\d+)\.(t?)state$/); return m ? cards[+m[1]][m[2] + 'col'] : ''; })(), kbc); return chk ? '<select data-act="set" data-prop="' + p + '">' + o('all', cur || 'all', 'toutes') + o('done', cur, 'cochées') + o('todo', cur, 'non cochées') + '</select>' : ''; };
   return '<div class="q-cards">' + cards.map(function (c, i) {
-    var num = filterRecs(recs, c.tags, c.match, c.state).length;
-    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate).length : null;
+    var num = filterRecs(recs, c.tags, c.match, c.state, c.col).length;
+    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate, c.tcol).length : null;
     var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0, def = qCardLabel(b, c, names);
     var lab = e ? '<span class="fld q-lab" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="cards.' + i + '.label" data-nl data-ph="' + esc(def) + '">' + esc(c.label || '') + '</span>'
       : '<span class="q-lab">' + esc(String(c.label || '').trim() || def) + '</span>';
@@ -199,11 +224,35 @@ function qTh(b, key, label) {
   if (staticRender) return '<th>' + esc(label) + '</th>';
   return '<th><button type="button" class="q-th" data-qsort="' + esc(key) + '" title="Trier">' + esc(label) + (on ? '<span class="q-dir">' + (sp.dir === 'desc' ? ' ↓' : ' ↑') + '</span>' : '') + '</button></th>';
 }
+function qKanban(b, recs, pi) {
+  // résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie
+  var src = b.src || 'facts', groups = [], gi = {};
+  var add = function (key, name, r) { if (!(key in gi)) { gi[key] = groups.length; groups.push({ name: name, recs: [] }); } if (r) groups[gi[key]].recs.push(r); };
+  var gb = src === 'check' || src === 'kanban' ? '' : (b.groupBy || (qSortOptions(b, recs)[0] || [''])[0]);
+  if (src === 'check') { add('0', 'Non cochées'); add('1', 'Cochées'); }
+  if (src === 'kanban') kbColumns(b, pi).forEach(function (c) { if (!b.col || c.key === b.col) add(c.key, c.name); });   // colonnes vides comprises
+  recs.forEach(function (r) {
+    if (src === 'kanban') return add(r.col, r.colName, r);
+    if (src === 'check') return add(r.done ? '1' : '0', '', r);
+    var c = null; for (var i = 0; i < r.cells.length; i++) if ('c:' + r.cells[i].k.toLowerCase() === gb) c = r.cells[i];
+    var t = c ? htmlText(c.v).replace(/\s+/g, ' ').trim() : ''; add(t.toLowerCase(), t || '(vide)', r);
+  });
+  var card = function (r) {
+    if (src === 'kanban') { var k = r.kb; return '<article class="kb-card"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
+      (k.due || k.who ? '<div class="kb-meta">' + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(r.x) + '</article>'; }
+    if (src === 'check') return '<article class="kb-card' + (r.done ? ' done' : '') + '"><div class="q-it">' + qBox(r) + ' ' + (r.par ? '<span class="q-par">' + esc(r.par) + ' › </span>' : '') + R(r.html) + '</div>' + qSource(r.x) + '</article>';
+    return '<article class="kb-card"><div class="q-kvs">' + r.cells.filter(function (c) { return 'c:' + c.k.toLowerCase() !== gb && !isBlank(c.v); }).map(function (c) { return '<span class="q-kv"><span class="q-k">' + esc(c.k) + '</span> ' + R(c.v) + '</span>'; }).join('') + '</div>' + qSource(r.x) + '</article>';
+  };
+  return '<div class="kb kb-q"><div class="kb-cols">' + groups.map(function (g) {
+    return '<section class="kb-col"><div class="kb-head"><span class="kb-title">' + esc(g.name) + '</span><span class="kb-n">' + g.recs.length + '</span></div><div class="kb-list">' + (g.recs.map(card).join('') || '<p class="kb-empty">—</p>') + '</div></section>';
+  }).join('') + '</div></div>';
+}
 function queryResult(b, pi, e) {
   var recs = queryRecords(b, pi), src = b.src || 'facts', view = b.view || 'table';
   if (view === 'count') return qCards(b, pi, e, recs);
   if (!recs.length) return '<p class="muted q-empty">Aucun résultat.</p>';
   recs = qSorted(b, recs);
+  if (view === 'kanban') return qKanban(b, recs, pi);
   var total = recs.length, lim = Math.max(0, +b.limit || 0);
   if (lim && recs.length > lim) recs = recs.slice(0, lim);
   var more = recs.length < total ? '<p class="muted q-more">' + recs.length + ' premiers résultats sur ' + total + '</p>' : '';
@@ -239,17 +288,19 @@ function queryForm(b) {
   var want = b.tags || [], chips = qChips('q-tag', null, scopeTags(b, doc.cur), want, 'tous les résultats');
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   return '<div class="q-form">' +
-    '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + '</select></label>' +
+    '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + '</select></label>' +
+    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, doc.cur)) : '') +
     (b.src === 'check' ? '<select data-act="set" data-prop="state" title="État des cases">' + o('all', b.state || 'all', 'toutes') + o('done', b.state, 'cochées') + o('todo', b.state, 'non cochées') + '</select>' : '') +
     '<label>dans <select data-act="set" data-prop="scope" class="q-scope">' + scopes + '</select></label>' +
     (pageScope ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') +
     '<div class="q-tags"><span class="q-lbl">' + (b.view === 'count' ? 'Parmi ceux qui ont les pastilles' : 'Avec les pastilles') + '</span>' + chips +
     (want.length > 1 ? '<select data-act="set" data-prop="match" title="Combinaison des pastilles">' + o('any', b.match || 'any', 'au moins une') + o('all', b.match, 'toutes') + '</select>' : '') +
     (want.length ? '' : '<span class="muted q-hint">(aucune choisie : tout est retenu)</span>') + '</div>' +
-    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('count', b.view, 'le nombre') + '</select></label>' +
+    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + '</select></label>' +
+    (b.view === 'kanban' && b.src !== 'check' && b.src !== 'kanban' ? '<label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, doc.cur)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label>' : '') +
     (b.view !== 'count' ? '<label>trier par <select data-act="set" data-prop="sortBy">' + o('', b.sortBy || '', 'ordre du document') +
       qSortOptions(b, queryRecords(b, doc.cur)).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
       (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
-      '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>' : '') +
+      (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
     '</div>';
 }

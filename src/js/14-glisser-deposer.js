@@ -142,3 +142,36 @@ function tgEnd(apply) {
   lastCell = d.kind === 'row' ? { b: d.b.id, r: at, c: 0 } : { b: d.b.id, r: 1, c: at };
 }
 document.addEventListener('keydown', function (e) { if (tgDrag && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); tgEnd(false); } }, true);
+
+/* ---------- Glisser-déposer des cartes de kanban (édition : par la poignée ; lecture : la carte entière) ---------- */
+var kbDrag = null, kbDrop = null, kbLine = null;
+app.addEventListener('mousedown', function (e) { var g = e.target.closest && e.target.closest('.kb-grip'); if (g) g.closest('.kb-card').setAttribute('draggable', 'true'); });
+app.addEventListener('dragstart', function (e) {
+  var c = e.target.closest && e.target.closest('.kb-card[draggable=true]'); if (!c) return;
+  kbDrag = { b: c.closest('[data-kb]').dataset.kb, ci: +c.dataset.ci, ki: +c.dataset.ki }; kbDrop = null; c.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', c.textContent.trim().slice(0, 80)); } catch (_) {}
+});
+app.addEventListener('dragover', function (e) {
+  if (!kbDrag) return;
+  var col = e.target.closest && e.target.closest('[data-kb="' + kbDrag.b + '"] .kb-col');
+  if (!kbLine) { kbLine = document.createElement('div'); kbLine.className = 'drop-line'; ui.appendChild(kbLine); }
+  if (!col) { kbLine.style.display = 'none'; kbDrop = null; return; }
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  var cards = $$('.kb-card', col), k = cards.length, list = $('.kb-list', col);
+  for (var i = 0; i < cards.length; i++) { var r = cards[i].getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { k = i; break; } }
+  kbDrop = { tc: +col.dataset.ci, tk: k };
+  var lr = list.getBoundingClientRect(), y = k < cards.length ? cards[k].getBoundingClientRect().top - 5 : (cards.length ? cards[cards.length - 1].getBoundingClientRect().bottom + 3 : lr.top + 4);
+  kbLine.style.left = (lr.left + 4) + 'px'; kbLine.style.width = (lr.width - 8) + 'px'; kbLine.style.height = '3px'; kbLine.style.top = y + 'px'; kbLine.style.display = 'block';
+});
+app.addEventListener('drop', function (e) {
+  if (!kbDrag) return;
+  e.preventDefault(); var d = kbDrag, t = kbDrop; kbEnd();
+  var b = byId(d.b); if (b && t) kbMove(b, d.ci, d.ki, t.tc, t.tk);
+});
+function kbEnd() {
+  if (kbLine) kbLine.style.display = 'none';
+  $$('.kb-card.dragging', app).forEach(function (c) { c.classList.remove('dragging'); });
+  $$('.kb-edit .kb-card[draggable]', app).forEach(function (c) { c.removeAttribute('draggable'); });
+  kbDrag = null; kbDrop = null;
+}
+app.addEventListener('dragend', function () { if (kbDrag) kbEnd(); });

@@ -52,8 +52,21 @@ function caretOffset(el) {
 }
 function setCaretOffset(el, n) {
   var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), t, r = document.createRange();
-  while ((t = w.nextNode())) { if (n <= t.nodeValue.length) { r.setStart(t, n); r.collapse(true); var s = getSelection(); s.removeAllRanges(); s.addRange(r); return; } n -= t.nodeValue.length; }
+  while ((t = w.nextNode())) {
+    var inTab = t.parentNode.closest && t.parentNode.closest('span.tab');
+    if (n < t.nodeValue.length || (n === t.nodeValue.length && !inTab)) { r.setStart(t, n); r.collapse(true); var s = getSelection(); s.removeAllRanges(); s.addRange(r); return; }
+    if (n === t.nodeValue.length && inTab) { tabExit(inTab); return; }
+    n -= t.nodeValue.length;
+  }
   caretTo(el, true);
+}
+function tabExit(tab) {
+  // curseur juste après un taquet et ceux qui le suivent (sinon la saisie irait dedans, invisible)
+  for (var q = tab.nextSibling; q; q = q.nextSibling) { if (q.nodeType === 3 && q.nodeValue.replace(/\u200B/g, '') === '') continue; if (q.nodeType === 1 && q.classList.contains('tab')) { tab = q; continue; } break; }
+  var nx = tab.nextSibling, r = document.createRange(), s = getSelection();
+  if (nx && nx.nodeType === 3 && nx.nodeValue.length) r.setStart(nx, 0);
+  else { var z = document.createTextNode('\u200B'); tab.parentNode.insertBefore(z, nx); r.setStart(z, 1); }
+  r.collapse(true); s.removeAllRanges(); s.addRange(r);
 }
 function extractTail(el) {
   var s = getSelection(); var r0 = s.getRangeAt(0); r0.deleteContents();

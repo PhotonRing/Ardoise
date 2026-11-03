@@ -284,3 +284,18 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-cadd{align-self:center;border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;padding:8px 14px;cursor:pointer;font:500 13px var(--f-body)}
 .q-cadd:hover{border-color:var(--accent);color:var(--accent)}
 .q-chip.q-gone{text-decoration:line-through}
+
+.kb-edit .kb-card{padding-top:26px}
+.kb-ct.fld,.kb-tx.fld{display:block}
+.kb-title.fld{display:block}
+.kb-whoi.fld{display:inline-block;min-width:9ch}
+.kb-duei{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.kb-duei span{font-size:11px}
+.kb-duei input{font:500 12px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:24px;padding:0 4px}
+.kb-ctools{display:flex;gap:1px}
+.kb-ctools button{border:0;background:none;color:var(--muted);width:20px;height:20px;border-radius:4px;cursor:pointer;padding:0}
+.kb-ctools button:hover:not(:disabled){background:var(--accent-soft);color:var(--accent)}
+.kb-ctools button:disabled{opacity:.3;cursor:default}
+.kb-add,.kb-addcol{border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;padding:7px 10px;cursor:pointer;font:500 12.5px var(--f-body)}
+.kb-add:hover,.kb-addcol:hover{border-color:var(--accent);color:var(--accent)}
+.kb-addcol{flex:0 0 auto;align-self:flex-start}

@@ -11,6 +11,22 @@ app.addEventListener('input', function (e) {
   if (el.matches('.zn-in')) { var bz = byId(el.dataset.b); bz.zones[+el.dataset.zn].label = el.value; var mz = mapOf(bz.id); if (mz) mz.setZones(bz.zones); markDirty(); return; }
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img')) el.innerHTML = '';
+  if (el.querySelector('span.tab, span.ln')) {
+    // enveloppes des lignes en retrait recalculées ; le curseur est gardé par un repère (les sauts de ligne ne comptent pas comme des caractères)
+    var sl = getSelection(), mk = null;
+    if (sl.rangeCount && sl.isCollapsed && el.contains(sl.anchorNode)) { mk = document.createElement('i'); var rr = sl.getRangeAt(0).cloneRange(); rr.insertNode(mk); }
+    layoutLines(el);
+    if (mk) {
+      var pv = mk.previousSibling, cr2 = document.createRange(); cr2.setStartBefore(mk); cr2.collapse(true); mk.remove();
+      sl.removeAllRanges(); sl.addRange(cr2);
+      if (pv && pv.nodeType === 1 && pv.classList.contains('tab')) tabExit(pv);
+    }
+  }
+  $$('span.tab', el).forEach(function (t) {
+    if (t.textContent === '\t') return;
+    var extra = t.textContent.replace(/\t/g, ''); t.textContent = '\t';
+    if (extra) { var tn = document.createTextNode(extra); t.after(tn); var r = document.createRange(); r.setStart(tn, extra.length); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  });
   var bl = byId(el.dataset.b); if (!bl) return;
   if (bl.type === 'p' && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
     // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
@@ -36,6 +52,7 @@ app.addEventListener('beforeinput', function (e) {
 });
 app.addEventListener('change', function (e) {
   var el = e.target;
+  if (el.matches('input.kb-due-in')) { var bk = byId(el.dataset.b); if (bk) { var dv = el.value || ''; change(function () { setPath(bk, el.dataset.k, dv); }); } return; }
   if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); change(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
@@ -123,8 +140,13 @@ app.addEventListener('keydown', function (e) {
       return;
     }
     if (b.type === 'p') {
-      var tail = extractTail(el); b.html = sanitize(el.innerHTML);
-      insertAt(idx(b) + 1, 'p', b.indent > 0 ? { html: tail, indent: b.indent } : { html: tail }); return;
+      // Entrée passe à la ligne ; Entrée sur la dernière ligne restée vide (ou dans un paragraphe vide) crée un nouveau bloc
+      var lb = lineBefore(el);
+      if (caretAtEnd(el) && (el.textContent.replace(/\u200B/g, '') === '' || (lb.multi && lb.line === ''))) {
+        b.html = sanitize(el.innerHTML);   // la ligne vide finale disparaît (l'assainissement retire les sauts de ligne finaux)
+        insertAt(idx(b) + 1, 'p', b.indent > 0 ? { indent: b.indent } : {}); return;
+      }
+      document.execCommand('insertLineBreak'); return;
     }
     if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'subtitle', 'step'].indexOf(b.type) >= 0) {
       if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
@@ -132,7 +154,11 @@ app.addEventListener('keydown', function (e) {
     }
     nextField(el, 1); return;
   }
-  if (e.key === 'Tab' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); indentPara(b, el, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Tab' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    if (!indentLine(el, e.shiftKey ? -1 : 1) && e.shiftKey && b.indent > 0) indentPara(b, el, -1);   // ancien retrait du paragraphe entier
+    return;
+  }
   if (e.key === 'Backspace' && b.type === 'p' && b.indent > 0 && caretAtStart(el)) { e.preventDefault(); indentPara(b, el, -1); return; }
   if (el.hasAttribute('data-li') && (b.type === 'list' || b.type === 'check')) {
     // sous-niveaux : Tab / Maj+Tab, ou Retour arrière en début d'un élément en retrait
@@ -225,6 +251,42 @@ function cellArrow(e, el, b, k) {
   if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(r > 0 && focusCell(b, r - 1, c, true))) leaveTable(el, b, -1); return true; }
   if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(r < nr - 1 && focusCell(b, r + 1, c, false))) leaveTable(el, b, 1); return true; }
   return false;
+}
+function lineBefore(el) {
+  // texte de la ligne du curseur avant lui, et présence d'une ligne au-dessus (saut de ligne avant le curseur)
+  var s = getSelection(); if (!s.rangeCount) return { line: '', multi: false };
+  var r = document.createRange(); r.selectNodeContents(el); r.setEnd(s.anchorNode, s.anchorOffset);
+  var d = document.createElement('div'); d.appendChild(r.cloneContents());
+  $$('br', d).forEach(function (br) { br.replaceWith('\n'); });
+  var t = d.textContent.replace(/​/g, ''), i = t.lastIndexOf('\n');
+  return { line: i < 0 ? t : t.slice(i + 1), multi: i >= 0 };
+}
+function lineStart(el) {
+  // position du début de la ligne du curseur : juste après le saut de ligne qui la précède, sinon début du champ
+  var s = getSelection(), cr = s.getRangeAt(0), start = document.createRange(), brs = $$('br', el), last = null;
+  brs.forEach(function (br) { var t = document.createRange(); t.setStartAfter(br); if (t.compareBoundaryPoints(Range.START_TO_START, cr) <= 0) last = br; });
+  if (last) start.setStartAfter(last); else start.setStart(el, 0);
+  start.collapse(true); return start;
+}
+function lineTabs(el) {
+  // taquets en début de la ligne du curseur (dans l'ordre)
+  var st = lineStart(el), n = st.startContainer.nodeType === 3 ? st.startContainer : st.startContainer.childNodes[st.startOffset], out = [];
+  for (; n; n = n.nextSibling) {
+    if (n.nodeType === 1 && n.classList.contains('ln')) { n = { nextSibling: n.firstChild }; continue; }   // ligne enveloppée (retrait suspendu)
+    if (n.nodeType === 3) { if (n.nodeValue.replace(/​/g, '') === '') continue; break; }
+    if (n.nodeType === 1 && n.classList.contains('tab')) out.push(n); else break;
+  }
+  return out;
+}
+function indentLine(el, d) {
+  // retrait de la ligne du curseur : un taquet (span.tab) de plus en début de ligne, ou un de moins. Vrai si la ligne a changé
+  var tabs = lineTabs(el);
+  if (d > 0) { var tab = document.createElement('span'); tab.className = 'tab'; tab.textContent = '\t'; lineStart(el).insertNode(tab); tabs = lineTabs(el); }
+  else { if (!tabs.length) return false; tabs.pop().remove(); }
+  // curseur : s'il était en début de ligne (avant ou dans les taquets), juste après le dernier taquet
+  var s = getSelection(), cr = s.getRangeAt(0), last = tabs[tabs.length - 1];
+  if (last) { var after = document.createRange(); after.setStartAfter(last); if (cr.compareBoundaryPoints(Range.START_TO_START, after) <= 0 || cr.startContainer.parentNode.closest('span.tab')) tabExit(last); }
+  fire(el); return true;
 }
 function indentPara(b, el, d) {
   // retrait du paragraphe, appliqué en place pour garder le curseur où il est

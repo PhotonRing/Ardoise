@@ -37,11 +37,12 @@ function renderPage(d, edit, vf) {
 function renderBlock(b, e, num) {
   function f(tag, cls, k, val, o) {
     o = o || {};
-    var rich = o.rich !== false;
-    if (!e) return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + (rich ? R(val) : esc(val)) + '</' + tag + '>';
+    var rich = o.rich !== false, body = rich ? R(val) : esc(val);
+    if (o.lines) body = linesHTML(body);   // paragraphe : retrait suspendu des lignes en retrait
+    if (!e) return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + body + '</' + tag + '>';
     return '<' + tag + ' class="' + (cls ? cls + ' ' : '') + 'fld' + (o.soft ? ' soft' : '') + '" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="' + k + '"' +
       (rich ? ' data-rich' : '') + (o.li ? ' data-li' : '') + (o.cell ? ' data-cell' : '') + (o.ml ? ' data-ml' : '') + (o.nl ? ' data-nl' : '') +
-      ' data-ph="' + esc(o.ph || '') + '">' + (rich ? R(val) : esc(val)) + '</' + tag + '>';
+      ' data-ph="' + esc(o.ph || '') + '">' + body + '</' + tag + '>';
   }
   function checks(base, arr) {
     if (!arr.length) return e ? '<button class="mini-add" type="button" data-act="item-add" data-k="' + base + '">+ case à cocher</button>' : '';
@@ -67,7 +68,7 @@ function renderBlock(b, e, num) {
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
     case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1 });
+    case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1, lines: 1 });
     case 'step':
       var badge = '';
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
@@ -77,6 +78,7 @@ function renderBlock(b, e, num) {
       if (!e && !sl) return '';
       return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
+    case 'kanban': return kanbanHTML(b, e, f);
     case 'query':
       return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur, e) + '</div></div>';

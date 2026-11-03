@@ -1,5 +1,5 @@
 /* ---------- Assainissement du texte riche ---------- */
-var SPAN_CLASSES = ['pill', 'alert'];   // et pc-N : couleur d'exception d'une pastille
+var SPAN_CLASSES = ['pill', 'alert', 'tab'];   // tab : retrait d'une ligne de paragraphe   // et pc-N : couleur d'exception d'une pastille
 var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg|math|noscript|input|button|select|textarea|img|video|audio|canvas|form)$/;
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;
 var sanCache = new Map();
@@ -50,6 +50,31 @@ function walk(src, dst) {
   }
 }
 var R = sanitize;
+function layoutLines(root) {
+  // lignes d'un paragraphe qui commencent par des taquets : enveloppées dans span.ln (bloc à retrait suspendu),
+  // pour que le texte renvoyé à la ligne reste aligné. Jamais enregistré (l'assainissement retire l'enveloppe)
+  Array.prototype.slice.call(root.querySelectorAll('span.ln')).forEach(function (w) { while (w.firstChild) w.parentNode.insertBefore(w.firstChild, w); w.remove(); });
+  if (!root.querySelector('span.tab')) return;
+  var lines = [[]];
+  Array.prototype.slice.call(root.childNodes).forEach(function (n) { if (n.nodeName === 'BR') lines.push([]); else lines[lines.length - 1].push(n); });
+  lines.forEach(function (ns) {
+    var k = 0;
+    for (var i = 0; i < ns.length; i++) {
+      var n = ns[i];
+      if (n.nodeType === 3 && n.nodeValue.replace(/​/g, '') === '') continue;
+      if (n.nodeType === 1 && n.classList.contains('tab')) { k++; continue; }
+      break;
+    }
+    if (!k) return;
+    var w = document.createElement('span'); w.className = 'ln'; w.style.setProperty('--n', k);
+    ns[0].parentNode.insertBefore(w, ns[0]); ns.forEach(function (n) { w.appendChild(n); });
+  });
+}
+function linesHTML(html) {
+  // rendu d'un paragraphe avec ses retraits de ligne
+  if (html.indexOf('class="tab"') < 0) return html;
+  var d = document.createElement('div'); d.innerHTML = html; layoutLines(d); return d.innerHTML;
+}
 function textOf(html) { var d = document.createElement('div'); d.innerHTML = R(html); return d.textContent.replace(/\s+/g, ' ').trim(); }
 function isBlank(html) { return !textOf(html); }
 

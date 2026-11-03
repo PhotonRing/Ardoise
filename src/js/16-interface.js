@@ -369,6 +369,10 @@ ltip.addEventListener('click', function (e) {
 window.addEventListener('scroll', hideLinkTip, { passive: true });
 document.addEventListener('selectionchange', function () {
   var s = getSelection(), a = null;
+  if (mode === 'edit' && s.rangeCount && s.isCollapsed && s.anchorNode) {
+    var tb = (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest('span.tab');
+    if (tb && fieldOf(tb)) { tabExit(tb); return; }   // le curseur ne reste pas dans un taquet
+  }
   if (mode === 'edit' && !pop && s.rangeCount && s.isCollapsed) {
     var f = fieldOf(s.anchorNode), n = s.anchorNode;
     if (f && f.hasAttribute('data-rich')) { a = (n.nodeType === 1 ? n : n.parentNode).closest('a, span.pill'); if (a && !f.contains(a)) a = null; }

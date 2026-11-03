@@ -8,6 +8,16 @@ app.addEventListener('click', function (e) {
   switch (a.dataset.act) {
     case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }); break;
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
+    case 'kb-card-add': var n0 = (b.cols[i].cards || []).length; change(function () { (b.cols[i].cards = b.cols[i].cards || []).push(kbNewCard()); }, { b: b.id, k: 'cols.' + i + '.cards.' + n0 + '.title' }); break;
+    case 'kb-card-del': change(function () { b.cols[+a.dataset.ci].cards.splice(+a.dataset.ki, 1); }); break;
+    case 'kb-col-add': change(function () { b.cols.push({ id: uid(), title: '', cards: [] }); }, { b: b.id, k: 'cols.' + b.cols.length + '.title' }); break;
+    case 'kb-col-del':
+      var kc = b.cols[i], nk = (kc.cards || []).length;
+      if (nk && !confirm('Supprimer la colonne « ' + (kc.title || 'sans titre') + ' » et ses ' + nk + ' carte' + (nk > 1 ? 's' : '') + ' ? (Ctrl+Z pour annuler)')) break;
+      change(function () { b.cols.splice(i, 1); }); break;
+    case 'kb-col-left': case 'kb-col-right':
+      var j2 = i + (a.dataset.act === 'kb-col-left' ? -1 : 1); if (j2 < 0 || j2 >= b.cols.length) break;
+      change(function () { var t = b.cols[i]; b.cols[i] = b.cols[j2]; b.cols[j2] = t; }); break;
     case 'q-card-add': change(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; b.cards.push(qDefCard(b)); }, { b: b.id, k: 'cards.' + ((b.cards && b.cards.length) || 1) + '.label' }); break;
     case 'q-card-del': if (b.cards && b.cards.length > 1) change(function () { b.cards.splice(i, 1); }); break;
     case 'q-ctag': case 'q-ttag':

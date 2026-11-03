@@ -98,6 +98,8 @@ app.addEventListener('click', function (e) {
   if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
   if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; change(function () { revealBlock(sid); }); }
+  var km = t.closest('[data-kbmove]');
+  if (km) { var kp = km.dataset.kbmove.split('|'), kb = byId(kp[0]); if (kb) kbMoveMenu(km, kb, +kp[1], +kp[2]); return; }
   var qc = t.closest('[data-qchk]');
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)

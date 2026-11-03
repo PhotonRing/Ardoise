@@ -15,6 +15,11 @@ function normBlocks(arr, newer) {
     for (var k in b) nb[k] = b[k];
     // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
     if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) nb.cards = [qDefCard(nb)];
+    if (nb.type === 'kanban') nb.cols = (Array.isArray(nb.cols) ? nb.cols : []).filter(function (c) { return c && typeof c === 'object'; }).map(function (c) {
+      var o = {}; for (var ck in c) o[ck] = c[ck]; o.id = c.id || uid(); o.title = String(c.title || '');
+      o.cards = (Array.isArray(c.cards) ? c.cards : []).filter(function (k) { return k && typeof k === 'object'; }).map(function (k) { var q = kbNewCard(); for (var kk in k) q[kk] = k[kk]; return q; });
+      return o;
+    });
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
   });
