@@ -163,6 +163,10 @@ app.addEventListener('keydown', function (e) {
     if (!indentLine(el, e.shiftKey ? -1 : 1) && e.shiftKey && b.indent > 0) indentPara(b, el, -1);   // ancien retrait du paragraphe entier
     return;
   }
+  if (e.key === 'Backspace' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && getSelection().isCollapsed && lineTabs(el).length && lineBefore(el).line.replace(/[\t\u200B]/g, '') === '') {
+    // début du texte d'une ligne en retrait : un niveau de retrait en moins (même si un espace sans chasse précède le curseur)
+    e.preventDefault(); indentLine(el, -1); return;
+  }
   if (e.key === 'Backspace' && b.type === 'p' && b.indent > 0 && caretAtStart(el)) { e.preventDefault(); indentPara(b, el, -1); return; }
   if (el.hasAttribute('data-li') && (b.type === 'list' || b.type === 'check')) {
     // sous-niveaux : Tab / Maj+Tab, ou Retour arrière en début d'un élément en retrait

@@ -15,7 +15,7 @@
 
 ## Fonctions
 
-- **Blocs** : en-tête, titres de section et sous-sections (repris dans le sommaire), sous-titres (hors sommaire), paragraphes (`Entrée` passe à la ligne, une seconde fois sur une ligne vide crée un nouveau bloc ; `Tab` met la ligne en retrait, la ligne suivante garde ce retrait, et une ligne longue reste alignée sur son retrait), étapes numérotées, fiche de faits, cartes, listes à cocher, tableaux, encadrés, blocs dépliables, images intégrées (depuis un fichier, le presse-papiers ou une adresse web, toujours stockées dans le document), séparateurs, pied de page.
+- **Blocs** : en-tête, titres de section et sous-sections (repris dans le sommaire), sous-titres (hors sommaire), paragraphes (`Entrée` passe à la ligne, une seconde fois sur une ligne vide crée un nouveau bloc ; `Tab` met la ligne en retrait, `Maj+Tab` ou `Retour arrière` en début de ligne en retirent un niveau, la ligne suivante garde ce retrait, et une ligne longue reste alignée sur son retrait), étapes numérotées, fiche de faits, cartes, listes à cocher, tableaux, encadrés, blocs dépliables, images intégrées (depuis un fichier, le presse-papiers ou une adresse web, toujours stockées dans le document), séparateurs, pied de page.
 - **Code** : trois styles (sombre, boîte avec nom de fichier et numéros de ligne, commande), coloration Bash, Python, PowerShell, JavaScript, JSON, YAML, SQL, HTML, C/Java/Go/Rust, détectée automatiquement.
 - **Chronologies** verticales ou horizontales (titres inclinés), styles et libellés des liens, bulles de description.
 - **Cartes géographiques** : fond simplifié intégré utilisable hors ligne, plan et satellite en ligne ; points, zones, cercles, itinéraires avec distances (km et milles nautiques), étiquettes déplaçables.
