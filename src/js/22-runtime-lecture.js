@@ -153,6 +153,7 @@ function exportPages() {
 function exportStatic() {
   if (isSealed() && !confirm('L’export statique n’est pas chiffré : la page exportée sera lisible par toute personne qui obtient le fichier. Continuer ?')) return;
   if (htimer) snapshot();
+  staticRender = true;
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
     ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
@@ -164,6 +165,7 @@ function exportStatic() {
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +
     '</body>\n</html>\n';
+  staticRender = false;
   download(html, fileName().replace(/\.html?$/i, '') + '-lecture.html');
   toast('Page statique téléchargée');
 }

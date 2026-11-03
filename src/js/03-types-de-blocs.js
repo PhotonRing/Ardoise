@@ -5,7 +5,7 @@ var T = {
   h3:      { label: 'Sous-section', ic: 'H3', desc: 'Niveau sous la section, repris dans le sommaire', kw: 'titre heading sous-section sous section', make: function () { return { html: '' }; } },
   subtitle: { label: 'Sous-titre', ic: 'T', desc: 'Petit titre, hors du sommaire', kw: 'titre sous-titre intertitre', make: function () { return { html: '' }; } },
   p:       { label: 'Paragraphe', ic: '¶', desc: 'Texte courant', kw: 'texte paragraphe', make: function () { return { html: '' }; } },
-  summary: { label: 'Sommaire', ic: '☰', desc: 'Sections ou sous-pages de la page, tenu à jour', kw: 'sommaire table des matieres toc index sections sous-pages plan', make: function () { return { title: 'Sommaire', src: 'sec', sort: 'doc', deep: true }; } },
+  summary: { label: 'Sommaire', ic: '☰', desc: 'Sections ou sous-pages de la page, tenu à jour', kw: 'sommaire table des matieres toc index sections sous-pages plan', make: function () { return { title: 'Sommaire', src: 'sec', sort: 'doc' }; } },
   query:   { label: 'Requête', ic: '⌕', desc: 'Fiches de faits, lignes de tableaux ou cases à cocher filtrées par pastilles : tableau, liste ou nombre', kw: 'requete query dataview filtre recherche pastille tag compteur widget tableau liste nombre',
     make: function () { return { title: '', src: 'facts', scope: 'doc', tags: [], match: 'any', view: 'table', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }; } },
   step:    { label: 'Étape numérotée', ic: '1.', desc: 'Ouvre une section avec pastille de numéro', kw: 'etape section numero step', make: function () { return { num: '', title: '', nonum: false }; } },

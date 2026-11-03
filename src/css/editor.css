@@ -29,6 +29,7 @@ html.is-edit section.step{gap:40px}
 .fab:hover,.fab:focus-within,.fab.dirty{opacity:1}
 .fab .ub{border-radius:999px}
 .fab .st{padding-left:8px}
+@media (max-width:560px){.fab .lbl{display:none}}
 .pop{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:6px;min-width:240px;max-width:calc(100vw - 16px);max-height:min(72vh,560px);overflow:auto}
 .pop h4{margin:8px 8px 6px;font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .mi{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:7px 8px;border-radius:7px;border:0;background:none;cursor:pointer}

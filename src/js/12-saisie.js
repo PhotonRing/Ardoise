@@ -40,6 +40,7 @@ app.addEventListener('change', function (e) {
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
     setPath(b, el.dataset.k, el.checked); snapshot(); markDirty(true);
+    if (b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast')) { var sy = scrollY; render(); scrollTo(0, sy); var cb = $('[data-b="' + b.id + '"][data-k="' + el.dataset.k + '"]', app); if (cb) cb.focus({ preventScroll: true }); }
     if (doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
     return;
   }
@@ -60,7 +61,7 @@ app.addEventListener('change', function (e) {
   if (el.matches('select[data-act=set]')) {
     var blk = byId(el.closest('.blk').dataset.id), prop = el.dataset.prop, v = el.value;
     holdBar(blk.id); keepView(blk); change(function () {
-      if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height') ? +v : v;
+      if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
       // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
       if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
     }, { b: blk.id });

@@ -378,3 +378,24 @@ html.nav-tabs:not(.is-edit){scroll-padding-top:70px}
 .q-cards{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}
 .q-cards .q-count{flex:1 1 180px;max-width:100%}
 .q-lab{font:500 12px/1.3 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+
+/* barres de défilement fines, aux couleurs du thème (onglets, sommaire, tableaux, code) */
+.tabs-in,.tabs-sub,.pnav-side,.tablewrap,.code pre,.codebox pre,pre.cmd,.toc-blk{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 40%,transparent) transparent}
+.tabs-in::-webkit-scrollbar,.tabs-sub::-webkit-scrollbar,.pnav-side::-webkit-scrollbar,.tablewrap::-webkit-scrollbar,.code pre::-webkit-scrollbar,.codebox pre::-webkit-scrollbar,pre.cmd::-webkit-scrollbar{width:6px;height:6px}
+.tabs-in::-webkit-scrollbar-thumb,.tabs-sub::-webkit-scrollbar-thumb,.pnav-side::-webkit-scrollbar-thumb,.tablewrap::-webkit-scrollbar-thumb,.code pre::-webkit-scrollbar-thumb,.codebox pre::-webkit-scrollbar-thumb,pre.cmd::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 40%,transparent);border-radius:3px}
+.tabs-in::-webkit-scrollbar-track,.tabs-sub::-webkit-scrollbar-track,.pnav-side::-webkit-scrollbar-track,.tablewrap::-webkit-scrollbar-track,.code pre::-webkit-scrollbar-track,.codebox pre::-webkit-scrollbar-track,pre.cmd::-webkit-scrollbar-track{background:transparent}
+.tabs-in:hover,.tabs-sub:hover,.pnav-side:hover{scrollbar-color:color-mix(in srgb,var(--muted) 65%,transparent) transparent}
+
+/* bloc requête : cases cochables, tri par en-tête, parent, carte liée */
+.q-box{border:0;background:none;padding:0;color:var(--accent);font-size:16px;line-height:1;cursor:pointer;width:1.5em}
+span.q-box{cursor:default}
+.q-boxc{width:2em}
+.q-par{color:var(--muted)}
+.q-th{border:0;background:none;padding:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer}
+.q-th:hover{color:var(--accent)}
+.q-dir{color:var(--accent)}
+.q-more{margin:6px 0 0;font-size:12.5px}
+a.q-count{text-decoration:none;color:inherit}
+.q-linked:hover{border-color:var(--accent)}
+.q-go{position:absolute;top:6px;right:32px;width:22px;height:22px;display:grid;place-items:center;border-radius:5px;color:var(--muted);text-decoration:none}
+.q-go:hover{background:var(--accent-soft);color:var(--accent)}

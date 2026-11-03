@@ -45,8 +45,10 @@ function renderBlock(b, e, num) {
   }
   function checks(base, arr) {
     if (!arr.length) return e ? '<button class="mini-add" type="button" data-act="item-add" data-k="' + base + '">+ case à cocher</button>' : '';
-    return '<ul class="check">' + arr.map(function (it, i) {
-      var id = b.id + '-' + base.replace(/\./g, '-') + '-' + i;
+    // ordre d'affichage (liste à cocher) : l'ordre saisi reste celui du document ; les sous-éléments suivent leur parent
+    var order = b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast') ? checkOrder(arr, b.order) : arr.map(function (x, k) { return k; });
+    return '<ul class="check">' + order.map(function (i) {
+      var it = arr[i], id = b.id + '-' + base.replace(/\./g, '-') + '-' + i;
       return '<li' + (it.lv > 0 ? ' class="lv-' + Math.min(6, +it.lv) + '"' : '') + '><input type="checkbox" id="' + id + '" data-b="' + b.id + '" data-k="' + base + '.' + i + '.done"' + (it.done ? ' checked' : '') + '>' +
         (e ? f('div', 'lbl', base + '.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : '<label for="' + id + '">' + R(it.html) + '</label>') + '</li>';
     }).join('') + '</ul>';
@@ -76,7 +78,7 @@ function renderBlock(b, e, num) {
       return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
     case 'query':
-      return '<div class="q-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
+      return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur, e) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
@@ -231,16 +233,38 @@ function renderBlock(b, e, num) {
   }
   return '';
 }
+function checkOrder(arr, order) {
+  // indices des éléments dans l'ordre d'affichage : à chaque niveau, cochés avant ou après les autres (tri stable)
+  var root = { kids: [] }, stack = [{ lv: -1, n: root }];
+  arr.forEach(function (it, i) {
+    var lv = +it.lv || 0, n = { i: i, done: !!it.done, kids: [] };
+    while (stack.length > 1 && stack[stack.length - 1].lv >= lv) stack.pop();
+    stack[stack.length - 1].n.kids.push(n); stack.push({ lv: lv, n: n });
+  });
+  var out = [];
+  (function walk(list) {
+    list.map(function (n, k) { return { n: n, k: k }; }).sort(function (x, y) {
+      var dx = x.n.done ? 1 : 0, dy = y.n.done ? 1 : 0; if (order === 'doneFirst') { dx = 1 - dx; dy = 1 - dy; }
+      return dx - dy || x.k - y.k;
+    }).forEach(function (x) { out.push(x.n.i); walk(x.n.kids); });
+  })(root.kids);
+  return out;
+}
+function summaryDepth(b) {
+  // nombre de niveaux affichés (0 : tous) ; blocs plus anciens : « deep » (sous-niveaux oui / non)
+  if (b.depth != null && b.depth !== '') return Math.max(0, +b.depth || 0);
+  return b.deep === false ? 1 : 0;
+}
 function summaryItems(b, pi) {
   // entrées du bloc sommaire : [{ t, n, href, kids }]
-  var pg = doc.pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [];
+  var pg = doc.pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
   if (b.src === 'pages') {
-    var mkp = function (j) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: b.deep !== false ? pageKids(doc.pages, j).map(mkp) : [] }; };
-    out = pageKids(doc.pages, pi).map(mkp);
+    var mkp = function (j, lv) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: !dp || lv < dp ? pageKids(doc.pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
+    out = pageKids(doc.pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {
       var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
-      if (x.lv === 1 || !out.length) out.push(it); else if (b.deep !== false) out[out.length - 1].kids.push(it);
+      if (x.lv === 1 || !out.length) out.push(it); else if (dp !== 1) out[out.length - 1].kids.push(it);
     });
   }
   if (b.sort === 'alpha') (function srt(arr) { arr.sort(cmp); arr.forEach(function (it) { srt(it.kids); }); })(out);
@@ -264,10 +288,13 @@ function settings(b) {
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
     case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
       '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
-      tog('deep', b.deep !== false, b.src === 'pages' ? 'Sous-niveaux' : 'Sous-sections', b.src === 'pages' ? 'Afficher aussi les sous-pages des sous-pages' : 'Afficher aussi les sous-sections');
+      '<select data-act="set" data-prop="depth" title="Nombre de niveaux affichés">' + (b.src === 'pages'
+        ? opt(1, summaryDepth(b), '1 niveau') + opt(2, summaryDepth(b), '2 niveaux') + opt(3, summaryDepth(b), '3 niveaux') + opt(0, summaryDepth(b), 'Tous les niveaux')
+        : opt(1, summaryDepth(b) === 1 ? 1 : 0, 'Sections seules') + opt(0, summaryDepth(b) === 1 ? 1 : 0, 'Sections et sous-sections')) + '</select>';
     case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
     case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
-    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher');
+    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
+      '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
     case 'list': return tog('ordered', b.ordered, '1.', 'Liste numérotée');
     case 'code': return '<select data-act="set" data-prop="variant" title="Style">' + opt('dark', b.variant, 'Sombre') + opt('box', b.variant, 'Boîte + fichier') + opt('cmd', b.variant, 'Commande') + '</select>' +
       '<select data-act="set" data-prop="lang" title="Langage pour la coloration">' + Object.keys(HL.names).map(function (k) {
@@ -439,7 +466,8 @@ function applyTheme() {
   var r = document.documentElement;
   r.setAttribute('data-palette', doc.palette);
   r.setAttribute('data-typo', doc.typo);
-  if (doc.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', doc.theme);
+  var th = mode === 'view' && viewerTheme ? viewerTheme : doc.theme;   // en lecture, le thème choisi par le lecteur l'emporte
+  if (th === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', th);
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
   navLayout(); paintFavicon();

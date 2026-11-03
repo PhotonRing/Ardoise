@@ -34,7 +34,8 @@ function serializeFile() {
 function buildFile(stored) {
   var sealedFile = isSealed();
   var root = document.documentElement.cloneNode(true);
-  root.classList.remove('is-edit', 'nav-none', 'nav-side', 'nav-tabs', 'nav-push'); root.style.removeProperty('--navw'); if (!root.getAttribute('style')) root.removeAttribute('style'); if (!root.className) root.removeAttribute('class');
+  root.classList.remove('is-edit', 'nav-none', 'nav-side', 'nav-tabs', 'nav-push');
+  if (doc.theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', doc.theme); root.style.removeProperty('--navw'); if (!root.getAttribute('style')) root.removeAttribute('style'); if (!root.className) root.removeAttribute('class');
   var liveHead = document.head.children, cloneHead = root.querySelector('head');
   for (var i = liveHead.length - 1; i >= 0; i--) if (headKeep.indexOf(liveHead[i]) < 0) cloneHead.children[i].remove();
   var body = root.querySelector('body');

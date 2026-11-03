@@ -13,7 +13,8 @@ function normBlocks(arr, newer) {
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
-    if (nb.type === 'query' && !(Array.isArray(nb.cards) && nb.cards.length)) nb.cards = [qDefCard(nb)];   // vue nombre d'Ardoise 1.7
+    // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
+    if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) nb.cards = [qDefCard(nb)];
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
   });

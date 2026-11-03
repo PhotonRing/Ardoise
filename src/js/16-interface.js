@@ -26,6 +26,8 @@ function renderChrome() {
   } else {
     chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="st" id="st"><i></i><span></span></span>' +
       (dirty ? '<button class="ub" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
+      '<button class="ub" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
+      '<button class="ub" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
       '<button class="ub primary" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button></div>';
   }
   updateUndo(); setStatus();
@@ -42,6 +44,8 @@ ui.addEventListener('click', function (e) {
     var b = f ? byId(f.dataset.id) : null;
     openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); });
   }
+  else if (k === 'print') printPage();
+  else if (k === 'vmenu') openViewMenu(a);
   else if (k === 'style') openStyle(a);
   else if (k === 'file') openFile(a);
 });
@@ -116,6 +120,31 @@ function openStyle(anchor) {
     change(function () { doc[k] = k === 'width' ? +v : v; }); draw();
   });
   draw(); placePop(p, anchor);
+}
+/* Menu de lecture : rien de ce qu'il fait n'est enregistré dans le document */
+var viewerTheme = '';   // thème choisi par ce lecteur (ce navigateur), prioritaire en lecture sur celui du document
+try { viewerTheme = localStorage.getItem(LS + 'viewtheme') || ''; } catch (_) {}
+function foldAll(open) {
+  // lecture : plie ou déplie toutes les sections de la page (sans modifier le document)
+  var hs = $$('.wrap [data-vfold]', app).map(function (b) { return b.parentNode; });
+  (open ? hs : hs.slice().reverse()).forEach(function (h) { foldToggle(h, open); viewFold[h.id.slice(2)] = !open; });
+}
+function openViewMenu(anchor) {
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop'; pop = p;
+  var anyFold = !!$('.wrap [data-vfold]', app);
+  function mi(k, ic, label, sub, on) { return '<button class="mi" type="button" data-vm="' + k + '"' + (on ? ' aria-pressed="true"' : '') + '><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (on ? '<kbd>✓</kbd>' : '') + '</button>'; }
+  p.innerHTML = '<h4>Lecture</h4>' + mi('print', '⎙', 'Imprimer / PDF') + mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
+    (anyFold ? '<div class="hr"></div>' + mi('unfold', '⌄', 'Tout déplier') + mi('fold', '›', 'Tout plier') : '') +
+    '<div class="hr"></div><h4>Thème (pour vous seulement)</h4>' + mi('th-', '◐', 'Celui du document', '', !viewerTheme) + mi('th-light', '☀', 'Clair', '', viewerTheme === 'light') + mi('th-dark', '☾', 'Sombre', '', viewerTheme === 'dark') +
+    '<div class="hr"></div>' + mi('help', '⌨', 'Raccourcis clavier');
+  p.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-vm]'); if (!b) return; var k = b.dataset.vm; closePop();
+    if (k === 'print') printPage(); else if (k === 'export') exportStatic(); else if (k === 'help') showHelp();
+    else if (k === 'fold' || k === 'unfold') foldAll(k === 'unfold');
+    else if (k.indexOf('th-') === 0) { viewerTheme = k.slice(3); try { if (viewerTheme) localStorage.setItem(LS + 'viewtheme', viewerTheme); else localStorage.removeItem(LS + 'viewtheme'); } catch (_) {} applyTheme(); }
+  });
+  placePop(p, anchor);
 }
 function openFile(anchor) {
   closePop();

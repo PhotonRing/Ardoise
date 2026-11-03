@@ -98,6 +98,22 @@ app.addEventListener('click', function (e) {
   if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
   if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; change(function () { revealBlock(sid); }); }
+  var qc = t.closest('[data-qchk]');
+  if (qc) {
+    // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
+    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
+    if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; change(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
+    return;
+  }
+  var qs = t.closest('[data-qsort]');
+  if (qs) {
+    var qhost = qs.closest('[data-qid]'), qblk = qhost && byId(qhost.dataset.qid);
+    if (!qblk) return;
+    var cur = qSortSpec(qblk), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
+    if (mode === 'edit') change(function () { qblk.sortBy = by; qblk.sortDir = dir; });
+    else { viewSort[qblk.id] = { by: by, dir: dir }; render(); }   // lecture : rien n'est enregistré
+    scrollTo(0, sy2); return;
+  }
   var vfb = t.closest('[data-vfold]');
   if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !foldToggle(hd); return; }   // lecture : rien n'est enregistré
   var fb = t.closest('[data-pgfold]');
