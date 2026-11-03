@@ -77,7 +77,7 @@ function renderBlock(b, e, num) {
         '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
     case 'query':
       return '<div class="q-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur) + '</div></div>';
+        (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur, e) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -478,8 +478,8 @@ function refreshDerived() {
   // blocs requête de la page : résultats recalculés après la saisie
   doc.blocks.forEach(function (b) {
     if (b.type !== 'query') return;
-    var box = $('.blk[data-id="' + b.id + '"] .q-res', app); if (!box) return;
-    var h = paintPills(queryResult(b, doc.cur)); if (box.innerHTML !== h) box.innerHTML = h;
+    var box = $('.blk[data-id="' + b.id + '"] .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
+    var h = paintPills(queryResult(b, doc.cur, mode === 'edit')); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   doc.blocks.forEach(function (b) {

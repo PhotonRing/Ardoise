@@ -272,3 +272,14 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
 .q-chip:hover{opacity:.85}
 .q-hint{font-size:12px}
+
+.q-cards .q-count{position:relative;flex-basis:260px}
+.q-lab.fld{display:block;min-width:8ch}
+.q-cform{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+.q-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.q-cform select{font:500 12px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:26px;padding:0 4px;max-width:100%}
+.q-cdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border:0;border-radius:5px;background:none;color:var(--muted);cursor:pointer;font:600 14px/1 var(--f-body)}
+.q-cdel:hover{background:var(--bad-soft);color:var(--bad)}
+.q-cadd{align-self:center;border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;padding:8px 14px;cursor:pointer;font:500 13px var(--f-body)}
+.q-cadd:hover{border-color:var(--accent);color:var(--accent)}
+.q-chip.q-gone{text-decoration:line-through}

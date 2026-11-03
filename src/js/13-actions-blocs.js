@@ -8,6 +8,11 @@ app.addEventListener('click', function (e) {
   switch (a.dataset.act) {
     case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }); break;
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
+    case 'q-card-add': change(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; b.cards.push(qDefCard(b)); }, { b: b.id, k: 'cards.' + ((b.cards && b.cards.length) || 1) + '.label' }); break;
+    case 'q-card-del': if (b.cards && b.cards.length > 1) change(function () { b.cards.splice(i, 1); }); break;
+    case 'q-ctag': case 'q-ttag':
+      var ct = a.dataset.tag, cp = a.dataset.act === 'q-ctag' ? 'tags' : 'ttags';
+      change(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; var c = b.cards[i], w = c[cp] || (c[cp] = []), at = w.indexOf(ct); if (at >= 0) w.splice(at, 1); else w.push(ct); }); break;
     case 'q-tag': var tk = a.dataset.tag; change(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); }); break;
     case 'fold': delete viewFold[b.id]; change(function () { if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;

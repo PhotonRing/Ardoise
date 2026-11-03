@@ -359,7 +359,6 @@ html.nav-tabs:not(.is-edit){scroll-padding-top:70px}
 .q-count{display:inline-flex;flex-direction:column;gap:4px;min-width:180px;padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px}
 .q-count b{font:800 34px/1 var(--f-display);color:var(--fg);font-variant-numeric:tabular-nums}
 .q-count b small{font-size:18px;color:var(--muted);font-weight:600}
-.q-count span{font:500 12px/1.2 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .q-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
 .q-bar i{display:block;height:100%;background:var(--accent)}
 .q-table td,.q-table th{font-size:14px}
@@ -374,3 +373,8 @@ html.nav-tabs:not(.is-edit){scroll-padding-top:70px}
 .q-k{font:500 11px/1.2 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .q-checks li.done>span:not(.q-box){color:var(--muted);text-decoration:line-through}
 .q-empty{margin:0;font-size:14px}
+
+/* vue nombre : cartes à la suite */
+.q-cards{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch}
+.q-cards .q-count{flex:1 1 180px;max-width:100%}
+.q-lab{font:500 12px/1.3 var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}

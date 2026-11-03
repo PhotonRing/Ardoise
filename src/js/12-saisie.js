@@ -59,7 +59,11 @@ app.addEventListener('change', function (e) {
   }
   if (el.matches('select[data-act=set]')) {
     var blk = byId(el.closest('.blk').dataset.id), prop = el.dataset.prop, v = el.value;
-    holdBar(blk.id); keepView(blk); change(function () { blk[prop] = (prop === 'min' || prop === 'height') ? +v : v; }, { b: blk.id });
+    holdBar(blk.id); keepView(blk); change(function () {
+      if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height') ? +v : v;
+      // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
+      if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
+    }, { b: blk.id });
   }
 });
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
