@@ -141,7 +141,11 @@ app.addEventListener('keydown', function (e) {
     }
     if (b.type === 'p') {
       // Entrée passe à la ligne ; Entrée sur la dernière ligne restée vide (ou dans un paragraphe vide) crée un nouveau bloc
-      var lb = lineBefore(el);
+      var lb = lineBefore(el), lt = lineTabs(el);
+      // ligne en retrait restée vide : elle remonte d'un niveau (comme un élément de liste)
+      if (lt.length && lb.line.replace(/[\t\u200B]/g, '') === '' && lineAfter(el) === '') { indentLine(el, -1); return; }
+      // ligne en retrait : la nouvelle ligne garde le même retrait
+      if (lt.length) { newLineTabs(el, lt.length); return; }
       if (caretAtEnd(el) && (el.textContent.replace(/\u200B/g, '') === '' || (lb.multi && lb.line === ''))) {
         b.html = sanitize(el.innerHTML);   // la ligne vide finale disparaît (l'assainissement retire les sauts de ligne finaux)
         insertAt(idx(b) + 1, 'p', b.indent > 0 ? { indent: b.indent } : {}); return;
@@ -260,6 +264,21 @@ function lineBefore(el) {
   $$('br', d).forEach(function (br) { br.replaceWith('\n'); });
   var t = d.textContent.replace(/​/g, ''), i = t.lastIndexOf('\n');
   return { line: i < 0 ? t : t.slice(i + 1), multi: i >= 0 };
+}
+function lineAfter(el) {
+  // texte de la ligne du curseur après lui (jusqu'au saut de ligne suivant)
+  var s = getSelection(); if (!s.rangeCount) return '';
+  var r = document.createRange(); r.selectNodeContents(el); r.setStart(s.anchorNode, s.anchorOffset);
+  var d = document.createElement('div'); d.appendChild(r.cloneContents());
+  var br = d.querySelector('br'); if (br) { while (br.nextSibling) br.nextSibling.remove(); var p = br.parentNode; while (p && p !== d) { while (p.nextSibling) p.nextSibling.remove(); p = p.parentNode; } br.remove(); }
+  return d.textContent.replace(/​/g, '');
+}
+function newLineTabs(el, k) {
+  // nouvelle ligne au curseur avec k taquets (sans le saut de ligne supplémentaire que le navigateur ajoute en fin de ligne)
+  var s = getSelection(), r = s.getRangeAt(0); r.deleteContents();
+  var frag = document.createDocumentFragment(), last = null; frag.appendChild(document.createElement('br'));
+  for (var i = 0; i < k; i++) { last = document.createElement('span'); last.className = 'tab'; last.textContent = '\t'; frag.appendChild(last); }
+  r.insertNode(frag); tabExit(last); fire(el);
 }
 function lineStart(el) {
   // position du début de la ligne du curseur : juste après le saut de ligne qui la précède, sinon début du champ
