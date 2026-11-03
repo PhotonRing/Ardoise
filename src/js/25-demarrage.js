@@ -2,7 +2,7 @@
 tlTips();
 navSpyFn = navSpy();
 function boot(d) {
-  doc = d;
+  doc = d; loadNavFold();
   mode = (freshDoc || (location.hash === '#edit' && (!doc.lock || unlocked) && !doc.newer)) ? 'edit' : 'view';
   var m = location.hash.match(/^#p(\d+)$/); if (m) doc.cur = Math.max(0, Math.min(doc.pages.length - 1, +m[1] - 1));
   render();

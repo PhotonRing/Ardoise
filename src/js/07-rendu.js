@@ -21,7 +21,7 @@ function renderPage(d, edit) {
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
-  return '<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>';
+  return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>');
 }
 function renderBlock(b, e, num) {
   function f(tag, cls, k, val, o) {
@@ -36,7 +36,7 @@ function renderBlock(b, e, num) {
     if (!arr.length) return e ? '<button class="mini-add" type="button" data-act="item-add" data-k="' + base + '">+ case à cocher</button>' : '';
     return '<ul class="check">' + arr.map(function (it, i) {
       var id = b.id + '-' + base.replace(/\./g, '-') + '-' + i;
-      return '<li><input type="checkbox" id="' + id + '" data-b="' + b.id + '" data-k="' + base + '.' + i + '.done"' + (it.done ? ' checked' : '') + '>' +
+      return '<li' + (it.lv > 0 ? ' class="lv-' + Math.min(6, +it.lv) + '"' : '') + '><input type="checkbox" id="' + id + '" data-b="' + b.id + '" data-k="' + base + '.' + i + '.done"' + (it.done ? ' checked' : '') + '>' +
         (e ? f('div', 'lbl', base + '.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : '<label for="' + id + '">' + R(it.html) + '</label>') + '</li>';
     }).join('') + '</ul>';
   }
@@ -78,10 +78,18 @@ function renderBlock(b, e, num) {
       }).join('') + (e ? '<button class="add-item" type="button" data-act="card-add">+ Carte</button>' : '') + '</div>';
     case 'check': return checks('items', b.items) || (e ? '' : '');
     case 'list':
-      var tg = b.ordered ? 'ol' : 'ul';
-      return '<' + tg + ' class="list">' + b.items.map(function (h, i) {
-        return '<li>' + (e ? f('span', '', 'items.' + i, h, { li: 1, ph: 'Élément' }) : R(h)) + '</li>';
-      }).join('') + '</' + tg + '>';
+      // éléments à plat avec un niveau (lv) : rendus en listes imbriquées
+      var tg = b.ordered ? 'ol' : 'ul', cur = -1, lo = '';
+      b.items.forEach(function (it, i) {
+        var lv = Math.max(0, Math.min(+it.lv || 0, cur + 1));
+        if (cur < 0) { lo += '<' + tg + ' class="list">'; cur = 0; }
+        else if (lv > cur) { lo += '<' + tg + '>'; cur = lv; }
+        else { lo += '</li>'; while (cur > lv) { lo += '</' + tg + '></li>'; cur--; } }
+        lo += '<li>' + (e ? f('span', '', 'items.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : R(it.html));
+      });
+      if (cur < 0) return '<' + tg + ' class="list"></' + tg + '>';
+      lo += '</li>'; while (cur > 0) { lo += '</' + tg + '></li>'; cur--; }
+      return lo + '</' + tg + '>';
     case 'code':
       var clang = HL.resolve(b.lang, b.code, b.name);
       if (b.variant === 'box') {
@@ -213,14 +221,15 @@ function summaryItems(b, pi) {
   // entrées du bloc sommaire : [{ t, n, href, kids }]
   var pg = doc.pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [];
   if (b.src === 'pages') {
-    out = (pg.sub ? [] : pageKids(doc.pages, pi)).map(function (j) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: [] }; });
+    var mkp = function (j) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: b.deep !== false ? pageKids(doc.pages, j).map(mkp) : [] }; };
+    out = pageKids(doc.pages, pi).map(mkp);
   } else {
     sectionsOf(pg).forEach(function (x) {
       var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
       if (x.lv === 1 || !out.length) out.push(it); else if (b.deep !== false) out[out.length - 1].kids.push(it);
     });
   }
-  if (b.sort === 'alpha') { out.sort(cmp); out.forEach(function (it) { it.kids.sort(cmp); }); }
+  if (b.sort === 'alpha') (function srt(arr) { arr.sort(cmp); arr.forEach(function (it) { srt(it.kids); }); })(out);
   return out;
 }
 function summaryList(b, pi) {
@@ -229,7 +238,7 @@ function summaryList(b, pi) {
   return items.length ? ol(items) : '';
 }
 function summaryEmpty(b) {
-  return '<p class="muted toc-blk-e">' + (b.src === 'pages' ? (doc.pages[doc.cur].sub ? 'Une sous-page n’a pas elle-même de sous-pages.' : 'Cette page n’a pas encore de sous-pages (menu ⋯ d’une page → « Mettre en sous-page »).')
+  return '<p class="muted toc-blk-e">' + (b.src === 'pages' ? 'Cette page n’a pas encore de sous-pages : « + » à côté de son nom dans le sommaire, ou glissez-y une page.'
     : 'Aucune section dans cette page : ajoutez des titres de section, des étapes ou des sous-sections.') + '</p>';
 }
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
@@ -241,7 +250,7 @@ function settings(b) {
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
     case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
       '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
-      (b.src !== 'pages' ? tog('deep', b.deep !== false, 'Sous-sections', 'Afficher aussi les sous-sections') : '');
+      tog('deep', b.deep !== false, b.src === 'pages' ? 'Sous-niveaux' : 'Sous-sections', b.src === 'pages' ? 'Afficher aussi les sous-pages des sous-pages' : 'Afficher aussi les sous-sections');
     case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
     case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
     case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher');
@@ -310,38 +319,48 @@ function sectionsOf(pg) {
   });
   return out;
 }
-function pageParent(pages, i) { while (i > 0 && pages[i].sub) i--; return i; }   // page de premier niveau du groupe
-function pageKids(pages, g) { var out = []; for (var j = g + 1; j < pages.length && pages[j].sub; j++) out.push(j); return out; }
-var navFold = {};   // groupes de sous-pages dépliés / repliés à la main (par id de page), le temps de la session
+/* Arborescence des pages : liste à plat (ordre de lecture), chaque page a un niveau (lv, absent = 0) ;
+   les sous-pages d'une page la suivent directement, avec un niveau de plus */
+function pageLv(pages, i) { return +pages[i].lv || 0; }
+function pageEnd(pages, i) { var lv = pageLv(pages, i), j = i + 1; while (j < pages.length && pageLv(pages, j) > lv) j++; return j; }   // fin de la page et de ses sous-pages (exclue)
+function pageParent(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) if (pageLv(pages, j) < lv) return j; return -1; }
+function pageRoot(pages, i) { var p; while ((p = pageParent(pages, i)) >= 0) i = p; return i; }
+function pageAncestors(pages, i) { var out = []; while ((i = pageParent(pages, i)) >= 0) out.push(i); return out; }
+function pageKids(pages, i) { var out = [], lv = pageLv(pages, i), end = pageEnd(pages, i); for (var j = i + 1; j < end; j++) if (pageLv(pages, j) === lv + 1) out.push(j); return out; }
+function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) { var l = pageLv(pages, j); if (l === lv) return j; if (l < lv) return -1; } return -1; }
+function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
+var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
+function loadNavFold() { try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + doc.id) || '{}') || {}; } catch (_) { navFold = {}; } }
+function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
 function navHTML(d, edit, all) {
   // all : export statique, toutes les pages sont présentes et le script bascule de l'une à l'autre
-  var pages = d.pages, cur = d.cur, w = +d.width || 820, curG = pageParent(pages, cur);
-  var groups = pages.map(function (pg, i) { return i; }).filter(function (i) { return i === 0 || !pages[i].sub; });
-  var anySub = groups.length < pages.length;
-  var more = function (i) { return edit && i === cur ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
-  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageParent(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
-  var tab = function (i) { return '<span class="ptab-w' + (i === cur || (i === curG && !all) ? ' on' : '') + '">' + pgBtn('ptab', i) + more(i) + '</span>'; };
-  // onglets : pages de premier niveau, puis une seconde rangée avec les sous-pages du groupe affiché
-  var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + groups.map(tab).join('') +
+  var pages = d.pages, cur = d.cur, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
+  var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
+  var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
+  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
+  var tab = function (i) { var dl = pageLv(pages, i); return '<span class="ptab-w' + (i === cur || (i === curRoot && !all) ? ' on' : '') + (dl > 1 ? ' d' + Math.min(dl, 4) : '') + '">' + pgBtn('ptab', i) + menu(i) + '</span>'; };
+  // onglets : pages de premier niveau, puis une seconde rangée avec toutes les sous-pages de la page affichée
+  var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + roots.map(tab).join('') +
     (edit ? '<button type="button" class="ptab-add" data-pgadd title="Ajouter une page">+ Page</button>' : '') + '</div>' +
-    groups.map(function (g) {
-      var kids = pageKids(pages, g); if (!kids.length || (!all && g !== curG)) return '';
-      return '<div class="tabs-sub" data-grp="' + g + '" style="max-width:' + w + 'px"' + (g === curG ? '' : ' hidden') + '>' + kids.map(tab).join('') + '</div>';
+    roots.map(function (g) {
+      var end = pageEnd(pages, g); if (end === g + 1 || (!all && g !== curRoot)) return '';
+      var desc = []; for (var j = g + 1; j < end; j++) desc.push(j);
+      return '<div class="tabs-sub" data-grp="' + g + '" style="max-width:' + w + 'px"' + (g === curRoot ? '' : ' hidden') + '>' + desc.map(tab).join('') + '</div>';
     }).join('') + '</nav>';
-  var entry = function (i, kids) {
-    var secs = (all || i === cur) ? sectionsOf(pages[i]) : [];
-    var fold = '';
-    if (anySub && !(i && pages[i].sub)) {
-      var open = kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : i === curG);
-      fold = kids.length ? '<button type="button" class="toc-f" data-pgfold aria-expanded="' + !!open + '" title="Afficher / masquer les sous-pages">›</button>' : '<span class="toc-f"></span>';
-    }
-    return '<li class="toc-p' + (i === cur ? ' on' : '') + (i && pages[i].sub ? ' sub' : '') + (kids.length ? ' has-kids' + (open ? ' open' : '') : '') + '" data-pgi="' + i + '"><div class="toc-pr">' + fold + pgBtn('toc-pb', i) + more(i) + '</div>' +
+  // sommaire : arborescence repliable (la page affichée et ses parents sont dépliés, sauf choix contraire)
+  var entry = function (i) {
+    var kids = pageKids(pages, i), secs = (all || i === cur) ? sectionsOf(pages[i]) : [];
+    var open = !!kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : anc.indexOf(i) >= 0);
+    var fold = kids.length ? '<button type="button" class="toc-f" data-pgfold aria-expanded="' + open + '" title="Afficher / masquer les sous-pages">›</button>' : '<span class="toc-f"></span>';
+    return '<li class="toc-p' + (i === cur ? ' on' : '') + (kids.length ? ' has-kids' + (open ? ' open' : '') : '') + '" data-pgi="' + i + '">' +
+      '<div class="toc-pr"' + (edit ? ' draggable="true"' : '') + '>' + fold + pgBtn('toc-pb', i) +
+      (edit ? '<button type="button" class="toc-a" data-pgsub="' + i + '" title="Nouvelle sous-page" aria-label="Nouvelle sous-page">+</button>' + menu(i, true) : '') + '</div>' +
       (secs.length ? '<ol class="toc-s">' + secs.map(function (x) {
         return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + esc(x.t) + '</span></a></li>';
       }).join('') + '</ol>' : '') +
-      (kids.length ? '<ol class="toc-c">' + kids.map(function (j) { return entry(j, []); }).join('') + '</ol>' : '') + '</li>';
+      (kids.length ? '<ol class="toc-c">' + kids.map(entry).join('') + '</ol>' : '') + '</li>';
   };
-  var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + groups.map(function (g) { return entry(g, pageKids(pages, g)); }).join('') + '</ol>' +
+  var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + roots.map(entry).join('') + '</ol>' +
     (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
   return tabs + side;
 }

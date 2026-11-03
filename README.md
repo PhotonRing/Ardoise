@@ -19,7 +19,9 @@
 - **Code** : trois styles (sombre, boîte avec nom de fichier et numéros de ligne, commande), coloration Bash, Python, PowerShell, JavaScript, JSON, YAML, SQL, HTML, C/Java/Go/Rust, détectée automatiquement.
 - **Chronologies** verticales ou horizontales (titres inclinés), styles et libellés des liens, bulles de description.
 - **Cartes géographiques** : fond simplifié intégré utilisable hors ligne, plan et satellite en ligne ; points, zones, cercles, itinéraires avec distances (km et milles nautiques), étiquettes déplaçables.
-- **Plusieurs pages** par document, avec sommaire à gauche ou onglets selon la place disponible. Une page peut être rangée en **sous-page** de la précédente (menu ⋯ de la page) : groupes repliables dans le sommaire, seconde rangée d'onglets sur petit écran.
+- **Plusieurs pages** par document, rangées en **arborescence** sur autant de niveaux que nécessaire : sommaire à gauche façon explorateur (chevrons, pages repliables, « + » pour une sous-page, menu ⋯), ou onglets sur petit écran. Une page se déplace par **glisser-déposer** dans le sommaire (avant, après, ou dans une autre page) ou par son menu ; ses sous-pages la suivent.
+- **Listes à sous-niveaux** (listes à puces, numérotées et à cocher) : `Tab` / `Maj+Tab`.
+- **Pastilles nommées** : la couleur d'une pastille suit son nom (même nom, même couleur partout), choisie automatiquement parmi 16 couleurs à sa création. Un clic dans une pastille permet de changer la couleur de son nom partout, ou de cette pastille seulement.
 - **Liens** : « Lien » (`Ctrl+K`) vers une adresse web, « Page » vers une page ou une section du document (avec recherche) ; le lien suit la page ou la section si elle est renommée ou déplacée. Le curseur dans un lien affiche une bulle pour l'ouvrir, le modifier ou le retirer. Liens possibles aussi dans le surtitre et le chapeau.
 - **Sections pliables** en édition (titres de section, étapes, sous-sections) : l'état plié est enregistré, la lecture affiche toujours tout. Déplacer un titre plié emmène sa section.
 - **Tableaux** : flèches pour passer d'une cellule à l'autre, `Entrée` ou `Tab` à la fin de la dernière cellule ajoutent une ligne ; lignes et colonnes se déplacent par glisser-déposer (poignées au survol).
@@ -28,6 +30,22 @@
 - **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
 - **Export en page statique** (lecture seule, non chiffrée), **import / export JSON** (pour faire rédiger une page par une IA).
 - **Mise à jour de l'éditeur** : chaque document embarque l'éditeur de la version qui l'a créé. *Fichier → Mettre à jour Ardoise* le remplace par la dernière version publiée (ou par un `ardoise.html` choisi sur le disque) en conservant le contenu, le mot de passe et le chiffrement.
+
+## Mettre à jour un document
+
+Chaque document embarque **son propre éditeur**, celui de la version d'Ardoise qui l'a créé. Quand une nouvelle version sort, vos documents existants ne changent pas tout seuls : on les met à jour un par un, en gardant tout leur contenu.
+
+**Dans le navigateur**
+
+1. Ouvrez le document et passez en édition (`Ctrl+E`).
+2. *Fichier → Mettre à jour Ardoise…* : Ardoise cherche la dernière version publiée. Hors ligne, *Choisir un fichier…* et prenez un `ardoise.html` téléchargé depuis les [releases](../../releases/latest).
+3. *Mettre à jour* : le fichier est réécrit avec le nouvel éditeur, le même contenu, le même mot de passe et le même chiffrement, puis il se recharge. Sur Firefox et Safari, une copie est téléchargée : mettez-la à la place de l'ancien fichier.
+
+**Dans Obsidian** : après la mise à jour du plugin, un document plus ancien affiche un bandeau *Mettre à jour vers …* ; un clic suffit (sans réseau ni mot de passe).
+
+**Et le contenu ?** Rien à faire. Quand une version change la façon dont le contenu est rangé dans le fichier (son *format*), le nouvel éditeur convertit le document tout seul à l'ouverture, et le fichier est réécrit dans le nouveau format au prochain enregistrement.
+
+**Un document plus récent que son éditeur** (par exemple enregistré en 1.6 puis rouvert avec une copie 1.5) s'affiche en lecture seule avec un bandeau *Mettre à jour…*, pour que rien ne soit perdu. Les éditeurs antérieurs à 1.5 n'ont pas cette protection : mettez à jour tous vos documents plutôt que de garder d'anciennes copies d'Ardoise.
 
 ## Plugin Obsidian
 
@@ -60,16 +78,23 @@ scripts/geo/        génération de src/data/geo.json depuis Natural Earth
 
 Le code JavaScript est un seul module découpé en fichiers par thème (rendu, saisie, cartes, pages, enregistrement…) : les fichiers partagent la même portée et sont simplement concaténés, sans outil de bundling.
 
-## Format du document et migrations
+## Format du document et migrations (développement)
 
-Le contenu est un JSON (balise `#ardoise-doc`) qui porte le numéro de son format (`v`). À l'ouverture, `src/js/05-migrations.js` amène un document ancien au format courant, étape par étape, sur une copie : le fichier est réécrit au format courant au prochain enregistrement. Un document enregistré par une version plus récente d'Ardoise s'ouvre en **lecture seule** (rien ne peut l'appauvrir) avec la proposition de mettre l'éditeur à jour ; la mise à jour repart alors du fichier tel qu'il a été ouvert.
+Le contenu est un JSON (balise `#ardoise-doc`) qui porte le numéro de son format (`v`). À l'ouverture, `src/js/05-migrations.js` amène un document ancien au format courant, étape par étape, sur une copie ; le fichier est réécrit au format courant au prochain enregistrement. Un document d'un format plus récent que l'éditeur s'ouvre en lecture seule, et la mise à jour de l'éditeur repart du fichier tel qu'il a été ouvert.
 
-Pour faire évoluer le format : incrémenter `VERSION` dans `src/js/00-entete.js`, ajouter l'étape dans `src/js/05-migrations.js`, et un document de référence `scripts/fixtures/format-N.json` avec le résultat attendu `format-N.attendu.json`. `scripts/check.mjs` (lancé par la CI) vérifie qu'il ne manque aucune étape et que chaque document de référence donne exactement le résultat attendu.
+Pour faire évoluer le format :
+
+1. incrémenter `VERSION` dans `src/js/00-entete.js` ;
+2. ajouter l'étape `{ from: <ancien format>, desc, run }` dans `src/js/05-migrations.js` ;
+3. ajouter un document de référence `scripts/fixtures/format-N.json` (N = ancien format) et le résultat attendu `format-N.attendu.json`, et mettre à jour les `.attendu.json` existants.
+
+`scripts/check.mjs` (lancé par la CI) vérifie qu'il ne manque aucune étape et que chaque document de référence donne exactement le résultat attendu.
 
 | Format | Ardoise | Changement |
 | --- | --- | --- |
 | 1 | jusqu'à 1.4 | — |
 | 2 | 1.5 | Surtitre de l'en-tête en texte enrichi (liens) ; palette « ardoise » renommée « graphite » |
+| 3 | 1.6 | Listes à sous-niveaux (éléments `{ html, lv }`) ; pastilles nommées (registre `tags`, exceptions `pc-N`) ; pages sur plusieurs niveaux (`lv` au lieu de `sub`) |
 
 ## Assembler localement
 

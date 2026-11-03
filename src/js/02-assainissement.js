@@ -1,5 +1,5 @@
 /* ---------- Assainissement du texte riche ---------- */
-var SPAN_CLASSES = ['pill', 'p-ok', 'p-bad', 'p-warn', 'p-info', 'alert'];
+var SPAN_CLASSES = ['pill', 'alert'];   // et pc-N : couleur d'exception d'une pastille
 var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg|math|noscript|input|button|select|textarea|img|video|audio|canvas|form)$/;
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;
 var sanCache = new Map();
@@ -36,7 +36,7 @@ function walk(src, dst) {
         if (/^https?:/i.test(h)) { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener'); }
       }
     } else if (tag === 'span') {
-      var cls = Array.prototype.filter.call(n.classList, function (c) { return SPAN_CLASSES.indexOf(c) >= 0; });
+      var cls = Array.prototype.filter.call(n.classList, function (c) { return SPAN_CLASSES.indexOf(c) >= 0 || (/^pc-\d{1,2}$/.test(c) && +c.slice(3) < TAG_COLORS && n.classList.contains('pill')); });
       if (cls.length) { el = document.createElement('span'); el.className = cls.join(' '); }
       else {
         var st = n.getAttribute('style') || '';

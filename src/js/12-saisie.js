@@ -126,6 +126,12 @@ app.addEventListener('keydown', function (e) {
   }
   if (e.key === 'Tab' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); indentPara(b, el, e.shiftKey ? -1 : 1); return; }
   if (e.key === 'Backspace' && b.type === 'p' && b.indent > 0 && caretAtStart(el)) { e.preventDefault(); indentPara(b, el, -1); return; }
+  if (el.hasAttribute('data-li') && (b.type === 'list' || b.type === 'check')) {
+    // sous-niveaux : Tab / Maj+Tab, ou Retour arrière en début d'un élément en retrait
+    var li0 = listParts(k).i, it0 = b.items[li0];
+    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); listIndent(b, li0, e.shiftKey ? -1 : 1, el); return; }
+    if (e.key === 'Backspace' && it0 && +it0.lv > 0 && caretAtStart(el)) { e.preventDefault(); listIndent(b, li0, -1, el); return; }
+  }
   if (e.key === 'Backspace' && caretAtStart(el)) {
     if (el.hasAttribute('data-li')) {
       var lp = listParts(k), arr = getPath(b, lp.base);
@@ -222,15 +228,31 @@ function indentPara(b, el, d) {
 }
 function slashMenu(el, b) { openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
+function listIndent(b, i, d, el) {
+  // change le niveau d'un élément de liste ; ses sous-éléments le suivent
+  var arr = b.items, it = arr[i]; if (!it) return;
+  var lv = +it.lv || 0, end = i + 1;
+  while (end < arr.length && (+arr[end].lv || 0) > lv) end++;
+  var nl = Math.max(0, Math.min(lv + d, i > 0 ? (+arr[i - 1].lv || 0) + 1 : 0, 6));
+  if (nl === lv) return;
+  var off = caretOffset(el), k = el.dataset.k;
+  change(function () { for (var j = i; j < end; j++) { var x = Math.min(8, (+arr[j].lv || 0) + nl - lv); if (x > 0) arr[j].lv = x; else delete arr[j].lv; } });
+  var f = $('[data-b="' + b.id + '"][data-k="' + k + '"]', app); if (f) { f.focus({ preventScroll: true }); setCaretOffset(f, off); }
+}
 function splitItem(b, k, el) {
   var lp = listParts(k), arr = getPath(b, lp.base);
+  if (el.textContent === '' && (b.type === 'list' || b.type === 'check') && arr[lp.i] && +arr[lp.i].lv > 0) { listIndent(b, lp.i, -1, el); return; }   // élément vide en retrait : il remonte d'un niveau
   if (el.textContent === '' && lp.i === arr.length - 1 && arr.length > 1 && b.type !== 'cards') {
     // Entrée sur un élément vide en fin de liste : sortir de la liste
     change(function () { arr.pop(); }); insertAt(idx(b) + 1, 'p', {}); return;
   }
   var tail = extractTail(el); var head = sanitize(el.innerHTML);
   change(function () {
-    if (lp.suf) { arr[lp.i].html = head; arr.splice(lp.i + 1, 0, { html: tail, done: false }); }
+    if (lp.suf) {
+      arr[lp.i].html = head; var ni = b.type === 'list' ? { html: tail } : { html: tail, done: false };
+      if (+arr[lp.i].lv > 0) ni.lv = arr[lp.i].lv;
+      arr.splice(lp.i + 1, 0, ni);
+    }
     else { arr[lp.i] = head; arr.splice(lp.i + 1, 0, tail); }
   }, { b: b.id, k: lp.base + '.' + (lp.i + 1) + lp.suf, end: false });
 }

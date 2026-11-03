@@ -163,8 +163,7 @@ function openFile(anchor) {
 var itb = document.createElement('div'); itb.className = 'itb'; itb.style.display = 'none';
 itb.innerHTML = '<button data-i="bold" title="Gras (Ctrl+B)"><b>G</b></button><button data-i="italic" title="Italique (Ctrl+I)"><i>I</i></button>' +
   '<button data-i="code" title="Code (Ctrl+J)" style="font-family:var(--f-mono)!important">&lt;/&gt;</button><button data-i="link" title="Lien vers une adresse (Ctrl+K)">Lien</button><button data-i="pagelink" title="Lien vers une page ou une section du document">Page</button><span class="vsep"></span>' +
-  '<button data-i="p-ok" title="Pastille verte"><span class="dot" style="background:#5fd09a"></span></button><button data-i="p-bad" title="Pastille rouge"><span class="dot" style="background:#ff8a80"></span></button>' +
-  '<button data-i="p-warn" title="Pastille orange"><span class="dot" style="background:#f2c35b"></span></button><button data-i="p-info" title="Pastille bleue"><span class="dot" style="background:#8cc3f2"></span></button>' +
+  '<button data-i="pill" title="Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)"><span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille</button>' +
   '<button data-i="alert" title="Texte rouge" style="color:#ff8a80!important">A</button><span class="vsep"></span><button data-i="clear" title="Effacer la mise en forme">⌫</button>';
 ui.appendChild(itb);
 itb.addEventListener('mousedown', function (e) { e.preventDefault(); });
@@ -196,7 +195,7 @@ function inlineAction(kind) {
   if (kind === 'code') tag = 'code';
   else if (kind === 'link' || kind === 'pagelink') tag = 'a';
   else if (kind === 'alert') cls = 'alert';
-  else cls = 'pill ' + kind;
+  else cls = 'pill';
   var existing = ancestor(function (n) {
     if (tag === 'code') return n.tagName === 'CODE';
     if (tag === 'a') return n.tagName === 'A';
@@ -213,7 +212,8 @@ function inlineAction(kind) {
   }
   if (s.isCollapsed) return;
   if (tag === 'a') { openLinkPop(kind === 'pagelink' ? 'page' : 'url', r.cloneRange(), fld, null); return; }
-  wrapInline(tag, cls, null, fld);
+  var nel = wrapInline(tag, cls, null, fld);
+  if (nel && cls === 'pill') paintPill(nel);
 }
 /* Liens. Adresse : https://…, mailto:… ; page du document : #pg-<page> ; section : #pg-<page>/<bloc>
    (le lien suit la page ou la section si elle est déplacée ou renommée) */
@@ -241,7 +241,7 @@ function goLink(href) {
 }
 function openLinkPop(kind, range, fld, a) {
   // kind : 'url' (adresse) ou 'page' (page ou section) ; a : lien existant à modifier, sinon range : texte à lier
-  closePop(); hideLinkTip();
+  closePop(); hideLinkTip(); hidePillTip();
   var p = document.createElement('div'); p.className = 'pop link-pop'; pop = p;
   var cur = a ? a.getAttribute('href') || '' : '', L = parseLink(cur);
   function mi(k, ic, label) { return '<button class="mi" type="button" data-lk="' + k + '"><span class="ic">' + ic + '</span><span>' + label + '</span></button>'; }
@@ -257,15 +257,16 @@ function openLinkPop(kind, range, fld, a) {
     var items = [];
     doc.pages.forEach(function (pg, i) {
       var pt = pageTitle(pg, i);
-      items.push({ href: '#pg-' + pg.id, t: pt, ic: i && pg.sub ? '↳' : '▤', lv: 0, here: i === doc.cur, pt: pt });
-      sectionsOf(pg).forEach(function (x) { items.push({ href: '#pg-' + pg.id + '/' + x.id, t: (x.n ? x.n + ' · ' : '') + x.t, ic: '§', lv: x.lv, pt: pt }); });
+      var pl = pageLv(doc.pages, i);
+      items.push({ href: '#pg-' + pg.id, t: pt, ic: pl ? '↳' : '▤', lv: 0, pl: pl, here: i === doc.cur, pt: pt });
+      sectionsOf(pg).forEach(function (x) { items.push({ href: '#pg-' + pg.id + '/' + x.id, t: (x.n ? x.n + ' · ' : '') + x.t, ic: '§', lv: x.lv, pl: pl, pt: pt }); });
     });
     var draw = function () {
       var s = norm(q.value.trim());
       shown = items.filter(function (it) { return !s || norm(it.t + ' ' + it.pt).indexOf(s) >= 0; });
       curI = Math.min(curI, Math.max(0, shown.length - 1));
       list.innerHTML = shown.length ? shown.map(function (it, k) {
-        return '<button class="mi lk-lv' + it.lv + (k === curI ? ' act' : '') + (it.href === cur ? ' on' : '') + '" type="button" data-k="' + k + '"><span class="ic">' + it.ic + '</span><span>' + esc(it.t) +
+        return '<button class="mi lk-lv' + it.lv + (k === curI ? ' act' : '') + (it.href === cur ? ' on' : '') + '" type="button" data-k="' + k + '"' + (it.pl && !s ? ' style="margin-left:' + Math.min(it.pl, 4) * 16 + 'px;width:calc(100% - ' + Math.min(it.pl, 4) * 16 + 'px)"' : '') + '><span class="ic">' + it.ic + '</span><span>' + esc(it.t) +
           (it.lv ? (s ? '<small>' + esc(it.pt) + '</small>' : '') : (it.here ? '<small>Page affichée</small>' : '')) + '</span></button>';
       }).join('') : '<div class="menu-empty">Aucune page ni section</div>';
     };
@@ -340,9 +341,10 @@ document.addEventListener('selectionchange', function () {
   var s = getSelection(), a = null;
   if (mode === 'edit' && !pop && s.rangeCount && s.isCollapsed) {
     var f = fieldOf(s.anchorNode), n = s.anchorNode;
-    if (f && f.hasAttribute('data-rich')) { a = (n.nodeType === 1 ? n : n.parentNode).closest('a'); if (a && !f.contains(a)) a = null; }
+    if (f && f.hasAttribute('data-rich')) { a = (n.nodeType === 1 ? n : n.parentNode).closest('a, span.pill'); if (a && !f.contains(a)) a = null; }
   }
-  if (a) showLinkTip(a); else hideLinkTip();
+  if (a && a.tagName === 'A') showLinkTip(a); else hideLinkTip();
+  if (a && a.tagName === 'SPAN') showPillTip(a); else hidePillTip();
 });
 function wrapInline(tag, cls, href, fld) {
   var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
@@ -353,6 +355,7 @@ function wrapInline(tag, cls, href, fld) {
   r.insertNode(el);
   s.removeAllRanges(); var nr2 = document.createRange(); nr2.selectNodeContents(el); s.addRange(nr2);
   fire(fld);
+  return el;
 }
 function fire(fld) { fld.dispatchEvent(new Event('input', { bubbles: true })); }
 

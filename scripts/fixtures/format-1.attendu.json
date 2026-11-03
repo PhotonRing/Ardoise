@@ -6,12 +6,40 @@
     {
       "title": "Accueil",
       "blocks": [
-        { "id": "h1", "type": "header", "eyebrow": "R&amp;D · &lt;interne&gt;", "title": "Procédure <b>A</b>", "lede": "Chapeau" },
-        { "id": "e0", "type": "header", "eyebrow": "", "title": "Sans surtitre" },
-        { "id": "p1", "type": "p", "html": "Texte & <b>gras</b>" },
-        { "id": "t1", "type": "table", "rows": [["A", "B"], ["1", "2"]] }
+        {
+          "id": "h1",
+          "type": "header",
+          "eyebrow": "R&amp;D · &lt;interne&gt;",
+          "title": "Procédure <b>A</b>",
+          "lede": "Chapeau"
+        },
+        {
+          "id": "e0",
+          "type": "header",
+          "eyebrow": "",
+          "title": "Sans surtitre"
+        },
+        {
+          "id": "p1",
+          "type": "p",
+          "html": "Texte & <b>gras</b>"
+        },
+        {
+          "id": "t1",
+          "type": "table",
+          "rows": [
+            [
+              "A",
+              "B"
+            ],
+            [
+              "1",
+              "2"
+            ]
+          ]
+        }
       ]
     }
   ],
-  "v": 2
+  "v": 3
 }

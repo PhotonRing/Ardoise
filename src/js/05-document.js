@@ -13,6 +13,7 @@ function normBlocks(arr, newer) {
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
+    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
   });
   return out;
@@ -31,7 +32,9 @@ function normalize(d) {
   d.pages.forEach(function (pg) {
     if (!pg || !Array.isArray(pg.blocks)) return;
     var np = { id: pg.id || uid(), title: String(pg.title || ''), blocks: normBlocks(pg.blocks, mg.newer) };
-    if (pg.sub && out.pages.length) np.sub = true;   // sous-page de la page de premier niveau qui la précède
+    // niveau dans l'arborescence : au plus un de plus que la page qui précède
+    var lv = Math.min(Math.max(0, Math.floor(+pg.lv) || 0), out.pages.length ? (+out.pages[out.pages.length - 1].lv || 0) + 1 : 0, 8);
+    if (lv) np.lv = lv;
     out.pages.push(np);
   });
   if (!out.pages.length) out.pages.push({ id: uid(), title: '', blocks: [] });
@@ -39,13 +42,19 @@ function normalize(d) {
   // format plus récent que cet éditeur : lecture seule (le fichier d'origine sert à la mise à jour, voir applyUpdate)
   if (mg.newer) Object.defineProperty(out, 'newer', { value: mg.from, enumerable: false, configurable: true });
   if (d.mapKey) out.mapKey = String(d.mapKey);
+  if (d.tags && typeof d.tags === 'object') {
+    // registre des pastilles : nom → couleur
+    var tg = {}; for (var tk in d.tags) { var c = d.tags[tk] && Math.floor(+d.tags[tk].c); if (tagKey(tk) === tk && c >= 0 && c < TAG_COLORS) tg[tk] = { c: c }; }
+    if (Object.keys(tg).length) out.tags = tg;
+  }
   if (d.lock && d.lock.hash && d.lock.salt) {
     out.lock = { salt: d.lock.salt, hash: d.lock.hash, iter: +d.lock.iter || 210000 };
     if (d.lock.enc && d.lock.encSalt) { out.lock.enc = true; out.lock.encSalt = d.lock.encSalt; out.lock.encIter = +d.lock.encIter || ENC_ITER; }
   }
   return out;
 }
-function template(kind) { var t = TEMPLATES[kind](); t.v = VERSION; return t; }   // les modèles sont écrits dans le format courant
+var TEMPLATES_V = 2;   // format dans lequel les modèles (04-modeles.js) sont écrits : ils passent par les migrations
+function template(kind) { var t = TEMPLATES[kind](); t.v = TEMPLATES_V; return t; }
 var sealed = null, origStored = '';   // fichier chiffré en attente du mot de passe
 function loadInitial() {
   var raw = $('#ardoise-doc').textContent.trim(), d = null, j = null; origStored = raw;

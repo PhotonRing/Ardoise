@@ -44,6 +44,17 @@ function exitInline(il, dir) {
   var r = document.createRange(); r.setStart(tn, dir > 0 ? 1 : tn.nodeValue.length - 1); r.collapse(true);
   var s = getSelection(); s.removeAllRanges(); s.addRange(r);
 }
+function caretOffset(el) {
+  // position du curseur en nombre de caractères depuis le début du champ
+  var s = getSelection(); if (!s.rangeCount || !el.contains(s.anchorNode)) return 0;
+  var r = document.createRange(); r.selectNodeContents(el); r.setEnd(s.anchorNode, s.anchorOffset);
+  return r.toString().length;
+}
+function setCaretOffset(el, n) {
+  var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), t, r = document.createRange();
+  while ((t = w.nextNode())) { if (n <= t.nodeValue.length) { r.setStart(t, n); r.collapse(true); var s = getSelection(); s.removeAllRanges(); s.addRange(r); return; } n -= t.nodeValue.length; }
+  caretTo(el, true);
+}
 function extractTail(el) {
   var s = getSelection(); var r0 = s.getRangeAt(0); r0.deleteContents();
   var r = document.createRange(); r.selectNodeContents(el); r.setStart(r0.startContainer, r0.startOffset);

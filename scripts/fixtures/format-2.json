@@ -1,0 +1,98 @@
+{
+  "v": 2,
+  "title": "Document 1.5",
+  "palette": "petrole",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Accueil",
+      "blocks": [
+        {
+          "id": "h",
+          "type": "header",
+          "eyebrow": "Équipe <a href=\"https://exemple.org\">réseau</a>",
+          "title": "Suivi"
+        },
+        {
+          "id": "t",
+          "type": "table",
+          "rows": [
+            [
+              "Statut",
+              "Note"
+            ],
+            [
+              "<span class=\"pill p-ok\">OK</span>",
+              "<span class=\"pill p-warn\">À vérifier</span>"
+            ],
+            [
+              "<span class=\"pill p-bad\">ok</span>",
+              "<b>x</b> <span class=\"pill p-info\"><b>Info</b>&nbsp;&amp; co</span>"
+            ]
+          ]
+        },
+        {
+          "id": "l",
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Un <span class=\"pill p-warn\">À  vérifier</span>",
+            "Deux"
+          ]
+        },
+        {
+          "id": "c",
+          "type": "check",
+          "items": [
+            {
+              "html": "Tâche",
+              "done": true
+            }
+          ]
+        },
+        {
+          "id": "k",
+          "type": "code",
+          "variant": "dark",
+          "name": "",
+          "code": "<span class=\"pill p-ok\">pas une pastille</span>"
+        },
+        {
+          "id": "f",
+          "type": "facts",
+          "items": [
+            {
+              "k": "Clé",
+              "v": "<span class=\"alert\"><span class=\"pill p-bad\">KO</span></span>",
+              "alert": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "Sous-page",
+      "sub": true,
+      "blocks": []
+    },
+    {
+      "id": "c2",
+      "title": "Autre",
+      "blocks": []
+    },
+    {
+      "id": "d",
+      "title": "Sous-page 2",
+      "sub": true,
+      "blocks": [
+        {
+          "id": "l2",
+          "type": "list",
+          "ordered": true,
+          "items": []
+        }
+      ]
+    }
+  ]
+}
