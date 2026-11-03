@@ -23,8 +23,9 @@
 - **Listes à sous-niveaux** (listes à puces, numérotées et à cocher) : `Tab` / `Maj+Tab`.
 - **Pastilles nommées** : la couleur d'une pastille suit son nom (même nom, même couleur partout), choisie automatiquement parmi 16 couleurs à sa création. Un clic dans une pastille permet de changer la couleur de son nom partout, ou de cette pastille seulement.
 - **Liens** : « Lien » (`Ctrl+K`) vers une adresse web, « Page » vers une page ou une section du document (avec recherche) ; le lien suit la page ou la section si elle est renommée ou déplacée. Le curseur dans un lien affiche une bulle pour l'ouvrir, le modifier ou le retirer. Liens possibles aussi dans le surtitre et le chapeau.
-- **Sections pliables** en édition (titres de section, étapes, sous-sections) : l'état plié est enregistré, la lecture affiche toujours tout. Déplacer un titre plié emmène sa section.
+- **Sections pliables** (titres de section, étapes, sous-sections). En édition, l'état plié est enregistré et sert d'état de départ ; en lecture (et dans l'export statique), chacun plie et déplie librement, sans modifier le document. Déplacer un titre plié emmène sa section.
 - **Tableaux** : flèches pour passer d'une cellule à l'autre, `Entrée` ou `Tab` à la fin de la dernière cellule ajoutent une ligne ; lignes et colonnes se déplacent par glisser-déposer (poignées au survol).
+- **Bloc requête** (sans syntaxe à apprendre) : les fiches de faits, lignes de tableaux ou cases à cocher de tout le document, d'une page (avec ou sans ses sous-pages) ou d'une section, filtrées par pastilles (au moins une, ou toutes), affichées en tableau, en liste ou en nombre (avec la progression pour les cases à cocher). Tenu à jour, avec un lien vers la source de chaque résultat.
 - **Bloc sommaire** : sections de la page (avec ou sans sous-sections) ou sous-pages, dans l'ordre de la page ou par ordre alphabétique, tenu à jour automatiquement.
 - **En-tête** : surtitre et chapeau s'affichent ou se masquent indépendamment (le texte masqué est conservé).
 - **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
@@ -95,6 +96,7 @@ Pour faire évoluer le format :
 | 1 | jusqu'à 1.4 | — |
 | 2 | 1.5 | Surtitre de l'en-tête en texte enrichi (liens) ; palette « ardoise » renommée « graphite » |
 | 3 | 1.6 | Listes à sous-niveaux (éléments `{ html, lv }`) ; pastilles nommées (registre `tags`, exceptions `pc-N`) ; pages sur plusieurs niveaux (`lv` au lieu de `sub`) |
+| 4 | 1.7 | Bloc « Requête » (nouveau type de bloc, sans conversion) |
 
 ## Assembler localement
 

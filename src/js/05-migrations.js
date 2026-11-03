@@ -10,6 +10,8 @@
 //   3. ajouter scripts/fixtures/format-<ancienne VERSION>.json (un document de ce format) et son
 //      .attendu.json, et mettre à jour les .attendu.json existants : scripts/check.mjs vérifie que chaque
 //      document de référence arrive exactement au résultat attendu, et qu'aucune étape ne manque.
+// Un nouveau type de bloc demande aussi un nouveau format (étape vide) : un éditeur plus ancien ouvre alors
+// le document en lecture seule au lieu d'écarter ce bloc qu'il ne connaît pas.
 // Une étape reçoit le JSON brut (avant normalisation), toujours sous la forme { pages: [...] } : elle doit
 // tolérer les champs absents.
 var MIGRATIONS = [
@@ -33,7 +35,8 @@ var MIGRATIONS = [
       });
     });
     if (Object.keys(tags).length) d.tags = tags;
-  } }
+  } },
+  { from: 3, desc: 'Nouveau bloc « Requête » (aucune conversion)', run: function () {} }
 ];
 // --- outils des migrations (sans DOM : vérifiés aussi par scripts/check.mjs dans Node) ---
 var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1 };

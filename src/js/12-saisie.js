@@ -25,7 +25,7 @@ app.addEventListener('input', function (e) {
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header') refreshDerivedSoon();
+  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();
   markDirty();
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
@@ -36,9 +36,12 @@ app.addEventListener('beforeinput', function (e) {
 });
 app.addEventListener('change', function (e) {
   var el = e.target;
+  if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); change(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
-    setPath(b, el.dataset.k, el.checked); snapshot(); markDirty(true); return;
+    setPath(b, el.dataset.k, el.checked); snapshot(); markDirty(true);
+    if (doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+    return;
   }
   if (el.matches('.rt-color')) { var brc = byId(el.dataset.b); keepView(brc); change(function () { brc.routes[+el.dataset.rt].color = el.value; }); return; }
   if (el.matches('.rd-in')) {

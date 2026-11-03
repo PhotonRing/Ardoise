@@ -59,7 +59,41 @@ function tlTips() {
   window.addEventListener('scroll', hide, true);
   window.addEventListener('resize', hide);
 }
+function foldToggle(h, open) {
+  // lecture : plie / déplie la section du titre h, sans toucher au document (les sections pliées à l'intérieur restent pliées)
+  var lv = +h.getAttribute('data-fl'), skip = 0, n = h.nextElementSibling, btn = h.querySelector('[data-vfold]');
+  if (open == null) open = h.hasAttribute('data-folded');
+  if (open) h.removeAttribute('data-folded'); else h.setAttribute('data-folded', '');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  for (; n; n = n.nextElementSibling) {
+    var l = n.hasAttribute('data-fl') ? +n.getAttribute('data-fl') : -1;
+    if (l >= 0 && l <= lv) break;
+    if (!open) { n.setAttribute('data-fh', ''); continue; }
+    if (skip && !(l >= 0 && l <= skip)) continue;
+    skip = 0; n.removeAttribute('data-fh');
+    if (l > 0 && n.hasAttribute('data-folded')) skip = l;
+  }
+  if (open) window.dispatchEvent(new Event('resize'));   // cartes et chronologies révélées : remise en page
+  return open;
+}
+function foldReveal(el) {
+  // lecture : déplie les sections qui masquent el
+  for (var k = 0; k < 20; k++) {
+    var x = el.closest('[data-fh]'); if (!x) return;
+    var lv = x.hasAttribute('data-fl') ? +x.getAttribute('data-fl') : 99, h = null;
+    for (var p = x.previousElementSibling; p; p = p.previousElementSibling) {
+      if (!p.hasAttribute('data-fl')) continue;
+      var l = +p.getAttribute('data-fl');
+      if (l > 0 && l < lv && p.hasAttribute('data-folded')) { h = p; break; }
+      if (l < lv) lv = l;
+    }
+    if (!h) return; foldToggle(h, true);
+  }
+}
 function viewScript() {
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('[data-vfold]'); if (f) foldToggle(f.parentNode);
+  });
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-copy]'); if (!b) return;
     var box = b.closest('.code,.codebox'), pre = box.querySelector('pre');
@@ -104,7 +138,7 @@ function exportPages() {
       e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), t = document.querySelector('.pg[data-pgid="' + h[0] + '"]');
       if (t) {
         show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {}
-        var sec = h[1] && document.getElementById('b-' + h[1]); if (sec) sec.scrollIntoView({ block: 'start' });
+        var sec = h[1] && document.getElementById('b-' + h[1]); if (sec) { foldReveal(sec); sec.scrollIntoView({ block: 'start' }); }
       }
       return;
     }
@@ -125,7 +159,7 @@ function exportStatic() {
     $$('link[rel=icon], link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
       var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
-    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
+    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + foldToggle.toString() + foldReveal.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
     (doc.pages.some(function (pg) { return pg.blocks.some(function (b) { return b.type === 'map'; }); }) ?
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +

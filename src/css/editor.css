@@ -262,3 +262,13 @@ button.tl-dot:hover{transform:scale(1.2)}
 .ptip-sw button{height:22px;border-radius:6px;border:1px solid color-mix(in srgb,var(--pl-f) 35%,transparent);background:var(--pl-b);cursor:pointer;position:relative;padding:0}
 .ptip-sw button::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--pl-f)}
 .ptip-sw button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:1px}
+
+.q-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
+.q-form select{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:28px;padding:0 6px;max-width:260px}
+.q-form label{display:inline-flex;align-items:center;gap:6px}
+.q-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
+.q-lbl{margin-right:2px}
+.q-chip{border:0;cursor:pointer;opacity:.45}
+.q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
+.q-chip:hover{opacity:.85}
+.q-hint{font-size:12px}

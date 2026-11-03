@@ -1,0 +1,116 @@
+{
+  "v": 4,
+  "title": "Document 1.5",
+  "palette": "petrole",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Accueil",
+      "blocks": [
+        {
+          "id": "h",
+          "type": "header",
+          "eyebrow": "Équipe <a href=\"https://exemple.org\">réseau</a>",
+          "title": "Suivi"
+        },
+        {
+          "id": "t",
+          "type": "table",
+          "rows": [
+            [
+              "Statut",
+              "Note"
+            ],
+            [
+              "<span class=\"pill\">OK</span>",
+              "<span class=\"pill\">À vérifier</span>"
+            ],
+            [
+              "<span class=\"pill pc-1\">ok</span>",
+              "<b>x</b> <span class=\"pill\"><b>Info</b>&nbsp;&amp; co</span>"
+            ]
+          ]
+        },
+        {
+          "id": "l",
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "html": "Un <span class=\"pill\">À  vérifier</span>"
+            },
+            {
+              "html": "Deux"
+            }
+          ]
+        },
+        {
+          "id": "c",
+          "type": "check",
+          "items": [
+            {
+              "html": "Tâche",
+              "done": true
+            }
+          ]
+        },
+        {
+          "id": "k",
+          "type": "code",
+          "variant": "dark",
+          "name": "",
+          "code": "<span class=\"pill p-ok\">pas une pastille</span>"
+        },
+        {
+          "id": "f",
+          "type": "facts",
+          "items": [
+            {
+              "k": "Clé",
+              "v": "<span class=\"alert\"><span class=\"pill\">KO</span></span>",
+              "alert": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "Sous-page",
+      "blocks": [],
+      "lv": 1
+    },
+    {
+      "id": "c2",
+      "title": "Autre",
+      "blocks": []
+    },
+    {
+      "id": "d",
+      "title": "Sous-page 2",
+      "blocks": [
+        {
+          "id": "l2",
+          "type": "list",
+          "ordered": true,
+          "items": []
+        }
+      ],
+      "lv": 1
+    }
+  ],
+  "tags": {
+    "ok": {
+      "c": 0
+    },
+    "à vérifier": {
+      "c": 2
+    },
+    "info & co": {
+      "c": 3
+    },
+    "ko": {
+      "c": 1
+    }
+  }
+}

@@ -237,6 +237,7 @@ function goLink(href) {
   if (!L.bid) return;
   if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) change(function () { revealBlock(L.bid); });
   var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
+  if (el && mode === 'view') foldReveal(el);
   if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');
 }
 function openLinkPop(kind, range, fld, a) {

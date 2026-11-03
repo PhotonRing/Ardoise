@@ -8,7 +8,8 @@ app.addEventListener('click', function (e) {
   switch (a.dataset.act) {
     case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }); break;
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
-    case 'fold': change(function () { if (b.folded) delete b.folded; else b.folded = true; }); break;
+    case 'q-tag': var tk = a.dataset.tag; change(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); }); break;
+    case 'fold': delete viewFold[b.id]; change(function () { if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;
     case 'down': moveBlock(b, 1); break;
     case 'dup': dupBlock(b); break;

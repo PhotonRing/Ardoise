@@ -95,9 +95,11 @@ function openPageMenu(anchor, i) {
 app.addEventListener('click', function (e) {
   var t = e.target;
   var lk = t.closest('a[href^="#pg-"]');
-  if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
+  if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
   if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; change(function () { revealBlock(sid); }); }
+  var vfb = t.closest('[data-vfold]');
+  if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !foldToggle(hd); return; }   // lecture : rien n'est enregistré
   var fb = t.closest('[data-pgfold]');
   if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = tocFold(fb); saveNavFold(); return; }
   var ps = t.closest('[data-pgsub]'); if (ps && mode === 'edit') { addSubPage(+ps.dataset.pgsub); return; }

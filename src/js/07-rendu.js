@@ -3,12 +3,14 @@ function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
-function renderPage(d, edit) {
-  var out = [], open = false, counter = 0, fi = edit ? foldInfo(d.blocks) : null;
+function renderPage(d, edit, vf) {
+  // vf : sections pliées / dépliées en lecture (id → plié), le temps de la session ; sinon l'état enregistré
+  var isF = function (b) { return vf && vf[b.id] != null ? vf[b.id] : !!b.folded; };
+  var out = [], open = false, counter = 0, fi = foldInfo(d.blocks, edit ? null : isF), reg = edit ? null : foldRegions(d.blocks);
   d.blocks.forEach(function (b) {
-    if (fi && fi.hidden[b.id]) return;   // dans une section pliée (édition)
+    if (edit && fi.hidden[b.id]) return;   // dans une section pliée (édition)
     if (b.type === 'step' || b.type === 'footer') { if (open) out.push('</section>'); open = false; }
-    if (b.type === 'step') { out.push('<section class="step">'); open = true; }
+    if (b.type === 'step') { out.push('<section class="step"' + (edit ? '' : ' data-fl="1"') + '>'); open = true; }
     var num = null;
     if (b.type === 'step' && !b.nonum) {
       var n = String(b.num || '').trim();
@@ -16,7 +18,16 @@ function renderPage(d, edit) {
       else { counter++; num = String(counter); }
     }
     var inner = renderBlock(b, edit, num);
-    if (!edit && (b.type === 'step' || b.type === 'h2' || b.type === 'h3')) inner = inner.replace(/^<(\w+)/, '<$1 id="b-' + b.id + '"');
+    if (!edit && inner) {
+      // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
+      var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3') at += ' id="b-' + b.id + '"';
+      if (lv >= 0) at += ' data-fl="' + lv + '"';
+      if (folded) at += ' data-folded';
+      if (fi.hidden[b.id]) at += ' data-fh';
+      inner = inner.replace(/^<(\w+)/, '<$1' + at);
+      if (fold) inner = inner.replace(/^(<\w+[^>]*>)/, '$1<button type="button" class="fold-v" data-vfold aria-expanded="' + !folded + '" title="Plier / déplier la section"></button>');
+    }
     out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0) : inner);
   });
   if (open) out.push('</section>');
@@ -64,6 +75,9 @@ function renderBlock(b, e, num) {
       if (!e && !sl) return '';
       return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
+    case 'query':
+      return '<div class="q-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -273,7 +287,17 @@ function settings(b) {
   return '';
 }
 function foldLevel(b) { return b.type === 'step' || b.type === 'h2' ? 1 : b.type === 'h3' ? 2 : b.type === 'header' || b.type === 'footer' ? 0 : -1; }
-function foldInfo(blocks) {
+function foldRegions(blocks) {
+  // nombre de blocs de chaque section (titre de section, étape, sous-section), pliée ou non
+  var n = {};
+  blocks.forEach(function (b, i) {
+    var lv = foldLevel(b); if (lv <= 0) return;
+    var c = 0; for (var j = i + 1; j < blocks.length; j++) { var l = foldLevel(blocks[j]); if (l >= 0 && l <= lv) break; c++; }
+    n[b.id] = c;
+  });
+  return n;
+}
+function foldInfo(blocks, isFolded) {
   // blocs masqués par une section pliée : jusqu'au prochain titre de même niveau ou de niveau supérieur
   // hidden : id du bloc → id du titre plié qui le masque ; count : nombre de blocs masqués par titre
   var hidden = {}, count = {}, cur = null;
@@ -281,7 +305,7 @@ function foldInfo(blocks) {
     var lv = foldLevel(b);
     if (cur && lv >= 0 && lv <= cur.lv) cur = null;
     if (cur) { hidden[b.id] = cur.id; count[cur.id] = (count[cur.id] || 0) + 1; return; }
-    if (lv > 0 && b.folded) cur = { lv: lv, id: b.id };
+    if (lv > 0 && (isFolded ? isFolded(b) : b.folded)) cur = { lv: lv, id: b.id };
   });
   return { hidden: hidden, count: count };
 }
@@ -329,6 +353,7 @@ function pageAncestors(pages, i) { var out = []; while ((i = pageParent(pages, i
 function pageKids(pages, i) { var out = [], lv = pageLv(pages, i), end = pageEnd(pages, i); for (var j = i + 1; j < end; j++) if (pageLv(pages, j) === lv + 1) out.push(j); return out; }
 function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) { var l = pageLv(pages, j); if (l === lv) return j; if (l < lv) return -1; } return -1; }
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
+var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
 function loadNavFold() { try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + doc.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
@@ -405,7 +430,7 @@ function navSpy() {
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('a[data-sec]'); if (!a) return;
     var t = target(a.getAttribute('data-sec')); if (!t) return;
-    e.preventDefault(); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    e.preventDefault(); if (typeof foldReveal === 'function') foldReveal(t); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
   window.addEventListener('resize', navLayout);
   return spy;
@@ -450,6 +475,12 @@ function refreshDerived() {
       if (navSpyFn) navSpyFn();
     }
   }
+  // blocs requête de la page : résultats recalculés après la saisie
+  doc.blocks.forEach(function (b) {
+    if (b.type !== 'query') return;
+    var box = $('.blk[data-id="' + b.id + '"] .q-res', app); if (!box) return;
+    var h = paintPills(queryResult(b, doc.cur)); if (box.innerHTML !== h) box.innerHTML = h;
+  });
   // blocs sommaire de la page : la liste suit les titres saisis
   doc.blocks.forEach(function (b) {
     if (b.type !== 'summary') return;
@@ -471,7 +502,7 @@ function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(re
 function render(focus) {
   var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
   lastNav = navHTML(doc, mode === 'edit', false);
-  app.innerHTML = lastNav + renderPage(doc, mode === 'edit');
+  app.innerHTML = lastNav + renderPage(doc, mode === 'edit', viewFold);
   applyTheme();
   if (navSpyFn) navSpyFn();
   if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
