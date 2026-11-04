@@ -466,6 +466,7 @@ span.ln+br{display:none}
   a{text-decoration:underline;text-underline-offset:2px}
   .code pre,.codebox pre,pre.cmd{white-space:pre-wrap;overflow:visible;word-break:break-word}
   .map-list{break-inside:avoid}
+  .map canvas{max-width:100%;height:auto!important}
   /* empilement ordinaire plutôt qu'en colonne flexible : découpage fiable dans tous les navigateurs */
   .wrap,section.step,header.b-header,.keep-print{display:block}
   .wrap>*+*,.keep-print>*+*{margin-top:14px}

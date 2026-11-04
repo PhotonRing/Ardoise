@@ -117,10 +117,17 @@ function printPrep(on) {
   Array.prototype.forEach.call(document.querySelectorAll(on ? 'details.fold:not([open])' : 'details.fold[data-pr]'), function (d) { if (on) { d.open = true; d.setAttribute('data-pr', ''); } else { d.open = false; d.removeAttribute('data-pr'); } });
   printKeep(on);
 }
-// impression depuis Ardoise : la page est redessinée sans interaction (en-têtes et cases de requête en texte, cartes
-// de kanban fixes), comme dans l'export statique, préparée pour l'impression, puis rétablie après
-window.addEventListener('beforeprint', function () { if (!doc || staticRender) return; staticRender = 'print'; var sy = scrollY; render(); scrollTo(0, sy); printPrep(true); });
-window.addEventListener('afterprint', function () { if (staticRender !== 'print') return; staticRender = false; var sy = scrollY; render(); scrollTo(0, sy); });
+// impression depuis Ardoise : les éléments interactifs (en-têtes triables, cases de requête) deviennent du texte dans la
+// page affichée, sans la redessiner : le navigateur imprime tout de suite après, et une carte recréée n'aurait pas eu le
+// temps de se dessiner. La page est redessinée après l'impression
+var printing = false;
+window.addEventListener('beforeprint', function () {
+  if (!doc || staticRender) return; printing = true;
+  $$('button.q-th', app).forEach(function (bt) { var sp = document.createElement('span'); sp.innerHTML = bt.innerHTML; bt.replaceWith(sp); });
+  $$('button.q-box', app).forEach(function (bt) { var sp = document.createElement('span'); sp.className = 'q-box'; sp.textContent = bt.textContent; bt.replaceWith(sp); });
+  printPrep(true);
+});
+window.addEventListener('afterprint', function () { if (!printing) return; printing = false; var sy = scrollY; render(); scrollTo(0, sy); });
 function viewScript() {
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-vfold]'); if (f) foldToggle(f.parentNode);
@@ -200,7 +207,7 @@ function exportStatic() {
   download(html, fileName().replace(/\.html?$/i, '') + '-lecture.html');
   toast('Page statique téléchargée');
 }
-function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render(); } setTimeout(function () { window.print(); if (m === 'edit') { mode = 'edit'; render(); } }, 50); }
+function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render(); } setTimeout(function () { window.print(); if (m === 'edit') { mode = 'edit'; render(); } }, 300); /* le temps que les cartes se dessinent */ }
 function copyJSON() {
   if (htimer) snapshot();
   var base = { v: VERSION, title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
