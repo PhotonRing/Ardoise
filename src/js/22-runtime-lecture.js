@@ -90,16 +90,36 @@ function foldReveal(el) {
     if (!h) return; foldToggle(h, true);
   }
 }
-function printOpen() {
-  // impression : les blocs dépliables fermés s'ouvrent le temps de l'impression, puis se referment
-  var opened = [];
-  window.addEventListener('beforeprint', function () { Array.prototype.forEach.call(document.querySelectorAll('details.fold:not([open])'), function (d) { d.open = true; opened.push(d); }); });
-  window.addEventListener('afterprint', function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+function printKeep(on) {
+  // impression : chaque titre (section, sous-section, sous-titre, étape, en-tête) est groupé avec ce qui le suit dans un
+  // ensemble insécable, pour ne jamais rester seul en bas de page, y compris dans les navigateurs qui ignorent
+  // break-after: avoid (Firefox). Ce qui suit n'est emmené que s'il n'est pas trop haut ; les groupes sont défaits après
+  Array.prototype.forEach.call(document.querySelectorAll('.keep-print'), function (g) { while (g.firstChild) g.parentNode.insertBefore(g.firstChild, g); g.remove(); });
+  if (!on) return;
+  var SEL = 'h2, h3, .subtitle, .step-head, header.b-header', LIMIT = 700;   // au-delà, la suite ne tiendrait pas sur une page de toute façon
+  var isHead = function (el) { return el.matches(SEL) && !(el.matches('h2') && el.parentNode.matches('.step-head')); };
+  Array.prototype.forEach.call(document.querySelectorAll('.wrap ' + SEL.split(', ').join(', .wrap ')), function (h) {
+    if (!isHead(h) || h.closest('.keep-print') || h.parentNode.closest('.kb, .q-blk, .toc-blk, .sub, .fold, .tl-card, .facts')) return;
+    var items = [h];
+    for (var n = h.nextElementSibling; n; n = n.nextElementSibling) {
+      if (n.offsetParent === null && getComputedStyle(n).display === 'none') continue;   // section pliée, masquée
+      if (isHead(n)) { items.push(n); continue; }
+      if (n.getBoundingClientRect().height <= LIMIT) items.push(n);
+      break;
+    }
+    if (items.length < 2) return;
+    var g = document.createElement('div'); g.className = 'keep-print'; h.parentNode.insertBefore(g, h);
+    items.forEach(function (x) { g.appendChild(x); });
+  });
 }
-printOpen();
-// impression depuis Ardoise : la page est redessinée sans interaction (en-têtes et cases de requête en texte,
-// cartes de kanban fixes), comme dans l'export statique, puis rétablie après l'impression
-window.addEventListener('beforeprint', function () { if (!doc || staticRender) return; staticRender = 'print'; var sy = scrollY; render(); scrollTo(0, sy); });
+function printPrep(on) {
+  // impression : blocs dépliables ouverts et titres groupés avec leur suite, puis tout est rétabli
+  Array.prototype.forEach.call(document.querySelectorAll(on ? 'details.fold:not([open])' : 'details.fold[data-pr]'), function (d) { if (on) { d.open = true; d.setAttribute('data-pr', ''); } else { d.open = false; d.removeAttribute('data-pr'); } });
+  printKeep(on);
+}
+// impression depuis Ardoise : la page est redessinée sans interaction (en-têtes et cases de requête en texte, cartes
+// de kanban fixes), comme dans l'export statique, préparée pour l'impression, puis rétablie après
+window.addEventListener('beforeprint', function () { if (!doc || staticRender) return; staticRender = 'print'; var sy = scrollY; render(); scrollTo(0, sy); printPrep(true); });
 window.addEventListener('afterprint', function () { if (staticRender !== 'print') return; staticRender = false; var sy = scrollY; render(); scrollTo(0, sy); });
 function viewScript() {
   document.addEventListener('click', function (e) {
@@ -171,7 +191,7 @@ function exportStatic() {
     $$('link[rel=icon], link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
       var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
-    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();(' + printOpen.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + foldToggle.toString() + foldReveal.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
+    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + printKeep.toString() + printPrep.toString() + 'addEventListener("beforeprint",function(){printPrep(true)});addEventListener("afterprint",function(){printPrep(false)});' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + foldToggle.toString() + foldReveal.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
     (doc.pages.some(function (pg) { return pg.blocks.some(function (b) { return b.type === 'map'; }); }) ?
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +

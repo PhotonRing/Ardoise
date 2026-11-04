@@ -67,7 +67,9 @@ function openBlockMenu(anchor, onPick, onCancel) {
   var q = $('.menu-q', p), list = $('.menu-list', p), cur = 0, shown = [];
   function draw() {
     var s = norm(q.value.trim());
+    var rank = function (t) { var l = norm(T[t].label); return l === s ? -1 : l.indexOf(s) === 0 ? 0 : l.indexOf(s) > 0 ? 1 : 2; };
     shown = ORDER.filter(function (t) { return !s || norm(T[t].label + ' ' + T[t].kw + ' ' + T[t].desc).indexOf(s) >= 0; });
+    if (s) shown = shown.map(function (t, i) { return { t: t, r: rank(t), i: i }; }).sort(function (a, b) { return a.r - b.r || a.i - b.i; }).map(function (x) { return x.t; });
     cur = Math.min(cur, Math.max(0, shown.length - 1));
     list.innerHTML = shown.length ? shown.map(function (t, i) {
       return '<button class="mi' + (i === cur ? ' act' : '') + '" data-t="' + t + '" type="button"><span class="ic">' + T[t].ic + '</span><span>' + T[t].label + '<small>' + T[t].desc + '</small></span></button>';
@@ -372,6 +374,10 @@ document.addEventListener('selectionchange', function () {
   if (mode === 'edit' && s.rangeCount && s.isCollapsed && s.anchorNode) {
     var tb = (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest('span.tab');
     if (tb && fieldOf(tb)) { tabExit(tb); return; }   // le curseur ne reste pas dans un taquet
+    var an = s.anchorNode, nx = an.nodeType === 1 ? an.childNodes[s.anchorOffset] : (s.anchorOffset === an.nodeValue.length || an.nodeValue.slice(s.anchorOffset).replace(/\u200B/g, '') === '' ? an.nextSibling : null);
+    if (nx && nx.nodeType === 1 && nx.classList.contains('ln')) nx = nx.firstChild;
+    while (nx && nx.nodeType === 3 && nx.nodeValue.replace(/\u200B/g, '') === '') nx = nx.nextSibling;
+    if (nx && nx.nodeType === 1 && nx.classList.contains('tab') && fieldOf(nx)) { tabExit(nx); return; }   // juste avant un taquet (touche Début…)
   }
   if (mode === 'edit' && !pop && s.rangeCount && s.isCollapsed) {
     var f = fieldOf(s.anchorNode), n = s.anchorNode;

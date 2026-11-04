@@ -403,7 +403,8 @@ a.q-count{text-decoration:none;color:inherit}
 /* retrait d'une ligne de paragraphe (Tab) */
 span.tab{white-space:pre;tab-size:2em;-moz-tab-size:2em}
 /* ligne en retrait : retrait suspendu, la suite de la ligne reste alignée sur son texte */
-span.ln{display:block;padding-left:calc(var(--n,1) * 2em);text-indent:calc(var(--n,1) * -2em)}
+span.ln{display:block;padding-left:calc(var(--n,1) * 2em)}
+span.ln>span.tab{display:none}
 span.ln+br{display:none}
 
 /* kanban (bloc et vue en colonnes du bloc requête) */
@@ -465,4 +466,15 @@ span.ln+br{display:none}
   a{text-decoration:underline;text-underline-offset:2px}
   .code pre,.codebox pre,pre.cmd{white-space:pre-wrap;overflow:visible;word-break:break-word}
   .map-list{break-inside:avoid}
+  /* empilement ordinaire plutôt qu'en colonne flexible : découpage fiable dans tous les navigateurs */
+  .wrap,section.step,header.b-header,.keep-print{display:block}
+  .wrap>*+*,.keep-print>*+*{margin-top:14px}
+  section.step>*+*{margin-top:12px}
+  header.b-header>*+*{margin-top:6px}
+  /* titre et ce qui le suit (groupés juste avant l'impression) : jamais coupés */
+  .keep-print{break-inside:avoid;page-break-inside:avoid}
+  /* tableau qui tient sur une page : entier ; plus long : l'en-tête reste avec la première ligne */
+  .tablewrap{break-inside:avoid;page-break-inside:avoid}
+  thead{break-after:avoid;page-break-after:avoid}
+  tbody tr:first-child{break-before:avoid;page-break-before:avoid}
 }
