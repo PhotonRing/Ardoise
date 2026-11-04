@@ -408,7 +408,7 @@ span.ln+br{display:none}
 
 /* kanban (bloc et vue en colonnes du bloc requête) */
 .kb-cols{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 40%,transparent) transparent}
-.kb-col{flex:0 0 260px;max-width:100%;background:color-mix(in srgb,var(--surface) 55%,var(--bg));border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px}
+.kb-col{flex:1 0 220px;max-width:100%;background:color-mix(in srgb,var(--surface) 55%,var(--bg));border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px}
 .kb-head{display:flex;align-items:center;gap:6px;padding:2px 4px}
 .kb-title{flex:1;min-width:0;font:600 13px/1.3 var(--f-body)}
 .kb-n{font:600 11px/1 var(--f-mono);color:var(--muted);background:var(--line);border-radius:999px;padding:3px 7px}
@@ -432,3 +432,37 @@ span.ln+br{display:none}
 .kb-empty{margin:0;color:var(--muted);text-align:center;font-size:12px}
 .kb-q .kb-card .q-src{align-self:flex-start}
 @media (hover:none){.kb-ctl{opacity:1}}
+
+/* ---------- impression et PDF ---------- */
+/* page A4 avec marges ; thème clair quel que soit le thème affiché ; couleurs de fond imprimées ;
+   titres jamais seuls en bas de page ; blocs qui doivent rester entiers non coupés (un paragraphe
+   long ou un grand tableau peut l'être, entre deux lignes) */
+@page{size:A4;margin:16mm 15mm 18mm}
+@media print{
+  :root:not(#impression){--bg:#f5f7f8; --surface:#ffffff; --fg:#17212b; --muted:#566573; --line:#d9e0e5; --code-bg:#14202b; --code-fg:#e4ebf0; --code-soft:#eef2f4; --ok:#1f7a4d; --ok-soft:#e3f3ea; --bad:#b42318; --bad-soft:#fdecea; --warn:#8a5a00; --warn-soft:#fdf3d8; --info:#1f5f99; --info-soft:#e4eef8; --acc-l:#b4540a; --accs-l:#fbeee2; --acc-d:#f0954a; --accs-d:#3a2614; --accent:var(--acc-l); --accent-soft:var(--accs-l); --on-accent:#ffffff; --accent:var(--acc-l); --accent-soft:var(--accs-l); --on-accent:#fff; --t4f:#52257e;--t4b:#ede1fa;--t5f:#832152;--t5b:#fbe0ed;--t6f:#1d877e;--t6b:#dffbf9;--t7f:#252c7e;--t7b:#e1e3fa;--t8f:#617e25;--t8b:#f1fae1;--t9f:#186e8b;--t9b:#def5fc;--t10f:#7e4a25;--t10b:#faebe1;--t11f:#762d76;--t11b:#f8e2f8;--t12f:#297a52;--t12b:#e2f9ed;--t13f:#405264;--t13b:#e7edf4;--t14f:#937910;--t14b:#fdf7dd;--t15f:#8b2818;--t15b:#fce2de;color-scheme:light}
+  html,body{background:#fff!important}
+  body{font-size:10.5pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wrap{max-width:none!important;margin:0!important;padding:0!important;gap:14px}
+  h1{font-size:24pt} h2{font-size:15pt}
+  p,li,dd{orphans:3;widows:3}
+  /* titres, en-tête, tête d'étape : toujours avec ce qui suit */
+  h1,h2,h3,.subtitle,.eyebrow,.step-head,header.b-header,.toc-blk-t,.kb-head,figure.fig figcaption{break-after:avoid;page-break-after:avoid}
+  h2+*,h3+*,.subtitle+*,.step-head+*{break-before:avoid;page-break-before:avoid}
+  /* blocs entiers */
+  .facts,.sub,.note,.fig,.mapblk,.map,.code,.codebox,pre.cmd,.fold,.toc-blk,.q-count,.q-cards,.kb,.kb-card,.tl-h,.tl-v-item,.tl-card,
+  .q-list li,ul.check li,.list li,tr,dl .fact,footer.b-foot,header.b-header{break-inside:avoid;page-break-inside:avoid}
+  .subs{display:grid}
+  /* tableaux : en-tête répété sur chaque page, pas de défilement horizontal */
+  .tablewrap{overflow:visible!important}
+  .tablewrap table{min-width:0!important}
+  thead{display:table-header-group}
+  /* kanban : colonnes à la ligne plutôt qu'en défilement */
+  .kb-cols{flex-wrap:wrap;overflow:visible}
+  .kb-col{flex:1 1 30%;min-width:0}
+  .kb-ctl,.q-go,.q-cdel,.q-cadd{display:none!important}
+  /* pas d'ombres ni d'effets d'écran */
+  .kb-card,.q-count,.sub,.facts{box-shadow:none}
+  a{text-decoration:underline;text-underline-offset:2px}
+  .code pre,.codebox pre,pre.cmd{white-space:pre-wrap;overflow:visible;word-break:break-word}
+  .map-list{break-inside:avoid}
+}

@@ -90,6 +90,17 @@ function foldReveal(el) {
     if (!h) return; foldToggle(h, true);
   }
 }
+function printOpen() {
+  // impression : les blocs dépliables fermés s'ouvrent le temps de l'impression, puis se referment
+  var opened = [];
+  window.addEventListener('beforeprint', function () { Array.prototype.forEach.call(document.querySelectorAll('details.fold:not([open])'), function (d) { d.open = true; opened.push(d); }); });
+  window.addEventListener('afterprint', function () { opened.forEach(function (d) { d.open = false; }); opened = []; });
+}
+printOpen();
+// impression depuis Ardoise : la page est redessinée sans interaction (en-têtes et cases de requête en texte,
+// cartes de kanban fixes), comme dans l'export statique, puis rétablie après l'impression
+window.addEventListener('beforeprint', function () { if (!doc || staticRender) return; staticRender = 'print'; var sy = scrollY; render(); scrollTo(0, sy); });
+window.addEventListener('afterprint', function () { if (staticRender !== 'print') return; staticRender = false; var sy = scrollY; render(); scrollTo(0, sy); });
 function viewScript() {
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-vfold]'); if (f) foldToggle(f.parentNode);
@@ -160,7 +171,7 @@ function exportStatic() {
     $$('link[rel=icon], link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, false, true) + doc.pages.map(function (pg, i) {
       var c = doc.cur; doc.cur = i; var h = '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, false) + '</div>'; doc.cur = c; return h;
-    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + foldToggle.toString() + foldReveal.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
+    }).join('\n') + '\n<script>(' + viewScript.toString() + ')();(' + printOpen.toString() + ')();' + tlFit.toString() + '(' + tlTips.toString() + ')();' + navLayout.toString() + navSpy.toString() + tocFold.toString() + foldToggle.toString() + foldReveal.toString() + '(' + exportPages.toString() + ')();<\/script>\n' +
     (doc.pages.some(function (pg) { return pg.blocks.some(function (b) { return b.type === 'map'; }); }) ?
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +

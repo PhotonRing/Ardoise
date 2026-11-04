@@ -187,7 +187,7 @@ function qCompare(a, b) {
   var x = a.s != null ? a.s : String(a.n != null ? a.n : a.d), y = b.s != null ? b.s : String(b.n != null ? b.n : b.d);
   return x.localeCompare(y, 'fr', { numeric: true, sensitivity: 'base' });
 }
-function qSortSpec(b) { var v = mode === 'view' && !staticRender && viewSort[b.id]; return v || { by: b.sortBy || '', dir: b.sortDir || 'asc' }; }
+function qSortSpec(b) { var v = mode === 'view' && staticRender !== true && viewSort[b.id]; return v || { by: b.sortBy || '', dir: b.sortDir || 'asc' }; }
 function qSortOptions(b, recs) {
   // choix de tri : colonnes (fiches, lignes) ou élément / état (cases), et source
   if ((b.src || 'facts') === 'check') return [['txt', 'Élément'], ['done', 'État (cochées)'], ['src', 'Source']];

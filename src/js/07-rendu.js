@@ -404,7 +404,7 @@ function navHTML(d, edit, all) {
   // sommaire : arborescence repliable (la page affichée et ses parents sont dépliés, sauf choix contraire)
   var entry = function (i) {
     var kids = pageKids(pages, i), secs = (all || i === cur) ? sectionsOf(pages[i]) : [];
-    var open = !!kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : anc.indexOf(i) >= 0);
+    var open = !!kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : anc.indexOf(i) >= 0 || i === cur);
     var fold = kids.length ? '<button type="button" class="toc-f" data-pgfold aria-expanded="' + open + '" title="Afficher / masquer les sous-pages">›</button>' : '<span class="toc-f"></span>';
     return '<li class="toc-p' + (i === cur ? ' on' : '') + (kids.length ? ' has-kids' + (open ? ' open' : '') : '') + '" data-pgi="' + i + '">' +
       '<div class="toc-pr"' + (edit ? ' draggable="true"' : '') + '>' + fold + pgBtn('toc-pb', i) +
