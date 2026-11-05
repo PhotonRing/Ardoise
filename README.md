@@ -30,6 +30,7 @@
 - **Bloc requête** (sans syntaxe à apprendre) : les fiches de faits, lignes de tableaux, cartes de kanban (avec leur colonne) ou cases à cocher (toutes, cochées ou non cochées) de tout le document, d'une page (avec ou sans ses sous-pages) ou d'une section, filtrées par pastilles (seules celles présentes dans la portée choisie sont proposées), affichées en tableau, en liste ou en colonnes façon kanban (tri par colonne, par élément, par état ou par source, en reconnaissant nombres et dates ; nombre de résultats limitable ; un clic sur un en-tête trie aussi) ou en **cartes de nombre** : autant de cartes que voulu, à la suite, chacune avec son texte, ses pastilles, et un total au choix (aucun, tous les résultats, ou un autre filtre) pour afficher « X / total » avec une barre de progression, et un lien vers la page ou la section visée. Les cases à cocher se cochent depuis la requête, et une sous-case affiche le texte de sa case parente (ou le titre de sa carte). Tenu à jour, avec un lien vers la source de chaque résultat.
 - **Bloc sommaire** : sections de la page (avec ou sans sous-sections) ou sous-pages (nombre de niveaux au choix), dans l'ordre de la page ou par ordre alphabétique, tenu à jour automatiquement.
 - **En-tête** : surtitre et chapeau s'affichent ou se masquent indépendamment (le texte masqué est conservé).
+- **Synchronisation entre copies**, en direct et hors ligne (*Fichier → Synchronisation*) : toute copie du fichier reste à jour avec les autres ; deux personnes qui écrivent dans le même paragraphe voient leurs saisies fusionnées, caractère par caractère, et une copie restée hors ligne se rattrape à sa prochaine ouverture. On voit qui est là (nom généré, modifiable) et quel bloc chacun modifie. Les échanges passent par un **relais aveugle** qui ne voit que des données chiffrées (AES-256-GCM, clé rangée dans le fichier) ; le relais s'installe chez soi en une commande (voir [relais/](relais/)).
 - **Protection par mot de passe** de l'édition, avec **chiffrement optionnel du contenu** (AES-256-GCM, clé dérivée du mot de passe par PBKDF2-SHA256, 600 000 itérations) : le fichier enregistré ne contient alors plus rien de lisible et le mot de passe est demandé à l'ouverture.
 - **Export en page statique** (lecture seule, non chiffrée), **import / export JSON** (pour faire rédiger une page par une IA).
 - **Mise à jour de l'éditeur** : chaque document embarque l'éditeur de la version qui l'a créé. *Fichier → Mettre à jour Ardoise* le remplace par la dernière version publiée (ou par un `ardoise.html` choisi sur le disque) en conservant le contenu, le mot de passe et le chiffrement.
@@ -49,6 +50,16 @@ Chaque document embarque **son propre éditeur**, celui de la version d'Ardoise 
 **Et le contenu ?** Rien à faire. Quand une version change la façon dont le contenu est rangé dans le fichier (son *format*), le nouvel éditeur convertit le document tout seul à l'ouverture, et le fichier est réécrit dans le nouveau format au prochain enregistrement.
 
 **Un document plus récent que son éditeur** (par exemple enregistré en 1.6 puis rouvert avec une copie 1.5) s'affiche en lecture seule avec un bandeau *Mettre à jour…*, pour que rien ne soit perdu. Les éditeurs antérieurs à 1.5 n'ont pas cette protection : mettez à jour tous vos documents plutôt que de garder d'anciennes copies d'Ardoise.
+
+## Synchroniser plusieurs copies
+
+1. Installez un relais (une commande, voir [relais/README.md](relais/README.md)), ou utilisez celui de quelqu'un en qui vous avez confiance : il ne voit de toute façon que des données chiffrées.
+2. Dans le document : *Fichier → Synchronisation…*, saisissez l'adresse du relais (`wss://…`), puis *Activer*.
+3. Enregistrez le fichier, puis partagez-en une copie (courriel, clé USB, dossier partagé…). **Toute copie du fichier se synchronise** : la clé est dans le fichier, chiffrée avec lui si le document est protégé par mot de passe.
+
+Chacun voit les autres personnes présentes (pastilles en haut à droite, nom modifiable dans la même fenêtre) et, en édition, le bloc que chacun est en train de modifier. Les modifications arrivent en une seconde environ ; une copie hors ligne garde les siennes et se met à jour à sa prochaine ouverture. *Nouvelle clé* coupe les copies existantes.
+
+Bon à savoir : Annuler (`Ctrl+Z`) ne défait que vos propres modifications, en gardant celles reçues entre-temps ; si deux personnes changent le même réglage (couleur, case à cocher…), la dernière modification l'emporte ; un bloc déplacé pendant que quelqu'un le modifie peut perdre cette modification.
 
 ## Plugin Obsidian
 

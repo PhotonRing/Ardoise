@@ -26,7 +26,7 @@ function serializeFile() {
   // renvoie une promesse du fichier complet ; chiffré si le document le demande
   doc.savedAt = new Date().toISOString();
   doc.title = docTitle();
-  var json = JSON.stringify(doc);
+  var json = JSON.stringify(synSaved(doc));
   return (isSealed() ? sealJSON(json).then(function (env) {
     return JSON.stringify({ v: VERSION, id: doc.id, palette: doc.palette, typo: doc.typo, theme: doc.theme, enc: env });
   }) : Promise.resolve(json)).then(function (stored) { return buildFile(stored); });
@@ -132,7 +132,7 @@ function checkDraft() {
     '<button class="ub primary" data-d="1">Restaurer</button><button class="ub out" data-d="0">Ignorer</button>';
   bannerEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]'); if (!b) return;
-    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
+    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { synKeep(doc, nd); doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
     else { try { localStorage.removeItem(LS + 'draft:' + doc.id); } catch (_) {} }
     hideBanner();
   });

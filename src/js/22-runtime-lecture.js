@@ -229,7 +229,7 @@ function importJSON() {
       if (nd.newer) { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + nd.newer + ') : mettez d’abord Ardoise à jour.'; return false; }
       nd.id = doc.id; nd.savedAt = doc.savedAt; if (doc.mapKey) nd.mapKey = doc.mapKey; else delete nd.mapKey; if (doc.lock) nd.lock = doc.lock; else delete nd.lock;
       var seen = {}, nb = 0; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (seen[b.id]) b.id = uid(); seen[b.id] = 1; nb++; }); });
-      change(function () { doc = nd; }); pageHash(0);
+      synKeep(doc, nd); change(function () { doc = nd; }); pageHash(0);
       toast(nb + ' blocs importés' + (nd.pages.length > 1 ? ' sur ' + nd.pages.length + ' pages' : ''));
     } }]);
   $('textarea', m).focus();

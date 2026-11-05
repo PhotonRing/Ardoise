@@ -543,6 +543,7 @@ function render(focus) {
   tlFit(app);
   renderChrome();
   updateCheat();
+  synPaintPeers();
   navReveal(keep);
   if (focus) focusField(focus.b, focus.k, focus.end !== false);
 }

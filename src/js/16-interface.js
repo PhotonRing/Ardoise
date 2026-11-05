@@ -20,22 +20,23 @@ function renderChrome() {
       '<button class="ub" data-ui="add" title="Insérer un bloc">+ <span class="lbl">Bloc</span></button>' +
       '<button class="ub" data-ui="style" title="Couleurs, typographie, largeur, thème">◐ <span class="lbl">Style</span></button>' +
       '<button class="ub" data-ui="file" title="Fichier">☰ <span class="lbl">Fichier</span></button><span class="vsep"></span>' +
-      '<span class="st" id="st"><i></i><span></span></span>' +
+      '<span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
       '<button class="ub out" data-ui="mode" title="Lecture (Ctrl+E)">◉ <span class="lbl">Lecture</span></button>' +
       '<button class="ub primary" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="lbl" style="display:none">⤓</span></button></div>';
   } else {
-    chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="st" id="st"><i></i><span></span></span>' +
+    chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
       (dirty ? '<button class="ub" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
       '<button class="ub" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
       '<button class="ub" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
       '<button class="ub primary" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button></div>';
   }
-  updateUndo(); setStatus();
+  updateUndo(); setStatus(); synPaint();
 }
 ui.addEventListener('click', function (e) {
   var a = e.target.closest('[data-ui]'); if (!a) return;
   var k = a.dataset.ui;
-  if (k === 'undo') undo();
+  if (k === 'sync') synDialog();
+  else if (k === 'undo') undo();
   else if (k === 'redo') redo();
   else if (k === 'mode') toggleMode();
   else if (k === 'save') save(false);
@@ -161,6 +162,8 @@ function openFile(anchor) {
     mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
     mi('print', '⎙', 'Imprimer / PDF') +
     '<div class="hr"></div>' +
+    mi('sync', '⇄', 'Synchronisation…', doc.sync ? 'Active · ' + doc.sync.relay : 'Garder plusieurs copies à jour, en direct') +
+    '<div class="hr"></div>' +
     mi('json-copy', '{ }', 'Copier le JSON', 'Pour le faire modifier par une IA') + mi('json-import', '⇥', 'Importer du JSON…', 'Remplace le contenu de la page') +
     '<div class="hr"></div>' +
     (doc.lock ? mi('pw-set', '🔒', 'Changer le mot de passe', isSealed() ? 'Édition protégée · contenu chiffré' : 'L’édition est protégée') +
@@ -180,6 +183,7 @@ function openFile(anchor) {
     else if (k === 'json-copy') copyJSON();
     else if (k === 'json-import') importJSON();
     else if (k === 'help') showHelp();
+    else if (k === 'sync') synDialog();
     else if (k === 'update') openUpdate();
     else if (k === 'pw-set') setPassword();
     else if (k === 'pw-del') removePassword();

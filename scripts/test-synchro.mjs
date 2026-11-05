@@ -1,0 +1,176 @@
+// Banc d'essai du moteur de synchronisation (src/js/05-synchro-moteur.js) : plusieurs copies modifient au hasard
+// un document de type Ardoise, s'échangent leurs opérations par un relais simulé (dans le désordre de leurs
+// connexions, en double, après une période hors ligne, ou en repartant d'un instantané), et doivent toutes
+// aboutir exactement au même document.  node scripts/test-synchro.mjs [parties] [graine]
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+const ctx = vm.createContext({});
+vm.runInContext(readFileSync(new URL('../src/js/05-synchro-moteur.js', import.meta.url), 'utf8') +
+  '\nthis.E = { synCreate, synLoad, synDump, synDiff, synApply, synJSON, synEq };', ctx);
+const { synCreate, synLoad, synDump, synDiff, synApply, synJSON, synEq } = ctx.E;
+
+let seed = +(process.argv[3] || 12345);
+const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+const ri = (n) => Math.floor(rnd() * n);
+const pick = (a) => a[ri(a.length)];
+const clone = (x) => JSON.parse(JSON.stringify(x));
+let uidN = 0;
+const uid = () => 'b' + (uidN++).toString(36) + ri(1e6).toString(36);
+const WORDS = ['carte', 'été', 'Brest', '<b>gras</b>', '&amp;', 'café ☕', 'x', 'nœud', '<a href="#p1">lien</a>', '😀', 'deux mots'];
+const word = () => pick(WORDS);
+const text = () => Array.from({ length: ri(4) }, word).join(' ');
+const block = () => {
+  const t = pick(['p', 'check', 'table', 'map', 'kanban']), b = { id: uid(), type: t };
+  if (t === 'p') b.html = text();
+  if (t === 'check') b.items = Array.from({ length: 1 + ri(3) }, () => ({ html: text(), done: rnd() < 0.5 }));
+  if (t === 'table') b.rows = [['A', 'B'], [text(), text()]];
+  if (t === 'map') { b.markers = [{ lat: 1, lon: 2, label: word() }]; b.view = { lat: 1, lon: 2, z: 3 }; }
+  if (t === 'kanban') b.cols = [{ id: uid(), title: word(), cards: [{ id: uid(), title: text() }] }];
+  return b;
+};
+const editText = (s) => {
+  const r = ri(4);
+  if (r === 0 || !s) return s + word();
+  const i = ri(s.length + 1);
+  if (r === 1) return s.slice(0, i) + word() + s.slice(i);
+  if (r === 2) return s.slice(0, i) + s.slice(i + 1 + ri(4));
+  return word();
+};
+// une modification aléatoire, faite directement sur le JSON (comme le fait l'éditeur)
+function mutate(d) {
+  const pg = pick(d.pages), bl = pg.blocks;
+  const r = ri(14);
+  if (r === 0 || !bl.length) { bl.splice(ri(bl.length + 1), 0, block()); return; }
+  if (r === 1 && bl.length > 1) { bl.splice(ri(bl.length), 1); return; }
+  if (r === 2 && bl.length > 1) { const [m] = bl.splice(ri(bl.length), 1); bl.splice(ri(bl.length + 1), 0, m); return; }
+  if (r === 3) { d.title = editText(d.title); return; }
+  if (r === 4) { d.palette = pick(['ambre', 'graphite', 'bleu']); return; }
+  if (r === 5 && d.pages.length < 4) { d.pages.push({ id: uid(), title: word(), blocks: [block()] }); return; }
+  if (r === 6) { pg.title = editText(pg.title); return; }
+  if (r === 7) { if (d.tags && rnd() < 0.5) delete d.tags; else d.tags = Object.assign(d.tags || {}, { [word().toLowerCase()]: { c: ri(16) } }); return; }
+  const b = pick(bl);
+  if (b.type === 'p') { if (rnd() < 0.9) b.html = editText(b.html); else b.html = text(); }
+  else if (b.type === 'check') {
+    const it = b.items, q = ri(5);
+    if (q === 0) it.splice(ri(it.length + 1), 0, { html: text(), done: false });
+    else if (q === 1 && it.length > 1) it.splice(ri(it.length), 1);
+    else if (q === 2 && it.length) pick(it).done = !pick(it).done;
+    else if (it.length) { const x = pick(it); x.html = editText(x.html); if (rnd() < 0.2) x.lv = ri(3); }
+  } else if (b.type === 'table') {
+    const q = ri(4);
+    if (q === 0) b.rows.push(b.rows[0].map(() => text()));
+    else if (q === 1 && b.rows.length > 2) b.rows.splice(1 + ri(b.rows.length - 1), 1);
+    else if (q === 2) b.rows.forEach((row, i) => row.push(i ? '' : 'C'));
+    else { const row = pick(b.rows), j = ri(row.length); row[j] = editText(row[j]); }
+  } else if (b.type === 'map') {
+    if (rnd() < 0.5) b.markers.push({ lat: ri(90), lon: ri(180), label: word() }); else if (b.markers.length) pick(b.markers).label = editText(pick(b.markers).label);
+    if (rnd() < 0.3) b.view = { lat: ri(9), lon: ri(9), z: ri(5) };
+  } else if (b.type === 'kanban') {
+    const c = pick(b.cols), q = ri(3);
+    if (q === 0) c.cards.push({ id: uid(), title: text() });
+    else if (q === 1 && c.cards.length) { const [k] = c.cards.splice(ri(c.cards.length), 1); pick(b.cols).cards.push(k); }
+    else if (c.cards.length) { const k = pick(c.cards); k.title = editText(k.title); }
+    if (rnd() < 0.1) b.cols.push({ id: uid(), title: word(), cards: [] });
+  }
+}
+
+let checks = 0, snaps = 0, reloads = 0;
+function game(n) {
+  const base = { title: 'Doc', palette: 'ambre', pages: [{ id: 'p0', title: 'Accueil', blocks: [block(), block()] }] };
+  // relais : les numéros de trames sont absolus (r.cur) ; le tableau ne garde que celles depuis « first »
+  const relay = { log: [], snap: null, first: 0 };
+  const mk = (actor) => ({ actor, st: null, doc: null, cur: 0, pending: [], online: true });
+  const reps = Array.from({ length: n }, (_, i) => mk('r' + i + '-' + ri(1e6).toString(36)));
+  // la première copie active la synchronisation ; les autres sont des copies de son fichier
+  reps[0].st = synCreate(reps[0].actor); reps[0].doc = clone(base);
+  const init = synDiff(reps[0].st, {}, reps[0].doc); reps[0].pending.push(...init);
+  const saved = JSON.stringify({ st: synDump(reps[0].st), doc: reps[0].doc, pending: reps[0].pending });
+  for (const r of reps.slice(1)) { const f = JSON.parse(saved); r.st = synLoad(f.st, r.actor); r.doc = f.doc; r.pending = f.pending; }
+  const send = (r) => { if (r.pending.length) { relay.log.push(r.pending); r.pending = []; } };
+  const receive = (r, all) => {
+    if (r.cur < relay.first) {
+      // trop en retard : on repart de l'instantané, puis on rejoue ses propres modifications non envoyées
+      const lam = r.st.lamport; reloads++;
+      r.st = synLoad(JSON.parse(JSON.stringify(relay.snap.st)), r.actor); if (r.st.lamport < lam) r.st.lamport = lam;
+      synApply(r.st, r.pending); r.cur = relay.snap.upto;
+    }
+    const total = relay.first + relay.log.length;
+    const end = all ? total : Math.min(total, r.cur + 1 + ri(4));
+    for (; r.cur < end; r.cur++) synApply(r.st, relay.log[r.cur - relay.first] || []);
+    r.doc = synJSON(r.st.root);
+  };
+  for (let step = 0; step < 120; step++) {
+    const r = pick(reps), act = ri(10);
+    if (act < 5) {
+      const before = clone(r.doc); mutate(r.doc);
+      const ops = synDiff(r.st, before, r.doc); r.pending.push(...ops);
+      const got = synJSON(r.st.root); checks++;
+      if (!synEq(got, r.doc)) throw new Error('modification locale mal reproduite\n' + JSON.stringify(r.doc) + '\n' + JSON.stringify(got));
+      r.doc = got;
+      if (r.online) send(r);
+    } else if (act < 8) { if (r.online) receive(r, false); }
+    else if (act === 8) { r.online = !r.online; if (r.online) send(r); }
+    else if (relay.log.length - relay.first > 8) {
+      // une copie à jour dépose un instantané ; le relais oublie les trames qu'il contient
+      const s = reps.find((x) => x.online && x.cur === relay.first + relay.log.length);
+      if (s) { relay.snap = { st: synDump(s.st), upto: s.cur }; relay.log = []; relay.first = s.cur; snaps++; }
+    }
+  }
+  // tout le monde se reconnecte et rattrape tout
+  for (const r of reps) { r.online = true; send(r); }
+  for (const r of reps) receive(r, true);
+  for (const r of reps) {
+    checks++;
+    if (!synEq(r.doc, reps[0].doc)) throw new Error('copies divergentes\n' + JSON.stringify(reps[0].doc) + '\n' + JSON.stringify(r.doc));
+    // l'état enregistré dans le fichier redonne le même document
+    const back = synLoad(JSON.parse(JSON.stringify(synDump(r.st))), 'x');
+    if (!synEq(synJSON(back.root), r.doc)) throw new Error('état enregistré incomplet');
+  }
+}
+// Scénarios précis : ce que chacun voit après fusion
+function pair(doc) {
+  const a = synCreate('A'), init = synDiff(a, {}, doc), b = synCreate('B'); synApply(b, init);
+  return { a, b, da: clone(doc), db: clone(doc) };
+}
+function swap(x, opsA, opsB) { synApply(x.a, opsB); synApply(x.b, opsA); const ja = synJSON(x.a.root), jb = synJSON(x.b.root); if (!synEq(ja, jb)) throw new Error('scénario : divergence'); checks++; return ja; }
+function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : ' + msg); }
+{ // deux personnes écrivent dans le même paragraphe : les deux saisies sont gardées
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'Bonjour le monde' }] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].html = 'Bonjour le <b>vaste</b> monde';
+  const nb = clone(x.db); nb.pages[0].blocks[0].html = 'Bonjour tout le monde !';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(r.pages[0].blocks[0].html === 'Bonjour tout le <b>vaste</b> monde !', 'fusion du texte : ' + r.pages[0].blocks[0].html);
+}
+{ // l'un supprime un mot pendant que l'autre en ajoute un ailleurs
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'un deux trois' }] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].html = 'un trois';
+  const nb = clone(x.db); nb.pages[0].blocks[0].html = 'un deux trois quatre';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(r.pages[0].blocks[0].html === 'un trois quatre', 'suppression et ajout : ' + r.pages[0].blocks[0].html);
+}
+{ // chacun ajoute un bloc, l'un coche une case, l'autre modifie le texte de la même case
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'c', type: 'check', items: [{ html: 'lait', done: false }] }] }] });
+  const na = clone(x.da); na.pages[0].blocks.push({ id: 'n1', type: 'p', html: 'A' }); na.pages[0].blocks[0].items[0].done = true;
+  const nb = clone(x.db); nb.pages[0].blocks.unshift({ id: 'n2', type: 'p', html: 'B' }); nb.pages[0].blocks[0 + 1].items[0].html = 'lait entier';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(r.pages[0].blocks.map((b) => b.id).join() === 'n2,c,n1', 'blocs ajoutés : ' + r.pages[0].blocks.map((b) => b.id));
+  expect(r.pages[0].blocks[1].items[0].done === true && r.pages[0].blocks[1].items[0].html === 'lait entier', 'case cochée et modifiée');
+}
+{ // un bloc supprimé d'un côté, modifié de l'autre : il reste supprimé
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'x' }, { id: 'c', type: 'p', html: 'y' }] }] });
+  const na = clone(x.da); na.pages[0].blocks.shift();
+  const nb = clone(x.db); nb.pages[0].blocks[0].html = 'x modifié';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(r.pages[0].blocks.length === 1 && r.pages[0].blocks[0].id === 'c', 'bloc supprimé');
+}
+{ // même réglage changé des deux côtés : une seule valeur, la même partout
+  const x = pair({ palette: 'ambre', pages: [] });
+  const na = clone(x.da); na.palette = 'bleu'; const nb = clone(x.db); nb.palette = 'vert';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(r.palette === 'bleu' || r.palette === 'vert', 'réglage');
+}
+const games = +(process.argv[2] || 300);
+for (let g = 0; g < games; g++) game(2 + (g % 3));
+if (games >= 50 && (!snaps || !reloads)) throw new Error('instantanés non exercés');
+console.log(`synchronisation : OK (${games} parties, ${checks} vérifications, ${snaps} instantanés, ${reloads} reprises depuis un instantané)`);
