@@ -5,6 +5,13 @@ app.addEventListener('input', function (e) {
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); markDirty(); } return; }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); markDirty(); return; }
   if (el.matches('.map-q')) { mapSearch(el); return; }
+  if (el.matches('.ch-q')) { chSearch(el); return; }
+  if (el.matches('.ch-txt')) {
+    // titre et unité : appliqués en direct (le centre, un nombre, à la validation)
+    if (el.dataset.p === 'mid') return;
+    var bt0 = byId(el.dataset.b); bt0.choro[el.dataset.p] = el.value; chRefresh(bt0); markDirty(); return;
+  }
+  if (el.matches('.ch-v') || el.matches('.ch-ta')) return;
   if (el.matches('.rt-in')) { var br = byId(el.dataset.b); br.routes[+el.dataset.rt].label = el.value; var mr = mapOf(br.id); if (mr) mr.setRoutes(br.routes); markDirty(); return; }
   if (el.matches('.rd-in')) return;
   if (el.matches('.st-in')) { var bs = byId(el.dataset.b), rr = bs.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(bs.id); if (ms) ms.setRoutes(bs.routes); markDirty(); return; }
@@ -41,7 +48,7 @@ app.addEventListener('input', function (e) {
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();
+  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   markDirty();
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
@@ -60,6 +67,35 @@ app.addEventListener('change', function (e) {
     if (b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast')) { var sy = scrollY; render(); scrollTo(0, sy); var cb = $('[data-b="' + b.id + '"][data-k="' + el.dataset.k + '"]', app); if (cb) cb.focus({ preventScroll: true }); }
     if (doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
     return;
+  }
+  if (el.matches('.ch-v')) {
+    var bv = byId(el.dataset.b), vid = el.dataset.id, nv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (nv === null && el.value.trim() !== '') { toast('Valeur non reconnue : indiquez un nombre (ex. 12,5 ou 1 250)'); el.value = chRaw(bv.choro.data[vid]); return; }
+    bv.choro.data[vid] = nv; el.value = chRaw(nv); snapshot(); markDirty(true); chRefresh(bv); return;
+  }
+  if (el.matches('.ch-txt[data-p=mid]')) {
+    var bmid = byId(el.dataset.b), mv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (mv === null && el.value.trim() !== '') { toast('Centre non reconnu : indiquez un nombre, ou laissez vide'); el.value = chRaw(bmid.choro.mid); return; }
+    keepView(bmid); change(function () { if (mv === null) delete bmid.choro.mid; else bmid.choro.mid = mv; }); return;
+  }
+  if (el.matches('.ch-txt')) { snapshot(); return; }
+  if (el.matches('.ch-set')) {
+    var bset = byId(el.dataset.b), sp = el.dataset.p, sv = el.value;
+    keepView(bset); change(function () {
+      if (sp === 'src.k' || sp === 'src.v') { bset.choro.src[sp.slice(4)] = +sv; return; }
+      bset.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) bset.choro.cols = [];
+    }); return;
+  }
+  if (el.matches('.ch-src')) {
+    // source des valeurs : saisie dans la liste, ou un tableau du document (colonnes devinées)
+    var bsrc = byId(el.dataset.b), tid = el.value, tb = null;
+    doc.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === tid) tb = x; }); });
+    keepView(bsrc); chPaste = null;
+    change(function () { if (!tid || !tb) delete bsrc.choro.src; else { var g = chGuessCols(tb); bsrc.choro.src = { b: tid, k: g.k, v: g.v }; } }); return;
+  }
+  if (el.matches('.ch-col')) {
+    var bcol = byId(el.dataset.b), ck = +el.dataset.k, cv0 = el.value;
+    keepView(bcol); change(function () { var a = (bcol.choro.cols || []).slice(); while (a.length <= ck) a.push(null); a[ck] = cv0; bcol.choro.cols = a; }); return;
   }
   if (el.matches('.rt-color')) { var brc = byId(el.dataset.b); keepView(brc); change(function () { brc.routes[+el.dataset.rt].color = el.value; }); return; }
   if (el.matches('.rd-in')) {
@@ -87,6 +123,7 @@ app.addEventListener('change', function (e) {
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
 app.addEventListener('focusout', function (e) {
   if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
+  if (e.target.matches && e.target.matches('.ch-q')) { var cr0 = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { cr0.hidden = true; }, 150); }
   if (e.target.matches && e.target.matches('.map-q')) { var res = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); }
 });
 app.addEventListener('focusin', function (e) {
@@ -117,6 +154,23 @@ app.addEventListener('keydown', function (e) {
       e.preventDefault(); res._cur = Math.max(0, Math.min(n - 1, (res._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
       $$('.mi', res).forEach(function (m, j) { m.classList.toggle('act', j === res._cur); });
     }
+    return;
+  }
+  if (el.matches('.ch-q')) {
+    var cres = el.parentNode.querySelector('.map-res'), cn = (cres._items || []).length;
+    if (e.key === 'Enter') { e.preventDefault(); if (cn) chPick(el, cres._cur || 0); }
+    else if (e.key === 'Escape') { el.value = ''; cres.hidden = true; }
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cn) {
+      e.preventDefault(); cres._cur = Math.max(0, Math.min(cn - 1, (cres._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
+      $$('.mi', cres).forEach(function (m, j) { m.classList.toggle('act', j === cres._cur); });
+    }
+    return;
+  }
+  if (el.matches('.ch-v') && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+    // passer d'une valeur à l'autre au clavier (la valeur est validée en quittant le champ)
+    e.preventDefault();
+    var all = $$('.ch-v[data-b="' + el.dataset.b + '"]', app), ix = all.indexOf(el) + (e.key === 'ArrowUp' ? -1 : 1), nx = all[ix];
+    if (nx) { nx.focus(); nx.select(); } else el.blur();
     return;
   }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
