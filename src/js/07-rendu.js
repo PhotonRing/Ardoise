@@ -627,6 +627,7 @@ function choroPanel(b) {
     '<div class="ch-r">' + tg('ch-parts', c.parts, 'Territoires détachés', 'Répéter l’étiquette sur les territoires détachés du pays (Guyane, Réunion, Canaries, Alaska…) et sur les territoires rattachés') +
       tg('ch-sov', c.sov, 'Territoires rattachés', 'Colorer les territoires sans valeur propre (Nouvelle-Calédonie, Groenland, Porto Rico…) comme leur pays souverain') + '</div>' +
     '<div class="ch-r">' + tg('ch-legend', c.legend, 'Légende', 'Afficher la légende sur la carte') +
+      tg('ch-unitlab', c.unitLab, 'Unité sur la carte', 'Ajouter l’unité après chaque valeur affichée sur les pays (elle reste dans la légende et l’infobulle)') +
       (src ? '' : tg('ch-paste', chPaste === id, 'Coller un tableau…', 'Importer deux colonnes copiées d’un tableur')) +
       '<button type="button" class="mk-b mk-t ch-off" data-act="ch-off" title="Retirer les couleurs et toutes les données par pays">Retirer</button></div>' +
     (!src && chPaste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
