@@ -214,7 +214,7 @@ function ardoiseMapKit() {
       cols: (Array.isArray(ch.cols) ? ch.cols : []).slice(0, 3).map(function (c) { return isHex(c) ? c : null; }),
       labels: ['value', 'both', 'name', 'none'].indexOf(ch.labels) >= 0 ? ch.labels : 'value',
       dec: ['auto', '0', '1', '2', 'k'].indexOf(String(ch.dec)) >= 0 ? String(ch.dec) : 'auto',
-      title: String(ch.title || ''), unit: String(ch.unit || ''), legend: ch.legend !== false, parts: !!ch.parts, sov: !!ch.sov };
+      title: String(ch.title || ''), unit: String(ch.unit || ''), legend: ch.legend !== false, parts: !!ch.parts, sov: !!ch.sov, unitLab: !!ch.unitLab };
   }
   function nice(x, up) {
     // arrondi « lisible » (1, 2, 2,5, 5 × 10ⁿ) d'une borne de classe
@@ -426,7 +426,7 @@ function ardoiseMapKit() {
         items.forEach(function (it) {
           var moved = ch.lp[it.key]; if (!!moved !== pass) return;
           var v = ch.data[it.sid]; if (v == null && ch.labels !== 'name') return;
-          var vt = fmtVal(v, ch.dec), L = ch.labels === 'value' ? [[vt, FV]] : ch.labels === 'name' ? [[it.name, FN]] : vt ? [[it.name, FN], [vt, FV]] : [[it.name, FN]];
+          var vt = fmtVal(v, ch.dec, ch.unitLab ? ch.unit : ''), L = ch.labels === 'value' ? [[vt, FV]] : ch.labels === 'name' ? [[it.name, FN]] : vt ? [[it.name, FN], [vt, FV]] : [[it.name, FN]];
           var w = 0; L.forEach(function (l) { ctx.font = l[1]; w = Math.max(w, ctx.measureText(l[0]).width); });
           var h = L.length * 13 + 2, k = Math.round(view.cx - it.lx), ax = (it.lx + k) * s + ox, ay = it.ly * s + oy, x = ax, y = ay;
           if (moved) { var q = merc(moved[1], moved[0]); x = q[0] * s + ox; while (x - ax > s / 2) x -= s; while (x - ax < -s / 2) x += s; y = q[1] * s + oy; }
