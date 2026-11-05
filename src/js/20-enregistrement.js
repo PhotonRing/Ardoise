@@ -26,7 +26,7 @@ function serializeFile() {
   // renvoie une promesse du fichier complet ; chiffré si le document le demande
   doc.savedAt = new Date().toISOString();
   doc.title = docTitle();
-  var json = JSON.stringify(doc);
+  var json = JSON.stringify(synSaved(doc));
   return (isSealed() ? sealJSON(json).then(function (env) {
     return JSON.stringify({ v: VERSION, id: doc.id, palette: doc.palette, typo: doc.typo, theme: doc.theme, enc: env });
   }) : Promise.resolve(json)).then(function (stored) { return buildFile(stored); });
@@ -58,6 +58,13 @@ function idb(fn) {
   });
 }
 function getHandle() { return idb(function (db, res) { var r = db.transaction('handles').objectStore('handles').get(doc.id); r.onsuccess = function () { res(r.result || null); }; r.onerror = function () { res(null); }; }); }
+function forgetHandle() { return idb(function (db, res) { var tx = db.transaction('handles', 'readwrite'); tx.objectStore('handles').delete(doc.id); tx.oncomplete = function () { res(true); }; tx.onerror = function () { res(false); }; }); }
+// Poignée périmée : le fichier a été modifié, remplacé, déplacé ou supprimé hors d'Ardoise depuis qu'elle a été obtenue
+// (fréquent sur Android : copie téléchargée mise à la place, synchronisation, gestionnaire de fichiers). Le navigateur
+// refuse alors d'y écrire ; il faut choisir le fichier de nouveau.
+function staleHandle(e) { return !!e && /^(InvalidStateError|NotFoundError|NoModificationAllowedError|NotReadableError|InvalidModificationError)$/.test(e.name); }
+function dropHandle() { fileHandle = null; handleGranted = false; forgetHandle(); }
+var STALE_MSG = 'le fichier a été modifié ou déplacé depuis son ouverture';
 function putHandle(h) { return idb(function (db, res) { var tx = db.transaction('handles', 'readwrite'); tx.objectStore('handles').put(h, doc.id); tx.oncomplete = function () { res(true); }; tx.onerror = function () { res(false); }; }); }
 function perm(h, ask) {
   var o = { mode: 'readwrite' };
@@ -75,7 +82,7 @@ function afterSave(where) {
   if (mode === 'view') renderChrome(); else setStatus();
   if (where) toast(where);
 }
-function saveFailed(e) { saving = false; setStatus(); toast('Enregistrement impossible : ' + (e && e.message || e), 5000); }
+function saveFailed(e) { saving = false; setStatus(); if (e && e.name === 'AbortError') return; toast('Enregistrement impossible : ' + (e && e.message || e), 5000); }
 function save(as) {
   if (!doc) return Promise.resolve();
   if (doc.newer) { newerNotice(true); return Promise.resolve(); }   // l'enregistrer ici perdrait ce que cet éditeur ne connaît pas
@@ -90,8 +97,23 @@ function save(as) {
       return pickNew();
     }).then(function (h) {
       if (!h) { saving = false; setStatus(); return; }
+      var reused = h === fileHandle;
       fileHandle = h; handleGranted = true;
-      return serializeFile().then(function (html) { return writeTo(h, html); }).then(function () { putHandle(h); afterSave('Enregistré dans ' + h.name + (autosaveOn ? ' · auto-save actif' : '')); }, saveFailed);
+      return serializeFile().then(function (html) {
+        return writeTo(h, html).then(function () { return h; }, function (e) {
+          if (!reused || !staleHandle(e)) throw e;
+          // poignée périmée : on l'oublie et on fait choisir le fichier de nouveau (même nom proposé)
+          var name = h.name; dropHandle();
+          return window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Page HTML', accept: { 'text/html': ['.html', '.htm'] } }] }).then(function (h2) {
+            fileHandle = h2; handleGranted = true;
+            return writeTo(h2, html).then(function () { return h2; });
+          }, function (e2) {
+            if (e2 && e2.name === 'AbortError') throw e2;
+            // le sélecteur demande un geste de l'utilisateur : le prochain enregistrement l'ouvrira directement
+            throw new Error(STALE_MSG + '. Enregistrez de nouveau pour le choisir.');
+          });
+        });
+      }).then(function (hh) { putHandle(hh); afterSave('Enregistré dans ' + hh.name + (autosaveOn ? ' · auto-save actif' : '')); }, saveFailed);
     }).catch(function (err) {
       saving = false;
       if (err && err.name === 'AbortError') { setStatus(); return; }
@@ -110,7 +132,13 @@ function autoSave() {
     if (!ok) { setStatus(); return; }
     if (htimer) snapshot();
     saving = true; setStatus();
-    serializeFile().then(function (html) { return writeTo(fileHandle, html).then(function () { afterSave(); }, function () { saving = false; handleGranted = false; setStatus(); }); }, saveFailed);
+    serializeFile().then(function (html) {
+      return writeTo(fileHandle, html).then(function () { afterSave(); }, function (e) {
+        saving = false; handleGranted = false;
+        if (staleHandle(e)) { dropHandle(); toast('Auto-save interrompu : ' + STALE_MSG + '. Enregistrez (Ctrl+S) pour le choisir de nouveau.', 7000); }
+        setStatus();
+      });
+    }, saveFailed);
   });
 }
 function download(text, name) {
@@ -132,7 +160,7 @@ function checkDraft() {
     '<button class="ub primary" data-d="1">Restaurer</button><button class="ub out" data-d="0">Ignorer</button>';
   bannerEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]'); if (!b) return;
-    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
+    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { synKeep(doc, nd); doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
     else { try { localStorage.removeItem(LS + 'draft:' + doc.id); } catch (_) {} }
     hideBanner();
   });
@@ -211,7 +239,13 @@ function applyUpdate(tpl) {
       var html = graftFile(tpl, curFile);
       if (!h) { download(html, fileName()); afterSave(); toast('Document mis à jour téléchargé : remplacez l’ancien fichier par celui-ci, puis rouvrez-le', 6000); return; }
       fileHandle = h;
-      return writeTo(h, html).then(function () { return putHandle(h); }).then(function () {
+      return writeTo(h, html).catch(function (e) {
+        if (!staleHandle(e)) throw e;
+        // poignée périmée : le document mis à jour est téléchargé à la place
+        dropHandle(); download(html, fileName()); afterSave(); toast('Document mis à jour téléchargé (' + STALE_MSG + ') : remplacez l’ancien fichier par celui-ci, puis rouvrez-le', 8000);
+        return 'dl';
+      }).then(function (r) { return r === 'dl' ? r : putHandle(h); }).then(function (r) {
+        if (r === 'dl') return;
         afterSave(); toast('Ardoise ' + versionOf(html) + ' installée · rechargement…');
         // dans Obsidian, le plugin recharge lui-même le document mis à jour
         if (!window.ardoiseHost) setTimeout(function () { location.reload(); }, 800);

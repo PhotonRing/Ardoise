@@ -12,11 +12,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Assembler ardoise.html
         run: node build.mjs
       - name: Vérifier le fichier assemblé
         run: node scripts/check.mjs
+      - name: Synchronisation (moteur de fusion et relais)
+        run: node scripts/test-synchro.mjs 300 && node scripts/test-relais.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: ardoise-html

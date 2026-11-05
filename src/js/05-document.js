@@ -49,6 +49,8 @@ function normalize(d) {
   // format plus récent que cet éditeur : lecture seule (le fichier d'origine sert à la mise à jour, voir applyUpdate)
   if (mg.newer) Object.defineProperty(out, 'newer', { value: mg.from, enumerable: false, configurable: true });
   if (d.mapKey) out.mapKey = String(d.mapKey);
+  // synchronisation entre copies : configuration et état, hors du contenu (voir 24-synchronisation.js)
+  if (d.sync && typeof d.sync === 'object' && typeof d.sync.key === 'string' && typeof d.sync.relay === 'string') synSetCfg(out, { relay: d.sync.relay, key: d.sync.key, seq: +d.sync.seq || 0, state: d.sync.state || null, pending: Array.isArray(d.sync.pending) ? d.sync.pending : [] });
   if (d.tags && typeof d.tags === 'object') {
     // registre des pastilles : nom → couleur
     var tg = {}; for (var tk in d.tags) { var c = d.tags[tk] && Math.floor(+d.tags[tk].c); if (tagKey(tk) === tk && c >= 0 && c < TAG_COLORS) tg[tk] = { c: c }; }

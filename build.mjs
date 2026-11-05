@@ -42,3 +42,7 @@ writeFileSync(join(root, 'dist', 'obsidian', 'main.js'), plugin.replace('__ARDOI
 writeFileSync(join(root, 'dist', 'obsidian', 'manifest.json'), obs('manifest.json').replace('{{version}}', version));
 writeFileSync(join(root, 'dist', 'obsidian', 'styles.css'), obs('styles.css'));
 console.log(`dist/obsidian/ — plugin Obsidian ${version}`);
+
+// Relais de synchronisation (un seul fichier, aucune dépendance), joint aux releases
+writeFileSync(join(root, 'dist', 'ardoise-relais.mjs'), readFileSync(join(root, 'relais', 'relais.mjs'), 'utf8'));
+console.log(`dist/ardoise-relais.mjs — relais de synchronisation`);

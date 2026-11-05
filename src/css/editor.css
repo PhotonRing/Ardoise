@@ -28,6 +28,24 @@ html.is-edit section.step{gap:40px}
 .fab{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:6px;padding:5px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.14);opacity:.7;transition:opacity .15s}
 .fab:hover,.fab:focus-within,.fab.dirty{opacity:1}
 .fab .ub{border-radius:999px}
+/* synchronisation : état et personnes présentes */
+.syn[hidden]{display:none}
+.syn-b{display:inline-flex;align-items:center;gap:0;height:30px;padding:0 8px 0 9px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--fg);cursor:pointer}
+.syn-b:hover{border-color:var(--accent)}
+.syn-b>i{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:4px}
+.syn-b.ok>i{background:var(--ok)}.syn-b.connexion>i{background:var(--warn)}.syn-b.hors-ligne>i{background:var(--muted);box-shadow:0 0 0 2px var(--line)}.syn-b.erreur>i{background:var(--bad)}
+.syn-av{width:22px;height:22px;border-radius:50%;color:#fff;font:700 11px/22px var(--f-body);text-align:center;margin-left:-4px;border:2px solid var(--surface)}
+.syn-av:first-of-type{margin-left:2px}
+.blk.syn-peer{box-shadow:0 0 0 2px var(--syn);border-radius:6px;position:relative}
+.blk.syn-peer::after{content:attr(data-syn);position:absolute;top:-10px;right:8px;background:var(--syn);color:#fff;font:600 10.5px/1 var(--f-body);padding:3px 6px;border-radius:5px;pointer-events:none;z-index:5}
+.syn-dlg{display:flex;flex-direction:column;gap:10px;font-size:13px}
+.syn-dlg label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+.syn-dlg input{height:34px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--fg);padding:0 10px;font:13px var(--f-body);font-weight:400}
+.syn-dlg input:focus{outline:none;border-color:var(--accent)}
+.syn-dlg p{margin:0}
+.syn-who{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.syn-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 9px 3px 6px}
+.syn-pill i{width:10px;height:10px;border-radius:50%}
 .fab .st{padding-left:8px}
 @media (max-width:560px){.fab .lbl{display:none}}
 .pop{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:6px;min-width:240px;max-width:calc(100vw - 16px);max-height:min(72vh,560px);overflow:auto}
