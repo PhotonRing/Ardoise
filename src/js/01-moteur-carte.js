@@ -68,7 +68,13 @@ function ardoiseMapKit() {
       var lp = merc(c[1], c[2]), main = rings[0];
       // contour principal (le plus étendu) : décide si l'étiquette d'une valeur tient dans le pays
       rings.forEach(function (r) { if ((r.b[2] - r.b[0]) * (r.b[3] - r.b[1]) > (main.b[2] - main.b[0]) * (main.b[3] - main.b[1])) main = r; });
-      return { name: c[0], lx: lp[0], ly: lp[1], ml: c[3], rings: rings, b: b, mb: main.b, id: c[5] || c[0], aka: c[6] ? String(c[6]).split('|') : [] };
+      // morceaux détachés (Guyane, Réunion, Canaries, Alaska…) : leurs contours, nom éventuel et point d'étiquette
+      var parts = (c[8] || []).map(function (u) {
+        var rs = u[4].map(function (i) { return rings[i]; }).filter(Boolean), pb = [9, 9, -9, -9], pm = merc(u[2], u[3]);
+        rs.forEach(function (r) { pb[0] = Math.min(pb[0], r.b[0]); pb[1] = Math.min(pb[1], r.b[1]); pb[2] = Math.max(pb[2], r.b[2]); pb[3] = Math.max(pb[3], r.b[3]); });
+        return { key: u[0], name: u[1] || '', lx: pm[0], ly: pm[1], b: pb };
+      });
+      return { name: c[0], lx: lp[0], ly: lp[1], ml: c[3], rings: rings, b: b, mb: main.b, id: c[5] || c[0], aka: c[6] ? String(c[6]).split('|') : [], sov: c[7] || null, parts: parts };
     });
     var lakes = g.lakes.map(ring);
     var cities = g.cities || [];
@@ -79,6 +85,10 @@ function ardoiseMapKit() {
     return GEO;
   }
   function redrawAll() { instances.forEach(function (i) { i.request(); }); }
+  // largeur utile d'une page A4 imprimée (210 mm moins 2 × 15 mm de marges, voir @page dans page.css), en pixels CSS
+  var PRINT_W = Math.floor(180 * 96 / 25.4);
+  window.addEventListener('beforeprint', function () { instances.forEach(function (i) { i.print(true); }); });
+  window.addEventListener('afterprint', function () { instances.forEach(function (i) { i.print(false); }); });
   function tile(bg, url) {
     var t = tileCache[url]; if (t) return t;
     t = tileCache[url] = { img: new Image(), ok: false, err: false };
@@ -195,7 +205,7 @@ function ardoiseMapKit() {
     if (!ch || typeof ch !== 'object') return null;
     var data = {}, lp = {};
     if (ch.data && typeof ch.data === 'object') for (var k in ch.data) { if (!/^[A-Z0-9]{2,3}$/.test(k)) continue; var v = ch.data[k]; data[k] = (v === null || v === '' || v === undefined) ? null : chNum(v); }
-    if (ch.lp && typeof ch.lp === 'object') for (var j in ch.lp) { var l = cleanLL(ch.lp[j]); if (l && j in data) lp[j] = l; }
+    if (ch.lp && typeof ch.lp === 'object') for (var j in ch.lp) { var l = cleanLL(ch.lp[j]); if (l && /^[A-Z0-9]{2,3}(\/[A-Za-z0-9_-]{1,12})?$/.test(j)) lp[j] = l; }
     var pal = ch.pal; if (!PALS.some(function (p) { return p[0] === pal; })) pal = 'bleus';
     var scale = ch.scale; if (!CH_SCALES.some(function (p) { return p[0] === scale; })) scale = 'lin';
     var n = Math.round(+ch.classes); if (!(n >= 3 && n <= 9)) n = 5;
@@ -204,7 +214,7 @@ function ardoiseMapKit() {
       cols: (Array.isArray(ch.cols) ? ch.cols : []).slice(0, 3).map(function (c) { return isHex(c) ? c : null; }),
       labels: ['value', 'both', 'name', 'none'].indexOf(ch.labels) >= 0 ? ch.labels : 'value',
       dec: ['auto', '0', '1', '2', 'k'].indexOf(String(ch.dec)) >= 0 ? String(ch.dec) : 'auto',
-      title: String(ch.title || ''), unit: String(ch.unit || ''), legend: ch.legend !== false };
+      title: String(ch.title || ''), unit: String(ch.unit || ''), legend: ch.legend !== false, parts: !!ch.parts, sov: !!ch.sov };
   }
   function nice(x, up) {
     // arrondi « lisible » (1, 2, 2,5, 5 × 10ⁿ) d'une borne de classe
@@ -291,14 +301,23 @@ function ardoiseMapKit() {
     el.classList.toggle('locked', locked); el.classList.toggle('editing', !!o.edit);
     var cv = el.querySelector('canvas'), ctx = cv.getContext('2d'), pins = el.querySelector('.map-pins'), zl = el.querySelector('.map-zl'),
       attr = el.querySelector('.map-attr'), hint = el.querySelector('.map-hint'), bgBtn = el.querySelector('[data-bgc]');
-    var W = 0, H = 0, dpr = 1, raf = 0, addMode = false, drawMode = null, draft = [], hoverP = null, edit = null, vDrag = false, hintT = 0, viewT = 0, alive = true, lastTap = null;
+    var W = 0, H = 0, dpr = 1, printing = null, raf = 0, addMode = false, drawMode = null, draft = [], hoverP = null, edit = null, vDrag = false, hintT = 0, viewT = 0, alive = true, lastTap = null;
     // données par pays : réglages nettoyés, échelle, couleur de chaque pays, étiquettes dessinées (pour les saisir)
     var leg = el.querySelector('.map-leg'), tip = el.querySelector('.map-tip'), ch = null, CS = null, chCol = {}, chList = [], chBoxes = [], hov = null, chDrag = false;
+    function srcOf(c) {
+      // pays dont la valeur s'applique : le pays lui-même, ou son pays souverain (option « territoires rattachés »)
+      if (!ch || !c) return null;
+      if (c.id in ch.data) return c.id;
+      return ch.sov && c.sov && c.sov in ch.data ? c.sov : null;
+    }
     function setCh(v) {
       ch = cleanCh(v); CS = ch ? chScale(ch) : null; chCol = {}; chList = [];
       if (ch) {
-        var I = countryIndex();
-        for (var id in ch.data) { var c = CS.color(ch.data[id]); if (c) chCol[id] = c; if (I.by[id]) chList.push(I.by[id]); }
+        G.countries.forEach(function (c) {
+          var sid = srcOf(c); if (!sid) return;
+          var col = CS.color(ch.data[sid]); if (col) chCol[c.id] = col;
+          chList.push(c);
+        });
         chList.sort(function (a, b) { return (b.mb[2] - b.mb[0]) * (b.mb[3] - b.mb[1]) - (a.mb[2] - a.mb[0]) * (a.mb[3] - a.mb[1]); });
       }
       el.classList.toggle('choro', !!ch);
@@ -315,13 +334,13 @@ function ardoiseMapKit() {
           return '<span style="' + pos + '">' + escH(fmtVal(t.v, ch.dec)) + '</span>';
         }).join('') + '</div>';
       }
-      var nd = false; for (var id in ch.data) if (!chCol[id]) nd = true;
+      var nd = false; for (var id in ch.data) if (!CS.color(ch.data[id])) nd = true;
       if (nd) h += '<div class="lg-nd"><i></i><span>Sans donnée' + (ch.scale === 'log' ? ' ou ≤ 0' : '') + '</span></div>';
       leg.innerHTML = h; leg.hidden = false;
     }
 
     function size() {
-      W = el.clientWidth; H = el.clientHeight; dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = el.clientWidth; H = el.clientHeight; dpr = printing ? 2 : Math.min(2, window.devicePixelRatio || 1);
       cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
       cv.style.width = W + 'px'; cv.style.height = H + 'px';
     }
@@ -393,19 +412,30 @@ function ardoiseMapKit() {
       if (!ch || ch.labels === 'none') return;
       var casing = C.dark ? '#0b1218' : '#ffffff', FN = '500 10.5px ' + C.font, FV = '700 11.5px ' + C.font;
       ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+      // étiquettes possibles : chaque pays (dans son contour principal) ; avec l'option « territoires », ses morceaux
+      // détachés et les territoires rattachés, qui répètent la valeur de leur pays et passent après les pays
+      var items = [], extra = [];
+      chList.forEach(function (c) {
+        var sid = srcOf(c), own = sid === c.id;
+        if (own) items.push({ key: c.id, pick: c.id, sid: sid, c: c, lx: c.lx, ly: c.ly, name: c.name, main: true });
+        else if (ch.parts) extra.push({ key: c.id, pick: sid, sid: sid, c: c, lx: c.lx, ly: c.ly, name: c.name, b: c.b });
+        if (ch.parts) c.parts.forEach(function (pt) { extra.push({ key: c.id + '/' + pt.key, pick: sid, sid: sid, c: c, lx: pt.lx, ly: pt.ly, name: pt.name || c.name, b: pt.b }); });
+      });
+      items = items.concat(extra);
       [true, false].forEach(function (pass) {
-        chList.forEach(function (c) {
-          var moved = ch.lp[c.id]; if (!!moved !== pass) return;
-          var v = ch.data[c.id]; if (v == null && ch.labels !== 'name') return;
-          var vt = fmtVal(v, ch.dec), L = ch.labels === 'value' ? [[vt, FV]] : ch.labels === 'name' ? [[c.name, FN]] : vt ? [[c.name, FN], [vt, FV]] : [[c.name, FN]];
+        items.forEach(function (it) {
+          var moved = ch.lp[it.key]; if (!!moved !== pass) return;
+          var v = ch.data[it.sid]; if (v == null && ch.labels !== 'name') return;
+          var vt = fmtVal(v, ch.dec), L = ch.labels === 'value' ? [[vt, FV]] : ch.labels === 'name' ? [[it.name, FN]] : vt ? [[it.name, FN], [vt, FV]] : [[it.name, FN]];
           var w = 0; L.forEach(function (l) { ctx.font = l[1]; w = Math.max(w, ctx.measureText(l[0]).width); });
-          var h = L.length * 13 + 2, k = Math.round(view.cx - c.lx), ax = (c.lx + k) * s + ox, ay = c.ly * s + oy, x = ax, y = ay;
+          var h = L.length * 13 + 2, k = Math.round(view.cx - it.lx), ax = (it.lx + k) * s + ox, ay = it.ly * s + oy, x = ax, y = ay;
           if (moved) { var q = merc(moved[1], moved[0]); x = q[0] * s + ox; while (x - ax > s / 2) x -= s; while (x - ax < -s / 2) x += s; y = q[1] * s + oy; }
-          else if ((c.mb[2] - c.mb[0]) * s < w * 0.75 || (c.mb[3] - c.mb[1]) * s < 11) return;
+          else if (it.main ? ((it.c.mb[2] - it.c.mb[0]) * s < w * 0.75 || (it.c.mb[3] - it.c.mb[1]) * s < 11)
+            : Math.max((it.b[2] - it.b[0]) * s, (it.b[3] - it.b[1]) * s) < 4) return;   // un morceau détaché : dès qu'il est visible
           if (x < -w || x > W + w || y < -20 || y > H + 20) return;
           var bx = [x - w / 2 - 3, y - h / 2, x + w / 2 + 3, y + h / 2];
           if (!moved && overlaps(boxes, bx)) return;
-          boxes.push(bx); chBoxes.push({ id: c.id, b: bx, x: x, y: y });
+          boxes.push(bx); chBoxes.push({ id: it.key, pick: it.pick, b: bx, x: x, y: y });
           if (moved) leaderBox([ax, ay], bx[0], bx[1], bx[2], bx[3], C.fg);
           L.forEach(function (l, j) {
             var ly = y + (j - (L.length - 1) / 2) * 13;
@@ -703,7 +733,7 @@ function ardoiseMapKit() {
       var all = markers.map(function (m) { return [m.lat, m.lon]; });
       zones.forEach(function (z) { all = all.concat(z.pts); });
       routes.forEach(function (r) { all = all.concat(r.pts); });
-      chList.forEach(function (c) { var a = unmerc(c.mb[0], c.mb[1]), b2 = unmerc(c.mb[2], c.mb[3]); all.push([a[1], a[0]], [b2[1], b2[0]]); });
+      chList.forEach(function (c) { if (!ch || !(c.id in ch.data)) return; var a = unmerc(c.mb[0], c.mb[1]), b2 = unmerc(c.mb[2], c.mb[3]); all.push([a[1], a[0]], [b2[1], b2[0]]); });
       if (!fitPts(all, all.length === 1 ? 7 : 11)) { var c = merc(10, 30); view.cx = c[0]; view.cy = c[1]; view.z = 1.6; clamp(); request(); changed(); }
     }
     function flash(sel) { var le = zl.querySelector(sel) || pins.querySelector(sel); if (le) { le.classList.remove('flash'); void le.offsetWidth; le.classList.add('flash'); } }
@@ -789,8 +819,8 @@ function ardoiseMapKit() {
       var c = countryAt(pos), id = c ? c.id : null;
       if (id !== hov) { hov = id; request(); }
       if (!c) { tip.hidden = true; return; }
-      var v = ch.data[c.id];
-      tip.innerHTML = '<b>' + escH(c.name) + '</b>' + (v != null ? '<span>' + escH(fmtVal(v, ch.dec, ch.unit)) + '</span>' : '<span class="nd">Sans donnée</span>');
+      var sid = srcOf(c), v = sid ? ch.data[sid] : null, sn = sid && sid !== c.id ? countryIndex().by[sid] : null;
+      tip.innerHTML = '<b>' + escH(c.name) + '</b>' + (v != null ? '<span>' + escH(fmtVal(v, ch.dec, ch.unit)) + (sn ? ' <small>(' + escH(sn.name) + ')</small>' : '') + '</span>' : '<span class="nd">Sans donnée</span>');
       tip.hidden = false;
       var tw = tip.offsetWidth, th = tip.offsetHeight, tx = pos[0] + 14, ty = pos[1] + 16;
       if (tx + tw > W - 6) tx = pos[0] - tw - 10; if (ty + th > H - 6) ty = pos[1] - th - 10;
@@ -813,7 +843,7 @@ function ardoiseMapKit() {
         cv.removeEventListener('pointermove', mvh); cv.removeEventListener('pointerup', uph); cv.removeEventListener('pointercancel', uph);
         chDrag = false;
         if (mv) { lastTap = null; var v = ch.lp[hb.id]; if (o.onChoroLabel) o.onChoroLabel(hb.id, [r5(v[0]), r5(v[1])]); }
-        else { lastTap = { lab: key, t: Date.now() }; if (o.onCountryPick) o.onCountryPick(hb.id); }
+        else { lastTap = { lab: key, t: Date.now() }; if (o.onCountryPick) o.onCountryPick(hb.pick || hb.id); }
       };
       cv.addEventListener('pointermove', mvh); cv.addEventListener('pointerup', uph); cv.addEventListener('pointercancel', uph);
     }
@@ -860,7 +890,7 @@ function ardoiseMapKit() {
       if (ch) {
         // un toucher affiche l'infobulle ; en édition, un clic sur un pays le retrouve dans la liste des données
         if (e.pointerType === 'touch') hoverAt(pos);
-        var cp = o.edit && !edit && countryAt(pos); if (cp && o.onCountryPick) o.onCountryPick(cp.id);
+        var cp = o.edit && !edit && countryAt(pos); if (cp && o.onCountryPick) o.onCountryPick(srcOf(cp) || cp.id);
       }
     }
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -1051,6 +1081,18 @@ function ardoiseMapKit() {
       setZones: function (arr) { zones = cleanZ(arr); buildZl(); request(); },
       setRoutes: function (arr) { routes = cleanR(arr); buildZl(); request(); },
       setChoro: function (v) { setCh(v); request(); },
+      print: function (on) {
+        // impression : le navigateur fige la page sans laisser la carte se redessiner ; elle est donc redessinée sur-le-champ,
+        // à la largeur de la page (A4) et en haute résolution, avec la même étendue visible, puis rétablie après
+        if (on && !printing && W) {
+          var w0 = W, w1 = Math.min(W, PRINT_W);
+          printing = { z: view.z };
+          if (w1 < w0) { el.style.width = w1 + 'px'; view.z += Math.log(w1 / w0) / Math.LN2; }
+        } else if (!on && printing) { el.style.width = ''; view.z = printing.z; printing = null; }
+        else return;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        size(); clamp(); draw();
+      },
       setAddMode: function (on) { addMode = !!on; if (addMode) { drawMode = null; draft = []; } el.classList.toggle('adding', addMode); if (addMode) showHint('Cliquez sur la carte pour placer un point', 2500); },
       setDrawMode: setDrawMode,
       setEdit: function (kind, i) { edit = kind ? { kind: kind, i: i } : null; lastTap = null; el.classList.toggle('pin-edit', !!(edit && edit.kind === 'marker')); buildZl(); request(); },

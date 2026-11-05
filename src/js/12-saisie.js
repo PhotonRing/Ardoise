@@ -48,7 +48,7 @@ app.addEventListener('input', function (e) {
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();
+  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   markDirty();
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
@@ -81,7 +81,17 @@ app.addEventListener('change', function (e) {
   if (el.matches('.ch-txt')) { snapshot(); return; }
   if (el.matches('.ch-set')) {
     var bset = byId(el.dataset.b), sp = el.dataset.p, sv = el.value;
-    keepView(bset); change(function () { bset.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) bset.choro.cols = []; }); return;
+    keepView(bset); change(function () {
+      if (sp === 'src.k' || sp === 'src.v') { bset.choro.src[sp.slice(4)] = +sv; return; }
+      bset.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) bset.choro.cols = [];
+    }); return;
+  }
+  if (el.matches('.ch-src')) {
+    // source des valeurs : saisie dans la liste, ou un tableau du document (colonnes devinées)
+    var bsrc = byId(el.dataset.b), tid = el.value, tb = null;
+    doc.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === tid) tb = x; }); });
+    keepView(bsrc); chPaste = null;
+    change(function () { if (!tid || !tb) delete bsrc.choro.src; else { var g = chGuessCols(tb); bsrc.choro.src = { b: tid, k: g.k, v: g.v }; } }); return;
   }
   if (el.matches('.ch-col')) {
     var bcol = byId(el.dataset.b), ck = +el.dataset.k, cv0 = el.value;

@@ -6,14 +6,15 @@ Récupération des seuls fichiers utiles :
 
     git clone --depth 1 --filter=blob:none --sparse https://github.com/nvkelso/natural-earth-vector.git scripts/geo/ne
     git -C scripts/geo/ne sparse-checkout set --no-cone /geojson/ne_50m_admin_0_countries.geojson \
-        /geojson/ne_50m_lakes.geojson /geojson/ne_10m_ports.geojson /geojson/ne_10m_populated_places.geojson
+        /geojson/ne_50m_lakes.geojson /geojson/ne_10m_ports.geojson /geojson/ne_10m_populated_places.geojson \
+        /geojson/ne_50m_admin_0_map_units.geojson
 
 Puis, depuis la racine du dépôt :  python3 scripts/geo/build_geo.py
 
 Contenu produit :
   - contours des pays (1:50 M, simplifiés à ~0,6 centième de degré, coordonnées en entiers delta + varint, base64),
     noms de pays en français, rang d'affichage des étiquettes, code ADM0_A3 et variantes (codes ISO,
-    noms anglais ou usuels) pour les données par pays ;
+    noms anglais ou usuels), pays souverain et territoires détachés (map units) pour les données par pays ;
   - grands lacs ;
   - ~1 000 ports nommés (avec leur pays) et ~7 300 villes (nom local, nom français, pays, population en milliers,
     zoom minimal d'affichage, capitale), pour la recherche et l'affichage.
@@ -86,15 +87,77 @@ def aliases(p):
         if v and v!=p['NAME_FR'] and v not in out: out.append(v)
     out+= [a for a in AKA.get(p['ADM0_A3'],'').split('|') if a and a not in out]
     return '|'.join(out)
+# Rattachement des territoires à leur pays souverain (option des données par pays) : SOV_A3 de Natural Earth,
+# sauf rattachement indéterminé (Palestine)
+sovmain={}
+for f in c['features']:
+    p=f['properties']
+    if p['ADMIN']==p['SOVEREIGNT']: sovmain[p['SOV_A3']]=p['ADM0_A3']
+def sovereign(p):
+    m=sovmain.get(p['SOV_A3'])
+    return m if m and m!=p['ADM0_A3'] and p['TYPE']!='Indeterminate' else 0
+# Territoires détachés (Guyane, Réunion, Açores, Svalbard…) : « map units » de Natural Earth dont l'emprise ne touche
+# pas celle du territoire principal ; chacun reçoit ses contours (numéros dans la liste du pays), son nom et son point
+# d'étiquette, pour y répéter la valeur du pays
+mu=json.load(open('ne/geojson/ne_50m_admin_0_map_units.geojson'))['features']
+units={}
+def bbox(pts):
+    xs=[x for x,y in pts]; ys=[y for x,y in pts]; return [min(xs),min(ys),max(xs),max(ys)]
+def bunion(bs): return [min(b[0] for b in bs),min(b[1] for b in bs),max(b[2] for b in bs),max(b[3] for b in bs)]
+for f in mu:
+    p=f['properties']
+    units.setdefault(p['ADM0_A3'],[]).append({'code':p['GU_A3'],'name':p['NAME_FR'] or p['NAME'],'lx':p['LABEL_X'],'ly':p['LABEL_Y'],
+        'b':bunion([bbox(poly[0]) for poly in polys(f['geometry'])])})
+def inb(b,x,y,m=0): return b[0]-m<=x<=b[2]+m and b[1]-m<=y<=b[3]+m
+def touch(a,b,m=0.5): return not (a[2]+m<b[0] or b[2]+m<a[0] or a[3]+m<b[1] or b[3]+m<a[1])
+def detached(p,rb):
+    U=units.get(p['ADM0_A3'],[])
+    if len(U)<2: return []
+    main=next((u for u in U if inb(u['b'],p['LABEL_X'],p['LABEL_Y'])),None) or max(U,key=lambda u:(u['b'][2]-u['b'][0])*(u['b'][3]-u['b'][1]))
+    out=[]
+    for u in U:
+        if u is main or touch(u['b'],main['b']): continue
+        idx=[i for i,(b,outer) in enumerate(rb) if outer and inb(u['b'],(b[0]+b[2])/2,(b[1]+b[3])/2,0.05)]
+        if idx: out.append([u['code'],u['name'],round(u['lx'],2),round(u['ly'],2),idx])
+    return out
+def gap(a,b):
+    # écart entre deux emprises, en degrés (longitudes prises de part et d'autre de l'antiméridien)
+    dx=min(max(0,b[0]-a[2],a[0]-b[2]),max(0,b[0]+360-a[2],a[0]-b[2]-360),max(0,b[0]-360-a[2],a[0]-b[2]+360))
+    return max(dx,max(0,b[1]-a[3],a[1]-b[3]))
+def far_groups(p,rb,taken):
+    # groupes d'îles éloignés du contour principal (Canaries, Hawaï, Alaska, Galápagos…), sans nom : à plus de 3°
+    outer=[(i,b) for i,(b,o) in enumerate(rb) if o and i not in taken]
+    if len(outer)<2: return []
+    main=max(outer,key=lambda t:(t[1][2]-t[1][0])*(t[1][3]-t[1][1]))
+    near=[main]; rest=[t for t in outer if t is not main]; grew=True
+    while grew:   # tout ce qui touche (à 3° près) le territoire principal en fait partie
+        grew=False
+        for t in rest[:]:
+            if any(gap(t[1],n[1])<=3 for n in near): near.append(t); rest.remove(t); grew=True
+    groups=[]
+    for t in rest:   # regroupement de proche en proche (à 3° près)
+        hit=[g for g in groups if any(gap(t[1],x[1])<=3 for x in g)]
+        for g in hit: groups.remove(g)
+        groups.append(sum(hit,[])+[t])
+    out=[]
+    for g in groups:
+        big=max(g,key=lambda t:(t[1][2]-t[1][0])*(t[1][3]-t[1][1]))[1]
+        lx,ly=(big[0]+big[2])/2,(big[1]+big[3])/2
+        out.append(['P%d_%d'%(round(lx),round(ly)),'',round(lx,2),round(ly,2),sorted(i for i,b in g)])
+    return out
+def parts(p,rb):
+    d=detached(p,rb)
+    return d+far_groups(p,rb,set(i for u in d for i in u[4]))
 meta=[]; tot=0; cpolys=[]
 for f in c['features']:
-    p=f['properties']; rings=[]
+    p=f['properties']; rings=[]; rb=[]
     for poly in polys(f['geometry']):
-        for r in poly:
+        for k,r in enumerate(poly):
             n=ring(r,TOL)
-            if n: rings.append(n); tot+=n
+            if n: rings.append(n); rb.append((bbox(r),k==0)); tot+=n
     if not rings: continue
-    meta.append([p['NAME_FR'] or p['NAME'], round(p['LABEL_X'],2), round(p['LABEL_Y'],2), round(p['MIN_LABEL'] or 5,1), rings, p['ADM0_A3'], aliases(p)])
+    meta.append([p['NAME_FR'] or p['NAME'], round(p['LABEL_X'],2), round(p['LABEL_Y'],2), round(p['MIN_LABEL'] or 5,1), rings, p['ADM0_A3'], aliases(p), sovereign(p)]
+                + ([parts(p,rb)] if parts(p,rb) else []))
     cpolys.append((p['NAME_FR'] or p['NAME'], polys(f['geometry'])))
 lakes=json.load(open('ne/geojson/ne_50m_lakes.geojson')); lk=[]
 for f in lakes['features']:

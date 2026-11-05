@@ -299,7 +299,7 @@ footer.b-foot a{color:var(--accent)}
 .map-tip{position:absolute;left:0;top:0;pointer-events:none;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:12px/1.35 var(--f-body);box-shadow:0 4px 14px rgba(0,0,0,.16);display:flex;flex-direction:column;max-width:220px}
 .map-tip b{font-weight:600}
 .map-tip span{font-variant-numeric:tabular-nums}
-.map-tip .nd{color:var(--muted)}
+.map-tip .nd,.map-tip small{color:var(--muted)}
 @media print{.map-ctl,.map-hint,.map-tip{display:none}}
 /* navigation entre pages */
 .pnav-tabs,.pnav-side{display:none}

@@ -86,6 +86,8 @@ app.addEventListener('click', function (e) {
       keepView(b); chPaste = null; change(function () { delete b.choro; }); break;
     case 'ch-del': keepView(b); change(function () { delete b.choro.data[a.dataset.id]; if (b.choro.lp) delete b.choro.lp[a.dataset.id]; }); break;
     case 'ch-rev': keepView(b); change(function () { b.choro.rev = !b.choro.rev; }); break;
+    case 'ch-parts': keepView(b); change(function () { if (b.choro.parts) delete b.choro.parts; else b.choro.parts = true; }); break;
+    case 'ch-sov': keepView(b); change(function () { if (b.choro.sov) delete b.choro.sov; else b.choro.sov = true; }); break;
     case 'ch-legend': keepView(b); change(function () { b.choro.legend = b.choro.legend === false; }); break;
     case 'ch-paste':
       chPaste = chPaste === b.id ? null : b.id; keepView(b); render(); cheatBlock = b.id; updateCheat();

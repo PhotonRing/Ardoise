@@ -201,6 +201,9 @@ html.is-edit .mk-panel.show{display:flex;flex-direction:column;position:fixed;le
 .ch-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-box .ch-v{flex:0 0 96px;text-align:right;font-variant-numeric:tabular-nums}
 .ch-box .ch-v:placeholder-shown{text-align:center}
+.ch-r>.ch-src{flex:1;min-width:0}
+.ch-box .ch-info{margin:0;font-size:12px;line-height:1.4}
+.ch-ro{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted);padding-right:4px}
 .ch-row.flash{animation:chfl 1s}
 @keyframes chfl{0%,40%{background:var(--accent-soft)}100%{background:transparent}}
 .cheat{position:fixed;right:14px;top:66px;z-index:45;width:236px;max-height:calc(100vh - 86px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);font:12px/1.35 var(--f-body);color:var(--fg)}
