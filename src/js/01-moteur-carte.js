@@ -292,7 +292,7 @@ function ardoiseMapKit() {
     var v0 = st.view || { lat: 30, lon: 10, z: 1.6 }, c0 = merc(v0.lon, v0.lat);
     var view = { cx: c0[0], cy: c0[1], z: +v0.z || 1.6 };
     var bg = BG.indexOf(st.bg) >= 0 ? st.bg : 'vector', key = String(st.key || '').trim();
-    var showCities = st.cities !== false, locked = !!o.locked, hideBg = !!o.hideBg;
+    var showCities = st.cities !== false, showCountries = st.countries !== false, locked = !!o.locked, hideBg = !!o.hideBg;
     var markers = cleanM(st.markers), zones = cleanZ(st.zones), routes = cleanR(st.routes);
     el.innerHTML = '<canvas></canvas><div class="map-zl"></div><div class="map-pins"></div><div class="map-ctl">' +
       (locked ? '' : '<button type="button" data-z="1" title="Zoom avant" aria-label="Zoom avant">+</button><button type="button" data-z="-1" title="Zoom arrière" aria-label="Zoom arrière">−</button>' +
@@ -303,7 +303,7 @@ function ardoiseMapKit() {
       attr = el.querySelector('.map-attr'), hint = el.querySelector('.map-hint'), bgBtn = el.querySelector('[data-bgc]');
     var W = 0, H = 0, dpr = 1, printing = null, raf = 0, addMode = false, drawMode = null, draft = [], hoverP = null, edit = null, vDrag = false, hintT = 0, viewT = 0, alive = true, lastTap = null;
     // données par pays : réglages nettoyés, échelle, couleur de chaque pays, étiquettes dessinées (pour les saisir)
-    var leg = el.querySelector('.map-leg'), tip = el.querySelector('.map-tip'), ch = null, CS = null, chCol = {}, chList = [], chBoxes = [], hov = null, chDrag = false;
+    var leg = el.querySelector('.map-leg'), tip = el.querySelector('.map-tip'), ch = null, CS = null, chCol = {}, chList = [], chIn = {}, chBoxes = [], hov = null, chDrag = false;
     function srcOf(c) {
       // pays dont la valeur s'applique : le pays lui-même, ou son pays souverain (option « territoires rattachés »)
       if (!ch || !c) return null;
@@ -311,12 +311,12 @@ function ardoiseMapKit() {
       return ch.sov && c.sov && c.sov in ch.data ? c.sov : null;
     }
     function setCh(v) {
-      ch = cleanCh(v); CS = ch ? chScale(ch) : null; chCol = {}; chList = [];
+      ch = cleanCh(v); CS = ch ? chScale(ch) : null; chCol = {}; chList = []; chIn = {};
       if (ch) {
         G.countries.forEach(function (c) {
           var sid = srcOf(c); if (!sid) return;
           var col = CS.color(ch.data[sid]); if (col) chCol[c.id] = col;
-          chList.push(c);
+          chList.push(c); chIn[c.id] = 1;
         });
         chList.sort(function (a, b) { return (b.mb[2] - b.mb[0]) * (b.mb[3] - b.mb[1]) - (a.mb[2] - a.mb[0]) * (a.mb[3] - a.mb[1]); });
       }
@@ -453,11 +453,12 @@ function ardoiseMapKit() {
     }
     function drawLabels(ox, oy, s, C, boxes) {
       ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = C.land;
-      if (view.z >= 1.8) {
+      if (view.z >= 1.8 && showCountries) {
         ctx.font = '500 11px ' + C.font; ctx.textAlign = 'center'; ctx.fillStyle = C.label;
         var lim = view.z + 1.3;
         for (var i = 0; i < G.byLabel.length; i++) {
           var c = G.byLabel[i]; if (c.ml > lim) break;
+          if (chIn[c.id]) continue;   // pays de la choroplèthe : leur nom suit le réglage « Étiquettes » des données
           var k = Math.round(view.cx - c.lx), x = (c.lx + k) * s + ox, y = c.ly * s + oy;
           if (x < -40 || x > W + 40 || y < 0 || y > H) continue;
           var w = ctx.measureText(c.name).width / 2 + 4, bx = [x - w, y - 9, x + w, y + 9];
