@@ -74,6 +74,28 @@ app.addEventListener('click', function (e) {
         toast(circ ? 'Glissez le carré pour déplacer le cercle, le rond pour changer le rayon (Alt : sans aimantation)' : 'Glissez les carrés pour déplacer, les ronds pour ajouter ; double-clic sur un carré pour supprimer ; Alt : sans aimantation. Les autres éléments sont figés ; Échap pour terminer.', 5500);
       }
       break;
+    case 'ch-on':
+      cheatBlock = b.id;
+      if (!b.choro) { keepView(b); change(function () { b.choro = { data: {}, pal: 'bleus', scale: 'lin', labels: 'value' }; }); }
+      updateCheat();
+      var chq = $('.ch-q[data-b="' + b.id + '"]', app); if (chq) { chq.focus({ preventScroll: true }); chq.scrollIntoView({ block: 'nearest' }); }
+      break;
+    case 'ch-off':
+      var nch = b.choro ? Object.keys(b.choro.data || {}).length : 0;
+      if (nch && !confirm('Retirer les couleurs et les données de ' + nch + ' pays ? (Ctrl+Z pour annuler)')) break;
+      keepView(b); chPaste = null; change(function () { delete b.choro; }); break;
+    case 'ch-del': keepView(b); change(function () { delete b.choro.data[a.dataset.id]; if (b.choro.lp) delete b.choro.lp[a.dataset.id]; }); break;
+    case 'ch-rev': keepView(b); change(function () { b.choro.rev = !b.choro.rev; }); break;
+    case 'ch-legend': keepView(b); change(function () { b.choro.legend = b.choro.legend === false; }); break;
+    case 'ch-paste':
+      chPaste = chPaste === b.id ? null : b.id; keepView(b); render(); cheatBlock = b.id; updateCheat();
+      var ta = $('.ch-ta[data-b="' + b.id + '"]', app); if (ta) ta.focus({ preventScroll: true });
+      break;
+    case 'ch-import':
+      var box = a.closest('.ch-paste'), rep = chImport(b, box.querySelector('.ch-ta').value, box.querySelector('.ch-repl input').checked);
+      if (rep.n) { chPaste = null; keepView(b); render(); cheatBlock = b.id; updateCheat(); }
+      toast(rep.n || rep.bad.length ? (rep.n ? rep.n + ' pays importé' + (rep.n > 1 ? 's' : '') : 'Aucun pays importé') + (rep.bad.length ? '. Non reconnu' + (rep.bad.length > 1 ? 's' : '') + ' : ' + rep.bad.slice(0, 6).join(', ') + (rep.bad.length > 6 ? '… (+' + (rep.bad.length - 6) + ')' : '') : '') : 'Rien à importer : collez deux colonnes (pays, valeur).', rep.bad.length ? 9000 : 3500);
+      break;
     case 'route-dist': keepView(b); change(function () { b.routes[i].hideDist = !b.routes[i].hideDist; }); break;
     case 'panel-min':
       panelMin = !panelMin; try { localStorage.setItem(LS + 'panelmin', panelMin ? '1' : '0'); } catch (_) {}

@@ -12,7 +12,8 @@ Puis, depuis la racine du dépôt :  python3 scripts/geo/build_geo.py
 
 Contenu produit :
   - contours des pays (1:50 M, simplifiés à ~0,6 centième de degré, coordonnées en entiers delta + varint, base64),
-    noms de pays en français et rang d'affichage des étiquettes ;
+    noms de pays en français, rang d'affichage des étiquettes, code ADM0_A3 et variantes (codes ISO,
+    noms anglais ou usuels) pour les données par pays ;
   - grands lacs ;
   - ~1 000 ports nommés (avec leur pays) et ~7 300 villes (nom local, nom français, pays, population en milliers,
     zoom minimal d'affichage, capitale), pour la recherche et l'affichage.
@@ -58,6 +59,33 @@ def ring(r,tol):
     return len(d)
 TOL=0.6  # en centièmes de degré
 c=json.load(open('ne/geojson/ne_50m_admin_0_countries.geojson'))
+# Données par pays (cartes choroplèthes) : chaque pays est identifié par son code ADM0_A3 (toujours renseigné,
+# unique) ; les codes ISO et les noms anglais ou usuels servent à reconnaître les pays d'un tableau collé.
+AKA={'CHN':'Chine','USA':'USA|Etats-Unis d’Amérique|Amérique','GBR':'UK|Grande-Bretagne','CZE':'République tchèque',
+     'COD':'RDC|Congo-Kinshasa|Congo (RDC)','COG':'Congo|Congo-Brazzaville','MMR':'Myanmar','TLS':'Timor-Leste','SWZ':'Swaziland',
+     'MKD':'Macédoine','VNM':'Vietnam','BLR':'Bélarus','NLD':'Hollande','CPV':'Cabo Verde','FSM':'Micronésie','SLV':'El Salvador',
+     'CAF':'Centrafrique','PSX':'Territoires palestiniens','ARE':'EAU','KNA':'Saint-Kitts-et-Nevis','VAT':'Vatican|Saint-Siège',
+     'KOR':'Corée|République de Corée','PRK':'République populaire démocratique de Corée','RUS':'Fédération de Russie',
+     'IRN':'République islamique d’Iran','SYR':'République arabe syrienne','LAO':'République démocratique populaire lao',
+     'TZA':'République-Unie de Tanzanie','BOL':'État plurinational de Bolivie','MDA':'République de Moldavie','SXM':'Sint Maarten',
+     'GNB':'Guinée Bissau','TTO':'Trinidad-et-Tobago','BIH':'Bosnie','STP':'Sao Tomé','SDS':'Sud-Soudan'}
+codes={}
+for f in c['features']:
+    p=f['properties']
+    for k in ('ISO_A3','ISO_A3_EH','ISO_A2','ISO_A2_EH'):
+        v=p.get(k)
+        if v and v!='-99': codes.setdefault(v,set()).add(p['ADM0_A3'])
+def aliases(p):
+    # codes qui ne désignent que ce pays, puis noms ; « | » sépare les variantes
+    out=[]
+    for k in ('ISO_A3','ISO_A3_EH','ISO_A2','ISO_A2_EH'):
+        v=p.get(k)
+        if v and v!='-99' and v!=p['ADM0_A3'] and len(codes[v])==1 and v not in out: out.append(v)
+    for k in ('NAME','NAME_EN','NAME_LONG','ADMIN','FORMAL_EN','FORMAL_FR'):
+        v=(p.get(k) or '').strip()
+        if v and v!=p['NAME_FR'] and v not in out: out.append(v)
+    out+= [a for a in AKA.get(p['ADM0_A3'],'').split('|') if a and a not in out]
+    return '|'.join(out)
 meta=[]; tot=0; cpolys=[]
 for f in c['features']:
     p=f['properties']; rings=[]
@@ -66,7 +94,7 @@ for f in c['features']:
             n=ring(r,TOL)
             if n: rings.append(n); tot+=n
     if not rings: continue
-    meta.append([p['NAME_FR'] or p['NAME'], round(p['LABEL_X'],2), round(p['LABEL_Y'],2), round(p['MIN_LABEL'] or 5,1), rings])
+    meta.append([p['NAME_FR'] or p['NAME'], round(p['LABEL_X'],2), round(p['LABEL_Y'],2), round(p['MIN_LABEL'] or 5,1), rings, p['ADM0_A3'], aliases(p)])
     cpolys.append((p['NAME_FR'] or p['NAME'], polys(f['geometry'])))
 lakes=json.load(open('ne/geojson/ne_50m_lakes.geojson')); lk=[]
 for f in lakes['features']:

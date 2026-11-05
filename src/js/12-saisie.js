@@ -5,6 +5,13 @@ app.addEventListener('input', function (e) {
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); markDirty(); } return; }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); markDirty(); return; }
   if (el.matches('.map-q')) { mapSearch(el); return; }
+  if (el.matches('.ch-q')) { chSearch(el); return; }
+  if (el.matches('.ch-txt')) {
+    // titre et unité : appliqués en direct (le centre, un nombre, à la validation)
+    if (el.dataset.p === 'mid') return;
+    var bt0 = byId(el.dataset.b); bt0.choro[el.dataset.p] = el.value; chRefresh(bt0); markDirty(); return;
+  }
+  if (el.matches('.ch-v') || el.matches('.ch-ta')) return;
   if (el.matches('.rt-in')) { var br = byId(el.dataset.b); br.routes[+el.dataset.rt].label = el.value; var mr = mapOf(br.id); if (mr) mr.setRoutes(br.routes); markDirty(); return; }
   if (el.matches('.rd-in')) return;
   if (el.matches('.st-in')) { var bs = byId(el.dataset.b), rr = bs.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(bs.id); if (ms) ms.setRoutes(bs.routes); markDirty(); return; }
@@ -61,6 +68,25 @@ app.addEventListener('change', function (e) {
     if (doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
     return;
   }
+  if (el.matches('.ch-v')) {
+    var bv = byId(el.dataset.b), vid = el.dataset.id, nv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (nv === null && el.value.trim() !== '') { toast('Valeur non reconnue : indiquez un nombre (ex. 12,5 ou 1 250)'); el.value = chRaw(bv.choro.data[vid]); return; }
+    bv.choro.data[vid] = nv; el.value = chRaw(nv); snapshot(); markDirty(true); chRefresh(bv); return;
+  }
+  if (el.matches('.ch-txt[data-p=mid]')) {
+    var bmid = byId(el.dataset.b), mv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (mv === null && el.value.trim() !== '') { toast('Centre non reconnu : indiquez un nombre, ou laissez vide'); el.value = chRaw(bmid.choro.mid); return; }
+    keepView(bmid); change(function () { if (mv === null) delete bmid.choro.mid; else bmid.choro.mid = mv; }); return;
+  }
+  if (el.matches('.ch-txt')) { snapshot(); return; }
+  if (el.matches('.ch-set')) {
+    var bset = byId(el.dataset.b), sp = el.dataset.p, sv = el.value;
+    keepView(bset); change(function () { bset.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) bset.choro.cols = []; }); return;
+  }
+  if (el.matches('.ch-col')) {
+    var bcol = byId(el.dataset.b), ck = +el.dataset.k, cv0 = el.value;
+    keepView(bcol); change(function () { var a = (bcol.choro.cols || []).slice(); while (a.length <= ck) a.push(null); a[ck] = cv0; bcol.choro.cols = a; }); return;
+  }
   if (el.matches('.rt-color')) { var brc = byId(el.dataset.b); keepView(brc); change(function () { brc.routes[+el.dataset.rt].color = el.value; }); return; }
   if (el.matches('.rd-in')) {
     var bd = byId(el.dataset.b), zi = +el.dataset.zn, km = parseFloat(el.value.replace(',', '.'));
@@ -87,6 +113,7 @@ app.addEventListener('change', function (e) {
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
 app.addEventListener('focusout', function (e) {
   if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
+  if (e.target.matches && e.target.matches('.ch-q')) { var cr0 = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { cr0.hidden = true; }, 150); }
   if (e.target.matches && e.target.matches('.map-q')) { var res = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); }
 });
 app.addEventListener('focusin', function (e) {
@@ -117,6 +144,23 @@ app.addEventListener('keydown', function (e) {
       e.preventDefault(); res._cur = Math.max(0, Math.min(n - 1, (res._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
       $$('.mi', res).forEach(function (m, j) { m.classList.toggle('act', j === res._cur); });
     }
+    return;
+  }
+  if (el.matches('.ch-q')) {
+    var cres = el.parentNode.querySelector('.map-res'), cn = (cres._items || []).length;
+    if (e.key === 'Enter') { e.preventDefault(); if (cn) chPick(el, cres._cur || 0); }
+    else if (e.key === 'Escape') { el.value = ''; cres.hidden = true; }
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cn) {
+      e.preventDefault(); cres._cur = Math.max(0, Math.min(cn - 1, (cres._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
+      $$('.mi', cres).forEach(function (m, j) { m.classList.toggle('act', j === cres._cur); });
+    }
+    return;
+  }
+  if (el.matches('.ch-v') && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+    // passer d'une valeur à l'autre au clavier (la valeur est validée en quittant le champ)
+    e.preventDefault();
+    var all = $$('.ch-v[data-b="' + el.dataset.b + '"]', app), ix = all.indexOf(el) + (e.key === 'ArrowUp' ? -1 : 1), nx = all[ix];
+    if (nx) { nx.focus(); nx.select(); } else el.blur();
     return;
   }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }

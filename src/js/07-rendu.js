@@ -143,7 +143,7 @@ function renderBlock(b, e, num) {
       var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
       var rdist = function (r) { if (!MapKit) MapKit = ardoiseMapKit(); return MapKit.fmtDist(MapKit.pathLen(r.pts)); };
       var zdesc = function (z) { return z.shape === 'circle' ? 'cercle de ' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + ' km' : z.pts.length + ' sommets'; };
-      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, cities: b.cities !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
+      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: b.choro || undefined, cities: b.cities !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
         ' tabindex="0" role="application" aria-label="Carte" style="height:' + mh + 'px"><div class="map-nojs">Carte interactive : JavaScript nécessaire pour l’afficher.</div></div>';
       if (!e) {
         var li = mks.map(function (m, i) { return '<li><button type="button" data-go="' + i + '"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' + esc(m.label || 'Point ' + (i + 1)) + '</button><span class="muted">' + mll(m) + '</span></li>'; })
@@ -161,10 +161,11 @@ function renderBlock(b, e, num) {
       return '<div class="mapblk">' + mapEl +
         '<div class="map-tools"><div class="map-search"><input type="text" class="map-q" data-b="' + b.id + '" placeholder="Ajouter un point : ville, port, ou « 48.38, -4.47 »" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
         '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mapUi.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
-        tool('poly', '▱ Zone', 'Dessiner une zone sommet par sommet') + tool('circle', '○ Cercle', 'Dessiner une zone circulaire : centre puis rayon') + tool('route', '⤳ Itinéraire', 'Tracer un itinéraire étape par étape') + '</div>' +
+        tool('poly', '▱ Zone', 'Dessiner une zone sommet par sommet') + tool('circle', '○ Cercle', 'Dessiner une zone circulaire : centre puis rayon') + tool('route', '⤳ Itinéraire', 'Tracer un itinéraire étape par étape') +
+        '<button type="button" class="ub out" data-act="ch-on" aria-pressed="' + !!b.choro + '" title="Colorer les pays selon une valeur (carte choroplèthe)">▦ Pays</button></div>' +
         '<p class="muted map-sum">' + (mks.length + zns.length + rts.length ? [mks.length ? mks.length + ' point' + (mks.length > 1 ? 's' : '') : '', zns.length ? zns.length + ' zone' + (zns.length > 1 ? 's' : '') : '', rts.length ? rts.length + ' itinéraire' + (rts.length > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') + ' — cliquez sur la carte pour afficher la liste à gauche.' : 'Rien sur la carte : cherchez une ville ou un port, placez un point, dessinez une zone, un cercle ou un itinéraire.') + '</p>' +
         '<div class="mk-panel' + (panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (panelMin ? '▸' : '–') + '</button></div>' +
-        '<div class="mk-list">' + ((mks.length || zns.length || rts.length) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') +
+        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b) +
           (mks.length ? '<div class="mk-h">Points</div>' : '') + mks.map(function (m, i) {
             return '<div class="mk-item' + (ed && ed.kind === 'marker' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' +
               '<input class="mk-in" data-b="' + b.id + '" data-mk="' + i + '" data-p="label" value="' + esc(m.label) + '" placeholder="Libellé du point">' +
@@ -543,6 +544,93 @@ function render(focus) {
   navReveal(keep);
   if (focus) focusField(focus.b, focus.k, focus.end !== false);
 }
+// Données par pays (choroplèthe) : réglages et valeurs, dans le panneau « Éléments de la carte »
+var chPaste = null;   // bloc dont la zone « Coller un tableau » est ouverte
+var CH_LABELS = [['value', 'Valeurs'], ['both', 'Noms + valeurs'], ['name', 'Noms'], ['none', 'Sans étiquette']];
+var CH_DEC = [['auto', 'Décimales auto'], ['0', '0 décimale'], ['1', '1 décimale'], ['2', '2 décimales'], ['k', 'Abrégé (k, M)']];
+function chRaw(v) {
+  // valeur saisie, telle quelle (sans arrondi), avec séparateur de milliers et virgule décimale
+  if (v == null) return '';
+  var t = String(v); if (/e/i.test(t)) return t.replace('.', ',');
+  var neg = t.charAt(0) === '-', p = t.replace('-', '').split('.');
+  return (neg ? '-' : '') + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f') + (p[1] ? ',' + p[1] : '');
+}
+function choroPanel(b) {
+  if (!b.choro) return '';
+  if (!MapKit) MapKit = ardoiseMapKit();
+  var K = MapKit.choro, c = K.clean(b.choro), S = K.scale(c), I = K.index(), id = b.id;
+  var sel = function (p, cur, list, title) { return '<select class="ch-set" data-b="' + id + '" data-p="' + p + '" title="' + title + '">' + list.map(function (x) { return opt(x[0], cur, esc(x[1])); }).join('') + '</select>'; };
+  var txt = function (p, val, ph, cls, title) { return '<input class="mk-in ch-txt' + (cls ? ' ' + cls : '') + '" data-b="' + id + '" data-p="' + p + '" value="' + esc(val) + '" placeholder="' + ph + '" title="' + (title || ph) + '">'; };
+  var rows = Object.keys(c.data).filter(function (k) { return I.by[k]; }).sort(function (x, y) { return I.by[x].name.localeCompare(I.by[y].name, 'fr'); });
+  var classed = c.scale === 'quant' || c.scale === 'eq', perso = c.pal === 'perso' || c.pal === 'perso3';
+  var defCols = c.pal === 'perso3' ? ['#2166ac', '#f3efec', '#b2182b'] : ['#eef5fb', '#0c3b72'];
+  return '<div class="mk-h">Données par pays</div><div class="ch-box">' +
+    '<div class="ch-r">' + txt('title', c.title, 'Titre de la légende') + txt('unit', c.unit, 'Unité', 'ch-unit', 'Unité, ajoutée après chaque valeur (ex. %, hab., €)') + '</div>' +
+    '<div class="ch-r">' + sel('scale', c.scale, K.scales, 'Échelle des couleurs : linéaire ou logarithmique (dégradé continu), quantiles ou intervalles égaux (classes)') + (classed ? sel('classes', c.classes, [3, 4, 5, 6, 7, 8, 9].map(function (n) { return [n, n + ' classes']; }), 'Nombre de classes') : '') + '</div>' +
+    '<div class="ch-r">' + sel('pal', c.pal, K.pals, 'Palette') + '<button type="button" class="mk-b" data-act="ch-rev" aria-pressed="' + c.rev + '" title="Inverser la palette">⇄</button></div>' +
+    (perso ? '<div class="ch-r ch-cols">' + defCols.map(function (d, k) { return '<input type="color" class="ch-col" data-b="' + id + '" data-k="' + k + '" value="' + (c.cols[k] || d) + '" title="' + (k === 0 ? 'Valeurs basses' : k === defCols.length - 1 ? 'Valeurs hautes' : 'Milieu') + '">'; }).join('<span class="ch-arr">→</span>') + '</div>' : '') +
+    (c.scale === 'lin' ? '<div class="ch-r"><span class="rd-u">Centre</span>' + txt('mid', chRaw(c.mid), 'facultatif', 'ch-mid', 'Valeur placée au milieu de la palette (utile avec une palette divergente)') + '</div>' : '') +
+    '<div class="ch-r">' + sel('labels', c.labels, CH_LABELS, 'Étiquettes sur la carte') + sel('dec', c.dec, CH_DEC, 'Format des nombres (k = milliers, M = millions, Md = milliards)') + '</div>' +
+    '<div class="ch-r"><button type="button" class="mk-b mk-t" data-act="ch-legend" aria-pressed="' + c.legend + '" title="Afficher la légende sur la carte">Légende</button>' +
+      '<button type="button" class="mk-b mk-t" data-act="ch-paste" aria-pressed="' + (chPaste === id) + '" title="Importer deux colonnes copiées d’un tableur">Coller un tableau…</button>' +
+      '<button type="button" class="mk-b mk-t ch-off" data-act="ch-off" title="Retirer les couleurs et toutes les données par pays">Retirer</button></div>' +
+    (chPaste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
+      '<div class="ch-r"><button type="button" class="ub" data-act="ch-import">Importer</button><label class="ch-repl"><input type="checkbox"> Remplacer les données existantes</label></div></div>' : '') +
+    '<div class="map-search ch-search"><input type="text" class="ch-q" data-b="' + id + '" placeholder="Ajouter un pays…" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
+    (rows.length ? '' : '<p class="muted">Aucun pays : ajoutez-en un, cliquez sur un pays de la carte ou collez un tableau.</p>') +
+    rows.map(function (k) {
+      var v = c.data[k], col = S.color(v);
+      return '<div class="ch-row" data-b="' + id + '" data-id="' + k + '"><span class="ch-sw"' + (col ? ' style="background:' + col + '"' : '') + '></span><span class="ch-n" title="' + esc(I.by[k].name) + ' (' + k + ')">' + esc(I.by[k].name) + '</span>' +
+        '<input class="mk-in ch-v" data-b="' + id + '" data-id="' + k + '" value="' + chRaw(v) + '" placeholder="—" inputmode="decimal" title="Valeur (vide : sans donnée)">' +
+        '<button type="button" class="mk-b" data-act="ch-del" data-id="' + k + '" title="Retirer ce pays">×</button></div>';
+    }).join('') + '</div>';
+}
+function chRefresh(b) {
+  // valeur ou texte modifié sans redessiner le bloc : couleurs de la liste et carte mises à jour
+  var K = MapKit.choro, S = K.scale(K.clean(b.choro)), m = mapOf(b.id);
+  $$('.ch-row[data-b="' + b.id + '"]', app).forEach(function (r) { var col = S.color(b.choro.data[r.dataset.id]); r.querySelector('.ch-sw').style.background = col || ''; });
+  if (m) m.setChoro(b.choro);
+}
+function chSearch(inp) {
+  var res = inp.parentNode.querySelector('.map-res'), q = MapKit.choro.norm(inp.value), b = byId(inp.dataset.b), items = [];
+  if (!q) { res.hidden = true; res.innerHTML = ''; res._items = []; return; }
+  var I = MapKit.choro.index(), first = [], other = [], seen = {};
+  MapKit.data().countries.forEach(function (c) {
+    var keys = [c.name, c.id].concat(c.aka).map(MapKit.choro.norm), pre = keys.some(function (k) { return k.indexOf(q) === 0; });
+    if (pre) first.push(c); else if (q.length >= 3 && keys.some(function (k) { return k.indexOf(q) > 0; })) other.push(c);
+  });
+  first.sort(function (x, y) { return x.name.localeCompare(y.name, 'fr'); });
+  first.concat(other).forEach(function (c) { if (!seen[c.id] && items.length < 10) { seen[c.id] = 1; items.push(c); } });
+  res._items = items; res._cur = 0;
+  res.innerHTML = items.length ? items.map(function (c, i) { var has = b.choro && c.id in b.choro.data; return '<button type="button" class="mi' + (i ? '' : ' act') + '" data-r="' + i + '"><span><b>' + esc(c.name) + '</b><small>' + c.id + (has ? ' · déjà dans la liste' : '') + '</small></span></button>'; }).join('')
+    : '<div class="menu-empty">Aucun pays trouvé.</div>';
+  res.hidden = false;
+}
+function chFocus(b, id) {
+  var v = $('.ch-v[data-b="' + b.id + '"][data-id="' + id + '"]', app); if (!v) return;
+  cheatBlock = b.id; updateCheat(); v.focus({ preventScroll: true }); v.select(); var r = v.closest('.ch-row'); r.scrollIntoView({ block: 'nearest' });
+}
+function chPick(inp, i) {
+  var res = inp.parentNode.querySelector('.map-res'), c = (res._items || [])[i]; if (!c) return;
+  var b = byId(inp.dataset.b); inp.value = ''; res.hidden = true;
+  if (!(c.id in b.choro.data)) { keepView(b); change(function () { b.choro.data[c.id] = null; }); }
+  chFocus(b, c.id);
+}
+function chImport(b, text, replace) {
+  // deux colonnes collées (tableur, CSV) : nom ou code du pays, puis valeur ; renvoie le compte rendu
+  var K = MapKit.choro, ok = {}, bad = [], n = 0;
+  String(text || '').split(/\r?\n/).forEach(function (line, li) {
+    line = line.trim(); if (!line) return;
+    var m = line.match(/^(.+?)\s*[\t;|]\s*(.*)$/) || line.match(/^(.+?)\s*,\s*(-?[\d\s\u00a0\u202f.]+(?:,\d+)?\s*%?)$/) || line.match(/^(.+?)\s+([-−]?[\d\u00a0\u202f.,]+\s*%?)$/);
+    if (!m) { if (li) bad.push(line); return; }
+    var name = m[1].replace(/^["']|["']$/g, ''), raw = m[2].split(/[\t;|]/)[0].replace(/^["']|["']$/g, ''), v = K.num(raw), id = K.match(name);
+    if (!id) { if (li || v != null) bad.push(name); return; }
+    if (v == null && raw.trim()) { bad.push(name + ' (valeur « ' + raw.trim() + ' »)'); return; }
+    ok[id] = v; n++;
+  });
+  if (n) { keepView(b); change(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
+  return { n: n, bad: bad };
+}
 var panelMin = false;
 try { panelMin = localStorage.getItem(LS + 'panelmin') === '1'; } catch (_) {}
 var MapKit = null, maps = [], mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }, cheatBlock = null;
@@ -558,7 +646,7 @@ function mountMaps() {
     if (!b.routes) b.routes = [];
     var ed = mode === 'edit';
     var focusIn = function (sel) { cheatBlock = b.id; updateCheat(); var inp = $(sel, app); if (inp) { inp.focus({ preventScroll: true }); var it = inp.closest('.mk-item'); if (it) it.scrollIntoView({ block: 'nearest' }); } };
-    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, cities: b.cities !== false, key: doc.mapKey }, {
+    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: b.choro, cities: b.cities !== false, key: doc.mapKey }, {
       edit: ed, locked: !ed && !!b.lock, hideBg: !ed && !!b.hideBg,
       onView: function (v) { if (ed) { b.view = v; markDirty(true); } },
       onBg: function (bg) { if (!ed) return; b.bg = bg; markDirty(true); var s = $('.blk[data-id="' + b.id + '"] select[data-prop=bg]', app); if (s) s.value = bg; },
@@ -593,6 +681,13 @@ function mountMaps() {
           while (r.np.length < r.pts.length) r.np.push(null);
           r.np[j] = ll;
         });
+      },
+      onChoroLabel: function (id, ll) { keepView(b); change(function () { if (!b.choro.lp) b.choro.lp = {}; if (ll) b.choro.lp[id] = ll; else delete b.choro.lp[id]; }); },
+      onCountryPick: function (id) {
+        cheatBlock = b.id; updateCheat();
+        if (b.choro && id in b.choro.data) { chFocus(b, id); return; }
+        var q = $('.ch-q[data-b="' + b.id + '"]', app), c = MapKit.choro.index().by[id]; if (!q || !c) return;
+        q.value = c.name; q.focus({ preventScroll: true }); chSearch(q);
       },
       onStepPick: function (i, j) { focusIn('.st-in[data-b="' + b.id + '"][data-rt="' + i + '"][data-s="' + j + '"]'); },
       onPick: function (kind, i) { focusIn(kind === 'zone' ? '.zn-in[data-b="' + b.id + '"][data-zn="' + i + '"]' : '.rt-in[data-b="' + b.id + '"][data-rt="' + i + '"]'); }

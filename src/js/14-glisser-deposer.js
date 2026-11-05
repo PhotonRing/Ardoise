@@ -2,6 +2,7 @@
 var dragId = null, dropLine = null, dropTarget = null;
 app.addEventListener('mousedown', function (e) {
   var r = e.target.closest('.map-res [data-r]');
+  if (r && r.closest('.ch-search')) { e.preventDefault(); chPick(r.closest('.ch-search').querySelector('.ch-q'), +r.dataset.r); return; }
   if (r) { e.preventDefault(); pickResult(r.closest('.map-search').querySelector('.map-q'), +r.dataset.r); return; }
   var h = e.target.closest('.g-drag'); if (!h) return;
   var blk = h.closest('.blk'); blk.setAttribute('draggable', 'true');

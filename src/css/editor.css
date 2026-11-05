@@ -177,6 +177,32 @@ html.is-edit .mk-panel.show{display:flex;flex-direction:column;position:fixed;le
 .mk-item .mk-b{width:28px;height:28px;flex:none}
 .mk-b.mk-t{width:auto;padding:0 7px;font:600 11px var(--f-mono)}
 .map-sum{font-size:12.5px}
+/* données par pays (panneau « Éléments de la carte ») */
+.ch-box{display:flex;flex-direction:column;gap:5px;padding:2px 0}
+.ch-r{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0}
+.ch-r>select,.ch-r>.ch-txt{flex:1 1 0;min-width:0}
+.ch-box select,.ch-box input:not([type=checkbox]):not([type=color]),.ch-box textarea{height:28px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);font:12.5px var(--f-body);padding:0 7px;min-width:0}
+.ch-box select:focus,.ch-box input:focus,.ch-box textarea:focus{outline:none;border-color:var(--accent)}
+.ch-r>.ch-unit{flex:0 0 74px}
+.ch-r>.ch-mid{flex:1}
+.ch-box .mk-b{flex:none;width:28px;height:28px}
+.ch-box .mk-b.mk-t{width:auto;padding:0 8px;font:600 12px var(--f-body)}
+.ch-box .ch-off:hover{color:var(--bad);border-color:var(--bad)}
+.ch-cols input[type=color]{width:42px;height:28px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer}
+.ch-arr{color:var(--muted);font-size:12px}
+.ch-paste{display:flex;flex-direction:column;gap:5px}
+.ch-box textarea.ch-ta{height:auto;min-height:96px;padding:6px 7px;resize:vertical;font:12px/1.4 var(--f-mono)}
+.ch-repl{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.ch-search{min-width:0;flex:none}
+.ch-box .ch-q{width:100%;height:30px}
+.ch-search .map-res{top:34px}
+.ch-row{display:flex;align-items:center;gap:6px;min-width:0;padding:1px 0}
+.ch-sw{flex:none;width:13px;height:13px;border-radius:3px;background:var(--map-land);border:1px solid var(--map-border)}
+.ch-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-box .ch-v{flex:0 0 96px;text-align:right;font-variant-numeric:tabular-nums}
+.ch-box .ch-v:placeholder-shown{text-align:center}
+.ch-row.flash{animation:chfl 1s}
+@keyframes chfl{0%,40%{background:var(--accent-soft)}100%{background:transparent}}
 .cheat{position:fixed;right:14px;top:66px;z-index:45;width:236px;max-height:calc(100vh - 86px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);font:12px/1.35 var(--f-body);color:var(--fg)}
 .cheat-h{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
 .cheat.min .cheat-h{border-bottom:0}
