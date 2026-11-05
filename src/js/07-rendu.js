@@ -509,7 +509,8 @@ function refreshDerived() {
   // blocs requête de la page : résultats recalculés après la saisie
   doc.blocks.forEach(function (b) {
     if (b.type !== 'query') return;
-    var box = $('.blk[data-id="' + b.id + '"] .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
+    // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
+    var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
     var h = paintPills(queryResult(b, doc.cur, mode === 'edit')); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // blocs sommaire de la page : la liste suit les titres saisis
