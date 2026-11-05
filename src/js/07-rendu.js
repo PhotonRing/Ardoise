@@ -143,7 +143,7 @@ function renderBlock(b, e, num) {
       var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
       var rdist = function (r) { if (!MapKit) MapKit = ardoiseMapKit(); return MapKit.fmtDist(MapKit.pathLen(r.pts)); };
       var zdesc = function (z) { return z.shape === 'circle' ? 'cercle de ' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + ' km' : z.pts.length + ' sommets'; };
-      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b) || undefined, cities: b.cities !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
+      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
         ' tabindex="0" role="application" aria-label="Carte" style="height:' + mh + 'px"><div class="map-nojs">Carte interactive : JavaScript nécessaire pour l’afficher.</div></div>';
       if (!e) {
         var li = mks.map(function (m, i) { return '<li><button type="button" data-go="' + i + '"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' + esc(m.label || 'Point ' + (i + 1)) + '</button><span class="muted">' + mll(m) + '</span></li>'; })
@@ -310,7 +310,7 @@ function settings(b) {
     case 'timeline': return '<select data-act="set" data-prop="orient" title="Orientation">' + opt('v', b.orient || 'v', 'Verticale') + opt('h', b.orient || 'v', 'Horizontale (45°)') + '</select>' + (b.orient === 'h' ? '<select data-act="set" data-prop="segPos" title="Position des libellés de liens">' + opt('above', b.segPos || 'above', 'Libellés au-dessus') + opt('below', b.segPos || 'above', 'Libellés en dessous') + '</select>' + tog('noCards', !b.noCards, 'Fiches', 'Afficher les fiches de description sous la frise') : '') + act('tl-add', '+ événement', 'Ajouter un événement à la fin');
     case 'map': return '<select data-act="set" data-prop="height" title="Hauteur">' + opt(300, b.height, 'Petite') + opt(420, b.height, 'Moyenne') + opt(560, b.height, 'Grande') + '</select>' +
       '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
-      tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
+      tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('countries', b.countries !== false, 'Pays', 'Afficher les noms des pays sur le fond simplifié (avec des données par pays, le réglage « Étiquettes » peut les afficher sur les pays colorés)') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
       tog('lock', b.lock, 'Figée', 'Lecture : empêcher de déplacer et de zoomer la carte') + tog('hideBg', b.hideBg, 'Fond fixe', 'Lecture : masquer le bouton de changement de fond');
     case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
   }
@@ -712,7 +712,7 @@ function mountMaps() {
     if (!b.routes) b.routes = [];
     var ed = mode === 'edit';
     var focusIn = function (sel) { cheatBlock = b.id; updateCheat(); var inp = $(sel, app); if (inp) { inp.focus({ preventScroll: true }); var it = inp.closest('.mk-item'); if (it) it.scrollIntoView({ block: 'nearest' }); } };
-    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: chView(b), cities: b.cities !== false, key: doc.mapKey }, {
+    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: chView(b), cities: b.cities !== false, countries: b.countries !== false, key: doc.mapKey }, {
       edit: ed, locked: !ed && !!b.lock, hideBg: !ed && !!b.hideBg,
       onView: function (v) { if (ed) { b.view = v; markDirty(true); } },
       onBg: function (bg) { if (!ed) return; b.bg = bg; markDirty(true); var s = $('.blk[data-id="' + b.id + '"] select[data-prop=bg]', app); if (s) s.value = bg; },

@@ -292,7 +292,7 @@ function ardoiseMapKit() {
     var v0 = st.view || { lat: 30, lon: 10, z: 1.6 }, c0 = merc(v0.lon, v0.lat);
     var view = { cx: c0[0], cy: c0[1], z: +v0.z || 1.6 };
     var bg = BG.indexOf(st.bg) >= 0 ? st.bg : 'vector', key = String(st.key || '').trim();
-    var showCities = st.cities !== false, locked = !!o.locked, hideBg = !!o.hideBg;
+    var showCities = st.cities !== false, showCountries = st.countries !== false, locked = !!o.locked, hideBg = !!o.hideBg;
     var markers = cleanM(st.markers), zones = cleanZ(st.zones), routes = cleanR(st.routes);
     el.innerHTML = '<canvas></canvas><div class="map-zl"></div><div class="map-pins"></div><div class="map-ctl">' +
       (locked ? '' : '<button type="button" data-z="1" title="Zoom avant" aria-label="Zoom avant">+</button><button type="button" data-z="-1" title="Zoom arrière" aria-label="Zoom arrière">−</button>' +
@@ -453,7 +453,7 @@ function ardoiseMapKit() {
     }
     function drawLabels(ox, oy, s, C, boxes) {
       ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = C.land;
-      if (view.z >= 1.8) {
+      if (view.z >= 1.8 && showCountries) {
         ctx.font = '500 11px ' + C.font; ctx.textAlign = 'center'; ctx.fillStyle = C.label;
         var lim = view.z + 1.3;
         for (var i = 0; i < G.byLabel.length; i++) {
