@@ -59,6 +59,12 @@ app.addEventListener('beforeinput', function (e) {
 });
 app.addEventListener('change', function (e) {
   var el = e.target;
+  if (el.matches('input.q-num[data-prop]')) {
+    // nombre d'un filtre de requête (échéance dans les N jours…)
+    var bq2 = byId(el.closest('.blk').dataset.id), nv2 = Math.max(1, Math.min(999, Math.round(+el.value) || 1));
+    holdBar(bq2.id); change(function () { bq2[el.dataset.prop] = nv2; }); return;
+  }
+  if (el.matches('select.kb-prio-in')) { var bp = byId(el.dataset.b); if (bp) { var pv = el.value || ''; change(function () { if (pv) setPath(bp, el.dataset.k, pv); else { var o = getPath(bp, el.dataset.k.replace(/\.prio$/, '')); if (o) delete o.prio; } }); } return; }
   if (el.matches('input.kb-due-in')) { var bk = byId(el.dataset.b); if (bk) { var dv = el.value || ''; change(function () { setPath(bk, el.dataset.k, dv); }); } return; }
   if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); change(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
   if (el.matches('input[type=checkbox][data-k]')) {

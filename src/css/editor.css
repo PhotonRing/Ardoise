@@ -314,6 +314,7 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
 .q-form select{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:28px;padding:0 6px;max-width:260px}
 .q-form label{display:inline-flex;align-items:center;gap:6px}
+.q-form .q-num{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:28px;padding:0 6px;width:64px}
 .q-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
 .q-lbl{margin-right:2px}
 .q-chip{border:0;cursor:pointer;opacity:.45}
@@ -336,6 +337,8 @@ button.tl-dot:hover{transform:scale(1.2)}
 .kb-ct.fld,.kb-tx.fld{display:block}
 .kb-title.fld{display:block}
 .kb-whoi.fld{display:inline-block;min-width:9ch}
+.kb-prio-in{font:600 12px var(--f-body);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:24px;padding:0 4px;cursor:pointer}
+.kb-prio-in.p1{color:var(--bad);border-color:var(--bad)}.kb-prio-in.p2{color:var(--warn);border-color:var(--warn)}.kb-prio-in.p3{color:var(--info);border-color:var(--info)}
 .kb-duei{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
 .kb-duei span{font-size:11px}
 .kb-duei input{font:500 12px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:24px;padding:0 4px}

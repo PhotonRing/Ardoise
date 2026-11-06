@@ -1,7 +1,16 @@
 /* ---------- Bloc kanban ---------- */
-// Colonnes de cartes (titre, description, échéance et responsable facultatifs). Les cartes se déplacent par
+// Colonnes de cartes (titre, description, échéance, responsable et priorité facultatifs). Les cartes se déplacent par
 // glisser-déposer ou par « Déplacer vers… », en édition comme en lecture (le déplacement est enregistré).
 function kbNewCard() { return { id: uid(), title: '', html: '', due: '', who: '' }; }
+// priorité : P1 (haute, cadre rouge), P2 (moyenne, orange), P3 (basse, bleu) ; absente par défaut
+var KB_PRIO = { p1: 'haute', p2: 'moyenne', p3: 'basse' };
+function kbPrio(p) { return KB_PRIO[p] ? '<span class="kb-prio ' + p + '" title="Priorité ' + KB_PRIO[p] + '">' + p.toUpperCase() + '</span>' : ''; }
+function kbToday(n, u) {
+  // date du jour (aaaa-mm-jj), ou dans n jours (u = 'j'), semaines ('s') ou mois ('m')
+  var d = new Date(); d.setHours(12, 0, 0, 0);
+  if (n) { if (u === 'm') d.setMonth(d.getMonth() + n); else d.setDate(d.getDate() + n * (u === 's' ? 7 : 1)); }
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 function kbDate(iso, long) {
   // aaaa-mm-jj → « 12 mars 2025 » (long) ou « 12/03/2025 »
   var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return String(iso || '');
@@ -11,8 +20,7 @@ function kbDate(iso, long) {
 function kbLate(iso, last) {
   // échéance passée (hors dernière colonne, considérée comme « terminé »)
   if (!iso || last) return false;
-  var d = new Date(), t = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-  return iso < t;
+  return iso < kbToday();
 }
 function kbWho(name) {
   var n = String(name || '').trim(); if (!n) return '';
@@ -29,10 +37,12 @@ function kanbanHTML(b, e, f) {
         '<button type="button" data-act="kb-col-del" data-i="' + ci + '" title="Supprimer la colonne">×</button></span>' : '') + '</div>' +
       '<div class="kb-list" data-ci="' + ci + '">' + cards.map(function (k, ki) {
         var base = 'cols.' + ci + '.cards.' + ki, meta;
-        if (e) meta = '<div class="kb-meta"><label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="date" class="kb-due-in" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
+        if (e) meta = '<div class="kb-meta"><select class="kb-prio-in' + (KB_PRIO[k.prio] ? ' ' + k.prio : '') + '" data-b="' + b.id + '" data-k="' + base + '.prio" title="Priorité (facultative)">' +
+            [['', 'Priorité'], ['p1', 'P1 · haute'], ['p2', 'P2 · moyenne'], ['p3', 'P3 · basse']].map(function (o) { return '<option value="' + o[0] + '"' + ((k.prio || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+          '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="date" class="kb-due-in" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
           f('span', 'kb-whoi', base + '.who', k.who, { rich: false, ph: 'Responsable', nl: 1 }) + '</div>';
-        else meta = k.due || k.who ? '<div class="kb-meta">' + (k.due ? '<span class="kb-due' + (kbLate(k.due, last) ? ' late' : '') + '" title="Échéance">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '';
-        return '<article class="kb-card" data-ci="' + ci + '" data-ki="' + ki + '"' + (e || staticRender ? '' : ' draggable="true"') + '>' +
+        else meta = k.due || k.who || KB_PRIO[k.prio] ? '<div class="kb-meta">' + kbPrio(k.prio) + (k.due ? '<span class="kb-due' + (kbLate(k.due, last) ? ' late' : '') + '" title="Échéance">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '';
+        return '<article class="kb-card' + (KB_PRIO[k.prio] ? ' prio-' + k.prio : '') + '" data-ci="' + ci + '" data-ki="' + ki + '"' + (e || staticRender ? '' : ' draggable="true"') + '>' +
           (staticRender ? '' : '<div class="kb-ctl">' + (e ? '<span class="kb-grip" title="Glisser pour déplacer">⋮⋮</span>' : '') +
           '<button type="button" class="kb-mv" data-kbmove="' + b.id + '|' + ci + '|' + ki + '" title="Déplacer vers…" aria-label="Déplacer vers une autre colonne">⇄</button>' +
           (e ? '<button type="button" class="kb-del" data-act="kb-card-del" data-ci="' + ci + '" data-ki="' + ki + '" title="Supprimer la carte">×</button>' : '') + '</div>') +
