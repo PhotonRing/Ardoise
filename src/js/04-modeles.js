@@ -59,10 +59,10 @@ var TEMPLATES = {
       { id: 'suivi', title: '', lv: 1, blocks: [
         mk('header', { eyebrow: 'Visite guidée · sous-page', title: 'Suivi de projet', lede: 'Un kanban, et des blocs requête qui se tiennent à jour tout seuls à partir du contenu du document.' }),
         mk('h2', { html: 'Kanban' }),
-        mk('p', { html: 'Glissez une carte d’une colonne à l’autre, ou utilisez <b>⇄</b> : en lecture aussi. L’échéance et la personne responsable sont facultatives ; une échéance dépassée s’affiche en rouge.' }),
+        mk('p', { html: 'Glissez une carte d’une colonne à l’autre, ou utilisez <b>⇄</b> : en lecture aussi. L’échéance, la personne responsable et la priorité (P1 à P3, avec un cadre de couleur) sont facultatives ; une échéance dépassée s’affiche en rouge.' }),
         mk('kanban', { cols: [
-          { id: uid(), title: 'À faire', cards: [{ id: uid(), title: 'Migrer la base ' + P('Prod'), html: 'Fenêtre de maintenance à caler', due: '2030-03-15', who: 'Alice', }, { id: uid(), title: 'Rédiger le guide utilisateur', html: '', due: '', who: '' }] },
-          { id: uid(), title: 'En cours', cards: [{ id: uid(), title: 'Supervision ' + P('Prod'), html: '', due: '2024-01-15', who: 'Bob' }, { id: uid(), title: 'Tests de charge ' + P('Recette'), html: '', due: '2030-02-01', who: '' }] },
+          { id: uid(), title: 'À faire', cards: [{ id: uid(), title: 'Migrer la base ' + P('Prod'), html: 'Fenêtre de maintenance à caler', due: '2030-03-15', who: 'Alice', prio: 'p1' }, { id: uid(), title: 'Rédiger le guide utilisateur', html: '', due: '', who: '', prio: 'p3' }] },
+          { id: uid(), title: 'En cours', cards: [{ id: uid(), title: 'Supervision ' + P('Prod'), html: '', due: '2024-01-15', who: 'Bob', prio: 'p1' }, { id: uid(), title: 'Tests de charge ' + P('Recette'), html: '', due: '2030-02-01', who: '', prio: 'p2' }] },
           { id: uid(), title: 'Fait', cards: [{ id: uid(), title: 'Sauvegardes ' + P('Prod'), html: '', due: '2024-06-01', who: 'Chloé' }] }] }),
         mk('h2', { html: 'Tableau de bord' }),
         mk('p', { html: 'Ces blocs requête comptent et listent les cartes ci-dessus : changez une carte de colonne, ils suivent. En édition, leur formulaire règle ce qu’ils cherchent, où, avec quelles pastilles, et comment l’afficher.' }),
@@ -70,6 +70,8 @@ var TEMPLATES = {
           { label: 'Cartes terminées', tags: [], match: 'any', state: 'all', col: 'fait', total: 'all' },
           { label: 'Cartes Prod terminées', tags: ['prod'], match: 'any', state: 'all', col: 'fait', total: 'filter', ttags: ['prod'], tmatch: 'any' }] }),
         mk('query', { title: 'Échéances', src: 'kanban', scope: 'here', view: 'table', sortBy: 'c:échéance', sortDir: 'asc', limit: 5, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('p', { html: 'Une requête sur les cartes peut aussi filtrer par responsable, par priorité et par échéance (dépassée, aujourd’hui, dans les prochains jours, semaines ou mois…). Celle-ci montre les cartes P1 ou P2 en retard ou à rendre dans les 3 mois :' }),
+        mk('query', { title: 'Urgences', src: 'kanban', scope: 'here', view: 'list', kbPrio: 'p12', kbDue: 'soon', kbDueN: 3, kbDueU: 'm', sortBy: 'c:échéance', sortDir: 'asc', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
         mk('h2', { html: 'Contrôles' }),
         mk('check', { items: [{ html: 'Sauvegardes ' + P('Prod'), done: true }, { html: 'Restauration testée', lv: 1, done: true }, { html: 'Supervision ' + P('Prod'), done: false }, { html: 'Alertes reçues', lv: 1, done: false }, { html: 'Recette validée ' + P('Recette'), done: false }] }),
         mk('query', { src: 'check', scope: 'here', view: 'list', tags: ['prod'], cards: [{ label: '', tags: [], match: 'any', state: 'done', total: 'all' }] })

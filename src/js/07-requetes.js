@@ -67,16 +67,17 @@ function queryRecords(b, pi, noTags) {
     } else if (b.src === 'kanban' && bl.type === 'kanban') {
       (bl.cols || []).forEach(function (c, ci) {
         (c.cards || []).forEach(function (k) {
-          recs.push({ x: x, kb: k, late: kbLate(k.due, ci === bl.cols.length - 1), col: tagKey(c.title || ''), colName: String(c.title || '').trim() || 'Colonne ' + (ci + 1), tags: pillKeys((k.title || '') + ' ' + (k.html || '')),
-            cells: [{ k: 'Titre', v: k.title }, { k: 'Colonne', v: esc(c.title || '') }, { k: 'Échéance', v: k.due ? kbDate(k.due) : '' }, { k: 'Responsable', v: esc(k.who || '') }] });
+          recs.push({ x: x, kb: k, late: kbLate(k.due, ci === bl.cols.length - 1), due: String(k.due || ''), prio: KB_PRIO[k.prio] ? k.prio : '', who: tagKey(k.who || ''), col: tagKey(c.title || ''), colName: String(c.title || '').trim() || 'Colonne ' + (ci + 1), tags: pillKeys((k.title || '') + ' ' + (k.html || '')),
+            cells: [{ k: 'Titre', v: k.title }, { k: 'Colonne', v: esc(c.title || '') }, { k: 'Priorité', v: KB_PRIO[k.prio] ? k.prio.toUpperCase() : '' }, { k: 'Échéance', v: k.due ? kbDate(k.due) : '' }, { k: 'Responsable', v: esc(k.who || '') }] });
         });
       });
     } else if ((b.src || 'facts') === 'facts' && bl.type === 'facts') {
       recs.push({ x: x, cells: bl.items.map(function (it) { return { k: String(it.k || '').trim() || 'Clé', v: it.v, alert: it.alert }; }), tags: pillKeys(bl.items.map(function (it) { return it.v; }).join(' ')) });
     }
   });
-  // kanban : une colonne
+  // kanban : une colonne, un responsable, une priorité, une échéance
   if (b.src === 'kanban' && b.col) recs = recs.filter(function (r) { return r.col === b.col; });
+  if (b.src === 'kanban') recs = recs.filter(qKbKeep(b));
   // cases à cocher : toutes, cochées ou non cochées
   if (b.src === 'check' && (b.state === 'done' || b.state === 'todo')) recs = recs.filter(function (r) { return b.state === 'done' ? r.done : !r.done; });
   var want = noTags ? [] : b.tags || [];
@@ -93,6 +94,43 @@ function filterRecs(recs, tags, match, state, col) {
     if (!tags.length) return true;
     return match === 'all' ? tags.every(function (t) { return r.tags.indexOf(t) >= 0; }) : tags.some(function (t) { return r.tags.indexOf(t) >= 0; });
   });
+}
+// Filtres des cartes de kanban : responsable (kbWho : clé du nom, « - » sans responsable), priorité (kbPrio : p1, p2,
+// p3, p12 pour P1 ou P2, « - » sans priorité) et échéance (kbDue, avec kbDueN et kbDueU pour « dans les N jours /
+// semaines / mois ») ; une échéance dépassée ne compte pas dans la dernière colonne (« terminé »), comme sur le kanban
+var Q_DUE = [['', 'toutes les échéances'], ['late', 'échéance dépassée'], ['today', 'échéance aujourd’hui'], ['next', 'échéance dans les…'],
+  ['soon', 'dépassée ou dans les…'], ['after', 'échéance au-delà de…'], ['set', 'avec une échéance'], ['none', 'sans échéance']];
+function qKbKeep(b) {
+  var who = b.kbWho || '', pr = b.kbPrio || '', due = b.kbDue || '', n = Math.max(1, Math.min(999, Math.round(+b.kbDueN) || 7)), u = b.kbDueU || 'j';
+  var today = kbToday(), lim = kbToday(n, u);
+  return function (r) {
+    if (who && (who === '-' ? r.who : r.who !== who)) return false;
+    if (pr && (pr === '-' ? r.prio : pr === 'p12' ? r.prio !== 'p1' && r.prio !== 'p2' : r.prio !== pr)) return false;
+    if (!due) return true;
+    var d = r.due, next = !!d && d >= today && d <= lim;
+    return due === 'late' ? r.late : due === 'today' ? d === today : due === 'next' ? next : due === 'soon' ? r.late || next
+      : due === 'after' ? !!d && d > lim : due === 'set' ? !!d : !d;
+  };
+}
+function qKbWhos(b, pi) {
+  // responsables des cartes de la portée : [{ key, name }] dans l'ordre d'apparition
+  var seen = {}, out = [];
+  queryBlocks(b, pi).forEach(function (x) {
+    if (x.blk.type !== 'kanban') return;
+    (x.blk.cols || []).forEach(function (c) { (c.cards || []).forEach(function (k) { var n = String(k.who || '').replace(/\s+/g, ' ').trim(), key = tagKey(n); if (key && !seen[key]) { seen[key] = 1; out.push({ key: key, name: n }); } }); });
+  });
+  return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
+}
+function qKbForm(b) {
+  var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (String(cur || '') === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
+  var whos = qKbWhos(b, doc.cur), w = b.kbWho || '';
+  if (w && w !== '-' && !whos.some(function (x) { return x.key === w; })) whos.push({ key: w, name: w });
+  var due = b.kbDue || '', withN = due === 'next' || due === 'soon' || due === 'after';
+  return '<select data-act="set" data-prop="kbWho" title="Responsable des cartes">' + o('', w, 'tous les responsables') + whos.map(function (x) { return o(x.key, w, 'responsable : ' + esc(x.name)); }).join('') + o('-', w, 'sans responsable') + '</select>' +
+    '<select data-act="set" data-prop="kbPrio" title="Priorité des cartes">' + o('', b.kbPrio, 'toutes les priorités') + o('p1', b.kbPrio, 'priorité P1') + o('p2', b.kbPrio, 'priorité P2') + o('p3', b.kbPrio, 'priorité P3') + o('p12', b.kbPrio, 'priorité P1 ou P2') + o('-', b.kbPrio, 'sans priorité') + '</select>' +
+    '<select data-act="set" data-prop="kbDue" title="Échéance des cartes">' + Q_DUE.map(function (x) { return o(x[0], due, x[1]); }).join('') + '</select>' +
+    (withN ? '<input type="number" class="q-num" data-prop="kbDueN" min="1" max="999" value="' + (Math.max(1, Math.round(+b.kbDueN) || 7)) + '" title="Nombre de jours, de semaines ou de mois">' +
+      '<select data-act="set" data-prop="kbDueU" title="Unité">' + o('j', b.kbDueU || 'j', 'jours') + o('s', b.kbDueU, 'semaines') + o('m', b.kbDueU, 'mois') + '</select>' : '');
 }
 function scopeTags(b, pi, recs) {
   // pastilles présentes dans les éléments cherchés de la portée (fiches, lignes ou cases), dans l'ordre du document
@@ -238,8 +276,8 @@ function qKanban(b, recs, pi) {
     var t = c ? htmlText(c.v).replace(/\s+/g, ' ').trim() : ''; add(t.toLowerCase(), t || '(vide)', r);
   });
   var card = function (r) {
-    if (src === 'kanban') { var k = r.kb; return '<article class="kb-card"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
-      (k.due || k.who ? '<div class="kb-meta">' + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(r.x) + '</article>'; }
+    if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
+      (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(r.x) + '</article>'; }
     if (src === 'check') return '<article class="kb-card' + (r.done ? ' done' : '') + '"><div class="q-it">' + qBox(r) + ' ' + (r.par ? '<span class="q-par">' + esc(r.par) + ' › </span>' : '') + R(r.html) + '</div>' + qSource(r.x) + '</article>';
     return '<article class="kb-card"><div class="q-kvs">' + r.cells.filter(function (c) { return 'c:' + c.k.toLowerCase() !== gb && !isBlank(c.v); }).map(function (c) { return '<span class="q-kv"><span class="q-k">' + esc(c.k) + '</span> ' + R(c.v) + '</span>'; }).join('') + '</div>' + qSource(r.x) + '</article>';
   };
@@ -289,7 +327,7 @@ function queryForm(b) {
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   return '<div class="q-form">' +
     '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + '</select></label>' +
-    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, doc.cur)) : '') +
+    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, doc.cur)) + qKbForm(b) : '') +
     (b.src === 'check' ? '<select data-act="set" data-prop="state" title="État des cases">' + o('all', b.state || 'all', 'toutes') + o('done', b.state, 'cochées') + o('todo', b.state, 'non cochées') + '</select>' : '') +
     '<label>dans <select data-act="set" data-prop="scope" class="q-scope">' + scopes + '</select></label>' +
     (pageScope ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') +
