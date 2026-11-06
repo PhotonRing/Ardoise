@@ -191,6 +191,7 @@ function synPresence(force) {
 var synPresT = 0;
 function synPresenceSoon() { if (!syn) return; clearTimeout(synPresT); synPresT = setTimeout(function () { synPresence(false); }, 250); }
 document.addEventListener('focusin', synPresenceSoon);
+document.addEventListener('focusout', synPresenceSoon);   // quitter un bloc sans en rejoindre un autre efface le cadre chez les autres
 
 // ---------- réception ----------
 // l'intégration (sans DOM) est dans 05-synchro-adaptateur.js ; ici, le curseur et le défilement restent en place
