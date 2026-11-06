@@ -35,10 +35,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Assembler ardoise.html
-        run: node build.mjs
-
-      - name: Vérifications (npm run check)
+      - name: Assemblage et vérifications (npm run check)
         run: npm run check
 
       - name: Lire la version
