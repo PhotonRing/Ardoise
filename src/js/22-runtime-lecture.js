@@ -190,7 +190,7 @@ function exportPages() {
 }
 function exportStatic() {
   if (isSealed() && !confirm('L’export statique n’est pas chiffré : la page exportée sera lisible par toute personne qui obtient le fichier. Continuer ?')) return;
-  if (htimer) snapshot();
+  session.valider();
   staticRender = true;
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
@@ -209,7 +209,7 @@ function exportStatic() {
 }
 function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render(); } setTimeout(function () { window.print(); if (m === 'edit') { mode = 'edit'; render(); } }, 300); /* le temps que les cartes se dessinent */ }
 function copyJSON() {
-  if (htimer) snapshot();
+  session.valider();
   var base = { v: VERSION, title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
   if (doc.tags) base.tags = doc.tags;
   if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.lv) o.lv = pg.lv; return o; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }

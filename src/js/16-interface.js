@@ -89,7 +89,7 @@ function openSheet() {
 function paintSheetUndo() {
   if (!sheet) return;
   var u = $('[data-sh=undo]', sheet), r = $('[data-sh=redo]', sheet);
-  if (u) u.disabled = hpos <= 0; if (r) r.disabled = hpos >= hist.length - 1;
+  var h = session.historique(); if (u) u.disabled = !h.annuler; if (r) r.disabled = !h.retablir;
 }
 document.addEventListener('keydown', function (e) { if (sheet && e.key === 'Escape') { e.preventDefault(); closeSheet(); } }, true);
 window.addEventListener('resize', function () { if (sheet && innerWidth > 760) closeSheet(); });

@@ -5,7 +5,7 @@ function newDoc(kind) {
   synStop();
   doc = normalize(template(kind)); doc.id = uid() + uid(); doc.savedAt = null;
   fileHandle = null; handleGranted = false; downloadMode = false; dirty = false; unlocked = false;
-  hist = []; hpos = -1; snapshot();
+  session.repartir();
   mode = 'edit'; render(); scrollTo(0, 0);
   setStatus('warn', 'Nouveau document · Ctrl+S pour choisir le fichier');
   focusField(doc.blocks[0].id, 'title');

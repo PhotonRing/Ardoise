@@ -2,8 +2,10 @@
 var dirty = false, fileHandle = null, autosaveOn = true, saving = false, saveTimer = null, draftTimer = null, lastMode = '', downloadMode = false;
 try { autosaveOn = localStorage.getItem(LS + 'autosave') !== '0'; } catch (_) {}
 var headKeep = $$('head > *');
-function markDirty(fromHistory) {
-  if (!fromHistory) { clearTimeout(htimer); htimer = setTimeout(snapshot, 500); }
+// sans fromHistory, c'est une frappe : la session la regroupe en une étape d'annulation et prévient « modifié »
+function markDirty(fromHistory) { if (fromHistory) marquerModifie(); else session.saisir(); }
+session.abonner('modifie', function () { marquerModifie(); });
+function marquerModifie() {
   var was = dirty; dirty = true;
   if (!was && mode === 'view') renderChrome(); else setStatus();
   clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 700);
@@ -86,7 +88,7 @@ function saveFailed(e) { saving = false; setStatus(); if (e && e.name === 'Abort
 function save(as) {
   if (!doc) return Promise.resolve();
   if (doc.newer) { newerNotice(true); return Promise.resolve(); }   // l'enregistrer ici perdrait ce que cet éditeur ne connaît pas
-  if (htimer) snapshot();
+  session.valider();
   clearTimeout(saveTimer);
   var dl = function () { return serializeFile().then(function (html) { download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci'); }); };
   if (window.showSaveFilePicker && !downloadMode) {
@@ -130,7 +132,7 @@ function autoSave() {
   perm(fileHandle, false).then(function (ok) {
     handleGranted = ok;
     if (!ok) { setStatus(); return; }
-    if (htimer) snapshot();
+    session.valider();
     saving = true; setStatus();
     serializeFile().then(function (html) {
       return writeTo(fileHandle, html).then(function () { afterSave(); }, function (e) {
@@ -228,7 +230,7 @@ function openUpdate() {
   });
 }
 function applyUpdate(tpl) {
-  if (htimer) snapshot();
+  session.valider();
   clearTimeout(saveTimer);
   var target = fileHandle ? perm(fileHandle, true).then(function (ok) { return ok ? fileHandle : null; })
     : (window.showSaveFilePicker && !downloadMode ? pickNew().catch(function (e) { return e && e.name === 'AbortError' ? false : null; }) : Promise.resolve(null));

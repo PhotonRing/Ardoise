@@ -227,7 +227,7 @@ function synRemote(s, batches, reload) {
   if (!doc.pages || !doc.pages.length) doc.pages = [{ id: uid(), title: '', blocks: [] }];
   var pi = -1; doc.pages.forEach(function (pg, i) { if (pg.id === pgId) pi = i; });
   doc.cur = pi >= 0 ? pi : Math.min(doc.cur, doc.pages.length - 1);
-  hist[hpos] = JSON.stringify(doc);   // l'arrivée n'est pas une modification locale à annuler
+  session.remplacerCourant();   // l'arrivée n'est pas une modification locale à annuler
   markDirty(true);
   render(); scrollTo(0, sy); synPutFocus(focus);
 }

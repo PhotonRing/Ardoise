@@ -2,7 +2,7 @@
 function pageHash(i) { try { history.replaceState(null, '', '#p' + (i + 1)); } catch (_) {} }
 function goPage(i, keepScroll) {
   i = Math.max(0, Math.min(doc.pages.length - 1, i));
-  if (htimer) snapshot();
+  session.valider();
   if (i === doc.cur) return;
   maps.forEach(function (m) { var b = byId(m.blockId); if (b && mode === 'edit') b.view = m.getView(); });
   mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }; cheatBlock = null;

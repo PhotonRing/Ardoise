@@ -1,6 +1,6 @@
 /* ---------- Mode lecture / édition ---------- */
 function toggleMode() {
-  if (htimer) snapshot();
+  session.valider();
   if (mode === 'view' && doc.lock && !unlocked) { askPassword(function () { toggleMode(); }); return; }
   if (mode === 'view' && doc.newer) { newerNotice(true); return; }
   mode = mode === 'edit' ? 'view' : 'edit';
