@@ -294,9 +294,9 @@ test('la page affichée reste la même, repérée par son identifiant, quand une
 
 // ---------- deux copies : vrai moteur et vrai adaptateur, faux transport ----------
 const DEUX = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'b1', type: 'p', html: 'a' }, { id: 'b2', type: 'p', html: 'b' }] }] });
-function copie(acteur, fraiche) {
+function copie(acteur, fraiche, depart) {
   const { ctx, avancer } = contexte();
-  ctx.session.remplacer(DEUX(), 'demarrage');
+  ctx.session.remplacer((depart || DEUX)(), 'demarrage');
   // synchronisation minimale, comme synStart sans connexion ; une copie fraîche adopte le document des autres
   ctx.syn = { st: ctx.synCreate(acteur), base: {}, pending: [], patches: [], patchBase: 0, adopt: !!fraiche, sendT: 0 };
   ctx.synLocal();
@@ -315,7 +315,7 @@ function echanger(a, b) {
   }
   throw new Error('le relais ne se stabilise pas');
 }
-function relier() { const a = copie('A'), b = copie('B', true); echanger(a, b); return { a, b }; }
+function relier(depart) { const a = copie('A', false, depart), b = copie('B', true, depart); echanger(a, b); return { a, b }; }
 
 test('deux copies : annuler ses propres modifications garde celles reçues entre-temps', () => {
   const { a, b } = relier();
@@ -356,6 +356,129 @@ test('deux copies : la troncature de l\'historique fait oublier les modification
   egal(a.ctx.syn.patches.length, 0, 'plus aucun état gardé n\'est antérieur à l\'arrivée');
   for (let i = 0; i < 400; i++) a.s.annuler();
   egal([a.bloc('b1'), a.ctx.doc.title], ['v1', 'reçu']);
+});
+
+// ---------- deux copies : l'autre copie change la structure (pages, blocs) ----------
+// trois pages ; la première a quatre blocs. On lit l'état d'une copie : ordre des pages, niveaux, blocs d'une page.
+const TROIS = () => ({ title: 'Doc', pages: [
+  { id: 'p1', title: 'Un', blocks: [{ id: 'b1', type: 'p', html: '1' }, { id: 'b2', type: 'p', html: '2' }, { id: 'b3', type: 'p', html: '3' }, { id: 'b4', type: 'p', html: '4' }] },
+  { id: 'p2', title: 'Deux', blocks: [] }, { id: 'p3', title: 'Trois', blocks: [] }] });
+const pages = (c) => c.ctx.doc.pages.map((p) => p.id);
+const niveaux = (c) => c.ctx.doc.pages.map((p) => p.lv || 0);
+const blocs = (c, pid = 'p1') => c.ctx.doc.pages.filter((p) => p.id === pid)[0].blocks.map((x) => x.id + '=' + x.html);
+const page = (d, pid) => d.pages.filter((p) => p.id === pid)[0];
+const bloc = (d, id, pid = 'p1') => page(d, pid).blocks.filter((x) => x.id === id)[0];
+const deplacer = (t, id, i) => { const j = t.findIndex((x) => x.id === id); const [x] = t.splice(j, 1); t.splice(i, 0, x); };
+// A tape dans b1, B fait `changement`, A annule puis rétablit ; `attendu(tape)` : ce que A et B doivent voir, frappe annulée ou rétablie
+function frappePuis(changement, attendu) {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { bloc(a.ctx.doc, 'b1').html = '1-A'; });
+  echanger(a, b);
+  b.s.modifier(() => changement(b.ctx.doc));
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c)], attendu(false), 'après annuler, chez ' + c.ctx.syn.st.actor);
+  a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c)], attendu(true), 'après rétablir, chez ' + c.ctx.syn.st.actor);
+  return { a, b };
+}
+const b1 = (tape) => 'b1=' + (tape ? '1-A' : '1');
+
+test('deux copies : annuler sa frappe garde le nouvel ordre des pages reçu', () => {
+  frappePuis((d) => { d.pages.reverse(); }, (t) => [['p3', 'p2', 'p1'], [b1(t), 'b2=2', 'b3=3', 'b4=4']]);
+});
+
+test('deux copies : annuler sa frappe garde la page ajoutée ou supprimée par l\'autre copie', () => {
+  frappePuis((d) => { d.pages.splice(1, 0, { id: 'p4', title: 'Quatre', blocks: [] }); }, (t) => [['p1', 'p4', 'p2', 'p3'], [b1(t), 'b2=2', 'b3=3', 'b4=4']]);
+  frappePuis((d) => { d.pages.splice(1, 1); }, (t) => [['p1', 'p3'], [b1(t), 'b2=2', 'b3=3', 'b4=4']]);
+});
+
+test('deux copies : annuler sa frappe garde le bloc ajouté, supprimé ou déplacé par l\'autre copie dans la même page', () => {
+  frappePuis((d) => { page(d, 'p1').blocks.splice(2, 0, { id: 'b5', type: 'p', html: '5' }); }, (t) => [['p1', 'p2', 'p3'], [b1(t), 'b2=2', 'b5=5', 'b3=3', 'b4=4']]);
+  frappePuis((d) => { page(d, 'p1').blocks.splice(2, 1); }, (t) => [['p1', 'p2', 'p3'], [b1(t), 'b2=2', 'b4=4']]);
+  frappePuis((d) => { deplacer(page(d, 'p1').blocks, 'b1', 3); }, (t) => [['p1', 'p2', 'p3'], ['b2=2', 'b3=3', 'b4=4', b1(t)]]);
+});
+
+test('deux copies : annuler son propre déplacement de page ou de bloc, malgré un ajout de l\'autre copie au même endroit', () => {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { deplacer(a.ctx.doc.pages, 'p3', 0); deplacer(page(a.ctx.doc, 'p1').blocks, 'b4', 0); });
+  echanger(a, b);
+  b.s.modifier(() => { b.ctx.doc.pages.splice(2, 0, { id: 'p4', title: 'Quatre', blocks: [] }); page(b.ctx.doc, 'p1').blocks.splice(3, 0, { id: 'b5', type: 'p', html: '5' }); });
+  echanger(a, b);
+  egal([pages(a), blocs(a).map((x) => x[1])], [['p3', 'p1', 'p4', 'p2'], ['4', '1', '2', '5', '3']], 'avant l\'annulation');
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c).map((x) => x[1])], [['p1', 'p4', 'p2', 'p3'], ['1', '2', '5', '3', '4']], 'annulé');
+  a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c).map((x) => x[1])], [['p3', 'p1', 'p4', 'p2'], ['4', '1', '2', '5', '3']], 'rétabli');
+});
+
+test('deux copies : annuler l\'ajout d\'un bloc que l\'autre copie a modifié le retire ; rétablir le rend avec la modification', () => {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { page(a.ctx.doc, 'p1').blocks.splice(1, 0, { id: 'b5', type: 'p', html: '' }); });
+  echanger(a, b);
+  b.s.modifier(() => { bloc(b.ctx.doc, 'b5').html = '5-B'; });
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal(blocs(c), ['b1=1', 'b2=2', 'b3=3', 'b4=4'], 'annulé chez ' + c.ctx.syn.st.actor);
+  a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal(blocs(c), ['b1=1', 'b5=5-B', 'b2=2', 'b3=3', 'b4=4'], 'rétabli chez ' + c.ctx.syn.st.actor);
+});
+
+test('deux copies : annuler une suppression ramène le bloc après son voisin, même si l\'ordre ou le voisin a changé', () => {
+  for (const [changement, annule, retabli] of [
+    [(d) => deplacer(page(d, 'p1').blocks, 'b4', 0), ['b4=4', 'b1=1', 'b2=2', 'b3=3'], ['b4=4', 'b1=1', 'b3=3']],
+    [(d) => page(d, 'p1').blocks.splice(0, 1), ['b2=2', 'b3=3', 'b4=4'], ['b3=3', 'b4=4']],
+  ]) {
+    const { a, b } = relier(TROIS);
+    a.s.modifier(() => { page(a.ctx.doc, 'p1').blocks.splice(1, 1); });
+    echanger(a, b);
+    b.s.modifier(() => changement(b.ctx.doc));
+    echanger(a, b);
+    a.s.annuler(); echanger(a, b);
+    for (const c of [a, b]) egal(blocs(c), annule, 'annulé chez ' + c.ctx.syn.st.actor);
+    a.s.retablir(); echanger(a, b);
+    for (const c of [a, b]) egal(blocs(c), retabli, 'rétabli chez ' + c.ctx.syn.st.actor);
+  }
+});
+
+test('deux copies : annuler un changement de niveau de page garde celui de l\'autre copie sur une autre page', () => {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { page(a.ctx.doc, 'p2').lv = 1; });
+  echanger(a, b);
+  b.s.modifier(() => { page(b.ctx.doc, 'p3').lv = 2; });
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal(niveaux(c), [0, 0, 2], 'annulé chez ' + c.ctx.syn.st.actor);
+  a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal(niveaux(c), [0, 1, 2], 'rétabli chez ' + c.ctx.syn.st.actor);
+});
+
+test('deux copies : plusieurs annulations d\'affilée gardent chacune les modifications reçues entre-temps', () => {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { bloc(a.ctx.doc, 'b1').html = '1-A'; });
+  a.s.modifier(() => { bloc(a.ctx.doc, 'b2').html = '2-A'; });
+  echanger(a, b);
+  b.s.modifier(() => { b.ctx.doc.pages.reverse(); });
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  egal([pages(a), blocs(a)], [['p3', 'p2', 'p1'], ['b1=1-A', 'b2=2', 'b3=3', 'b4=4']], 'première annulation');
+  b.s.modifier(() => { page(b.ctx.doc, 'p1').blocks.push({ id: 'b5', type: 'p', html: '5' }); });
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c)], [['p3', 'p2', 'p1'], ['b1=1', 'b2=2', 'b3=3', 'b4=4', 'b5=5']], 'seconde annulation chez ' + c.ctx.syn.st.actor);
+  a.s.retablir(); a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c)], [['p3', 'p2', 'p1'], ['b1=1-A', 'b2=2-A', 'b3=3', 'b4=4', 'b5=5']], 'rétabli chez ' + c.ctx.syn.st.actor);
+});
+
+test('deux copies sans réception : annuler et rétablir un déplacement et une frappe comme sans synchronisation', () => {
+  const { a, b } = relier(TROIS);
+  a.s.modifier(() => { deplacer(a.ctx.doc.pages, 'p1', 2); });
+  a.s.modifier(() => { bloc(a.ctx.doc, 'b1').html = '1-A'; });
+  echanger(a, b);
+  a.s.annuler(); egal([pages(a), blocs(a)[0]], [['p2', 'p3', 'p1'], 'b1=1']);
+  a.s.annuler(); egal([pages(a), blocs(a)[0]], [['p1', 'p2', 'p3'], 'b1=1']);
+  a.s.retablir(); a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal([pages(c), blocs(c)[0]], [['p2', 'p3', 'p1'], 'b1=1-A'], 'chez ' + c.ctx.syn.st.actor);
 });
 
 // --- remplacer : démarrage, déverrouillage, nouveau document ---

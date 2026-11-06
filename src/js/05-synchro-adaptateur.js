@@ -45,22 +45,68 @@ function synIntegrer(s, batches, reload) {
   return true;
 }
 function synPaths(a, b, path, out) {
-  // différences de chemin à chemin (tableaux d'objets à identifiant suivis par identifiant), pour l'annulation
+  // différences de chemin à chemin, pour l'annulation ; les tableaux d'objets à identifiant sont suivis par identifiant
   if (synEq(a, b)) return;
   if (synIsObj(a) && synIsObj(b)) { var ks = {}; Object.keys(a).concat(Object.keys(b)).forEach(function (k) { ks[k] = 1; }); Object.keys(ks).forEach(function (k) { synPaths(a[k], b[k], path.concat([k]), out); }); return; }
-  var ids = function (x) { return Array.isArray(x) && x.every(function (e) { return synIsObj(e) && typeof e.id === 'string'; }) ? x.map(function (e) { return e.id; }).join('\u0001') : null; };
-  if (Array.isArray(a) && Array.isArray(b) && ids(a) !== null && ids(a) === ids(b)) { b.forEach(function (e, i) { synPaths(a[i], e, path.concat([{ id: e.id }]), out); }); return; }
+  var ia = synIds(a), ib = synIds(b);
+  if (ia && ib) {
+    var avant = {}; a.forEach(function (e) { avant['$' + e.id] = e; });
+    b.forEach(function (e) { if (avant['$' + e.id]) synPaths(avant['$' + e.id], e, path.concat([{ id: e.id }]), out); });
+    synOrdre(ia, ib, b, path, out);
+    return;
+  }
   out.push({ p: path, v: b === undefined ? undefined : JSON.parse(JSON.stringify(b)) });
+}
+// identifiants d'un tableau d'objets à identifiant texte, tous différents ; sinon null
+function synIds(x) {
+  if (!Array.isArray(x)) return null;
+  var vus = {}, ids = [];
+  for (var i = 0; i < x.length; i++) { var e = x[i]; if (!synIsObj(e) || typeof e.id !== 'string' || vus['$' + e.id]) return null; vus['$' + e.id] = 1; ids.push(e.id); }
+  return ids;
+}
+// structure : seulement ce que l'autre copie a changé. Hors de la plus longue sous-suite commune, un élément est
+// ajouté ou déplacé (« X après » ses voisins précédents reçus, du plus proche au plus loin) ; jamais l'ordre complet
+// reçu, qui contiendrait aussi les déplacements locaux qu'on veut pouvoir annuler
+function synOrdre(ia, ib, b, path, out) {
+  var enA = {}, enB = {}, garde = {};
+  ia.forEach(function (id) { enA['$' + id] = 1; }); ib.forEach(function (id) { enB['$' + id] = 1; });
+  var ca = ia.filter(function (id) { return enB['$' + id]; }), cb = ib.filter(function (id) { return enA['$' + id]; });
+  var n = ca.length, m = cb.length, L = [], i, j;
+  for (i = n; i >= 0; i--) { L[i] = []; for (j = m; j >= 0; j--) L[i][j] = i === n || j === m ? 0 : ca[i] === cb[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]); }
+  for (i = 0, j = 0; i < n && j < m;) { if (ca[i] === cb[j]) { garde['$' + ca[i]] = 1; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+  ia.forEach(function (id) { if (!enB['$' + id]) out.push({ p: path, suppr: id }); });
+  ib.forEach(function (id, k) {
+    if (garde['$' + id]) return;
+    var x = { p: path, place: id, apres: ib.slice(0, k).reverse() };
+    if (!enA['$' + id]) x.v = JSON.parse(JSON.stringify(b[k]));   // nouveau : son contenu voyage avec lui
+    out.push(x);
+  });
+}
+// suit un chemin (clés, ou { id } dans un tableau) sur ses n premiers pas ; null s'il ne mène nulle part
+function synSuivre(d, p, n) {
+  var o = d;
+  for (var i = 0; i < n && o; i++) { var st = p[i]; o = typeof st === 'object' ? (Array.isArray(o) ? o.filter(function (e) { return e && e.id === st.id; })[0] : null) : o[st]; }
+  return o || null;
 }
 function synPatch(d, pt) {
   pt.forEach(function (x) {
-    var o = d;
-    for (var i = 0; i < x.p.length - 1 && o; i++) { var st = x.p[i]; o = typeof st === 'object' ? (Array.isArray(o) ? o.filter(function (e) { return e && e.id === st.id; })[0] : null) : o[st]; }
+    if ('suppr' in x || 'place' in x) { var t = synSuivre(d, x.p, x.p.length); if (Array.isArray(t)) synPlacer(t, x); return; }
+    var o = synSuivre(d, x.p, x.p.length - 1);
     if (!o || !x.p.length) return;
     var last = x.p[x.p.length - 1];
     if (typeof last === 'object') { if (!Array.isArray(o)) return; var j = -1; o.forEach(function (e, k) { if (e && e.id === last.id) j = k; }); if (j < 0) return; if (x.v === undefined) o.splice(j, 1); else o[j] = JSON.parse(JSON.stringify(x.v)); }
     else if (x.v === undefined) delete o[last]; else o[last] = JSON.parse(JSON.stringify(x.v));
   });
+}
+// rejeu de la structure : « X supprimé » retire X s'il est là ; « X après » le remet après le plus proche de ses
+// voisins reçus encore présent (aucun : en tête). Absent et pas nouveau (ajout local annulé) : rien, l'annulation l'emporte
+function synPlacer(t, x) {
+  var pos = function (id) { for (var k = 0; k < t.length; k++) if (t[k] && t[k].id === id) return k; return -1; };
+  var j = pos('suppr' in x ? x.suppr : x.place), e, k = -1;
+  if ('suppr' in x) { if (j >= 0) t.splice(j, 1); return; }
+  if (j >= 0) e = t.splice(j, 1)[0]; else if (x.v !== undefined) e = JSON.parse(JSON.stringify(x.v)); else return;
+  for (var i = 0; i < x.apres.length && k < 0; i++) k = pos(x.apres[i]);
+  t.splice(k + 1, 0, e);
 }
 // annulation pendant la synchronisation : l'état restauré reçoit les modifications arrivées depuis
 function synHistMark() { return syn ? syn.patchBase + syn.patches.length : 0; }
