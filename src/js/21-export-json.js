@@ -3,10 +3,9 @@ function newDoc(kind) {
   if (dirty && !confirm('Les modifications non enregistrées de cette page seront perdues (un brouillon reste dans le navigateur). Continuer ?')) return;
   saveDraft();
   synStop();
-  doc = normalize(template(kind)); doc.id = uid() + uid(); doc.savedAt = null;
-  fileHandle = null; handleGranted = false; downloadMode = false; dirty = false; unlocked = false;
-  session.repartir();
-  mode = 'edit'; render(); scrollTo(0, 0);
+  mode = 'edit';
+  session.remplacer(template(kind), 'nouveau');
+  scrollTo(0, 0);
   setStatus('warn', 'Nouveau document · Ctrl+S pour choisir le fichier');
   focusField(doc.blocks[0].id, 'title');
 }
