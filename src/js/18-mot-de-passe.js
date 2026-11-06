@@ -141,7 +141,7 @@ function lockScreen(env) {
       var d = normalize(JSON.parse(json));
       if (!d) throw new Error('contenu illisible');
       d.id = env.id || d.id; unlocked = true; sealed = null;
-      boot(d);
+      boot(d, 'deverrouillage');
     }).catch(function (x) { busy = false; btn.disabled = false; err.textContent = 'Ouverture impossible : ' + x.message; });
   });
 }

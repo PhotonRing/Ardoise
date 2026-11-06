@@ -385,7 +385,7 @@ function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; 
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
 var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
-function loadNavFold() { try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + doc.id) || '{}') || {}; } catch (_) { navFold = {}; } }
+function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
 function navHTML(d, edit, all) {
   // all : export statique, toutes les pages sont présentes et le script bascule de l'une à l'autre

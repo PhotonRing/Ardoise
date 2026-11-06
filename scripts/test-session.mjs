@@ -55,8 +55,7 @@ function monter() {
   s.abonner('rendu', (focus, info) => recu.rendu.push({ focus, info }));
   s.abonner('modifie', (depuisHistorique) => recu.modifie.push(depuisHistorique));
   s.abonner('historique', (etat) => recu.historique.push(etat));
-  ctx.doc = ctx.attach(DEPART());
-  s.repartir();
+  s.remplacer(DEPART(), 'demarrage');
   const vider = () => { recu.rendu.length = 0; recu.modifie.length = 0; recu.historique.length = 0; sync.length = 0; };
   vider();
   return { s, ctx, avancer, recu, sync, faux, vider, get doc() { return ctx.doc; }, texte: () => ctx.doc.pages[0].blocks[0].html };
@@ -117,11 +116,13 @@ test('valider valide tout de suite la frappe en attente ; sans frappe en attente
 
 test('annuler et rétablir restaurent l\'état exact et respectent les bornes', () => {
   const m = monter();
+  const initial = JSON.stringify(m.doc);
   m.s.modifier(() => ecrire(m, 'b'));
   m.s.modifier(() => { m.doc.title = 'Titre'; m.doc.pages[0].blocks.push({ id: 'b2', type: 'p', html: 'c' }); });
   const apres = JSON.stringify(m.doc);
   m.s.annuler(); m.s.annuler();
-  egal(JSON.parse(JSON.stringify(m.doc)), { title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'b1', type: 'p', html: 'a' }] }] });
+  egal(JSON.stringify(m.doc), initial);
+  egal([m.doc.title, m.doc.pages[0].blocks.length], ['Doc', 1]);
   m.vider();
   m.s.annuler();
   egal(m.texte(), 'a', 'rien avant le premier état');
@@ -187,16 +188,14 @@ test('l\'historique garde les 300 derniers états', () => {
   egal(m.s.historique(), { annuler: false, retablir: true });
 });
 
-test('consigner valide une étape sans redessiner ; repartir vide l\'historique', () => {
+test('consigner valide une étape sans redessiner', () => {
   const m = monter();
   ecrire(m, 'b');
   m.s.consigner();
   egal(m.recu.rendu.length, 0);
   egal(m.s.historique(), { annuler: true, retablir: false });
-  m.s.repartir();
-  egal(m.s.historique(), { annuler: false, retablir: false });
   m.s.annuler();
-  egal(m.texte(), 'b');
+  egal(m.texte(), 'a');
 });
 
 // ---------- adaptateur de synchronisation ----------
@@ -239,9 +238,8 @@ test('la troncature de l\'historique fait oublier les modifications reçues plus
 
 test('la configuration de synchronisation survit à annuler / rétablir (vrai adaptateur, synchronisation inactive)', () => {
   const { ctx } = contexte();
-  ctx.doc = ctx.attach(DEPART());
+  ctx.session.remplacer(DEPART(), 'demarrage');
   ctx.synSetCfg(ctx.doc, { relay: 'ws://relais', key: 'k' });
-  ctx.session.repartir();
   ctx.session.modifier(() => { ctx.doc.title = 'Autre'; });
   ctx.session.annuler();
   egal([ctx.doc.title, ctx.doc.sync], ['Doc', { relay: 'ws://relais', key: 'k' }], 'après annuler');
@@ -293,8 +291,7 @@ test('la page affichée reste la même, repérée par son identifiant, quand une
 const DEUX = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'b1', type: 'p', html: 'a' }, { id: 'b2', type: 'p', html: 'b' }] }] });
 function copie(acteur, fraiche) {
   const { ctx, avancer } = contexte();
-  ctx.doc = ctx.attach(DEUX());
-  ctx.session.repartir();
+  ctx.session.remplacer(DEUX(), 'demarrage');
   // synchronisation minimale, comme synStart sans connexion ; une copie fraîche adopte le document des autres
   ctx.syn = { st: ctx.synCreate(acteur), base: {}, pending: [], patches: [], patchBase: 0, adopt: !!fraiche, sendT: 0 };
   ctx.synLocal();
@@ -354,6 +351,92 @@ test('deux copies : la troncature de l\'historique fait oublier les modification
   egal(a.ctx.syn.patches.length, 0, 'plus aucun état gardé n\'est antérieur à l\'arrivée');
   for (let i = 0; i < 400; i++) a.s.annuler();
   egal([a.bloc('b1'), a.ctx.doc.title], ['v1', 'reçu']);
+});
+
+// --- remplacer : démarrage, déverrouillage, nouveau document ---
+const FICHIER = () => ({ v: 5, id: 'fichier', title: 'Fichier', savedAt: '2026-11-01T10:00:00.000Z', mapKey: 'cle-carte',
+  lock: { salt: 's', hash: 'h', iter: 1000 }, sync: { relay: 'ws://relais', key: 'k' },
+  pages: [{ id: 'p1', title: 'Un', blocks: [{ id: 'x1', type: 'p', html: 'un' }] }, { id: 'p2', title: 'Deux', blocks: [] }, { id: 'p3', title: 'Trois', blocks: [] }] });
+
+test('démarrage : garde ce qui vient du fichier, et un annuler immédiat ne change rien', () => {
+  const m = monter();
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.vider();
+  egal(m.s.remplacer(FICHIER(), 'demarrage'), { ok: true });
+  egal([m.doc.id, m.doc.savedAt, m.doc.mapKey, m.doc.lock.hash, m.doc.sync.relay, m.doc.cur], ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h', 'ws://relais', 0]);
+  egal(m.s.historique(), { annuler: false, retablir: false });
+  m.s.annuler();
+  egal(m.doc.pages[0].blocks[0].html, 'un');
+  egal(m.recu.rendu.length, 1, 'le document ouvert est dessiné');
+  egal(m.recu.modifie, [], 'ouvrir ne marque pas le document modifié');
+  egal(m.sync, [], 'rien ne part vers les autres copies');
+});
+
+test('démarrage : la page du lien #pN est respectée et bornée au nombre de pages', () => {
+  const m = monter();
+  m.s.remplacer(FICHIER(), 'demarrage', { page: 1 });
+  egal(m.doc.cur, 1);
+  m.s.remplacer(FICHIER(), 'demarrage', { page: 8 });
+  egal(m.doc.cur, 2, 'bornée à la dernière page');
+  m.s.remplacer(FICHIER(), 'demarrage');
+  egal(m.doc.cur, 0, 'sans lien : la première page');
+});
+
+test('déverrouillage : l\'historique repart du document déchiffré', () => {
+  const m = monter();
+  m.s.modifier(() => ecrire(m, 'b'));
+  egal(m.s.remplacer(FICHIER(), 'deverrouillage', { page: 2 }), { ok: true });
+  egal([m.doc.id, m.doc.lock.hash, m.doc.cur], ['fichier', 'h', 2]);
+  egal(m.s.historique(), { annuler: false, retablir: false });
+  m.s.modifier(() => { m.doc.pages[0].blocks[0].html = 'deux'; });
+  m.s.annuler(); m.s.annuler();
+  egal(m.doc.pages[0].blocks[0].html, 'un', 'on ne remonte pas avant le document déchiffré');
+});
+
+test('nouveau : nouvel identifiant, ni date d\'enregistrement, ni mot de passe, ni clé de carte, ni synchronisation', () => {
+  const m = monter();
+  m.s.remplacer(FICHIER(), 'demarrage', { page: 2 });
+  m.s.modifier(() => { m.doc.title = 'modifié'; });
+  const nf = []; m.s.abonner('nouveauFichier', () => nf.push(1));
+  m.vider();
+  egal(m.s.remplacer(FICHIER(), 'nouveau', { page: 2 }), { ok: true });
+  if (m.doc.id === 'fichier' || !m.doc.id) throw new Error('identifiant non renouvelé : ' + m.doc.id);
+  egal([m.doc.savedAt, m.doc.lock, m.doc.mapKey, m.doc.sync, m.doc.cur], [null, undefined, undefined, undefined, 0]);
+  egal(m.doc.pages[0].blocks[0].html, 'un', 'le contenu du modèle');
+  egal(nf.length, 1, '« nouveau fichier » prévenu');
+  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(m.recu.modifie, [], 'un nouveau document n\'est pas marqué modifié');
+  const autre = m.doc.id;
+  m.s.remplacer(FICHIER(), 'nouveau');
+  if (m.doc.id === autre) throw new Error('deux nouveaux documents ont le même identifiant');
+});
+
+test('démarrage : un format plus récent est ouvert ; une donnée illisible est refusée sans toucher au document', () => {
+  const m = monter();
+  egal(m.s.remplacer(Object.assign(FICHIER(), { v: 999 }), 'demarrage'), { ok: true });
+  if (!m.doc.newer) throw new Error('format plus récent non signalé');
+  m.s.remplacer(FICHIER(), 'demarrage');
+  egal(m.s.remplacer('pas un document', 'demarrage'), { refus: 'illisible' });
+  egal(m.s.remplacer({ pages: 3 }, 'nouveau'), { refus: 'illisible' });
+  egal(m.doc.id, 'fichier');
+});
+
+test('remplacer valide d\'abord la frappe en attente, qui ne passe pas dans le nouvel historique', () => {
+  const m = monter();
+  m.s.saisir(() => ecrire(m, 'ab'));
+  m.s.remplacer(FICHIER(), 'demarrage');
+  m.avancer(1000);
+  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(m.doc.pages[0].blocks[0].html, 'un');
+});
+
+test('un document déjà normalisé reste identique une fois remplacé', () => {
+  const m = monter();
+  const d = m.ctx.normalize(FICHIER());
+  const avant = JSON.stringify(d);
+  m.s.remplacer(d, 'demarrage');
+  egal(JSON.stringify(m.doc), avant);
+  egal(m.doc.sync.key, 'k');
 });
 
 for (const [nom, fn] of tests) {

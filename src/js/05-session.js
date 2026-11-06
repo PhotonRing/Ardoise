@@ -5,11 +5,21 @@
    rebaser, oublier, reprendre : voir 05-synchro-adaptateur.js). Au chargement, ce fichier ne touche ni au DOM ni au
    stockage. */
 var SESSION_DELAI = 500, SESSION_MAX = 300;
+// Règles de remplacement du document, par origine (voir la table des origines de la spec) :
+//   neuf : nouvel identifiant, sans mot de passe, clé de carte, date d'enregistrement ni synchronisation
+//   page : 'lien' (options.page, index borné au nombre de pages, sinon la première) ou 'premiere'
+//   historique : 'repart' (l'état chargé devient le seul état de l'historique)
+//   plusRecent : un format plus récent est refusé ; nouveauFichier : l'enregistrement oublie le fichier choisi
+var SESSION_ORIGINES = {
+  demarrage: { page: 'lien', historique: 'repart' },
+  deverrouillage: { page: 'lien', historique: 'repart' },
+  nouveau: { neuf: true, page: 'premiere', historique: 'repart', nouveauFichier: true }
+};
 var ADAPTATEUR_INERTE = { marque: function () { return 0; }, envoyer: function () {}, rebaser: function (json) { return json; }, oublier: function () {}, reprendre: function () {} };
 function creerSession(adaptateur) {
   var sy = adaptateur || ADAPTATEUR_INERTE;
   var pile = [], marques = [], pos = -1, minuteur = null;   // marques : repère des modifications reçues (synchronisation)
-  var abonnes = { rendu: [], modifie: [], historique: [] };
+  var abonnes = { rendu: [], modifie: [], historique: [], nouveauFichier: [] };
   function prevenir(ev) { var a = Array.prototype.slice.call(arguments, 1); abonnes[ev].forEach(function (fn) { fn.apply(null, a); }); }
   function etat() { return { annuler: pos > 0, retablir: pos < pile.length - 1 }; }
   // une étape d'historique, seulement si l'état a changé ; renvoie vrai si elle a été ajoutée
@@ -38,6 +48,24 @@ function creerSession(adaptateur) {
     }
     prevenir('historique', etat());
   }
+  // remplace le document entier selon la règle de son origine ; renvoie { ok: true } ou { refus: … } sans rien changer
+  function remplacer(donnees, origine, options) {
+    var r = SESSION_ORIGINES[origine];
+    if (!r) throw new Error('session : origine inconnue ' + origine);
+    valider();
+    var nd = null; try { nd = normalize(donnees); } catch (e) { nd = null; }
+    if (!nd) return { refus: 'illisible' };
+    if (nd.newer && r.plusRecent) return { refus: 'plus-recent' };
+    if (r.neuf) { nd.id = uid() + uid(); nd.savedAt = null; delete nd.lock; delete nd.mapKey; delete nd.sync; }
+    var p = r.page === 'lien' && options && +options.page >= 0 ? Math.floor(+options.page) : 0;
+    nd.cur = Math.min(p, nd.pages.length - 1);
+    doc = nd;
+    if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; pos = 0; }
+    if (r.nouveauFichier) prevenir('nouveauFichier');
+    prevenir('rendu', null, {});
+    prevenir('historique', etat());
+    return { ok: true };
+  }
   return {
     // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés
     modifier: function (fn, focus) { fn(); etape(); prevenir('rendu', focus, {}); prevenir('modifie', true); prevenir('historique', etat()); },
@@ -64,11 +92,10 @@ function creerSession(adaptateur) {
       prevenir('modifie', true);
       prevenir('historique', etat());
     },
-    // --- transitoires, absorbés par remplacer (tickets 03, 04, 05) ---
+    remplacer: remplacer,
+    // --- transitoires, absorbés par remplacer (tickets 04, 05) ---
     // ancien snapshot : étape immédiate, sans rendu ni marque « modifié »
-    consigner: function () { etape(); prevenir('historique', etat()); },
-    // l'historique repart du document courant
-    repartir: function () { clearTimeout(minuteur); minuteur = null; pile = []; marques = []; pos = -1; etape(); prevenir('historique', etat()); }
+    consigner: function () { etape(); prevenir('historique', etat()); }
   };
 }
 var session = creerSession(adaptateurSynchro());   // adaptateurSynchro : 05-synchro-adaptateur.js (déclaration remontée)
