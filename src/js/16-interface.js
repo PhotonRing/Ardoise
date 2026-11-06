@@ -16,19 +16,21 @@ function renderChrome() {
   if (mode === 'edit') {
     chrome.innerHTML = '<div class="tb" role="toolbar">' +
       '<span class="logo">' + LOGO_SVG + '<span class="lbl">Ardoise</span></span><span class="doc-name">' + esc(curTitle()) + '</span><span class="grow"></span>' +
-      '<button class="ub" data-ui="undo" title="Annuler (Ctrl+Z)">↶</button><button class="ub" data-ui="redo" title="Rétablir (Ctrl+Maj+Z)">↷</button><span class="vsep"></span>' +
-      '<button class="ub" data-ui="add" title="Insérer un bloc">+ <span class="lbl">Bloc</span></button>' +
-      '<button class="ub" data-ui="style" title="Couleurs, typographie, largeur, thème">◐ <span class="lbl">Style</span></button>' +
-      '<button class="ub" data-ui="file" title="Fichier">☰ <span class="lbl">Fichier</span></button><span class="vsep"></span>' +
+      '<button class="ub wide" data-ui="undo" title="Annuler (Ctrl+Z)">↶</button><button class="ub wide" data-ui="redo" title="Rétablir (Ctrl+Maj+Z)">↷</button><span class="vsep wide"></span>' +
+      '<button class="ub wide" data-ui="add" title="Insérer un bloc">+ <span class="lbl">Bloc</span></button>' +
+      '<button class="ub wide" data-ui="style" title="Couleurs, typographie, largeur, thème">◐ <span class="lbl">Style</span></button>' +
+      '<button class="ub wide" data-ui="file" title="Fichier">☰ <span class="lbl">Fichier</span></button><span class="vsep wide"></span>' +
       '<span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
-      '<button class="ub out" data-ui="mode" title="Lecture (Ctrl+E)">◉ <span class="lbl">Lecture</span></button>' +
-      '<button class="ub primary" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="lbl" style="display:none">⤓</span></button></div>';
+      '<button class="ub out wide" data-ui="mode" title="Lecture (Ctrl+E)">◉ <span class="lbl">Lecture</span></button>' +
+      '<button class="ub primary wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="lbl" style="display:none">⤓</span></button>' +
+      '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   } else {
     chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
-      (dirty ? '<button class="ub" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
-      '<button class="ub" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
-      '<button class="ub" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
-      '<button class="ub primary" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button></div>';
+      (dirty ? '<button class="ub wide" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
+      '<button class="ub wide" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
+      '<button class="ub wide" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
+      '<button class="ub primary wide" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button>' +
+      '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   }
   updateUndo(); setStatus(); synPaint();
 }
@@ -49,7 +51,48 @@ ui.addEventListener('click', function (e) {
   else if (k === 'vmenu') openViewMenu(a);
   else if (k === 'style') openStyle(a);
   else if (k === 'file') openFile(a);
+  else if (k === 'burger') openSheet();
 });
+/* Menu plein écran (petits écrans) : la barre ne garde que l'état de la synchronisation et de l'enregistrement ;
+   tout le reste est ici, en grands boutons, puis les menus Fichier (édition) ou Lecture */
+var sheet = null;
+function closeSheet() { if (sheet) { sheet.remove(); sheet = null; document.documentElement.classList.remove('sheet-on'); } }
+function openSheet() {
+  closePop(); closeSheet();
+  var ed = mode === 'edit', stEl = $('#st'), stTxt = stEl ? stEl.title : '';
+  var big = function (k, ic, label, extra) { return '<button type="button" class="sh-big' + (extra || '') + '" data-sh="' + k + '"><span class="ic">' + ic + '</span><span>' + label + '</span></button>'; };
+  var lockEd = doc.lock && !unlocked;
+  sheet = document.createElement('div'); sheet.className = 'sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', 'Menu');
+  sheet.innerHTML = '<div class="sh-h"><span class="logo">' + LOGO_SVG + '</span><span class="sh-t">' + esc(curTitle()) + '</span><button type="button" class="sh-x" data-sh="close" aria-label="Fermer le menu">×</button></div>' +
+    '<div class="sh-st"><span class="syn"></span><span class="st ' + (stEl ? stEl.className.replace(/\bst\b/, '') : '') + '"><i></i><span>' + esc(stTxt) + '</span></span></div>' +
+    '<div class="sh-grid">' + (ed
+      ? big('save', '⤓', 'Enregistrer', ' primary') + big('mode', '◉', 'Lecture') + big('undo', '↶', 'Annuler') + big('redo', '↷', 'Rétablir') + big('add', '+', 'Ajouter un bloc') + big('style', '◐', 'Style')
+      : big('mode', lockEd ? '🔒' : '✎', 'Modifier', ' primary') + (dirty ? big('save', '⤓', 'Enregistrer') : '')) + '</div>' +
+    '<div class="sh-list">' + (ed ? fileMenuHTML() : viewMenuHTML()) + '</div>';
+  ui.appendChild(sheet); document.documentElement.classList.add('sheet-on');
+  synPaint(); paintSheetUndo();
+  sheet.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-sh],[data-f],[data-vm],[data-ui]'); if (!t) return;
+    if (t.dataset.f) { closeSheet(); fileMenuAct(t.dataset.f); return; }
+    if (t.dataset.vm) { closeSheet(); viewMenuAct(t.dataset.vm); return; }
+    if (t.dataset.ui === 'sync') { closeSheet(); return; }   // la fenêtre de synchronisation s'ouvre par le gestionnaire de la barre
+    var k = t.dataset.sh, anchor = $('.burger', chrome);
+    if (k === 'undo' || k === 'redo') { if (k === 'undo') undo(); else redo(); paintSheetUndo(); return; }   // le menu reste ouvert pour enchaîner
+    closeSheet();
+    if (k === 'save') save(false);
+    else if (k === 'mode') toggleMode();
+    else if (k === 'add') { var f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.blk'); var b = f ? byId(f.dataset.id) : null; openBlockMenu(anchor, function (ty) { var nb = insertAfter(b, ty); if (ty === 'image') pickImage(nb); }); }
+    else if (k === 'style') openStyle(anchor);
+  });
+  var x = $('.sh-x', sheet); if (x) x.focus({ preventScroll: true });
+}
+function paintSheetUndo() {
+  if (!sheet) return;
+  var u = $('[data-sh=undo]', sheet), r = $('[data-sh=redo]', sheet);
+  if (u) u.disabled = hpos <= 0; if (r) r.disabled = hpos >= hist.length - 1;
+}
+document.addEventListener('keydown', function (e) { if (sheet && e.key === 'Escape') { e.preventDefault(); closeSheet(); } }, true);
+window.addEventListener('resize', function () { if (sheet && innerWidth > 760) closeSheet(); });
 
 function closePop() { if (pop) { pop.remove(); pop = null; var c = popClose; popClose = null; if (c) c(); } }
 function placePop(p, anchor) {
@@ -132,28 +175,29 @@ function foldAll(open) {
   var hs = $$('.wrap [data-vfold]', app).map(function (b) { return b.parentNode; });
   (open ? hs : hs.slice().reverse()).forEach(function (h) { foldToggle(h, open); viewFold[h.id.slice(2)] = !open; });
 }
-function openViewMenu(anchor) {
-  closePop();
-  var p = document.createElement('div'); p.className = 'pop'; pop = p;
+function viewMenuHTML() {
   var anyFold = !!$('.wrap [data-vfold]', app);
   function mi(k, ic, label, sub, on) { return '<button class="mi" type="button" data-vm="' + k + '"' + (on ? ' aria-pressed="true"' : '') + '><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (on ? '<kbd>✓</kbd>' : '') + '</button>'; }
-  p.innerHTML = '<h4>Lecture</h4>' + mi('print', '⎙', 'Imprimer / PDF') + mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
+  return '<h4>Lecture</h4>' + mi('print', '⎙', 'Imprimer / PDF') + mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
     (anyFold ? '<div class="hr"></div>' + mi('unfold', '⌄', 'Tout déplier') + mi('fold', '›', 'Tout plier') : '') +
     '<div class="hr"></div><h4>Thème (pour vous seulement)</h4>' + mi('th-', '◐', 'Celui du document', '', !viewerTheme) + mi('th-light', '☀', 'Clair', '', viewerTheme === 'light') + mi('th-dark', '☾', 'Sombre', '', viewerTheme === 'dark') +
     '<div class="hr"></div>' + mi('help', '⌨', 'Raccourcis clavier');
-  p.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-vm]'); if (!b) return; var k = b.dataset.vm; closePop();
-    if (k === 'print') printPage(); else if (k === 'export') exportStatic(); else if (k === 'help') showHelp();
-    else if (k === 'fold' || k === 'unfold') foldAll(k === 'unfold');
-    else if (k.indexOf('th-') === 0) { viewerTheme = k.slice(3); try { if (viewerTheme) localStorage.setItem(LS + 'viewtheme', viewerTheme); else localStorage.removeItem(LS + 'viewtheme'); } catch (_) {} applyTheme(); }
-  });
-  placePop(p, anchor);
 }
-function openFile(anchor) {
+function viewMenuAct(k) {
+  if (k === 'print') printPage(); else if (k === 'export') exportStatic(); else if (k === 'help') showHelp();
+  else if (k === 'fold' || k === 'unfold') foldAll(k === 'unfold');
+  else if (k.indexOf('th-') === 0) { viewerTheme = k.slice(3); try { if (viewerTheme) localStorage.setItem(LS + 'viewtheme', viewerTheme); else localStorage.removeItem(LS + 'viewtheme'); } catch (_) {} applyTheme(); }
+}
+function openViewMenu(anchor) {
   closePop();
   var p = document.createElement('div'); p.className = 'pop'; pop = p;
+  p.innerHTML = viewMenuHTML();
+  p.addEventListener('click', function (e) { var b = e.target.closest('[data-vm]'); if (!b) return; closePop(); viewMenuAct(b.dataset.vm); });
+  placePop(p, anchor);
+}
+function fileMenuHTML() {
   var fsa = !!window.showSaveFilePicker;
-  p.innerHTML = '<h4>Nouveau document</h4>' +
+  return '<h4>Nouveau document</h4>' +
     mi('new-vide', '□', 'Page vierge') + mi('new-runbook', '1.', 'Modèle procédure / runbook', 'Prérequis, étapes, vérification, retour arrière') +
     mi('new-outil', '{}', 'Modèle fiche outil / script', 'Utilisation, procédure, code complet') + mi('new-tour', '?', 'Visite guidée', 'Démonstration de tous les blocs') +
     '<div class="hr"></div>' +
@@ -173,24 +217,29 @@ function openFile(anchor) {
     '<div class="hr"></div>' + mi('update', '⟳', 'Mettre à jour Ardoise…', 'Version ' + (myVersion() || '?') + ' · garde le contenu') +
     mi('help', '⌨', 'Raccourcis clavier');
   function mi(k, ic, label, sub, kbd) { return '<button class="mi" type="button" data-f="' + k + '"><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (kbd ? '<kbd>' + kbd + '</kbd>' : '') + '</button>'; }
-  p.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-f]'); if (!b) return; var k = b.dataset.f; closePop();
-    if (k.indexOf('new-') === 0) newDoc(k.slice(4));
-    else if (k === 'save') save(false);
-    else if (k === 'saveas') save(true);
-    else if (k === 'export') exportStatic();
-    else if (k === 'print') printPage();
-    else if (k === 'json-copy') copyJSON();
-    else if (k === 'json-import') importJSON();
-    else if (k === 'help') showHelp();
-    else if (k === 'sync') synDialog();
-    else if (k === 'update') openUpdate();
-    else if (k === 'pw-set') setPassword();
-    else if (k === 'pw-del') removePassword();
-    else if (k === 'pw-seal') sealExisting();
-    else if (k === 'pw-unseal') unsealExisting();
-    else if (k === 'pw-lock') lockNow();
-  });
+}
+function fileMenuAct(k) {
+  if (k.indexOf('new-') === 0) newDoc(k.slice(4));
+  else if (k === 'save') save(false);
+  else if (k === 'saveas') save(true);
+  else if (k === 'export') exportStatic();
+  else if (k === 'print') printPage();
+  else if (k === 'json-copy') copyJSON();
+  else if (k === 'json-import') importJSON();
+  else if (k === 'help') showHelp();
+  else if (k === 'sync') synDialog();
+  else if (k === 'update') openUpdate();
+  else if (k === 'pw-set') setPassword();
+  else if (k === 'pw-del') removePassword();
+  else if (k === 'pw-seal') sealExisting();
+  else if (k === 'pw-unseal') unsealExisting();
+  else if (k === 'pw-lock') lockNow();
+}
+function openFile(anchor) {
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop'; pop = p;
+  p.innerHTML = fileMenuHTML();
+  p.addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (!b) return; closePop(); fileMenuAct(b.dataset.f); });
   placePop(p, anchor);
 }
 

@@ -111,13 +111,15 @@ function synHandle(s, m) {
     s.fresh = false;
     var frames = m.trames || [], chain = Promise.resolve(), remote = [];
     if (m.snap) chain = synOpen(m.snap.d).then(function (state) {
+      if (synNewer(s, state.f)) return;
       // trop en retard : on repart de l'instantané, puis on rejoue ses propres modifications non confirmées
       synLocal();
       var lam = s.st.lamport; s.st = synLoad(state, s.st.actor); if (s.st.lamport < lam) s.st.lamport = lam;
       synApply(s.st, s.pending); s.seq = m.snap.s; s.snapSeq = m.snap.s; remote.push(1);
     });
-    frames.forEach(function (f) { chain = chain.then(function () { return synOpen(f.d).then(function (b) { remote.push(b.o); s.seq = f.s; }, function () { s.seq = f.s; }); }); });
+    frames.forEach(function (f) { chain = chain.then(function () { if (s.newer) return; return synOpen(f.d).then(function (b) { if (synNewer(s, b.v)) return; remote.push(b.o); s.seq = f.s; }, function () { s.seq = f.s; }); }); });
     return chain.then(function () {
+      if (s.newer) { synRemote(s, remote.filter(function (x) { return Array.isArray(x); }), false); synBlock(s); return; }
       synRemote(s, remote.filter(function (x) { return Array.isArray(x); }), remote.indexOf(1) >= 0);
       // relais vide ou plus en retard que ce fichier (nouvelle clé, relais neuf, réinstallé ou changé) : on lui
       // envoie tout l'état, qui contient aussi les modifications en attente
@@ -128,7 +130,7 @@ function synHandle(s, m) {
       synMaybeSnap(s);
     });
   }
-  if (m.t === 'trame') return synOpen(m.d).then(function (b) { s.seq = m.s; synRemote(s, [b.o], false); synMaybeSnap(s); }, function () { s.seq = m.s; });
+  if (m.t === 'trame') return synOpen(m.d).then(function (b) { if (synNewer(s, b.v)) { synBlock(s); return; } s.seq = m.s; synRemote(s, [b.o], false); synMaybeSnap(s); }, function () { s.seq = m.s; });
   if (m.t === 'recu') {
     var sent = s.inflight[m.id]; delete s.inflight[m.id];
     if (sent) s.pending = s.pending.slice(sent);   // les envois partent dans l'ordre : les plus anciennes en attente
@@ -144,8 +146,21 @@ function synHandle(s, m) {
   }
   return Promise.resolve();
 }
+// Versions : chaque envoi porte le format du document de la copie qui l'a fait (VERSION, 00-entete.js). Une copie
+// dont l'éditeur est plus ancien que ce format ne l'applique pas : sa synchronisation s'arrête, sans rien perdre de
+// ses propres modifications, jusqu'à ce qu'Ardoise y soit mis à jour (Fichier → Mettre à jour Ardoise)
+function synNewer(s, v) { if (+v > VERSION) s.newer = +v; return !!s.newer; }
+function synBlock(s) {
+  if (syn !== s) return;
+  s.alive = false; clearTimeout(s.timer); clearInterval(s.presT);
+  if (s.ws) { try { s.ws.onclose = null; s.ws.close(); } catch (_) {} s.ws = null; }
+  s.peers = {};
+  synFail('Une autre copie utilise une version plus récente d’Ardoise : mettez à jour celle-ci (Fichier → Mettre à jour Ardoise) pour reprendre la synchronisation');
+  toast('Synchronisation en pause : mettez à jour Ardoise (Fichier → Mettre à jour Ardoise)', 8000);
+  synPaintPeers();
+}
 function synPeer(s, de, data) {
-  return synOpen(data).then(function (p) { if (!p || p.a === s.st.actor) return; s.peers[de] = { a: p.a, n: String(p.n || '').slice(0, 40), pg: p.pg, b: p.b, m: p.m, t: Date.now() }; synPaintPeers(); }, function () {});
+  return synOpen(data).then(function (p) { if (!p || p.a === s.st.actor) return; s.peers[de] = { a: p.a, n: String(p.n || '').slice(0, 40), pg: p.pg, b: p.b, m: p.m, ver: String(p.ver || '').slice(0, 20), t: Date.now() }; synPaintPeers(); }, function () {});
 }
 function synPrune() { if (!syn) return; var now = Date.now(), ch = false; Object.keys(syn.peers).forEach(function (k) { if (now - syn.peers[k].t > 70000) { delete syn.peers[k]; ch = true; } }); if (ch) synPaintPeers(); }
 
@@ -168,7 +183,7 @@ function synFlush(all) {
   var ops = s.pending.slice(all ? 0 : out); if (!ops.length) return;
   var id = ++s.msgId, upto = (all ? 0 : out) + ops.length;
   s.inflight[id] = upto;
-  synSeal({ a: s.st.actor, o: ops }).then(function (d) { if (syn === s && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify({ t: 'envoi', id: id, d: d })); });
+  synSeal({ a: s.st.actor, o: ops, v: VERSION, ver: myVersion() }).then(function (d) { if (syn === s && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify({ t: 'envoi', id: id, d: d })); });
 }
 function synFull(s) {
   // tout l'état sous forme d'opérations (mêmes identifiants) : pour un relais vide ou une nouvelle clé
@@ -179,12 +194,13 @@ function synMaybeSnap(s) {
   // tous les 200 envois, une copie à jour (rien en attente) dépose un instantané : le relais oublie les trames qu'il contient
   if (s.pending.length || s.seq - s.snapSeq < 200 || !s.ws) return;
   var upto = s.seq; s.snapSeq = upto;
-  synSeal(synDump(s.st)).then(function (d) { if (syn === s && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify({ t: 'instantane', jusqua: upto, d: d })); });
+  var dump = synDump(s.st); dump.f = VERSION;   // format du document, lu par les copies avant de repartir de l'instantané
+  synSeal(dump).then(function (d) { if (syn === s && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify({ t: 'instantane', jusqua: upto, d: d })); });
 }
 function synPresence(force) {
   var s = syn; if (!s || !s.ws || s.ws.readyState !== 1 || s.status !== 'ok') return;
   var a = document.activeElement, blk = a && a.closest && a.closest('[data-b], .blk[data-id]');
-  var p = { a: s.st.actor, n: synName(), pg: doc.pages[doc.cur] && doc.pages[doc.cur].id, b: blk ? (blk.dataset.b || blk.dataset.id) : null, m: mode };
+  var p = { a: s.st.actor, n: synName(), pg: doc.pages[doc.cur] && doc.pages[doc.cur].id, b: blk ? (blk.dataset.b || blk.dataset.id) : null, m: mode, ver: myVersion() };
   s.presLast = JSON.stringify(p);
   synSeal(p).then(function (d) { if (syn === s && s.ws && s.ws.readyState === 1) s.ws.send(JSON.stringify({ t: 'presence', d: d })); });
 }
@@ -299,7 +315,7 @@ function synPaint() {
     var st = syn.status, peers = Object.keys(syn.peers).map(function (k) { return syn.peers[k]; });
     var lab = st === 'ok' ? 'Synchronisé' + (peers.length ? ' · ' + (peers.length + 1) + ' personnes' : '') : st === 'connexion' ? 'Connexion au relais…' : st === 'hors-ligne' ? 'Hors ligne · les modifications partiront à la reconnexion' : 'Synchronisation : ' + syn.err;
     var seen = {};
-    el.innerHTML = '<button type="button" class="syn-b ' + st + '" data-ui="sync" title="' + esc(lab) + '"><i></i>' +
+    el.innerHTML = '<button type="button" class="syn-b ' + st + '" data-ui="sync" title="' + esc(lab) + '"><i></i><span class="syn-l">' + esc(lab) + '</span>' +
       peers.filter(function (p) { if (seen[p.a]) return false; seen[p.a] = 1; return true; }).slice(0, 5).map(function (p) {
         return '<span class="syn-av" style="background:' + synColor(p.a) + '" title="' + esc(p.n) + '">' + esc((p.n || '?').charAt(0).toUpperCase()) + '</span>';
       }).join('') + '</button>';
@@ -328,7 +344,7 @@ function synDialog() {
     '<label>Votre nom (vu par les autres copies)<input class="syn-nom" type="text" maxlength="40" value="' + esc(synName()) + '"></label>' +
     (on ? '<p class="syn-st"><b>État :</b> ' + esc(st) + '</p>' +
       '<div class="syn-who"><b>Présents</b>' + '<span class="syn-pill"><i style="background:' + (syn ? synColor(syn.st.actor) : '#888') + '"></i>' + esc(synName()) + ' (vous)</span>' +
-        peers.map(function (p) { return '<span class="syn-pill"><i style="background:' + synColor(p.a) + '"></i>' + esc(p.n) + (p.m === 'edit' ? ' · modifie' : ' · lit') + '</span>'; }).join('') + '</div>' +
+        peers.map(function (p) { return '<span class="syn-pill"><i style="background:' + synColor(p.a) + '"></i>' + esc(p.n) + (p.m === 'edit' ? ' · modifie' : ' · lit') + (p.ver && p.ver !== myVersion() ? ' · Ardoise ' + esc(p.ver) : '') + '</span>'; }).join('') + '</div>' +
       '<p class="muted">Toute copie de ce fichier se synchronise : partagez-le comme d’habitude (après l’avoir enregistré). « Nouvelle clé » coupe les copies existantes ; seules celles faites ensuite se synchronisent.</p>'
       : '<p class="muted">Une clé est créée et rangée dans le fichier : enregistrez-le, puis partagez-en une copie. Si le document est chiffré par mot de passe, la clé l’est aussi.</p>') + '</div>';
   var getUrl = function (bg) { return $('.syn-url', bg).value.trim(); };
