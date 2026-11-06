@@ -1,6 +1,6 @@
 /* ---------- Session du document ----------
    Seule propriétaire de l'historique d'annulation : pile des états, position, délai de regroupement de la frappe.
-   Les autres modules lisent `doc` et demandent les changements à la session ; le rendu, l'état modifié et les
+   Seule à réaffecter le document courant (vérifié par scripts/check.mjs). Les autres modules lisent `doc` et demandent les changements à la session ; le rendu, l'état modifié et les
    boutons annuler/rétablir sont des abonnés. La synchronisation n'est connue que par un adaptateur (marque, envoyer,
    rebaser, oublier, reprendre : voir 05-synchro-adaptateur.js). Au chargement, ce fichier ne touche ni au DOM ni au
    stockage. */
@@ -75,8 +75,10 @@ function creerSession(adaptateur) {
     if (r.page === 'gardee') p = ancien.cur < nd.pages.length ? ancien.cur : 0;
     nd.cur = Math.min(p, nd.pages.length - 1);
     doc = nd;
-    if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; pos = 0; }
+    // avant la remise à zéro de l'historique : la synchronisation du document précédent s'arrête sur « nouveau fichier »,
+    // et la marque du nouvel état ne doit pas venir d'elle
     if (r.nouveauFichier) prevenir('nouveauFichier');
+    if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; pos = 0; }
     if (r.historique === 'etape') { etape(); prevenir('rendu', null, {}); prevenir('modifie', true); }
     else prevenir('rendu', null, {});
     prevenir('historique', etat());
@@ -92,6 +94,7 @@ function creerSession(adaptateur) {
     annuler: function (focus) { aller(-1, focus); },
     retablir: function (focus) { aller(1, focus); },
     abonner: function (ev, fn) { if (!abonnes[ev]) throw new Error('session : événement inconnu ' + ev); abonnes[ev].push(fn); },
+    // lecture seule : possibilité d'annuler ou de rétablir (boutons, menu mobile)
     historique: etat,
     // modifications reçues d'une autre copie : les clés synchronisées de l'état reçu sont appliquées en place, la page
     // affichée est retrouvée par son identifiant et l'état courant de l'historique est remplacé sans créer d'étape.
@@ -108,10 +111,7 @@ function creerSession(adaptateur) {
       prevenir('modifie', true);
       prevenir('historique', etat());
     },
-    remplacer: remplacer,
-    // --- transitoire, absorbé au ticket 05 (pastilles, saisie des cases et des cartes) ---
-    // ancien snapshot : étape immédiate, sans rendu ni marque « modifié »
-    consigner: function () { etape(); prevenir('historique', etat()); }
+    remplacer: remplacer
   };
 }
 var session = creerSession(adaptateurSynchro());   // adaptateurSynchro : 05-synchro-adaptateur.js (déclaration remontée)

@@ -40,7 +40,7 @@ app.addEventListener('drop', function (e) {
     e.preventDefault();
     var imgHost = e.target.closest && e.target.closest('.img-drop');
     readImage(files[0], function (src) {
-      if (imgHost) { var ib = byId(imgHost.dataset.b); change(function () { ib.src = src; }); return; }
+      if (imgHost) { var ib = byId(imgHost.dataset.b); session.modifier(function () { ib.src = src; }); return; }
       var at = t ? idx(byId(t.id)) + (t.before ? 0 : 1) : doc.blocks.length;
       insertAt(at, 'image', { src: src }, false);
     });
@@ -49,7 +49,7 @@ app.addEventListener('drop', function (e) {
   if (!dragId || !t) { endDrag(); return; }
   e.preventDefault();
   var b = byId(dragId), target = byId(t.id);
-  if (b && target && b !== target) change(function () {
+  if (b && target && b !== target) session.modifier(function () {
     // un titre plié emmène les blocs de sa section ; déposé après un titre plié, on passe après sa section
     var us = blockUnits(), ub = null, ut = null;
     us.forEach(function (u) { if (u.id === b.id) ub = u; if (u.id === target.id) ut = u; });
@@ -136,7 +136,7 @@ function tgEnd(apply) {
   if (tgLine) tgLine.style.display = 'none'; tgRow.style.display = tgCol.style.display = 'none';
   if (!apply || d.to == null) return;
   var rows = d.b.rows, at = d.to > d.from ? d.to - 1 : d.to;
-  change(function () {
+  session.modifier(function () {
     if (d.kind === 'row') rows.splice(at, 0, rows.splice(d.from, 1)[0]);
     else rows.forEach(function (r) { r.splice(at, 0, r.splice(d.from, 1)[0]); });
   });

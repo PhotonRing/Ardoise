@@ -188,12 +188,16 @@ test('l\'historique garde les 300 derniers états', () => {
   egal(m.s.historique(), { annuler: false, retablir: true });
 });
 
-test('consigner valide une étape sans redessiner', () => {
+test('modification en place : saisir puis valider donne une étape tout de suite, sans redessiner', () => {
   const m = monter();
-  ecrire(m, 'b');
-  m.s.consigner();
-  egal(m.recu.rendu.length, 0);
+  m.s.saisir(() => ecrire(m, 'b'));
+  m.s.valider();
+  egal(m.recu.rendu.length, 0, 'pas de rendu');
+  egal(m.recu.modifie.length, 1, '« modifié » prévenu');
+  egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'un seul envoi');
   egal(m.s.historique(), { annuler: true, retablir: false });
+  m.avancer(1000);
+  egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'le délai ne valide rien de plus');
   m.s.annuler();
   egal(m.texte(), 'a');
 });
@@ -409,6 +413,17 @@ test('nouveau : nouvel identifiant, ni date d\'enregistrement, ni mot de passe, 
   const autre = m.doc.id;
   m.s.remplacer(FICHIER(), 'nouveau');
   if (m.doc.id === autre) throw new Error('deux nouveaux documents ont le même identifiant');
+});
+
+test('nouveau : « nouveau fichier » est prévenu avant que l\'historique reparte (la synchronisation est déjà arrêtée)', () => {
+  const m = monter();
+  m.faux.n = 37;   // marque de la synchronisation du document précédent
+  m.s.abonner('nouveauFichier', () => { m.faux.n = 0; });   // l'arrêt de la synchronisation remet la marque à 0
+  m.s.remplacer(FICHIER(), 'nouveau');
+  m.s.modifier(() => { m.doc.title = 'autre'; });
+  m.vider();
+  m.s.annuler();
+  egal(m.sync.filter((x) => x.startsWith('rebaser')), ['rebaser:0']);
 });
 
 test('démarrage : un format plus récent est ouvert ; une donnée illisible est refusée sans toucher au document', () => {

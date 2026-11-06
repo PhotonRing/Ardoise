@@ -155,7 +155,7 @@ function openStyle(anchor) {
     if (!e.target.matches('[data-mapkey]')) return;
     var v = e.target.value.trim();
     $$('.map[data-mapid]', app).forEach(function (el) { var b = byId(el.dataset.mapid), m = mapOf(el.dataset.mapid); if (b && m && mode === 'edit') b.view = m.getView(); });
-    change(function () { if (v) doc.mapKey = v; else delete doc.mapKey; });
+    session.modifier(function () { if (v) doc.mapKey = v; else delete doc.mapKey; });
     toast(v ? 'Clé CARTO enregistrée : le fond Plan utilise CARTO' : 'Clé retirée : le fond Plan utilise Esri');
   });
   p.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('[data-mapkey]')) e.target.blur(); });
@@ -163,7 +163,7 @@ function openStyle(anchor) {
     var b = e.target.closest('[data-set]'); if (!b) return;
     var k = b.dataset.set, v = b.dataset.v;
     if (k === 'autosave') { autosaveOn = v === '1'; try { localStorage.setItem(LS + 'autosave', autosaveOn ? '1' : '0'); } catch (_) {} setStatus(); draw(); return; }
-    change(function () { doc[k] = k === 'width' ? +v : v; }); draw();
+    session.modifier(function () { doc[k] = k === 'width' ? +v : v; }); draw();
   });
   draw(); placePop(p, anchor);
 }
@@ -319,7 +319,7 @@ function goLink(href) {
   var i = pageIndex(L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
   var moved = i !== doc.cur; if (moved) goPage(i);
   if (!L.bid) return;
-  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) change(function () { revealBlock(L.bid); });
+  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });
   var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
   if (el && mode === 'view') foldReveal(el);
   if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');

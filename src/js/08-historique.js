@@ -10,8 +10,6 @@ function settleInput() {
 function undo() { session.annuler(settleInput()); }
 function redo() { session.retablir(settleInput()); }
 function updateUndo() { var h = session.historique(), u = $('#ui [data-ui=undo]'), r = $('#ui [data-ui=redo]'); if (u) u.disabled = !h.annuler; if (r) r.disabled = !h.retablir; }
-function change(fn, focus) { session.modifier(fn, focus); }
-function snapshot() { session.consigner(); }
 // après annuler/rétablir, le curseur revient dans le champ seulement si son bloc existe encore
 session.abonner('rendu', function (focus, info) { render(info.historique && !(focus && byId(focus.b)) ? null : focus); });
 session.abonner('historique', function () { updateUndo(); });

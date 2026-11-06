@@ -56,7 +56,7 @@ function pillTipClick(e) {
   }
   var c = +b.dataset.c; if (!(c >= 0)) return;
   if (pillOwn(el) != null) { el.className = el.className.replace(/\s*\bpc-\d+\b/g, '') + ' pc-' + c; paintPill(el); fire(fld); }
-  else if (key) { doc.tags[key] = { c: c }; repaintPills(); snapshot(); markDirty(true); }
+  else if (key) { session.saisir(function () { doc.tags[key] = { c: c }; }); session.valider(); repaintPills(); }
   showPillTip(el, true);
 }
 window.addEventListener('scroll', hidePillTip, { passive: true });

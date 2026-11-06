@@ -61,6 +61,7 @@ function synStop() {
   if (syn.ws) { try { syn.ws.onclose = null; syn.ws.close(); } catch (_) {} }
   syn = null; synPaint(); synPaintPeers();
 }
+session.abonner('nouveauFichier', synStop);   // un nouveau document ne reprend pas la synchronisation du précédent
 function synFail(msg) { if (!syn) return; syn.status = 'erreur'; syn.err = msg; synPaint(); }
 function synConnect() {
   if (!syn || !syn.alive) return;
@@ -288,12 +289,12 @@ function synDialog() {
   var ro = doc.lock && !unlocked;   // édition protégée : réglages en lecture seule
   if (ro) { modal('Synchronisation', body.replace(/<input /g, '<input disabled '), [{ label: 'Fermer', fn: function (bg) { } }]); return; }
   var buttons = on ? [
-    { label: 'Enregistrer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); if (u !== doc.sync.relay) { synSaveState(); doc.sync.relay = u; doc.sync.seq = 0; markDirty(true); synStart(); toast('Relais changé : le document y est envoyé'); } } },
-    { label: 'Nouvelle clé', fn: function () { if (!confirm('Créer une nouvelle clé ? Les copies existantes de ce fichier ne se synchroniseront plus ; partagez ensuite une nouvelle copie.')) return false; synSaveState(); doc.sync.key = synNewKey(); doc.sync.seq = 0; markDirty(true); synStart(); toast('Nouvelle clé : enregistrez, puis partagez une nouvelle copie du fichier', 6000); } },
-    { label: 'Désactiver', fn: function () { if (!confirm('Désactiver la synchronisation de ce fichier ? Il gardera son contenu actuel.')) return false; synStop(); delete doc.sync; markDirty(true); toast('Synchronisation désactivée'); } },
+    { label: 'Enregistrer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); if (u !== doc.sync.relay) { synSaveState(); doc.sync.relay = u; doc.sync.seq = 0; marquerModifie(); synStart(); toast('Relais changé : le document y est envoyé'); } } },
+    { label: 'Nouvelle clé', fn: function () { if (!confirm('Créer une nouvelle clé ? Les copies existantes de ce fichier ne se synchroniseront plus ; partagez ensuite une nouvelle copie.')) return false; synSaveState(); doc.sync.key = synNewKey(); doc.sync.seq = 0; marquerModifie(); synStart(); toast('Nouvelle clé : enregistrez, puis partagez une nouvelle copie du fichier', 6000); } },
+    { label: 'Désactiver', fn: function () { if (!confirm('Désactiver la synchronisation de ce fichier ? Il gardera son contenu actuel.')) return false; synStop(); delete doc.sync; marquerModifie(); toast('Synchronisation désactivée'); } },
     { label: 'Fermer', fn: function (bg) { keepName(bg); } }
   ] : [
-    { label: 'Activer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); synSetCfg(doc, { relay: u, key: synNewKey() }); markDirty(true); synStart(); toast('Synchronisation activée : enregistrez, puis partagez une copie du fichier', 6000); } },
+    { label: 'Activer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); synSetCfg(doc, { relay: u, key: synNewKey() }); marquerModifie(); synStart(); toast('Synchronisation activée : enregistrez, puis partagez une copie du fichier', 6000); } },
     { label: 'Annuler' }
   ];
   modal('Synchronisation', body, buttons);

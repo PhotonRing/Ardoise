@@ -2,11 +2,11 @@
 var dirty = false, fileHandle = null, autosaveOn = true, saving = false, saveTimer = null, draftTimer = null, lastMode = '', downloadMode = false;
 try { autosaveOn = localStorage.getItem(LS + 'autosave') !== '0'; } catch (_) {}
 var headKeep = $$('head > *');
-// sans fromHistory, c'est une frappe : la session la regroupe en une étape d'annulation et prévient « modifié »
-function markDirty(fromHistory) { if (fromHistory) marquerModifie(); else session.saisir(); }
 session.abonner('modifie', function () { marquerModifie(); });
 // nouveau document : le fichier choisi, ses droits et le déverrouillage ne le concernent plus
 session.abonner('nouveauFichier', function () { fileHandle = null; handleGranted = false; downloadMode = false; dirty = false; unlocked = false; });
+// abonné de « modifié » ; appelé directement pour ce qui change le fichier sans étape d'annulation (vue d'une carte,
+// configuration de synchronisation). N'arme que le brouillon et l'enregistrement automatique.
 function marquerModifie() {
   var was = dirty; dirty = true;
   if (!was && mode === 'view') renderChrome(); else setStatus();
