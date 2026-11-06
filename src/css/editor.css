@@ -72,7 +72,7 @@ html.sheet-on{overflow:hidden}
 .syn-av{width:22px;height:22px;border-radius:50%;color:#fff;font:700 11px/22px var(--f-body);text-align:center;margin-left:-4px;border:2px solid var(--surface)}
 .syn-av:first-of-type{margin-left:2px}
 .blk.syn-peer{box-shadow:0 0 0 2px var(--syn);border-radius:6px;position:relative}
-.blk.syn-peer::after{content:attr(data-syn);position:absolute;top:-10px;right:8px;background:var(--syn);color:#fff;font:600 10.5px/1 var(--f-body);padding:3px 6px;border-radius:5px;pointer-events:none;z-index:5}
+.blk.syn-peer::after{content:attr(data-syn);position:absolute;top:-10px;right:8px;left:auto;bottom:auto;border:0;background:var(--syn);color:#fff;font:600 10.5px/1 var(--f-body);padding:3px 6px;border-radius:5px;pointer-events:none;z-index:5}
 .syn-dlg{display:flex;flex-direction:column;gap:10px;font-size:13px}
 .syn-dlg label{display:flex;flex-direction:column;gap:4px;font-weight:600}
 .syn-dlg input{height:34px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--fg);padding:0 10px;font:13px var(--f-body);font-weight:400}
