@@ -55,6 +55,8 @@ function synPaths(a, b, path, out) {
     synOrdre(ia, ib, b, path, out);
     return;
   }
+  // sans identifiant, même longueur : mêmes lignes, comparées position par position ; longueur différente : tout le tableau (limite connue)
+  if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) { b.forEach(function (e, k) { synPaths(a[k], e, path.concat([{ i: k, n: b.length }]), out); }); return; }
   out.push({ p: path, v: b === undefined ? undefined : JSON.parse(JSON.stringify(b)) });
 }
 // identifiants d'un tableau d'objets à identifiant texte, tous différents ; sinon null
@@ -82,10 +84,10 @@ function synOrdre(ia, ib, b, path, out) {
     out.push(x);
   });
 }
-// suit un chemin (clés, ou { id } dans un tableau) sur ses n premiers pas ; null s'il ne mène nulle part
+// suit un chemin (clés, { id } ou { i, n } dans un tableau) sur ses n premiers pas ; null s'il ne mène nulle part
 function synSuivre(d, p, n) {
   var o = d;
-  for (var i = 0; i < n && o; i++) { var st = p[i]; o = typeof st === 'object' ? (Array.isArray(o) ? o.filter(function (e) { return e && e.id === st.id; })[0] : null) : o[st]; }
+  for (var i = 0; i < n && o; i++) { var st = p[i]; o = typeof st !== 'object' ? o[st] : !Array.isArray(o) ? null : 'i' in st ? (o.length === st.n ? o[st.i] : null) : o.filter(function (e) { return e && e.id === st.id; })[0]; }
   return o || null;
 }
 function synPatch(d, pt) {
@@ -94,6 +96,8 @@ function synPatch(d, pt) {
     var o = synSuivre(d, x.p, x.p.length - 1);
     if (!o || !x.p.length) return;
     var last = x.p[x.p.length - 1];
+    // position : seulement si le tableau restauré a encore la longueur reçue ; sinon l'annulation l'emporte
+    if (typeof last === 'object' && 'i' in last) { if (Array.isArray(o) && o.length === last.n) o[last.i] = JSON.parse(JSON.stringify(x.v)); return; }
     if (typeof last === 'object') { if (!Array.isArray(o)) return; var j = -1; o.forEach(function (e, k) { if (e && e.id === last.id) j = k; }); if (j < 0) return; if (x.v === undefined) o.splice(j, 1); else o[j] = JSON.parse(JSON.stringify(x.v)); }
     else if (x.v === undefined) delete o[last]; else o[last] = JSON.parse(JSON.stringify(x.v));
   });

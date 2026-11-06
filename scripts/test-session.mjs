@@ -481,6 +481,61 @@ test('deux copies sans réception : annuler et rétablir un déplacement et une 
   for (const c of [a, b]) egal([pages(c), blocs(c)[0]], [['p2', 'p3', 'p1'], 'b1=1-A'], 'chez ' + c.ctx.syn.st.actor);
 });
 
+// ---------- deux copies : l'autre copie modifie une autre ligne du même bloc (listes sans identifiant) ----------
+// un seul bloc `x` dans la page ; A fait `frappe`, B fait `changement`, A annule puis rétablit ; `lire` donne ce qu'on compare
+function ligneVoisine(x, frappe, changement, lire, annule, retabli) {
+  const depart = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Un', blocks: [Object.assign({ id: 'x' }, x)] }] });
+  const { a, b } = relier(depart);
+  const de = (c) => bloc(c.ctx.doc, 'x');
+  a.s.modifier(() => frappe(de(a)));
+  echanger(a, b);
+  b.s.modifier(() => changement(de(b)));
+  echanger(a, b);
+  a.s.annuler(); echanger(a, b);
+  for (const c of [a, b]) egal(lire(de(c)), annule, 'après annuler, chez ' + c.ctx.syn.st.actor);
+  a.s.retablir(); echanger(a, b);
+  for (const c of [a, b]) egal(lire(de(c)), retabli, 'après rétablir, chez ' + c.ctx.syn.st.actor);
+  return { a, b };
+}
+
+test('deux copies : annuler sa frappe dans une liste à cocher garde la case cochée par l\'autre copie ; rétablir aussi', () => {
+  ligneVoisine({ type: 'check', items: [{ html: 'un', done: false }, { html: 'deux', done: false }] },
+    (x) => { x.items[1].html = 'deux-A'; }, (x) => { x.items[0].done = true; },
+    (x) => x.items.map((e) => e.html + (e.done ? ' ☑' : ' ☐')), ['un ☑', 'deux ☐'], ['un ☑', 'deux-A ☐']);
+});
+
+test('deux copies : annuler sa frappe dans une cellule garde la cellule modifiée par l\'autre copie ; rétablir aussi', () => {
+  ligneVoisine({ type: 'table', rows: [['Nom', 'État'], ['a', ''], ['b', '']] },
+    (x) => { x.rows[1][1] = 'OK-A'; }, (x) => { x.rows[2][1] = 'KO-B'; x.rows[1][0] = 'a-B'; },
+    (x) => x.rows, [['Nom', 'État'], ['a-B', ''], ['b', 'KO-B']], [['Nom', 'État'], ['a-B', 'OK-A'], ['b', 'KO-B']]);
+});
+
+test('deux copies : même chose pour une fiche de faits, une frise et une liste', () => {
+  ligneVoisine({ type: 'facts', items: [{ k: 'Clé', v: '', alert: false }, { k: 'Clé', v: '', alert: false }] },
+    (x) => { x.items[0].v = 'v-A'; }, (x) => { x.items[1].alert = true; },
+    (x) => x.items.map((e) => e.v + (e.alert ? '!' : '')), ['', '!'], ['v-A', '!']);
+  ligneVoisine({ type: 'timeline', orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] },
+    (x) => { x.items[0].title = 't-A'; }, (x) => { x.items[1].date = '2026'; },
+    (x) => x.items.map((e) => e.date + '|' + e.title), ['|', '2026|'], ['|t-A', '2026|']);
+  ligneVoisine({ type: 'list', ordered: true, items: [{ html: 'un' }, { html: 'deux' }] },
+    (x) => { x.items[1].html = 'deux-A'; }, (x) => { x.items[0].lv = 1; },
+    (x) => x.items.map((e) => e.html + (e.lv || 0)), ['un1', 'deux0'], ['un1', 'deux-A0']);
+});
+
+test('deux copies : limite connue, une ligne ajoutée par l\'autre copie dans la même liste laisse la frappe après annuler', () => {
+  const { a } = ligneVoisine({ type: 'check', items: [{ html: 'un', done: false }, { html: 'deux', done: false }] },
+    (x) => { x.items[1].html = 'deux-A'; }, (x) => { x.items.push({ html: 'trois-B', done: false }); },
+    (x) => x.items.map((e) => e.html), ['un', 'deux-A', 'trois-B'], ['un', 'deux-A', 'trois-B']);
+  egal(a.s.historique(), { annuler: true, retablir: false }, 'l\'étape locale reste à annuler');
+});
+
+test('deux copies : annuler l\'ajout local d\'une ligne l\'emporte sur la ligne voisine modifiée par l\'autre copie', () => {
+  // la liste restaurée n'a plus la longueur reçue : la case cochée par B ne s'applique pas, plutôt que sur la mauvaise ligne
+  ligneVoisine({ type: 'check', items: [{ html: 'un', done: false }, { html: 'deux', done: false }] },
+    (x) => { x.items.splice(0, 0, { html: 'zéro-A', done: false }); }, (x) => { x.items[2].done = true; },
+    (x) => x.items.map((e) => e.html + (e.done ? ' ☑' : ' ☐')), ['un ☐', 'deux ☐'], ['zéro-A ☐', 'un ☐', 'deux ☑']);
+});
+
 // --- remplacer : démarrage, déverrouillage, nouveau document ---
 const FICHIER = () => ({ v: 5, id: 'fichier', title: 'Fichier', savedAt: '2026-11-01T10:00:00.000Z', mapKey: 'cle-carte',
   lock: { salt: 's', hash: 'h', iter: 1000 }, sync: { relay: 'ws://relais', key: 'k' },
