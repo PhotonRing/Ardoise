@@ -70,14 +70,14 @@ function openSheet() {
       : big('mode', lockEd ? '🔒' : '✎', 'Modifier', ' primary') + (dirty ? big('save', '⤓', 'Enregistrer') : '')) + '</div>' +
     '<div class="sh-list">' + (ed ? fileMenuHTML() : viewMenuHTML()) + '</div>';
   ui.appendChild(sheet); document.documentElement.classList.add('sheet-on');
-  synPaint(); paintSheetUndo();
+  synPaint(); updateUndo();
   sheet.addEventListener('click', function (e) {
     var t = e.target.closest('[data-sh],[data-f],[data-vm],[data-ui]'); if (!t) return;
     if (t.dataset.f) { closeSheet(); fileMenuAct(t.dataset.f); return; }
     if (t.dataset.vm) { closeSheet(); viewMenuAct(t.dataset.vm); return; }
     if (t.dataset.ui === 'sync') { closeSheet(); return; }   // la fenêtre de synchronisation s'ouvre par le gestionnaire de la barre
     var k = t.dataset.sh, anchor = $('.burger', chrome);
-    if (k === 'undo' || k === 'redo') { if (k === 'undo') undo(); else redo(); paintSheetUndo(); return; }   // le menu reste ouvert pour enchaîner
+    if (k === 'undo' || k === 'redo') { if (k === 'undo') undo(); else redo(); return; }   // le menu reste ouvert pour enchaîner (boutons repeints par updateUndo)
     closeSheet();
     if (k === 'save') save(false);
     else if (k === 'mode') toggleMode();
@@ -85,11 +85,6 @@ function openSheet() {
     else if (k === 'style') openStyle(anchor);
   });
   var x = $('.sh-x', sheet); if (x) x.focus({ preventScroll: true });
-}
-function paintSheetUndo() {
-  if (!sheet) return;
-  var u = $('[data-sh=undo]', sheet), r = $('[data-sh=redo]', sheet);
-  if (u) u.disabled = hpos <= 0; if (r) r.disabled = hpos >= hist.length - 1;
 }
 document.addEventListener('keydown', function (e) { if (sheet && e.key === 'Escape') { e.preventDefault(); closeSheet(); } }, true);
 window.addEventListener('resize', function () { if (sheet && innerWidth > 760) closeSheet(); });
@@ -155,7 +150,7 @@ function openStyle(anchor) {
     if (!e.target.matches('[data-mapkey]')) return;
     var v = e.target.value.trim();
     $$('.map[data-mapid]', app).forEach(function (el) { var b = byId(el.dataset.mapid), m = mapOf(el.dataset.mapid); if (b && m && mode === 'edit') b.view = m.getView(); });
-    change(function () { if (v) doc.mapKey = v; else delete doc.mapKey; });
+    session.modifier(function () { if (v) doc.mapKey = v; else delete doc.mapKey; });
     toast(v ? 'Clé CARTO enregistrée : le fond Plan utilise CARTO' : 'Clé retirée : le fond Plan utilise Esri');
   });
   p.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('[data-mapkey]')) e.target.blur(); });
@@ -163,7 +158,7 @@ function openStyle(anchor) {
     var b = e.target.closest('[data-set]'); if (!b) return;
     var k = b.dataset.set, v = b.dataset.v;
     if (k === 'autosave') { autosaveOn = v === '1'; try { localStorage.setItem(LS + 'autosave', autosaveOn ? '1' : '0'); } catch (_) {} setStatus(); draw(); return; }
-    change(function () { doc[k] = k === 'width' ? +v : v; }); draw();
+    session.modifier(function () { doc[k] = k === 'width' ? +v : v; }); draw();
   });
   draw(); placePop(p, anchor);
 }
@@ -319,7 +314,7 @@ function goLink(href) {
   var i = pageIndex(L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
   var moved = i !== doc.cur; if (moved) goPage(i);
   if (!L.bid) return;
-  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) change(function () { revealBlock(L.bid); });
+  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });
   var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
   if (el && mode === 'view') foldReveal(el);
   if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');

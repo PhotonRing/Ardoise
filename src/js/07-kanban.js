@@ -58,7 +58,7 @@ function kbMove(b, ci, ki, tc, tk) {
   if (tk == null) tk = to.length;
   if (tc === ci && (tk === ki || tk === ki + 1)) return;
   var sy = scrollY;
-  change(function () { var c = from.splice(ki, 1)[0]; if (tc === ci && tk > ki) tk--; to.splice(tk, 0, c); });
+  session.modifier(function () { var c = from.splice(ki, 1)[0]; if (tc === ci && tk > ki) tk--; to.splice(tk, 0, c); });
   scrollTo(0, sy);
 }
 function kbMoveMenu(anchor, b, ci, ki) {

@@ -2,8 +2,12 @@
 var dirty = false, fileHandle = null, autosaveOn = true, saving = false, saveTimer = null, draftTimer = null, lastMode = '', downloadMode = false;
 try { autosaveOn = localStorage.getItem(LS + 'autosave') !== '0'; } catch (_) {}
 var headKeep = $$('head > *');
-function markDirty(fromHistory) {
-  if (!fromHistory) { clearTimeout(htimer); htimer = setTimeout(snapshot, 500); }
+session.abonner('modifie', function () { marquerModifie(); });
+// nouveau document : le fichier choisi, ses droits et le déverrouillage ne le concernent plus
+session.abonner('nouveauFichier', function () { fileHandle = null; handleGranted = false; downloadMode = false; dirty = false; unlocked = false; });
+// abonné de « modifié » ; appelé directement pour ce qui change le fichier sans étape d'annulation (vue d'une carte,
+// configuration de synchronisation). N'arme que le brouillon et l'enregistrement automatique.
+function marquerModifie() {
   var was = dirty; dirty = true;
   if (!was && mode === 'view') renderChrome(); else setStatus();
   clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 700);
@@ -86,7 +90,7 @@ function saveFailed(e) { saving = false; setStatus(); if (e && e.name === 'Abort
 function save(as) {
   if (!doc) return Promise.resolve();
   if (doc.newer) { newerNotice(true); return Promise.resolve(); }   // l'enregistrer ici perdrait ce que cet éditeur ne connaît pas
-  if (htimer) snapshot();
+  session.valider();
   clearTimeout(saveTimer);
   var dl = function () { return serializeFile().then(function (html) { download(html, fileName()); afterSave('Téléchargé : remplacez l’ancien fichier par celui-ci'); }); };
   if (window.showSaveFilePicker && !downloadMode) {
@@ -130,7 +134,7 @@ function autoSave() {
   perm(fileHandle, false).then(function (ok) {
     handleGranted = ok;
     if (!ok) { setStatus(); return; }
-    if (htimer) snapshot();
+    session.valider();
     saving = true; setStatus();
     serializeFile().then(function (html) {
       return writeTo(fileHandle, html).then(function () { afterSave(); }, function (e) {
@@ -160,7 +164,7 @@ function checkDraft() {
     '<button class="ub primary" data-d="1">Restaurer</button><button class="ub out" data-d="0">Ignorer</button>';
   bannerEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]'); if (!b) return;
-    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { synKeep(doc, nd); doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
+    if (b.dataset.d === '1') { var j = null; try { j = JSON.parse(d.json); } catch (_) {} if (j && session.remplacer(j, 'brouillon').ok) toast('Brouillon restauré · pensez à enregistrer'); }
     else { try { localStorage.removeItem(LS + 'draft:' + doc.id); } catch (_) {} }
     hideBanner();
   });
@@ -228,7 +232,7 @@ function openUpdate() {
   });
 }
 function applyUpdate(tpl) {
-  if (htimer) snapshot();
+  session.valider();
   clearTimeout(saveTimer);
   var target = fileHandle ? perm(fileHandle, true).then(function (ok) { return ok ? fileHandle : null; })
     : (window.showSaveFilePicker && !downloadMode ? pickNew().catch(function (e) { return e && e.name === 'AbortError' ? false : null; }) : Promise.resolve(null));

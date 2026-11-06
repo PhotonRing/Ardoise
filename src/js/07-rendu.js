@@ -385,7 +385,7 @@ function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; 
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
 var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
-function loadNavFold() { try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + doc.id) || '{}') || {}; } catch (_) { navFold = {}; } }
+function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
 function navHTML(d, edit, all) {
   // all : export statique, toutes les pages sont présentes et le script bascule de l'une à l'autre
@@ -682,7 +682,7 @@ function chFocus(b, id) {
 function chPick(inp, i) {
   var res = inp.parentNode.querySelector('.map-res'), c = (res._items || [])[i]; if (!c) return;
   var b = byId(inp.dataset.b); inp.value = ''; res.hidden = true;
-  if (!(c.id in b.choro.data)) { keepView(b); change(function () { b.choro.data[c.id] = null; }); }
+  if (!(c.id in b.choro.data)) { keepView(b); session.modifier(function () { b.choro.data[c.id] = null; }); }
   chFocus(b, c.id);
 }
 function chImport(b, text, replace) {
@@ -697,7 +697,7 @@ function chImport(b, text, replace) {
     if (v == null && raw.trim()) { bad.push(name + ' (valeur « ' + raw.trim() + ' »)'); return; }
     ok[id] = v; n++;
   });
-  if (n) { keepView(b); change(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
+  if (n) { keepView(b); session.modifier(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
   return { n: n, bad: bad };
 }
 var panelMin = false;
@@ -717,31 +717,31 @@ function mountMaps() {
     var focusIn = function (sel) { cheatBlock = b.id; updateCheat(); var inp = $(sel, app); if (inp) { inp.focus({ preventScroll: true }); var it = inp.closest('.mk-item'); if (it) it.scrollIntoView({ block: 'nearest' }); } };
     var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: chView(b), cities: b.cities !== false, countries: b.countries !== false, key: doc.mapKey }, {
       edit: ed, locked: !ed && !!b.lock, hideBg: !ed && !!b.hideBg,
-      onView: function (v) { if (ed) { b.view = v; markDirty(true); } },
-      onBg: function (bg) { if (!ed) return; b.bg = bg; markDirty(true); var s = $('.blk[data-id="' + b.id + '"] select[data-prop=bg]', app); if (s) s.value = bg; },
+      onView: function (v) { if (ed) { b.view = v; marquerModifie(); } },
+      onBg: function (bg) { if (!ed) return; b.bg = bg; marquerModifie(); var s = $('.blk[data-id="' + b.id + '"] select[data-prop=bg]', app); if (s) s.value = bg; },
       onAdd: function (lat, lon) { addMarker(b, lat, lon, ''); },
-      onMove: function (i, lat, lon) { keepView(b); change(function () { b.markers[i].lat = lat; b.markers[i].lon = lon; }); },
+      onMove: function (i, lat, lon) { keepView(b); session.modifier(function () { b.markers[i].lat = lat; b.markers[i].lon = lon; }); },
       onPin: function (i) { focusIn('.mk-in[data-b="' + b.id + '"][data-mk="' + i + '"][data-p=label]'); },
       onZone: function (z) {
         keepView(b); mapUi.draw = null;
         var nz = { label: '', color: 'accent', shape: z.shape }; if (z.shape === 'circle') { nz.c = z.c; nz.r = z.r; } else nz.pts = z.pts;
-        change(function () { b.zones.push(nz); });
+        session.modifier(function () { b.zones.push(nz); });
         focusIn('.zn-in[data-b="' + b.id + '"][data-zn="' + (b.zones.length - 1) + '"]');
       },
       onRoute: function (pts) {
         keepView(b); mapUi.draw = null;
-        change(function () { b.routes.push({ label: '', color: 'accent', pts: pts, names: pts.map(function () { return ''; }) }); });
+        session.modifier(function () { b.routes.push({ label: '', color: 'accent', pts: pts, names: pts.map(function () { return ''; }) }); });
         focusIn('.rt-in[data-b="' + b.id + '"][data-rt="' + (b.routes.length - 1) + '"]');
       },
       onDrawEnd: function () { mapUi.draw = null; setTimeout(updateCheat); $$('.blk[data-id="' + b.id + '"] [data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); },
       onZoneEdit: function (i, z) {
         keepView(b);
-        change(function () { var t = b.zones[i]; t.shape = z.shape; if (z.shape === 'circle') { t.c = z.c; t.r = z.r; delete t.pts; } else { t.pts = z.pts; delete t.c; delete t.r; } });
+        session.modifier(function () { var t = b.zones[i]; t.shape = z.shape; if (z.shape === 'circle') { t.c = z.c; t.r = z.r; delete t.pts; } else { t.pts = z.pts; delete t.c; delete t.r; } });
       },
-      onRouteEdit: function (i, pts, names, np) { keepView(b); change(function () { var r = b.routes[i]; r.pts = pts; r.names = names; r.np = np; delete r.no; }); },
+      onRouteEdit: function (i, pts, names, np) { keepView(b); session.modifier(function () { var r = b.routes[i]; r.pts = pts; r.names = names; r.np = np; delete r.no; }); },
       onLabelMove: function (kind, i, j, ll) {
         keepView(b);
-        change(function () {
+        session.modifier(function () {
           if (kind === 'marker') { var mk = b.markers[i]; if (ll) mk.lp = ll; else delete mk.lp; return; }
           if (kind === 'zone') { var z = b.zones[i]; delete z.lo; if (ll) z.lp = ll; else delete z.lp; return; }
           var r = b.routes[i]; delete r.no;
@@ -751,7 +751,7 @@ function mountMaps() {
           r.np[j] = ll;
         });
       },
-      onChoroLabel: function (id, ll) { keepView(b); change(function () { if (!b.choro.lp) b.choro.lp = {}; if (ll) b.choro.lp[id] = ll; else delete b.choro.lp[id]; }); },
+      onChoroLabel: function (id, ll) { keepView(b); session.modifier(function () { if (!b.choro.lp) b.choro.lp = {}; if (ll) b.choro.lp[id] = ll; else delete b.choro.lp[id]; }); },
       onCountryPick: function (id) {
         cheatBlock = b.id; updateCheat();
         var vw = chView(b);
@@ -774,7 +774,7 @@ function mountMaps() {
 }
 function addMarker(b, lat, lon, label) {
   keepView(b);
-  change(function () { b.markers.push({ lat: lat, lon: lon, label: label || '', color: 'accent' }); });
+  session.modifier(function () { b.markers.push({ lat: lat, lon: lon, label: label || '', color: 'accent' }); });
   if (!label) { var inp = $('.mk-in[data-b="' + b.id + '"][data-mk="' + (b.markers.length - 1) + '"][data-p=label]', app); if (inp) inp.focus({ preventScroll: true }); }
 }
 function parseLL(s) {

@@ -190,7 +190,7 @@ function exportPages() {
 }
 function exportStatic() {
   if (isSealed() && !confirm('L’export statique n’est pas chiffré : la page exportée sera lisible par toute personne qui obtient le fichier. Continuer ?')) return;
-  if (htimer) snapshot();
+  session.valider();
   staticRender = true;
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
@@ -209,7 +209,7 @@ function exportStatic() {
 }
 function printPage() { var m = mode; if (m === 'edit') { mode = 'view'; render(); } setTimeout(function () { window.print(); if (m === 'edit') { mode = 'edit'; render(); } }, 300); /* le temps que les cartes se dessinent */ }
 function copyJSON() {
-  if (htimer) snapshot();
+  session.valider();
   var base = { v: VERSION, title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
   if (doc.tags) base.tags = doc.tags;
   if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.lv) o.lv = pg.lv; return o; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }
@@ -224,13 +224,12 @@ function importJSON() {
       var raw = $('textarea', bg).value, d;
       try { d = JSON.parse(raw); } catch (e) { $('#jerr', bg).textContent = 'JSON invalide : ' + e.message; return false; }
       if (Array.isArray(d)) d = { blocks: d };
-      var nd; try { nd = normalize(d); } catch (e) { $('#jerr', bg).textContent = 'Conversion impossible : ' + e.message; return false; }
-      if (!nd) { $('#jerr', bg).textContent = 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
-      if (nd.newer) { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + nd.newer + ') : mettez d’abord Ardoise à jour.'; return false; }
-      nd.id = doc.id; nd.savedAt = doc.savedAt; if (doc.mapKey) nd.mapKey = doc.mapKey; else delete nd.mapKey; if (doc.lock) nd.lock = doc.lock; else delete nd.lock;
-      var seen = {}, nb = 0; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (seen[b.id]) b.id = uid(); seen[b.id] = 1; nb++; }); });
-      synKeep(doc, nd); change(function () { doc = nd; }); pageHash(0);
-      toast(nb + ' blocs importés' + (nd.pages.length > 1 ? ' sur ' + nd.pages.length + ' pages' : ''));
+      var r = session.remplacer(d, 'import');   // identifiant, mot de passe, clé de carte et date gardés ; étape annulable
+      if (r.refus === 'plus-recent') { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + r.format + ') : mettez d’abord Ardoise à jour.'; return false; }
+      if (r.refus) { $('#jerr', bg).textContent = r.message ? 'Conversion impossible : ' + r.message : 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
+      var nb = 0; doc.pages.forEach(function (pg) { nb += pg.blocks.length; });
+      pageHash(0);
+      toast(nb + ' blocs importés' + (doc.pages.length > 1 ? ' sur ' + doc.pages.length + ' pages' : ''));
     } }]);
   $('textarea', m).focus();
 }

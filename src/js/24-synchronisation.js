@@ -3,17 +3,14 @@
 // avec lui si le document est chiffré par mot de passe). Le relais (relais/relais.mjs, installable chez soi) ne
 // reçoit que des messages chiffrés (AES-256-GCM) et un identifiant de salon dérivé de la clé ; il les range et les
 // transmet aux autres copies, en direct ou à leur prochaine connexion. Les modifications sont fusionnées par le
-// moteur de 05-synchro-moteur.js. La présence (nom et couleur de chaque personne, bloc en cours de modification)
+// moteur de 05-synchro-moteur.js ; la session du document les voit par l'adaptateur de 05-synchro-adaptateur.js. La présence (nom et couleur de chaque personne, bloc en cours de modification)
 // passe aussi chiffrée, sans être conservée.
 //
 // Dans le fichier : doc.sync = { relay, key, seq, state, pending } (propriété non énumérable : hors de
 // l'historique d'annulation et des brouillons ; écrite à l'enregistrement par synSaved).
-var syn = null;   // session en cours
 var SYN_COLORS = ['#d9480f', '#1971c2', '#2f9e44', '#9c36b5', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4'];
 var SYN_ADJ = ['curieuse', 'joyeuse', 'discrète', 'rapide', 'patiente', 'rêveuse', 'agile', 'sereine', 'vive', 'attentive', 'audacieuse', 'paisible'];
 var SYN_ANI = ['Loutre', 'Mésange', 'Hermine', 'Libellule', 'Chouette', 'Baleine', 'Gazelle', 'Panthère', 'Marmotte', 'Grue', 'Tortue', 'Abeille'];
-function synKeep(from, to) { if (from && from.sync && to) Object.defineProperty(to, 'sync', { value: from.sync, writable: true, configurable: true, enumerable: false }); }
-function synSetCfg(d, cfg) { Object.defineProperty(d, 'sync', { value: cfg, writable: true, configurable: true, enumerable: false }); }
 var synNom = '';   // sans stockage du navigateur (plugin Obsidian), le nom reste le même pendant la session
 function synName() {
   var n = ''; try { n = localStorage.getItem(LS + 'nom') || ''; } catch (_) {}
@@ -22,9 +19,6 @@ function synName() {
   synNom = n; return n;
 }
 function synColor(actor) { var h = 0; for (var i = 0; i < actor.length; i++) h = (h * 31 + actor.charCodeAt(i)) >>> 0; return SYN_COLORS[h % SYN_COLORS.length]; }
-// contenu synchronisé : tout le document sauf ce qui est propre au fichier (identifiant, mot de passe, dates)
-var SYN_KEYS = ['title', 'palette', 'typo', 'width', 'theme', 'nav', 'mapKey', 'tags', 'pages'];
-function synSubset(d) { var o = {}; SYN_KEYS.forEach(function (k) { if (d[k] !== undefined && d[k] !== null) o[k] = d[k]; }); return JSON.parse(JSON.stringify(o)); }
 
 // ---------- chiffrement ----------
 function b64u(buf) { return b64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
@@ -67,6 +61,7 @@ function synStop() {
   if (syn.ws) { try { syn.ws.onclose = null; syn.ws.close(); } catch (_) {} }
   syn = null; synPaint(); synPaintPeers();
 }
+session.abonner('nouveauFichier', synStop);   // un nouveau document ne reprend pas la synchronisation du précédent
 function synFail(msg) { if (!syn) return; syn.status = 'erreur'; syn.err = msg; synPaint(); }
 function synConnect() {
   if (!syn || !syn.alive) return;
@@ -165,17 +160,6 @@ function synPeer(s, de, data) {
 function synPrune() { if (!syn) return; var now = Date.now(), ch = false; Object.keys(syn.peers).forEach(function (k) { if (now - syn.peers[k].t > 70000) { delete syn.peers[k]; ch = true; } }); if (ch) synPaintPeers(); }
 
 // ---------- envois ----------
-// modifications locales : appelée après chaque changement enregistré dans l'historique (snapshot), après une
-// annulation, et avant d'appliquer ce qui arrive des autres copies
-function synLocal() {
-  if (!syn || !doc || syn.adopt) return;
-  var cur = synSubset(doc);
-  var ops = synDiff(syn.st, syn.base, cur);
-  syn.base = cur;
-  if (!ops.length) return;
-  syn.pending = syn.pending.concat(ops);
-  clearTimeout(syn.sendT); syn.sendT = setTimeout(function () { synFlush(false); }, 120);
-}
 function synFlush(all) {
   // envoie ce qui n'est pas encore parti (tout, après une reconnexion), en une trame chiffrée
   var s = syn; if (!s || !s.ws || s.ws.readyState !== 1 || s.status !== 'ok') return;
@@ -207,47 +191,14 @@ function synPresence(force) {
 var synPresT = 0;
 function synPresenceSoon() { if (!syn) return; clearTimeout(synPresT); synPresT = setTimeout(function () { synPresence(false); }, 250); }
 document.addEventListener('focusin', synPresenceSoon);
+document.addEventListener('focusout', synPresenceSoon);   // quitter un bloc sans en rejoindre un autre efface le cadre chez les autres
 
 // ---------- réception ----------
+// l'intégration (sans DOM) est dans 05-synchro-adaptateur.js ; ici, le curseur et le défilement restent en place
 function synRemote(s, batches, reload) {
   if (!batches.length && !reload) return;
-  // ce qui a été saisi ici et pas encore pris en compte part d'abord (sinon la comparaison effacerait l'arrivée)
-  synLocal();
-  var changed = reload;
-  batches.forEach(function (ops) { if (synApply(s.st, ops)) changed = true; });
-  if (!changed) return;
-  var before = s.base, after = synJSON(s.st.root);
-  if (s.adopt) { s.adopt = false; toast('Document mis à jour depuis les autres copies', 4000); }
-  if (synEq(before, after)) return;
-  s.base = after;
-  // annulation : les retours en arrière gardent les modifications reçues entre-temps
-  var pt = []; synPaths(before, after, [], pt); s.patches.push(pt);
-  var focus = synGrabFocus(), sy = scrollY, pgId = doc.pages[doc.cur] && doc.pages[doc.cur].id;
-  SYN_KEYS.forEach(function (k) { if (after[k] === undefined) delete doc[k]; else doc[k] = JSON.parse(JSON.stringify(after[k])); });
-  if (!doc.pages || !doc.pages.length) doc.pages = [{ id: uid(), title: '', blocks: [] }];
-  var pi = -1; doc.pages.forEach(function (pg, i) { if (pg.id === pgId) pi = i; });
-  doc.cur = pi >= 0 ? pi : Math.min(doc.cur, doc.pages.length - 1);
-  hist[hpos] = JSON.stringify(doc);   // l'arrivée n'est pas une modification locale à annuler
-  markDirty(true);
-  render(); scrollTo(0, sy); synPutFocus(focus);
-}
-function synPaths(a, b, path, out) {
-  // différences de chemin à chemin (tableaux d'objets à identifiant suivis par identifiant), pour l'annulation
-  if (synEq(a, b)) return;
-  if (synIsObj(a) && synIsObj(b)) { var ks = {}; Object.keys(a).concat(Object.keys(b)).forEach(function (k) { ks[k] = 1; }); Object.keys(ks).forEach(function (k) { synPaths(a[k], b[k], path.concat([k]), out); }); return; }
-  var ids = function (x) { return Array.isArray(x) && x.every(function (e) { return synIsObj(e) && typeof e.id === 'string'; }) ? x.map(function (e) { return e.id; }).join('\u0001') : null; };
-  if (Array.isArray(a) && Array.isArray(b) && ids(a) !== null && ids(a) === ids(b)) { b.forEach(function (e, i) { synPaths(a[i], e, path.concat([{ id: e.id }]), out); }); return; }
-  out.push({ p: path, v: b === undefined ? undefined : JSON.parse(JSON.stringify(b)) });
-}
-function synPatch(d, pt) {
-  pt.forEach(function (x) {
-    var o = d;
-    for (var i = 0; i < x.p.length - 1 && o; i++) { var st = x.p[i]; o = typeof st === 'object' ? (Array.isArray(o) ? o.filter(function (e) { return e && e.id === st.id; })[0] : null) : o[st]; }
-    if (!o || !x.p.length) return;
-    var last = x.p[x.p.length - 1];
-    if (typeof last === 'object') { if (!Array.isArray(o)) return; var j = -1; o.forEach(function (e, k) { if (e && e.id === last.id) j = k; }); if (j < 0) return; if (x.v === undefined) o.splice(j, 1); else o[j] = JSON.parse(JSON.stringify(x.v)); }
-    else if (x.v === undefined) delete o[last]; else o[last] = JSON.parse(JSON.stringify(x.v));
-  });
+  var focus = synGrabFocus(), sy = scrollY;
+  if (synIntegrer(s, batches, reload)) { scrollTo(0, sy); synPutFocus(focus); }
 }
 // curseur : gardé à la même place dans le texte, décalé si quelqu'un a écrit avant lui
 function synGrabFocus() {
@@ -281,20 +232,6 @@ function synPutFocus(f) {
   var t = $(f.sel, app); if (!t) return;
   t.focus({ preventScroll: true });
   try { var v = t.value; t.setSelectionRange(synShift(f.text, v, f.s), synShift(f.text, v, f.e)); } catch (_) {}
-}
-// annulation pendant la synchronisation : l'état restauré reçoit les modifications arrivées depuis
-function synHistMark() { return syn ? syn.patchBase + syn.patches.length : 0; }
-function synTrim(mark) {
-  // les modifications reçues plus anciennes que le plus ancien état de l'historique ne servent plus
-  if (!syn || mark == null) return;
-  var drop = mark - syn.patchBase; if (drop > 0) { syn.patches.splice(0, drop); syn.patchBase += drop; }
-}
-function synRebase(json, mark) {
-  if (!syn || mark == null) return json;
-  var from = mark - syn.patchBase; if (from >= syn.patches.length) return json;
-  var d = JSON.parse(json);
-  for (var i = Math.max(0, from); i < syn.patches.length; i++) synPatch(d, syn.patches[i]);
-  return JSON.stringify(d);
 }
 
 // ---------- enregistrement ----------
@@ -353,12 +290,12 @@ function synDialog() {
   var ro = doc.lock && !unlocked;   // édition protégée : réglages en lecture seule
   if (ro) { modal('Synchronisation', body.replace(/<input /g, '<input disabled '), [{ label: 'Fermer', fn: function (bg) { } }]); return; }
   var buttons = on ? [
-    { label: 'Enregistrer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); if (u !== doc.sync.relay) { synSaveState(); doc.sync.relay = u; doc.sync.seq = 0; markDirty(true); synStart(); toast('Relais changé : le document y est envoyé'); } } },
-    { label: 'Nouvelle clé', fn: function () { if (!confirm('Créer une nouvelle clé ? Les copies existantes de ce fichier ne se synchroniseront plus ; partagez ensuite une nouvelle copie.')) return false; synSaveState(); doc.sync.key = synNewKey(); doc.sync.seq = 0; markDirty(true); synStart(); toast('Nouvelle clé : enregistrez, puis partagez une nouvelle copie du fichier', 6000); } },
-    { label: 'Désactiver', fn: function () { if (!confirm('Désactiver la synchronisation de ce fichier ? Il gardera son contenu actuel.')) return false; synStop(); delete doc.sync; markDirty(true); toast('Synchronisation désactivée'); } },
+    { label: 'Enregistrer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); if (u !== doc.sync.relay) { synSaveState(); doc.sync.relay = u; doc.sync.seq = 0; marquerModifie(); synStart(); toast('Relais changé : le document y est envoyé'); } } },
+    { label: 'Nouvelle clé', fn: function () { if (!confirm('Créer une nouvelle clé ? Les copies existantes de ce fichier ne se synchroniseront plus ; partagez ensuite une nouvelle copie.')) return false; synSaveState(); doc.sync.key = synNewKey(); doc.sync.seq = 0; marquerModifie(); synStart(); toast('Nouvelle clé : enregistrez, puis partagez une nouvelle copie du fichier', 6000); } },
+    { label: 'Désactiver', fn: function () { if (!confirm('Désactiver la synchronisation de ce fichier ? Il gardera son contenu actuel.')) return false; synStop(); delete doc.sync; marquerModifie(); toast('Synchronisation désactivée'); } },
     { label: 'Fermer', fn: function (bg) { keepName(bg); } }
   ] : [
-    { label: 'Activer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); synSetCfg(doc, { relay: u, key: synNewKey() }); markDirty(true); synStart(); toast('Synchronisation activée : enregistrez, puis partagez une copie du fichier', 6000); } },
+    { label: 'Activer', primary: true, fn: function (bg) { var u = okUrl(bg); if (!u) return false; keepName(bg); synSetCfg(doc, { relay: u, key: synNewKey() }); marquerModifie(); synStart(); toast('Synchronisation activée : enregistrez, puis partagez une copie du fichier', 6000); } },
     { label: 'Annuler' }
   ];
   modal('Synchronisation', body, buttons);

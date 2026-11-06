@@ -53,3 +53,19 @@ for (const f of fixtures) {
 const future = { v: VERSION + 1, pages: [] }, rf = ctx.migrate(future);
 if (!rf.newer || rf.doc !== future) throw new Error('migrations : un format plus récent doit être signalé et laissé intact');
 console.log(`migrations : OK (format ${VERSION}, ${fixtures.length} document(s) de référence)`);
+
+// Session du document (src/js/05-session.js) : seule elle réaffecte le document courant et écrit l'historique.
+// Les anciens noms (change, snapshot, markDirty, consigner) et les anciennes variables d'historique ne reviennent pas.
+const sansTextes = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g, "''").replace(/\/\/[^\n]*/g, '');
+const ANCIENS = [
+  [/(^|[^.\w$])(change|snapshot|markDirty)\s*\(/, 'ancien nom'],
+  [/\.consigner\b/, 'ancien nom'],
+  [/\b(htimer|hpos|histMarks|restoreHist|histGo)\b/, 'ancienne variable d\'historique'],
+  [/(^|[^.\w$])doc\s*=(?!=)/, 'réaffectation du document hors de la session'],
+];
+for (const f of readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js') && x !== '05-session.js')) {
+  sansTextes(js(f)).split('\n').forEach((ligne, i) => {
+    for (const [re, quoi] of ANCIENS) if (re.test(ligne)) throw new Error(`session : ${quoi} dans ${f}:${i + 1} : ${ligne.trim()}`);
+  });
+}
+console.log('session : OK (aucun ancien nom ni réaffectation du document hors de la session)');

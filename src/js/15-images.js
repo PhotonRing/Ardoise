@@ -2,7 +2,7 @@
 var filePick = document.createElement('input'); filePick.type = 'file'; filePick.accept = 'image/*';
 function pickImage(b) {
   filePick.value = '';
-  filePick.onchange = function () { var f = filePick.files[0]; if (f) readImage(f, function (src) { change(function () { b.src = src; }); }); };
+  filePick.onchange = function () { var f = filePick.files[0]; if (f) readImage(f, function (src) { session.modifier(function () { b.src = src; }); }); };
   filePick.click();
 }
 function imageFromUrl(url, cb) {

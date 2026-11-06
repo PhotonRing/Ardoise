@@ -91,7 +91,7 @@ function setPassword() {
       return Promise.all([derive(v[0], salt, iter), enc ? deriveKey(v[0], esalt, ENC_ITER) : null]).then(function (r) {
         var lock = { salt: b64(salt), hash: r[0], iter: iter };
         if (enc) { lock.enc = true; lock.encSalt = b64(esalt); lock.encIter = ENC_ITER; encKeys[lock.encSalt] = r[1]; forgetDraft(); }
-        change(function () { doc.lock = lock; });
+        session.modifier(function () { doc.lock = lock; });
         unlocked = true;
         toast((enc ? 'Contenu chiffré et édition protégée' : 'Édition protégée') + ' · enregistrez pour l’appliquer au fichier', 3500); return null;
       });
@@ -105,7 +105,7 @@ function sealExisting() {
       var esalt = crypto.getRandomValues(new Uint8Array(16));
       return deriveKey(v[0], esalt, ENC_ITER).then(function (key) {
         var s = b64(esalt); encKeys[s] = key; forgetDraft();
-        change(function () { doc.lock.enc = true; doc.lock.encSalt = s; doc.lock.encIter = ENC_ITER; });
+        session.modifier(function () { doc.lock.enc = true; doc.lock.encSalt = s; doc.lock.encIter = ENC_ITER; });
         toast('Contenu chiffré · enregistrez pour l’appliquer au fichier'); return null;
       });
     });
@@ -113,12 +113,12 @@ function sealExisting() {
 }
 function unsealExisting() {
   if (!confirm('Ne plus chiffrer le contenu ? Le document redeviendra lisible sans mot de passe (l’édition reste protégée).')) return;
-  change(function () { delete doc.lock.enc; delete doc.lock.encSalt; delete doc.lock.encIter; });
+  session.modifier(function () { delete doc.lock.enc; delete doc.lock.encSalt; delete doc.lock.encIter; });
   toast('Contenu non chiffré · enregistrez pour l’appliquer au fichier');
 }
 function removePassword() {
   if (!confirm('Retirer la protection par mot de passe' + (isSealed() ? ' et le chiffrement' : '') + ' ? Le document redeviendra lisible et modifiable sans mot de passe.')) return;
-  change(function () { delete doc.lock; }); toast('Protection retirée · enregistrez pour l’appliquer au fichier');
+  session.modifier(function () { delete doc.lock; }); toast('Protection retirée · enregistrez pour l’appliquer au fichier');
 }
 function lockScreen(env) {
   // ouverture d'un fichier chiffré : rien n'est affiché avant le bon mot de passe
@@ -141,7 +141,7 @@ function lockScreen(env) {
       var d = normalize(JSON.parse(json));
       if (!d) throw new Error('contenu illisible');
       d.id = env.id || d.id; unlocked = true; sealed = null;
-      boot(d);
+      boot(d, 'deverrouillage');
     }).catch(function (x) { busy = false; btn.disabled = false; err.textContent = 'Ouverture impossible : ' + x.message; });
   });
 }

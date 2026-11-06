@@ -2,7 +2,7 @@
 function pageHash(i) { try { history.replaceState(null, '', '#p' + (i + 1)); } catch (_) {} }
 function goPage(i, keepScroll) {
   i = Math.max(0, Math.min(doc.pages.length - 1, i));
-  if (htimer) snapshot();
+  session.valider();
   if (i === doc.cur) return;
   maps.forEach(function (m) { var b = byId(m.blockId); if (b && mode === 'edit') b.view = m.getView(); });
   mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }; cheatBlock = null;
@@ -12,7 +12,7 @@ function goPage(i, keepScroll) {
 }
 function insertPage(at, lv) {
   var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('p', {})] }; if (lv) pg.lv = lv;
-  change(function () { doc.pages.splice(at, 0, pg); doc.cur = at; });
+  session.modifier(function () { doc.pages.splice(at, 0, pg); doc.cur = at; });
   scrollTo(0, 0); pageHash(at); renamePage(at);
 }
 function addPage(after) {
@@ -26,20 +26,20 @@ function dupPage(i) {
   c.blocks.forEach(function (b) { b.id = uid(); });
   var ch = pageHeader(c), nm = pageTitle(doc.pages[i], i) + ' (copie)';
   if (ch && textOf(ch.title)) ch.title = esc(nm); else c.title = nm;
-  change(function () { doc.pages.splice(at, 0, c); doc.cur = at; }); scrollTo(0, 0); pageHash(at);
+  session.modifier(function () { doc.pages.splice(at, 0, c); doc.cur = at; }); scrollTo(0, 0); pageHash(at);
 }
 function delPage(i) {
   var n = pageEnd(doc.pages, i) - i;
   if (doc.pages.length - n < 1) { toast('Un document garde au moins une page'); return; }
   if (!confirm('Supprimer la page « ' + pageTitle(doc.pages[i], i) + ' »' + (n > 2 ? ' et ses ' + (n - 1) + ' sous-pages' : n > 1 ? ' et sa sous-page' : '') + ', avec tout leur contenu ? (Ctrl+Z pour annuler)')) return;
-  change(function () { doc.pages.splice(i, n); doc.cur = Math.min(i, doc.pages.length - 1); }); scrollTo(0, 0); pageHash(doc.cur);
+  session.modifier(function () { doc.pages.splice(i, n); doc.cur = Math.min(i, doc.pages.length - 1); }); scrollTo(0, 0); pageHash(doc.cur);
 }
 function movePageTo(i, j, where) {
   // déplace la page i et ses sous-pages : avant la page j ('before'), après j et ses sous-pages ('after'), ou dans j en dernière sous-page ('inside')
   var pages = doc.pages, end = pageEnd(pages, i);
   if (j >= i && j < end) return false;   // dans ses propres sous-pages
   var seg = pages.slice(i, end), base = pageLv(pages, i), tgt = pages[j], nl = pageLv(pages, j) + (where === 'inside' ? 1 : 0), curId = pages[doc.cur].id;
-  change(function () {
+  session.modifier(function () {
     pages.splice(i, end - i);
     var t = pages.indexOf(tgt), at = where === 'before' ? t : pageEnd(pages, t);
     seg.forEach(function (p) { var l = Math.min(8, (+p.lv || 0) - base + nl); if (l > 0) p.lv = l; else delete p.lv; });
@@ -65,7 +65,7 @@ function renamePage(i) {
   function commit(ok) {
     if (done) return; done = true;
     var v = inp.value.trim();
-    if (ok && v !== before) change(function () { if (hd) hd.title = esc(v); else pg.title = v; }); else render();
+    if (ok && v !== before) session.modifier(function () { if (hd) hd.title = esc(v); else pg.title = v; }); else render();
   }
   inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); commit(false); } });
   inp.addEventListener('blur', function () { commit(true); });
@@ -97,14 +97,14 @@ app.addEventListener('click', function (e) {
   var lk = t.closest('a[href^="#pg-"]');
   if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
-  if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; change(function () { revealBlock(sid); }); }
+  if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; session.modifier(function () { revealBlock(sid); }); }
   var km = t.closest('[data-kbmove]');
   if (km) { var kp = km.dataset.kbmove.split('|'), kb = byId(kp[0]); if (kb) kbMoveMenu(km, kb, +kp[1], +kp[2]); return; }
   var qc = t.closest('[data-qchk]');
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
     var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
-    if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; change(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
+    if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
     return;
   }
   var qs = t.closest('[data-qsort]');
@@ -112,7 +112,7 @@ app.addEventListener('click', function (e) {
     var qhost = qs.closest('[data-qid]'), qblk = qhost && byId(qhost.dataset.qid);
     if (!qblk) return;
     var cur = qSortSpec(qblk), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
-    if (mode === 'edit') change(function () { qblk.sortBy = by; qblk.sortDir = dir; });
+    if (mode === 'edit') session.modifier(function () { qblk.sortBy = by; qblk.sortDir = dir; });
     else { viewSort[qblk.id] = { by: by, dir: dir }; render(); }   // lecture : rien n'est enregistré
     scrollTo(0, sy2); return;
   }
