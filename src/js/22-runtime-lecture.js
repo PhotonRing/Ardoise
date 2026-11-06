@@ -224,13 +224,12 @@ function importJSON() {
       var raw = $('textarea', bg).value, d;
       try { d = JSON.parse(raw); } catch (e) { $('#jerr', bg).textContent = 'JSON invalide : ' + e.message; return false; }
       if (Array.isArray(d)) d = { blocks: d };
-      var nd; try { nd = normalize(d); } catch (e) { $('#jerr', bg).textContent = 'Conversion impossible : ' + e.message; return false; }
-      if (!nd) { $('#jerr', bg).textContent = 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
-      if (nd.newer) { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + nd.newer + ') : mettez d’abord Ardoise à jour.'; return false; }
-      nd.id = doc.id; nd.savedAt = doc.savedAt; if (doc.mapKey) nd.mapKey = doc.mapKey; else delete nd.mapKey; if (doc.lock) nd.lock = doc.lock; else delete nd.lock;
-      var seen = {}, nb = 0; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (seen[b.id]) b.id = uid(); seen[b.id] = 1; nb++; }); });
-      synKeep(doc, nd); change(function () { doc = nd; }); pageHash(0);
-      toast(nb + ' blocs importés' + (nd.pages.length > 1 ? ' sur ' + nd.pages.length + ' pages' : ''));
+      var r = session.remplacer(d, 'import');   // identifiant, mot de passe, clé de carte et date gardés ; étape annulable
+      if (r.refus === 'plus-recent') { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + r.format + ') : mettez d’abord Ardoise à jour.'; return false; }
+      if (r.refus) { $('#jerr', bg).textContent = r.message ? 'Conversion impossible : ' + r.message : 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
+      var nb = 0; doc.pages.forEach(function (pg) { nb += pg.blocks.length; });
+      pageHash(0);
+      toast(nb + ' blocs importés' + (doc.pages.length > 1 ? ' sur ' + doc.pages.length + ' pages' : ''));
     } }]);
   $('textarea', m).focus();
 }

@@ -17,5 +17,5 @@ function boot(d, origine) {
 }
 var initial = loadInitial();
 if (sealed) lockScreen(sealed); else boot(initial);
-window.ardoise = { get doc() { return doc; }, load: function (d) { if (doc.lock && !unlocked) return false; var nd = normalize(d); if (!nd || nd.newer) return false; nd.id = doc.id; synKeep(doc, nd); if (doc.lock) nd.lock = doc.lock; else delete nd.lock; change(function () { doc = nd; }); return true; }, save: save };
+window.ardoise = { get doc() { return doc; }, load: function (d) { return !!session.remplacer(d, 'externe', { deverrouille: unlocked }).ok; }, save: save };
 })();

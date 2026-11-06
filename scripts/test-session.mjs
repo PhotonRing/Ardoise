@@ -439,6 +439,146 @@ test('un document déjà normalisé reste identique une fois remplacé', () => {
   egal(m.doc.sync.key, 'k');
 });
 
+// --- remplacer : import JSON, chargement externe (plugin Obsidian), brouillon ---
+const ENTRANT = () => ({ id: 'autre', title: 'Importé', savedAt: '2020-01-01T00:00:00.000Z', mapKey: 'cle-entrante',
+  lock: { salt: 's2', hash: 'h2', iter: 1000 },
+  pages: [{ id: 'q1', title: 'A', blocks: [{ id: 'y1', type: 'p', html: 'importé' }] }, { id: 'q2', title: 'B', blocks: [] }, { id: 'q3', title: 'C', blocks: [] }] });
+// une session ouverte sur FICHIER, page 2 affichée
+function ouvert() { const m = monter(); m.s.remplacer(FICHIER(), 'demarrage', { page: 1 }); m.vider(); return m; }
+const propres = (m) => [m.doc.id, m.doc.savedAt, m.doc.mapKey, m.doc.lock && m.doc.lock.hash];
+
+test('import : garde identifiant, mot de passe, clé de carte et date d\'enregistrement, ouvre la page 1, et s\'annule', () => {
+  const m = ouvert();
+  egal(m.s.remplacer(ENTRANT(), 'import'), { ok: true });
+  egal(propres(m), ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h']);
+  egal([m.doc.title, m.doc.pages[0].blocks[0].html, m.doc.cur], ['Importé', 'importé', 0]);
+  egal(m.recu.modifie, [true]);
+  egal(m.recu.rendu.length, 1);
+  egal(m.recu.historique, [{ annuler: true, retablir: false }]);
+  egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'l\'import part vers les autres copies');
+  m.s.annuler();
+  egal([m.doc.title, m.doc.pages[0].blocks[0].html], ['Fichier', 'un']);
+});
+
+test('import : sur un document sans mot de passe, clé de carte ni date d\'enregistrement, ceux de l\'entrant sont retirés', () => {
+  const m = monter();
+  m.s.remplacer(ENTRANT(), 'import');
+  egal([m.doc.lock, m.doc.mapKey, m.doc.savedAt], [undefined, undefined, null]);
+  if (m.doc.id === 'autre') throw new Error('identifiant de l\'entrant repris');
+});
+
+test('import et chargement externe : les identifiants de blocs en double sont renouvelés, le premier garde le sien', () => {
+  for (const origine of ['import', 'externe']) {
+    const m = ouvert();
+    const e = ENTRANT();
+    e.pages[0].blocks.push({ id: 'y1', type: 'p', html: 'deux' });
+    e.pages[1].blocks.push({ id: 'y1', type: 'p', html: 'trois' });
+    m.s.remplacer(e, origine, { deverrouille: true });
+    const ids = m.doc.pages.flatMap((pg) => pg.blocks.map((b) => b.id));
+    egal(ids.length, 3, origine);
+    egal(new Set(ids).size, 3, origine + ' : identifiants distincts');
+    egal(ids[0], 'y1', origine);
+  }
+});
+
+test('chargement externe : garde les mêmes champs que l\'import, et la page affichée', () => {
+  const m = ouvert();
+  egal(m.s.remplacer(ENTRANT(), 'externe', { deverrouille: true }), { ok: true });
+  egal(propres(m), ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h'], 'la clé de carte et la date d\'enregistrement sont gardées');
+  egal([m.doc.title, m.doc.cur], ['Importé', 1]);
+  egal(m.recu.modifie, [true]);
+  m.s.annuler();
+  egal([m.doc.title, m.doc.cur], ['Fichier', 1]);
+});
+
+test('chargement externe et brouillon : la page affichée qui n\'existe plus ramène à la première', () => {
+  for (const origine of ['externe', 'brouillon']) {
+    const m = monter();
+    m.s.remplacer(FICHIER(), 'demarrage', { page: 2 });
+    const e = ENTRANT(); e.pages.length = 2;
+    m.s.remplacer(e, origine, { deverrouille: true });
+    egal(m.doc.cur, 0, origine);
+  }
+});
+
+test('brouillon : garde identifiant et mot de passe, prend clé de carte et date d\'enregistrement du brouillon, et s\'annule', () => {
+  const m = ouvert();
+  egal(m.s.remplacer(ENTRANT(), 'brouillon'), { ok: true });
+  egal(propres(m), ['fichier', '2020-01-01T00:00:00.000Z', 'cle-entrante', 'h']);
+  egal([m.doc.pages[0].blocks[0].html, m.doc.cur], ['importé', 1]);
+  egal(m.recu.modifie, [true]);
+  egal(m.s.historique(), { annuler: true, retablir: false });
+  m.s.annuler();
+  egal(m.doc.pages[0].blocks[0].html, 'un');
+});
+
+test('refus : un format plus récent, pour l\'import, le chargement externe et le brouillon, ne touche à rien', () => {
+  for (const origine of ['import', 'externe', 'brouillon']) {
+    const m = ouvert();
+    const avant = JSON.stringify(m.doc);
+    egal(m.s.remplacer(Object.assign(ENTRANT(), { v: 999 }), origine, { deverrouille: true }), { refus: 'plus-recent', format: 999 }, origine);
+    egal(JSON.stringify(m.doc), avant, origine);
+    egal(m.s.historique(), { annuler: false, retablir: false }, origine);
+    egal([m.recu.rendu.length, m.recu.modifie.length, m.recu.historique.length, m.sync.length], [0, 0, 0, 0], origine);
+  }
+});
+
+test('refus : le chargement externe d\'un document verrouillé et non déverrouillé ; l\'import et le brouillon l\'acceptent', () => {
+  const m = ouvert();
+  egal(m.s.remplacer(ENTRANT(), 'externe'), { refus: 'verrouille' });
+  egal([m.doc.title, m.recu.rendu.length], ['Fichier', 0]);
+  egal(m.s.remplacer(ENTRANT(), 'externe', { deverrouille: false }), { refus: 'verrouille' });
+  egal(m.s.remplacer(ENTRANT(), 'externe', { deverrouille: true }), { ok: true });
+  const n = monter();
+  egal(n.s.remplacer(ENTRANT(), 'externe'), { ok: true }, 'document courant sans mot de passe');
+  egal(ouvert().s.remplacer(ENTRANT(), 'import'), { ok: true });
+  egal(ouvert().s.remplacer(ENTRANT(), 'brouillon'), { ok: true });
+});
+
+test('refus : une donnée illisible porte le message de la conversion, s\'il y en a un', () => {
+  const m = ouvert();
+  egal(m.s.remplacer({ title: 'sans pages' }, 'import'), { refus: 'illisible' });
+  const r = m.s.remplacer({ pages: [{ blocks: [{ type: 'p', get html() { throw new Error('bloc cassé'); } }] }] }, 'import');
+  egal(r, { refus: 'illisible', message: 'bloc cassé' });
+  egal(m.doc.title, 'Fichier');
+});
+
+test('chaque remplacement annulable garde la configuration de synchronisation du document courant', () => {
+  for (const origine of ['import', 'externe', 'brouillon']) {
+    const m = ouvert();
+    m.s.remplacer(Object.assign(ENTRANT(), { sync: { relay: 'ws://autre', key: 'autre' } }), origine, { deverrouille: true });
+    egal(m.sync.includes('reprendre'), true, origine + ' : reprise par l\'adaptateur');
+  }
+  // vrai adaptateur : la configuration du document courant survit, celle de l'entrant n'est pas reprise
+  for (const origine of ['import', 'externe', 'brouillon']) {
+    const { ctx } = contexte();
+    const s = ctx.creerSession(ctx.adaptateurSynchro());
+    s.remplacer(FICHIER(), 'demarrage');
+    s.remplacer(Object.assign(ENTRANT(), { sync: { relay: 'ws://autre', key: 'autre' } }), origine, { deverrouille: true });
+    egal([ctx.doc.sync.relay, ctx.doc.sync.key], ['ws://relais', 'k'], origine);
+    s.remplacer(DEPART(), 'demarrage');
+    s.remplacer(Object.assign(ENTRANT(), { sync: { relay: 'ws://autre', key: 'autre' } }), origine);
+    egal(ctx.doc.sync, undefined, origine + ' : un JSON entrant n\'impose pas sa synchronisation');
+  }
+});
+
+test('import : la frappe en attente est validée d\'abord et reste annulable séparément', () => {
+  const m = ouvert();
+  m.s.saisir(() => ecrire(m, 'unx'));
+  m.s.remplacer(ENTRANT(), 'import');
+  m.s.annuler();
+  egal(m.texte(), 'unx');
+  m.s.annuler();
+  egal(m.texte(), 'un');
+});
+
+test('import d\'un contenu identique au document courant : aucune étape', () => {
+  const m = ouvert();
+  const d = JSON.parse(JSON.stringify(m.doc));
+  m.s.remplacer(d, 'import');
+  egal(m.s.historique(), { annuler: false, retablir: false });
+});
+
 for (const [nom, fn] of tests) {
   try { fn(); n++; } catch (e) { console.error(`ÉCHEC : ${nom}\n${e.stack || e.message}`); process.exit(1); }
 }

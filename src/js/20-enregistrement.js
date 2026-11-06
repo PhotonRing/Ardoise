@@ -164,7 +164,7 @@ function checkDraft() {
     '<button class="ub primary" data-d="1">Restaurer</button><button class="ub out" data-d="0">Ignorer</button>';
   bannerEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]'); if (!b) return;
-    if (b.dataset.d === '1') { var nd = normalize(JSON.parse(d.json)); if (nd && !nd.newer) { synKeep(doc, nd); doc = nd; render(); snapshot(); markDirty(true); toast('Brouillon restauré · pensez à enregistrer'); } }
+    if (b.dataset.d === '1') { var j = null; try { j = JSON.parse(d.json); } catch (_) {} if (j && session.remplacer(j, 'brouillon').ok) toast('Brouillon restauré · pensez à enregistrer'); }
     else { try { localStorage.removeItem(LS + 'draft:' + doc.id); } catch (_) {} }
     hideBanner();
   });

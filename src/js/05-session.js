@@ -7,13 +7,21 @@
 var SESSION_DELAI = 500, SESSION_MAX = 300;
 // Règles de remplacement du document, par origine (voir la table des origines de la spec) :
 //   neuf : nouvel identifiant, sans mot de passe, clé de carte, date d'enregistrement ni synchronisation
-//   page : 'lien' (options.page, index borné au nombre de pages, sinon la première) ou 'premiere'
-//   historique : 'repart' (l'état chargé devient le seul état de l'historique)
-//   plusRecent : un format plus récent est refusé ; nouveauFichier : l'enregistrement oublie le fichier choisi
+//   garde : champs repris du document courant (copiés, ou retirés s'il ne les a pas)
+//   page : 'lien' (options.page, index borné au nombre de pages, sinon la première), 'premiere' ou 'gardee' (la page
+//     affichée si le nouveau document l'a, sinon la première)
+//   historique : 'repart' (l'état chargé devient le seul état de l'historique) ou 'etape' (étape annulable)
+//   renumeroter : les identifiants de blocs en double sont renouvelés
+//   plusRecent : un format plus récent est refusé ; verrou : refusé si le document courant est verrouillé et pas
+//     déverrouillé (options.deverrouille) ; nouveauFichier : l'enregistrement oublie le fichier choisi
+// Hors 'neuf', la configuration de synchronisation est toujours celle du document courant (adaptateur, reprendre).
 var SESSION_ORIGINES = {
   demarrage: { page: 'lien', historique: 'repart' },
   deverrouillage: { page: 'lien', historique: 'repart' },
-  nouveau: { neuf: true, page: 'premiere', historique: 'repart', nouveauFichier: true }
+  nouveau: { neuf: true, page: 'premiere', historique: 'repart', nouveauFichier: true },
+  import: { garde: ['id', 'lock', 'mapKey', 'savedAt'], renumeroter: true, page: 'premiere', historique: 'etape', plusRecent: true },
+  externe: { garde: ['id', 'lock', 'mapKey', 'savedAt'], renumeroter: true, page: 'gardee', historique: 'etape', plusRecent: true, verrou: true },
+  brouillon: { garde: ['id', 'lock'], page: 'gardee', historique: 'etape', plusRecent: true }
 };
 var ADAPTATEUR_INERTE = { marque: function () { return 0; }, envoyer: function () {}, rebaser: function (json) { return json; }, oublier: function () {}, reprendre: function () {} };
 function creerSession(adaptateur) {
@@ -53,16 +61,24 @@ function creerSession(adaptateur) {
     var r = SESSION_ORIGINES[origine];
     if (!r) throw new Error('session : origine inconnue ' + origine);
     valider();
-    var nd = null; try { nd = normalize(donnees); } catch (e) { nd = null; }
-    if (!nd) return { refus: 'illisible' };
-    if (nd.newer && r.plusRecent) return { refus: 'plus-recent' };
+    var nd = null, err = null; try { nd = normalize(donnees); } catch (e) { nd = null; err = e; }
+    if (!nd) return err && err.message ? { refus: 'illisible', message: err.message } : { refus: 'illisible' };
+    if (nd.newer && r.plusRecent) return { refus: 'plus-recent', format: nd.newer };
+    if (r.verrou && doc && doc.lock && !(options && options.deverrouille)) return { refus: 'verrouille' };
+    var ancien = doc;
     if (r.neuf) { nd.id = uid() + uid(); nd.savedAt = null; delete nd.lock; delete nd.mapKey; delete nd.sync; }
+    (r.garde || []).forEach(function (k) { if (ancien[k] !== undefined && ancien[k] !== null) nd[k] = ancien[k]; else delete nd[k]; });
+    if (r.garde && !ancien.savedAt) nd.savedAt = null;   // normalize écrit toujours savedAt
+    if (r.renumeroter) { var vus = {}; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (vus[b.id]) b.id = uid(); vus[b.id] = 1; }); }); }
+    if (r.historique === 'etape') { delete nd.sync; sy.reprendre(ancien, nd); }   // la synchronisation reste celle du document courant
     var p = r.page === 'lien' && options && +options.page >= 0 ? Math.floor(+options.page) : 0;
+    if (r.page === 'gardee') p = ancien.cur < nd.pages.length ? ancien.cur : 0;
     nd.cur = Math.min(p, nd.pages.length - 1);
     doc = nd;
     if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; pos = 0; }
     if (r.nouveauFichier) prevenir('nouveauFichier');
-    prevenir('rendu', null, {});
+    if (r.historique === 'etape') { etape(); prevenir('rendu', null, {}); prevenir('modifie', true); }
+    else prevenir('rendu', null, {});
     prevenir('historique', etat());
     return { ok: true };
   }
@@ -93,7 +109,7 @@ function creerSession(adaptateur) {
       prevenir('historique', etat());
     },
     remplacer: remplacer,
-    // --- transitoires, absorbés par remplacer (tickets 04, 05) ---
+    // --- transitoire, absorbé au ticket 05 (pastilles, saisie des cases et des cartes) ---
     // ancien snapshot : étape immédiate, sans rendu ni marque « modifié »
     consigner: function () { etape(); prevenir('historique', etat()); }
   };
