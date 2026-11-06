@@ -7,7 +7,7 @@
    stockage. */
 var syn = null;   // synchronisation en cours (24-synchronisation.js)
 function adaptateurSynchro() { return { marque: synHistMark, envoyer: synLocal, rebaser: synRebase, oublier: synTrim, reprendre: synKeep }; }
-function synKeep(from, to) { if (from && from.sync && to) Object.defineProperty(to, 'sync', { value: from.sync, writable: true, configurable: true, enumerable: false }); }
+function synKeep(from, to) { if (from && from.sync && to) synSetCfg(to, from.sync); }
 function synSetCfg(d, cfg) { Object.defineProperty(d, 'sync', { value: cfg, writable: true, configurable: true, enumerable: false }); }
 // contenu synchronisé : tout le document sauf ce qui est propre au fichier (identifiant, mot de passe, dates)
 var SYN_KEYS = ['title', 'palette', 'typo', 'width', 'theme', 'nav', 'mapKey', 'tags', 'pages'];
@@ -41,7 +41,7 @@ function synIntegrer(s, batches, reload) {
   s.base = after;
   // annulation : les retours en arrière gardent les modifications reçues entre-temps
   var pt = []; synPaths(before, after, [], pt); s.patches.push(pt);
-  session.recevoir(after);
+  session.recevoir(after, SYN_KEYS);
   return true;
 }
 function synPaths(a, b, path, out) {
@@ -76,3 +76,6 @@ function synRebase(json, mark) {
   for (var i = Math.max(0, from); i < syn.patches.length; i++) synPatch(d, syn.patches[i]);
   return JSON.stringify(d);
 }
+
+// la session du document, une fois son adaptateur défini (sans DOM ni stockage)
+var session = creerSession(adaptateurSynchro());

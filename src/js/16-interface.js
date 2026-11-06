@@ -70,14 +70,14 @@ function openSheet() {
       : big('mode', lockEd ? '🔒' : '✎', 'Modifier', ' primary') + (dirty ? big('save', '⤓', 'Enregistrer') : '')) + '</div>' +
     '<div class="sh-list">' + (ed ? fileMenuHTML() : viewMenuHTML()) + '</div>';
   ui.appendChild(sheet); document.documentElement.classList.add('sheet-on');
-  synPaint(); paintSheetUndo();
+  synPaint(); updateUndo();
   sheet.addEventListener('click', function (e) {
     var t = e.target.closest('[data-sh],[data-f],[data-vm],[data-ui]'); if (!t) return;
     if (t.dataset.f) { closeSheet(); fileMenuAct(t.dataset.f); return; }
     if (t.dataset.vm) { closeSheet(); viewMenuAct(t.dataset.vm); return; }
     if (t.dataset.ui === 'sync') { closeSheet(); return; }   // la fenêtre de synchronisation s'ouvre par le gestionnaire de la barre
     var k = t.dataset.sh, anchor = $('.burger', chrome);
-    if (k === 'undo' || k === 'redo') { if (k === 'undo') undo(); else redo(); paintSheetUndo(); return; }   // le menu reste ouvert pour enchaîner
+    if (k === 'undo' || k === 'redo') { if (k === 'undo') undo(); else redo(); return; }   // le menu reste ouvert pour enchaîner (boutons repeints par updateUndo)
     closeSheet();
     if (k === 'save') save(false);
     else if (k === 'mode') toggleMode();
@@ -85,11 +85,6 @@ function openSheet() {
     else if (k === 'style') openStyle(anchor);
   });
   var x = $('.sh-x', sheet); if (x) x.focus({ preventScroll: true });
-}
-function paintSheetUndo() {
-  if (!sheet) return;
-  var u = $('[data-sh=undo]', sheet), r = $('[data-sh=redo]', sheet);
-  var h = session.historique(); if (u) u.disabled = !h.annuler; if (r) r.disabled = !h.retablir;
 }
 document.addEventListener('keydown', function (e) { if (sheet && e.key === 'Escape') { e.preventDefault(); closeSheet(); } }, true);
 window.addEventListener('resize', function () { if (sheet && innerWidth > 760) closeSheet(); });

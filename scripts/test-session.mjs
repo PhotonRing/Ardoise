@@ -53,7 +53,7 @@ function monter() {
   const recu = { rendu: [], modifie: [], historique: [] };
   const s = ctx.creerSession(faux);
   s.abonner('rendu', (focus, info) => recu.rendu.push({ focus, info }));
-  s.abonner('modifie', (depuisHistorique) => recu.modifie.push(depuisHistorique));
+  s.abonner('modifie', (...args) => recu.modifie.push(args));   // un appel par événement, sans argument
   s.abonner('historique', (etat) => recu.historique.push(etat));
   s.remplacer(DEPART(), 'demarrage');
   const vider = () => { recu.rendu.length = 0; recu.modifie.length = 0; recu.historique.length = 0; sync.length = 0; };
@@ -71,7 +71,7 @@ test('modifier valide une étape et prévient rendu (avec le focus), modifié et
   const m = monter();
   m.s.modifier(() => ecrire(m, 'b'), { b: 'b1', k: 'html' });
   egal(m.recu.rendu.map((r) => r.focus), [{ b: 'b1', k: 'html' }]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   egal(m.recu.historique, [{ annuler: true, retablir: false }]);
   m.s.annuler();
   egal(m.texte(), 'a');
@@ -88,7 +88,7 @@ test('une modification qui ne change rien ne crée pas d\'étape, mais redessine
 test('saisir prévient « modifié » tout de suite, sans redessiner, et valide l\'étape après 500 ms sans frappe', () => {
   const m = monter();
   m.s.saisir(() => ecrire(m, 'ab'));
-  egal(m.recu.modifie, [false]);
+  egal(m.recu.modifie, [[]]);
   egal(m.recu.rendu.length, 0);
   m.avancer(300);
   m.s.saisir(() => ecrire(m, 'abc'));
@@ -139,7 +139,7 @@ test('annuler prévient le rendu avec le focus demandé, « modifié » depuis l
   m.vider();
   m.s.annuler({ b: 'b1', k: 'html' });
   egal(m.recu.rendu, [{ focus: { b: 'b1', k: 'html' }, info: { historique: true } }]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   egal(m.sync.filter((x) => x === 'envoyer'), ['envoyer']);
 });
 
@@ -254,15 +254,16 @@ test('la configuration de synchronisation survit à annuler / rétablir (vrai ad
 
 // ---------- réception ----------
 const distant = (m, f) => { const e = JSON.parse(JSON.stringify(m.ctx.synSubset(m.doc))); f(e); return e; };
+const recevoir = (m, f) => m.s.recevoir(distant(m, f), m.ctx.SYN_KEYS);   // l'appelant donne les clés à appliquer
 
 test('une modification reçue s\'applique sans créer d\'étape d\'annulation, et prévient les abonnés', () => {
   const m = monter();
   m.s.modifier(() => ecrire(m, 'b'));
   m.vider();
-  m.s.recevoir(distant(m, (e) => { e.title = 'Reçu'; }));
+  recevoir(m, (e) => { e.title = 'Reçu'; });
   egal(m.doc.title, 'Reçu');
   egal(m.recu.rendu, [{ focus: null, info: { distant: true } }]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   egal(m.recu.historique, [{ annuler: true, retablir: false }]);
   egal(m.sync, [], 'rien ne repart vers les autres copies');
   m.s.annuler();
@@ -274,7 +275,7 @@ test('une modification reçue s\'applique sans créer d\'étape d\'annulation, e
 test('une clé absente de l\'état reçu est retirée ; les clés propres au fichier restent', () => {
   const m = monter();
   m.s.modifier(() => { m.doc.mapKey = 'cle'; m.doc.id = 'fichier'; });
-  m.s.recevoir(distant(m, (e) => { delete e.mapKey; }));
+  recevoir(m, (e) => { delete e.mapKey; });
   egal([m.doc.mapKey, m.doc.id], [undefined, 'fichier']);
 });
 
@@ -282,12 +283,12 @@ test('la page affichée reste la même, repérée par son identifiant, quand une
   const m = monter();
   m.s.modifier(() => { m.doc.pages.push({ id: 'p2', title: 'Deux', blocks: [] }, { id: 'p3', title: 'Trois', blocks: [] }); });
   m.doc.cur = 1;
-  m.s.recevoir(distant(m, (e) => { e.pages.reverse(); }));
+  recevoir(m, (e) => { e.pages.reverse(); });
   egal([m.doc.pages[m.doc.cur].id, m.doc.cur], ['p2', 1]);
   m.doc.cur = 0;
-  m.s.recevoir(distant(m, (e) => { e.pages = e.pages.filter((p) => p.id !== 'p3'); }));
+  recevoir(m, (e) => { e.pages = e.pages.filter((p) => p.id !== 'p3'); });
   egal(m.doc.pages[m.doc.cur].id, 'p2', 'p3 disparue : page bornée');
-  m.s.recevoir(distant(m, (e) => { e.pages = []; }));
+  recevoir(m, (e) => { e.pages = []; });
   egal(m.doc.pages.length, 1, 'jamais sans page');
 });
 
@@ -467,7 +468,7 @@ test('import : garde identifiant, mot de passe, clé de carte et date d\'enregis
   egal(m.s.remplacer(ENTRANT(), 'import'), { ok: true });
   egal(propres(m), ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h']);
   egal([m.doc.title, m.doc.pages[0].blocks[0].html, m.doc.cur], ['Importé', 'importé', 0]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   egal(m.recu.rendu.length, 1);
   egal(m.recu.historique, [{ annuler: true, retablir: false }]);
   egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'l\'import part vers les autres copies');
@@ -501,7 +502,7 @@ test('chargement externe : garde les mêmes champs que l\'import, et la page aff
   egal(m.s.remplacer(ENTRANT(), 'externe', { deverrouille: true }), { ok: true });
   egal(propres(m), ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h'], 'la clé de carte et la date d\'enregistrement sont gardées');
   egal([m.doc.title, m.doc.cur], ['Importé', 1]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   m.s.annuler();
   egal([m.doc.title, m.doc.cur], ['Fichier', 1]);
 });
@@ -521,7 +522,7 @@ test('brouillon : garde identifiant et mot de passe, prend clé de carte et date
   egal(m.s.remplacer(ENTRANT(), 'brouillon'), { ok: true });
   egal(propres(m), ['fichier', '2020-01-01T00:00:00.000Z', 'cle-entrante', 'h']);
   egal([m.doc.pages[0].blocks[0].html, m.doc.cur], ['importé', 1]);
-  egal(m.recu.modifie, [true]);
+  egal(m.recu.modifie, [[]]);
   egal(m.s.historique(), { annuler: true, retablir: false });
   m.s.annuler();
   egal(m.doc.pages[0].blocks[0].html, 'un');
