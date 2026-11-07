@@ -185,6 +185,12 @@ function renderBlock(b, d, ctx, num) {
       var colorSel = function (cls, attr, cur) { return '<select class="' + cls + '" data-b="' + b.id + '" ' + attr + ' title="Couleur">' + MK_COLORS.map(function (c) { return opt(c[0], cur || 'accent', c[1]); }).join('') + '</select>'; };
       var mapState = editorUi.map || {}, dk = mapState.draw === b.id ? mapState.kind : null, ed = mapState.editOf === b.id ? mapState.edit : null;
       var tool = function (kind, label, title) { return '<button type="button" class="ub out" data-act="map-draw" data-kind="' + kind + '" aria-pressed="' + (dk === kind) + '" title="' + title + '">' + label + '</button>'; };
+      var rtp = editorUi.routePaste, rtOpen = function (i) { return !!rtp && rtp.b === b.id && rtp.i === i; };
+      var rtBox = function (i) {
+        // zone de collage ouverte par le contexte d'édition : un nouvel itinéraire (i = -1) ou le remplacement de l'itinéraire i
+        return rtOpen(i) ? '<div class="ch-paste rt-paste"><textarea class="ch-ta rt-ta" data-b="' + b.id + '" rows="5" spellcheck="false" placeholder="Une ligne par point : latitude, longitude (ex. 48.38, -4.47), puis un libellé facultatif après une tabulation ou un point-virgule. Un point sans libellé prend le nom d’un lieu de la carte à moins de 50 m."></textarea>' +
+          '<div class="ch-r"><button type="button" class="ub" data-act="rt-import" data-i="' + i + '">' + (i < 0 ? 'Créer l’itinéraire' : 'Remplacer les points') + '</button></div></div>' : '';
+      };
       var edBtn = function (kind, i) { return '<button type="button" class="mk-b" data-act="shape-edit" data-kind="' + kind + '" data-i="' + i + '" aria-pressed="' + (!!ed && ed.kind === kind && ed.i === i) + '" title="Modifier sur la carte">✎</button>'; };
       return '<div class="mapblk">' + mapEl +
         '<div class="map-tools"><div class="map-search"><input type="text" class="map-q" data-b="' + b.id + '" placeholder="Ajouter un point : ville, port, ou « 48.38, -4.47 »" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
@@ -209,12 +215,13 @@ function renderBlock(b, d, ctx, num) {
               (z.shape === 'circle' ? '<span class="rd-u">rayon</span><input class="mk-in rd-in" data-b="' + b.id + '" data-zn="' + i + '" value="' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + '" title="Rayon en kilomètres (Entrée pour valider)"><span class="rd-u">km</span>'
                 : '<span class="mk-n">' + z.pts.length + ' sommets</span>') + '</div></div>';
           }).join('') +
-          (rts.length ? '<div class="mk-h">Itinéraires</div>' : '') + rts.map(function (r, i) {
+          '<div class="mk-h">Itinéraires</div>' + '<div class="ch-r"><button type="button" class="mk-b mk-t" data-act="rt-paste" data-i="-1" aria-pressed="' + rtOpen(-1) + '" title="Créer un itinéraire à partir d’une liste de coordonnées collée">Coller un itinéraire…</button></div>' + rtBox(-1) + rts.map(function (r, i) {
             return '<div class="mk-item' + (ed && ed.kind === 'route' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="rdot c-' + esc(r.color || 'accent') + '"></span>' +
               '<input class="mk-in rt-in" data-b="' + b.id + '" data-rt="' + i + '" value="' + esc(r.label) + '" placeholder="Nom de l’itinéraire">' +
               edBtn('route', i) + '<button type="button" class="mk-b" data-gr="' + i + '" title="Cadrer la carte sur cet itinéraire">⌖</button><button type="button" class="mk-b" data-act="route-del" data-i="' + i + '" title="Supprimer l’itinéraire">×</button></div>' +
               '<div class="mk-l2">' + colorSel('rt-color', 'data-rt="' + i + '"', r.color) + '<span class="mk-n">' + r.pts.length + ' étapes · ' + rdist(r) + '</span>' +
-              '<button type="button" class="mk-b mk-t" data-act="route-dist" data-i="' + i + '" aria-pressed="' + !r.hideDist + '" title="Afficher la distance sur la carte">km</button></div>' +
+              '<button type="button" class="mk-b mk-t" data-act="route-dist" data-i="' + i + '" aria-pressed="' + !r.hideDist + '" title="Afficher la distance sur la carte">km</button>' +
+              '<button type="button" class="mk-b mk-t" data-act="rt-paste" data-i="' + i + '" aria-pressed="' + rtOpen(i) + '" title="Remplacer les étapes par une liste de coordonnées collée (nom et couleur gardés)">Remplacer les points…</button></div>' + rtBox(i) +
               ((ed && ed.kind === 'route' && ed.i === i) ? r.pts.map(function (pt, j) {
                 return '<div class="mk-row st-row"><span class="st-n">' + (j + 1) + '</span><input class="mk-in st-in" data-b="' + b.id + '" data-rt="' + i + '" data-s="' + j + '" value="' + esc((r.names || [])[j] || '') + '" placeholder="' + (j === 0 ? 'Départ' : j === r.pts.length - 1 ? 'Arrivée' : 'Étape ' + (j + 1)) + ' (facultatif)">' +
                   '<span class="st-ll">' + (+pt[0]).toFixed(3) + ', ' + (+pt[1]).toFixed(3) + '</span></div>';
@@ -525,7 +532,7 @@ function viewCtx() {
   // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, état d'interface de l'édition
   var ed = mode === 'edit';
   return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
-    editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste } : null });
+    editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste, routePaste: rtPaste } : null });
 }
 function render(focus) {
   var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
@@ -545,6 +552,7 @@ function render(focus) {
 }
 // Données par pays (choroplèthe) : réglages et valeurs, dans le panneau « Éléments de la carte »
 var chPaste = null;   // bloc dont la zone « Coller un tableau » est ouverte
+var rtPaste = null;   // zone « Coller un itinéraire » ouverte : { b: bloc, i: itinéraire remplacé ou -1 pour en créer un }
 var CH_LABELS = [['value', 'Valeurs'], ['both', 'Noms + valeurs'], ['name', 'Noms'], ['none', 'Sans étiquette']];
 var CH_DEC = [['auto', 'Décimales auto'], ['0', '0 décimale'], ['1', '1 décimale'], ['2', '2 décimales'], ['k', 'Abrégé (k, M)']];
 function chRaw(v) {
@@ -695,6 +703,52 @@ function chImport(b, text, replace) {
   });
   if (n) { keepView(b); session.modifier(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
   return { n: n, bad: bad };
+}
+function routeImport(text, d, except) {
+  // liste collée, une ligne par point : coordonnées puis libellé facultatif (après tabulation ou point-virgule) ; except = itinéraire remplacé
+  var pts = [], names = [], bad = [];
+  String(text || '').split(/\r?\n/).forEach(function (line, li) {
+    if (!line.trim()) return;
+    // deux colonnes de nombres (lat puis lon) d'abord : « 48,38 ; -4,47 » ne doit pas se lire 48 puis 38
+    var f = line.split(/[\t;]/), two = f.length > 1 && /^\s*-?\d+(?:[.,]\d+)?\s*°?\s*[EWO]?\s*$/i.test(f[1]);
+    var c = two ? parseLL(f[0] + ' ' + f[1]) : null, k = 2;
+    if (!c) { c = parseLL(f[0]); k = 1; }
+    if (!c) { bad.push(li + 1); return; }
+    var lab = f.slice(k).join(' ').trim();
+    pts.push([c.lat, c.lon]); names.push(lab || routeNear(d, c.lat, c.lon, except));
+  });
+  return { pts: pts, names: names, bad: bad };
+}
+function routeNear(d, lat, lon, except) {
+  // nom du lieu du document le plus proche à moins de 50 m : points de toutes les cartes, étapes nommées des autres itinéraires
+  var best = '', bd = 50, rad = Math.PI / 180;
+  var see = function (n, la, lo) {
+    if (!n) return;
+    var s = Math.sin((la - lat) * rad / 2), t = Math.sin((lo - lon) * rad / 2);
+    var m = 2 * 6371008.8 * Math.asin(Math.sqrt(s * s + Math.cos(lat * rad) * Math.cos(la * rad) * t * t));
+    if (m < bd) { bd = m; best = n; }
+  };
+  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) {
+    if (x.type !== 'map') return;
+    (x.markers || []).forEach(function (mk) { see(String(mk.label || '').trim(), +mk.lat, +mk.lon); });
+    (x.routes || []).forEach(function (r, i) {
+      if (except && except.b === x.id && except.i === i) return;
+      (r.pts || []).forEach(function (p, j) { see(String((r.names || [])[j] || '').trim(), +p[0], +p[1]); });
+    });
+  }); });
+  return best;
+}
+function rtImport(b, text, i) {
+  // crée un itinéraire (i < 0) ou remplace les points de b.routes[i], en gardant nom et couleur ; rien sous deux points
+  var rep = routeImport(text, doc, i >= 0 ? { b: b.id, i: i } : null), ok = rep.pts.length >= 2;
+  if (ok) {
+    keepView(b);
+    session.modifier(function () {
+      if (i < 0) { b.routes.push({ label: '', color: 'accent', pts: rep.pts, names: rep.names }); return; }
+      var r = b.routes[i]; r.pts = rep.pts; r.names = rep.names; delete r.np; delete r.no; delete r.lp;
+    });
+  }
+  return { n: rep.pts.length, bad: rep.bad, ok: ok };
 }
 var panelMin = false;   // panneau « Éléments de la carte » réduit (préférence de ce navigateur, lue au démarrage)
 var MapKit = null, maps = [], mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }, cheatBlock = null;

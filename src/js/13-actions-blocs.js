@@ -99,12 +99,22 @@ app.addEventListener('click', function (e) {
       if (rep.n) { chPaste = null; keepView(b); render(); cheatBlock = b.id; updateCheat(); }
       toast(rep.n || rep.bad.length ? (rep.n ? rep.n + ' pays importé' + (rep.n > 1 ? 's' : '') : 'Aucun pays importé') + (rep.bad.length ? '. Non reconnu' + (rep.bad.length > 1 ? 's' : '') + ' : ' + rep.bad.slice(0, 6).join(', ') + (rep.bad.length > 6 ? '… (+' + (rep.bad.length - 6) + ')' : '') : '') : 'Rien à importer : collez deux colonnes (pays, valeur).', rep.bad.length ? 9000 : 3500);
       break;
+    case 'rt-paste':
+      var ri = +a.dataset.i; rtPaste = rtPaste && rtPaste.b === b.id && rtPaste.i === ri ? null : { b: b.id, i: ri }; keepView(b); render(); cheatBlock = b.id; updateCheat();
+      var rta = $('.rt-ta[data-b="' + b.id + '"]', app); if (rta) rta.focus({ preventScroll: true });
+      break;
+    case 'rt-import':
+      var rbox = a.closest('.rt-paste'), rr = rtImport(b, rbox.querySelector('.rt-ta').value, +a.dataset.i);
+      if (rr.ok) { rtPaste = null; keepView(b); render(); cheatBlock = b.id; updateCheat(); }
+      var rbad = rr.bad.length ? ' · lignes ignorées : ' + rr.bad.slice(0, 12).join(', ') + (rr.bad.length > 12 ? '… (+' + (rr.bad.length - 12) + ')' : '') : '';
+      toast((rr.ok ? rr.n + ' points importés' : 'Rien d’importé : il faut au moins deux points valides (latitude, longitude)') + rbad, rr.bad.length || !rr.ok ? 9000 : 3500);
+      break;
     case 'route-dist': keepView(b); session.modifier(function () { b.routes[i].hideDist = !b.routes[i].hideDist; }); break;
     case 'panel-min':
       panelMin = !panelMin; try { localStorage.setItem(LS + 'panelmin', panelMin ? '1' : '0'); } catch (_) {}
       $$('.mk-panel', app).forEach(function (pn) { pn.classList.toggle('min', panelMin); var bt = pn.querySelector('[data-act=panel-min]'); if (bt) bt.textContent = panelMin ? '▸' : '–'; });
       break;
-    case 'route-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } session.modifier(function () { b.routes.splice(i, 1); }); break;
+    case 'route-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } if (rtPaste && rtPaste.b === b.id) rtPaste = null; session.modifier(function () { b.routes.splice(i, 1); }); break;
     case 'zone-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } session.modifier(function () { b.zones.splice(i, 1); }); break;
     case 'img-alt': var v = prompt('Texte alternatif de l’image :', b.alt || ''); if (v !== null) session.modifier(function () { b.alt = v; }); break;
   }
