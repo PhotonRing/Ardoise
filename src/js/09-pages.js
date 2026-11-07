@@ -111,7 +111,7 @@ app.addEventListener('click', function (e) {
   if (qs) {
     var qhost = qs.closest('[data-qid]'), qblk = qhost && byId(qhost.dataset.qid);
     if (!qblk) return;
-    var cur = qSortSpec(qblk), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
+    var cur = qSortSpec(qblk, viewCtx()), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
     if (mode === 'edit') session.modifier(function () { qblk.sortBy = by; qblk.sortDir = dir; });
     else { viewSort[qblk.id] = { by: by, dir: dir }; render(); }   // lecture : rien n'est enregistré
     scrollTo(0, sy2); return;

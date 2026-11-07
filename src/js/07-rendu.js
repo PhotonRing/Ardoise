@@ -3,11 +3,23 @@ function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
-function renderPage(d, edit, vf) {
-  // vf : sections pliées / dépliées en lecture (id → plié), le temps de la session ; sinon l'état enregistré
-  var isF = function (b) { return vf && vf[b.id] != null ? vf[b.id] : !!b.folded; };
-  var out = [], open = false, counter = 0, fi = foldInfo(d.blocks, edit ? null : isF), reg = edit ? null : foldRegions(d.blocks);
-  d.blocks.forEach(function (b) {
+/* Le rendu est une fonction du document et d'un contexte, sans état de l'éditeur :
+   ctx = { page: indice de la page, view: 'edit' | 'read' | 'export', folds: plis de lecture de la session (id → plié),
+           sort: tris de lecture de la session (id → { by, dir }), navFolds: plis du sommaire latéral (id de page → ouvert),
+           editor: { bar, map, panelMin, paste } (vue 'edit' seulement) } ; un champ absent prend la valeur neutre */
+function rctx(ctx) {
+  ctx = ctx || {};
+  var view = ctx.view === 'edit' || ctx.view === 'export' ? ctx.view : 'read';
+  return { page: +ctx.page || 0, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
+    navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
+}
+function renderPage(d, ctx) {
+  ctx = rctx(ctx);
+  var edit = ctx.view === 'edit', vf = ctx.folds, blocks = d.pages[ctx.page].blocks;
+  // plis de lecture de la session ; sinon l'état enregistré
+  var isF = function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; };
+  var out = [], open = false, counter = 0, fi = foldInfo(blocks, edit ? null : isF), reg = edit ? null : foldRegions(blocks);
+  blocks.forEach(function (b) {
     if (edit && fi.hidden[b.id]) return;   // dans une section pliée (édition)
     if (b.type === 'step' || b.type === 'footer') { if (open) out.push('</section>'); open = false; }
     if (b.type === 'step') { out.push('<section class="step"' + (edit ? '' : ' data-fl="1"') + '>'); open = true; }
@@ -17,7 +29,7 @@ function renderPage(d, edit, vf) {
       if (n) { num = n; var m = n.match(/(\d+)\D*$/); if (m) counter = +m[1]; }
       else { counter++; num = String(counter); }
     }
-    var inner = renderBlock(b, edit, num);
+    var inner = renderBlock(b, d, ctx, num);
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
@@ -28,13 +40,15 @@ function renderPage(d, edit, vf) {
       inner = inner.replace(/^<(\w+)/, '<$1' + at);
       if (fold) inner = inner.replace(/^(<\w+[^>]*>)/, '$1<button type="button" class="fold-v" data-vfold aria-expanded="' + !folded + '" title="Plier / déplier la section"></button>');
     }
-    out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0) : inner);
+    out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0, ctx.editor) : inner);
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
   return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>');
 }
-function renderBlock(b, e, num) {
+function renderBlock(b, d, ctx, num) {
+  ctx = rctx(ctx);
+  var e = ctx.view === 'edit', ued = ctx.editor;
   function f(tag, cls, k, val, o) {
     o = o || {};
     var rich = o.rich !== false, body = rich ? R(val) : esc(val);
@@ -74,14 +88,14 @@ function renderBlock(b, e, num) {
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
       return '<div class="step-head">' + badge + f('h2', '', 'title', b.title, { ph: 'Titre de l’étape', nl: 1 }) + '</div>';
     case 'summary':
-      var sl = summaryList(b, doc.cur);
+      var sl = summaryList(b, d, ctx.page);
       if (!e && !sl) return '';
       return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
         '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
-    case 'kanban': return kanbanHTML(b, e, f);
+    case 'kanban': return kanbanHTML(b, ctx, f);
     case 'query':
       return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? queryForm(b) : '') + '<div class="q-res">' + queryResult(b, doc.cur, e) + '</div></div>';
+        (e ? queryForm(b, d, ctx) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -143,7 +157,7 @@ function renderBlock(b, e, num) {
       var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
       var rdist = function (r) { if (!MapKit) MapKit = ardoiseMapKit(); return MapKit.fmtDist(MapKit.pathLen(r.pts)); };
       var zdesc = function (z) { return z.shape === 'circle' ? 'cercle de ' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + ' km' : z.pts.length + ' sommets'; };
-      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
+      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b, d) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
         ' tabindex="0" role="application" aria-label="Carte" style="height:' + mh + 'px"><div class="map-nojs">Carte interactive : JavaScript nécessaire pour l’afficher.</div></div>';
       if (!e) {
         var li = mks.map(function (m, i) { return '<li><button type="button" data-go="' + i + '"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' + esc(m.label || 'Point ' + (i + 1)) + '</button><span class="muted">' + mll(m) + '</span></li>'; })
@@ -155,17 +169,17 @@ function renderBlock(b, e, num) {
         return '<div class="mapblk">' + mapEl + ((b.list && li.length) ? '<ol class="map-list">' + li.join('') + '</ol>' : '') + '</div>';
       }
       var colorSel = function (cls, attr, cur) { return '<select class="' + cls + '" data-b="' + b.id + '" ' + attr + ' title="Couleur">' + MK_COLORS.map(function (c) { return opt(c[0], cur || 'accent', c[1]); }).join('') + '</select>'; };
-      var dk = mapUi.draw === b.id ? mapUi.kind : null, ed = mapUi.editOf === b.id ? mapUi.edit : null;
+      var mu = ued.map || {}, dk = mu.draw === b.id ? mu.kind : null, ed = mu.editOf === b.id ? mu.edit : null;
       var tool = function (kind, label, title) { return '<button type="button" class="ub out" data-act="map-draw" data-kind="' + kind + '" aria-pressed="' + (dk === kind) + '" title="' + title + '">' + label + '</button>'; };
       var edBtn = function (kind, i) { return '<button type="button" class="mk-b" data-act="shape-edit" data-kind="' + kind + '" data-i="' + i + '" aria-pressed="' + (!!ed && ed.kind === kind && ed.i === i) + '" title="Modifier sur la carte">✎</button>'; };
       return '<div class="mapblk">' + mapEl +
         '<div class="map-tools"><div class="map-search"><input type="text" class="map-q" data-b="' + b.id + '" placeholder="Ajouter un point : ville, port, ou « 48.38, -4.47 »" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
-        '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mapUi.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
+        '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mu.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
         tool('poly', '▱ Zone', 'Dessiner une zone sommet par sommet') + tool('circle', '○ Cercle', 'Dessiner une zone circulaire : centre puis rayon') + tool('route', '⤳ Itinéraire', 'Tracer un itinéraire étape par étape') +
         '<button type="button" class="ub out" data-act="ch-on" aria-pressed="' + !!b.choro + '" title="Colorer les pays selon une valeur (carte choroplèthe)">▦ Pays</button></div>' +
         '<p class="muted map-sum">' + (mks.length + zns.length + rts.length ? [mks.length ? mks.length + ' point' + (mks.length > 1 ? 's' : '') : '', zns.length ? zns.length + ' zone' + (zns.length > 1 ? 's' : '') : '', rts.length ? rts.length + ' itinéraire' + (rts.length > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') + ' — cliquez sur la carte pour afficher la liste à gauche.' : 'Rien sur la carte : cherchez une ville ou un port, placez un point, dessinez une zone, un cercle ou un itinéraire.') + '</p>' +
-        '<div class="mk-panel' + (panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (panelMin ? '▸' : '–') + '</button></div>' +
-        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b) +
+        '<div class="mk-panel' + (ued.panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (ued.panelMin ? '▸' : '–') + '</button></div>' +
+        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b, d, ued) +
           (mks.length ? '<div class="mk-h">Points</div>' : '') + mks.map(function (m, i) {
             return '<div class="mk-item' + (ed && ed.kind === 'marker' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' +
               '<input class="mk-in" data-b="' + b.id + '" data-mk="' + i + '" data-p="label" value="' + esc(m.label) + '" placeholder="Libellé du point">' +
@@ -258,12 +272,12 @@ function summaryDepth(b) {
   if (b.depth != null && b.depth !== '') return Math.max(0, +b.depth || 0);
   return b.deep === false ? 1 : 0;
 }
-function summaryItems(b, pi) {
-  // entrées du bloc sommaire : [{ t, n, href, kids }]
-  var pg = doc.pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
+function summaryItems(b, d, pi) {
+  // entrées du bloc sommaire de la page pi : [{ t, n, href, kids }]
+  var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
   if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(doc.pages[j], j), href: '#pg-' + doc.pages[j].id, kids: !dp || lv < dp ? pageKids(doc.pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
-    out = pageKids(doc.pages, pi).map(function (j) { return mkp(j, 1); });
+    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
+    out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {
       var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
@@ -273,8 +287,8 @@ function summaryItems(b, pi) {
   if (b.sort === 'alpha') (function srt(arr) { arr.sort(cmp); arr.forEach(function (it) { srt(it.kids); }); })(out);
   return out;
 }
-function summaryList(b, pi) {
-  var items = summaryItems(b, pi);
+function summaryList(b, d, pi) {
+  var items = summaryItems(b, d, pi);
   function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + esc(it.t) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
   return items.length ? ol(items) : '';
 }
@@ -343,9 +357,9 @@ function revealBlock(id) {
   // déplie les sections qui masquent ce bloc
   for (var n = 0; n < 20; n++) { var h = foldInfo(doc.blocks).hidden[id], hb = h && byId(h); if (!hb) return; delete hb.folded; }
 }
-function wrapEdit(b, inner, nHidden) {
+function wrapEdit(b, inner, nHidden, ued) {
   var s = settings(b), fl = foldLevel(b) > 0;
-  return '<div class="blk' + (b.id === barHold ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
+  return '<div class="blk' + (ued && ued.bar != null && b.id === ued.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
@@ -387,9 +401,11 @@ var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) 
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
 function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
-function navHTML(d, edit, all) {
-  // all : export statique, toutes les pages sont présentes et le script bascule de l'une à l'autre
-  var pages = d.pages, cur = d.cur, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
+function navHTML(d, ctx) {
+  // vue 'export' : toutes les pages sont présentes et le script de la page exportée bascule de l'une à l'autre
+  ctx = rctx(ctx);
+  var edit = ctx.view === 'edit', all = ctx.view === 'export', nf = ctx.navFolds;
+  var pages = d.pages, cur = Math.min(ctx.page, pages.length - 1), w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
   var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
   var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
   var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
@@ -405,7 +421,7 @@ function navHTML(d, edit, all) {
   // sommaire : arborescence repliable (la page affichée et ses parents sont dépliés, sauf choix contraire)
   var entry = function (i) {
     var kids = pageKids(pages, i), secs = (all || i === cur) ? sectionsOf(pages[i]) : [];
-    var open = !!kids.length && (navFold[pages[i].id] != null ? navFold[pages[i].id] : anc.indexOf(i) >= 0 || i === cur);
+    var open = !!kids.length && (nf[pages[i].id] != null ? nf[pages[i].id] : anc.indexOf(i) >= 0 || i === cur);
     var fold = kids.length ? '<button type="button" class="toc-f" data-pgfold aria-expanded="' + open + '" title="Afficher / masquer les sous-pages">›</button>' : '<span class="toc-f"></span>';
     return '<li class="toc-p' + (i === cur ? ' on' : '') + (kids.length ? ' has-kids' + (open ? ' open' : '') : '') + '" data-pgi="' + i + '">' +
       '<div class="toc-pr"' + (edit ? ' draggable="true"' : '') + '>' + fold + pgBtn('toc-pb', i) +
@@ -478,13 +494,11 @@ function applyTheme() {
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
 var pointerBusy = false, navPending = false;
-document.addEventListener('pointerdown', function () { pointerBusy = true; }, true);
-document.addEventListener('pointerup', function () { setTimeout(function () { pointerBusy = false; if (navPending) { navPending = false; refreshDerived(); } }, 0); }, true);
 function refreshDerived() {
   // après une saisie : met à jour ce qui découle du contenu sans tout redessiner (le curseur et le clic en cours sont préservés)
   clearTimeout(derivedT); derivedT = 0;
   if (!doc) return;
-  var nh = navHTML(doc, mode === 'edit', false);
+  var vc = viewCtx(), nh = navHTML(doc, vc);
   if (nh !== lastNav && !$('.pnav-in', app)) {
     var tmp = document.createElement('div'); tmp.innerHTML = nh;
     var side = $('.pnav-side', app), ns = tmp.querySelector('.pnav-side'), ot = $('.pnav-tabs', app), nt = tmp.querySelector('.pnav-tabs');
@@ -511,13 +525,13 @@ function refreshDerived() {
     if (b.type !== 'query') return;
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
-    var h = paintPills(queryResult(b, doc.cur, mode === 'edit')); if (box.innerHTML !== h) box.innerHTML = h;
+    var h = paintPills(queryResult(b, doc, vc)); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   doc.blocks.forEach(function (b) {
     if (b.type !== 'summary') return;
     var box = $('.blk[data-id="' + b.id + '"] .toc-blk-l', app); if (!box) return;
-    var h = summaryList(b, doc.cur) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
+    var h = summaryList(b, doc, vc.page) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // numérotation automatique des étapes (pastilles vides qui affichent le numéro calculé)
   var counter = 0;
@@ -532,10 +546,22 @@ function refreshDerived() {
   var dn = $('#ui .doc-name'); if (dn && dn.textContent !== ct) dn.textContent = ct;
 }
 function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }
+function fileAppHTML(d, page) {
+  // aperçu de la page enregistré dans le fichier (#app) : vue de lecture sans plis ni tris de session, quel que soit le mode
+  var ctx = { page: page, view: 'read' };
+  return navHTML(d, ctx) + renderPage(d, ctx);
+}
+function viewCtx() {
+  // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, état d'interface de l'édition
+  var ed = mode === 'edit';
+  return { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
+    editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste } : null };
+}
 function render(focus) {
   var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
-  lastNav = navHTML(doc, mode === 'edit', false);
-  app.innerHTML = lastNav + renderPage(doc, mode === 'edit', viewFold);
+  var vc = viewCtx();
+  lastNav = navHTML(doc, vc);
+  app.innerHTML = lastNav + renderPage(doc, vc);
   applyTheme();
   if (navSpyFn) navSpyFn();
   if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
@@ -559,15 +585,15 @@ function chRaw(v) {
   return (neg ? '-' : '') + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f') + (p[1] ? ',' + p[1] : '');
 }
 // Source « tableau » : les valeurs sont lues dans un bloc tableau du document (colonne des pays, colonne des valeurs)
-function chTables() {
+function chTables(d) {
   var out = [];
-  doc.pages.forEach(function (pg, pi) { pg.blocks.forEach(function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
+  d.pages.forEach(function (pg, pi) { pg.blocks.forEach(function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
   return out;
 }
-function chTableLabel(t) {
+function chTableLabel(d, t) {
   var hd = t.b.rows[0].map(function (c) { return textOf(c); }).filter(Boolean).join(' · ') || 'sans en-tête';
   if (hd.length > 42) hd = hd.slice(0, 41) + '…';
-  return 'Tableau « ' + hd + ' »' + (doc.pages.length > 1 ? ' · ' + (pageTitle(t.pg, t.pi)) : '');
+  return 'Tableau « ' + hd + ' »' + (d.pages.length > 1 ? ' · ' + (pageTitle(t.pg, t.pi)) : '');
 }
 function chGuessCols(tb) {
   // colonne des pays : celle où le plus de cellules sont des pays ; des valeurs : une autre, la plus numérique
@@ -576,12 +602,12 @@ function chGuessCols(tb) {
   for (var j2 = 0; j2 < n; j2++) { if (j2 === bk) continue; var c2 = rows.filter(function (r) { return K.num(textOf(r[j2])) != null; }).length; if (c2 > best[1]) { best[1] = c2; bv = j2; } }
   return { k: bk, v: Math.min(bv, Math.max(0, n - 1)) };
 }
-function chView(b) {
+function chView(b, d) {
   // réglages tels que la carte les affiche : avec une source tableau, les valeurs viennent du tableau
   var ch = b.choro; if (!ch || !ch.src) return ch;
   var out = {}; for (var k in ch) out[k] = ch[k];
   var info = { n: 0, bad: [], dup: [], missing: false }, data = {}, t = null;
-  doc.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
+  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
   if (!t) info.missing = true;
   else {
     if (!MapKit) MapKit = ardoiseMapKit();
@@ -597,18 +623,18 @@ function chView(b) {
   out.data = data; Object.defineProperty(out, 'info', { value: info, enumerable: false });
   return out;
 }
-function choroPanel(b) {
+function choroPanel(b, d, ued) {
   if (!b.choro) return '';
   if (!MapKit) MapKit = ardoiseMapKit();
-  var K = MapKit.choro, vw = chView(b), c = K.clean(vw), S = K.scale(c), I = K.index(), id = b.id, src = b.choro.src, info = vw.info;
+  var K = MapKit.choro, vw = chView(b, d), c = K.clean(vw), S = K.scale(c), I = K.index(), id = b.id, src = b.choro.src, info = vw.info;
   var sel = function (p, cur, list, title) { return '<select class="ch-set" data-b="' + id + '" data-p="' + p + '" title="' + title + '">' + list.map(function (x) { return opt(x[0], cur, esc(x[1])); }).join('') + '</select>'; };
   var txt = function (p, val, ph, cls, title) { return '<input class="mk-in ch-txt' + (cls ? ' ' + cls : '') + '" data-b="' + id + '" data-p="' + p + '" value="' + esc(val) + '" placeholder="' + ph + '" title="' + (title || ph) + '">'; };
   var tg = function (a, on, label, title) { return '<button type="button" class="mk-b mk-t" data-act="' + a + '" aria-pressed="' + !!on + '" title="' + title + '">' + label + '</button>'; };
   var rows = Object.keys(c.data).filter(function (k) { return I.by[k]; }).sort(function (x, y) { return I.by[x].name.localeCompare(I.by[y].name, 'fr'); });
   var classed = c.scale === 'quant' || c.scale === 'eq', perso = c.pal === 'perso' || c.pal === 'perso3';
   var defCols = c.pal === 'perso3' ? ['#2166ac', '#f3efec', '#b2182b'] : ['#eef5fb', '#0c3b72'];
-  var tabs = chTables(), srcSel = '<select class="ch-src" data-b="' + id + '" title="D’où viennent les valeurs">' + opt('', src ? src.b : '', 'Valeurs saisies ici') +
-    tabs.map(function (t) { return opt(t.b.id, src ? src.b : '', esc(chTableLabel(t))); }).join('') + (src && info.missing ? opt(src.b, src.b, 'Tableau supprimé') : '') + '</select>';
+  var tabs = chTables(d), srcSel = '<select class="ch-src" data-b="' + id + '" title="D’où viennent les valeurs">' + opt('', src ? src.b : '', 'Valeurs saisies ici') +
+    tabs.map(function (t) { return opt(t.b.id, src ? src.b : '', esc(chTableLabel(d, t))); }).join('') + (src && info.missing ? opt(src.b, src.b, 'Tableau supprimé') : '') + '</select>';
   var srcCols = '';
   if (src && !info.missing) {
     var tb = null; tabs.forEach(function (t) { if (t.b.id === src.b) tb = t.b; });
@@ -630,9 +656,9 @@ function choroPanel(b) {
       tg('ch-sov', c.sov, 'Territoires rattachés', 'Colorer les territoires sans valeur propre (Nouvelle-Calédonie, Groenland, Porto Rico…) comme leur pays souverain') + '</div>' +
     '<div class="ch-r">' + tg('ch-legend', c.legend, 'Légende', 'Afficher la légende sur la carte') +
       tg('ch-unitlab', c.unitLab, 'Unité sur la carte', 'Ajouter l’unité après chaque valeur affichée sur les pays (elle reste dans la légende et l’infobulle)') +
-      (src ? '' : tg('ch-paste', chPaste === id, 'Coller un tableau…', 'Importer deux colonnes copiées d’un tableur')) +
+      (src ? '' : tg('ch-paste', ued.paste === id, 'Coller un tableau…', 'Importer deux colonnes copiées d’un tableur')) +
       '<button type="button" class="mk-b mk-t ch-off" data-act="ch-off" title="Retirer les couleurs et toutes les données par pays">Retirer</button></div>' +
-    (!src && chPaste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
+    (!src && ued.paste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
       '<div class="ch-r"><button type="button" class="ub" data-act="ch-import">Importer</button><label class="ch-repl"><input type="checkbox"> Remplacer les données existantes</label></div></div>' : '') +
     (src ? '' : '<div class="map-search ch-search"><input type="text" class="ch-q" data-b="' + id + '" placeholder="Ajouter un pays…" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>') +
     (rows.length ? '' : '<p class="muted">' + (src ? 'Aucun pays reconnu dans le tableau.' : 'Aucun pays : ajoutez-en un, cliquez sur un pays de la carte ou collez un tableau.') + '</p>') +
@@ -646,7 +672,7 @@ function choroPanel(b) {
 }
 function chRefresh(b) {
   // valeur ou texte modifié sans redessiner le bloc : couleurs de la liste et carte mises à jour
-  var vw = chView(b), K = MapKit.choro, S = K.scale(K.clean(vw)), m = mapOf(b.id);
+  var vw = chView(b, doc), K = MapKit.choro, S = K.scale(K.clean(vw)), m = mapOf(b.id);
   $$('.ch-row[data-b="' + b.id + '"]', app).forEach(function (r) { var col = S.color(vw.data[r.dataset.id]); r.querySelector('.ch-sw').style.background = col || ''; });
   if (m) m.setChoro(vw);
 }
@@ -655,8 +681,8 @@ function chRefreshLinked() {
   // tableau source modifié : cartes et listes des données mises à jour (sauf pendant une saisie dans la liste)
   doc.blocks.forEach(function (b) {
     if (b.type !== 'map' || !b.choro || !b.choro.src) return;
-    var m = mapOf(b.id); if (m) m.setChoro(chView(b));
-    var w = $('.ch-wrap[data-b="' + b.id + '"]', app); if (w && !w.contains(document.activeElement)) { var h = choroPanel(b); if (w.outerHTML !== h) w.outerHTML = h; }
+    var m = mapOf(b.id); if (m) m.setChoro(chView(b, doc));
+    var w = $('.ch-wrap[data-b="' + b.id + '"]', app); if (w && !w.contains(document.activeElement)) { var h = choroPanel(b, doc, viewCtx().editor); if (w.outerHTML !== h) w.outerHTML = h; }
   });
 }
 function chSearch(inp) {
@@ -700,8 +726,7 @@ function chImport(b, text, replace) {
   if (n) { keepView(b); session.modifier(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
   return { n: n, bad: bad };
 }
-var panelMin = false;
-try { panelMin = localStorage.getItem(LS + 'panelmin') === '1'; } catch (_) {}
+var panelMin = false;   // panneau « Éléments de la carte » réduit (préférence de ce navigateur, lue au démarrage)
 var MapKit = null, maps = [], mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }, cheatBlock = null;
 var MK_COLORS = [['accent', 'Accent'], ['ok', 'Vert'], ['bad', 'Rouge'], ['warn', 'Orange'], ['info', 'Bleu']];
 function mapOf(id) { for (var i = 0; i < maps.length; i++) if (maps[i].blockId === id) return maps[i]; return null; }
@@ -715,7 +740,7 @@ function mountMaps() {
     if (!b.routes) b.routes = [];
     var ed = mode === 'edit';
     var focusIn = function (sel) { cheatBlock = b.id; updateCheat(); var inp = $(sel, app); if (inp) { inp.focus({ preventScroll: true }); var it = inp.closest('.mk-item'); if (it) it.scrollIntoView({ block: 'nearest' }); } };
-    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: chView(b), cities: b.cities !== false, countries: b.countries !== false, key: doc.mapKey }, {
+    var inst = MapKit.mount(el, { view: b.view, bg: b.bg, markers: b.markers, zones: b.zones, routes: b.routes, choro: chView(b, doc), cities: b.cities !== false, countries: b.countries !== false, key: doc.mapKey }, {
       edit: ed, locked: !ed && !!b.lock, hideBg: !ed && !!b.hideBg,
       onView: function (v) { if (ed) { b.view = v; marquerModifie(); } },
       onBg: function (bg) { if (!ed) return; b.bg = bg; marquerModifie(); var s = $('.blk[data-id="' + b.id + '"] select[data-prop=bg]', app); if (s) s.value = bg; },
@@ -754,7 +779,7 @@ function mountMaps() {
       onChoroLabel: function (id, ll) { keepView(b); session.modifier(function () { if (!b.choro.lp) b.choro.lp = {}; if (ll) b.choro.lp[id] = ll; else delete b.choro.lp[id]; }); },
       onCountryPick: function (id) {
         cheatBlock = b.id; updateCheat();
-        var vw = chView(b);
+        var vw = chView(b, doc);
         if (vw && id in vw.data) { chFocus(b, id); return; }
         if (b.choro && b.choro.src) { var cn = MapKit.choro.index().by[id]; toast((cn ? cn.name : id) + ' ne figure pas dans le tableau source'); return; }
         var q = $('.ch-q[data-b="' + b.id + '"]', app), c = MapKit.choro.index().by[id]; if (!q || !c) return;

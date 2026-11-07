@@ -47,7 +47,7 @@ function buildFile(stored) {
   Array.prototype.slice.call(body.attributes).forEach(function (a) { body.removeAttribute(a.name); });
   root.querySelector('title').textContent = sealedFile ? 'Document protégé' : docTitle();
   root.querySelector('#ardoise-doc').textContent = stored.replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, function (c) { return c === '\u2028' ? '\\u2028' : '\\u2029'; });
-  root.querySelector('#app').innerHTML = sealedFile ? '<div class="wrap"><p>Document chiffré : ouvrez ce fichier dans un navigateur et saisissez le mot de passe.</p></div>' : navHTML(doc, false, false) + renderPage(doc, false);
+  root.querySelector('#app').innerHTML = sealedFile ? '<div class="wrap"><p>Document chiffré : ouvrez ce fichier dans un navigateur et saisissez le mot de passe.</p></div>' : fileAppHTML(doc, doc.cur);
   return '<!doctype html>\n' + root.outerHTML;
 }
 // Poignées de fichier conservées par document (IndexedDB), pour l'auto-save après réouverture
