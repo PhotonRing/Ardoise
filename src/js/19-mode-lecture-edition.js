@@ -1,29 +1,16 @@
 /* ---------- Mode lecture / édition ---------- */
-// bloc d'ancrage dans la vue cible (ctx comme renderPage) : le bloc lui-même, sinon le titre plié qui le masque,
-// sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
-function anchorBlock(d, ctx, id) {
-  ctx = rctx(ctx, d);
-  var blocks = d.pages[ctx.page].blocks, vf = ctx.folds, edit = ctx.view === 'edit';
-  var fi = foldInfo(blocks, edit ? null : function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; });
-  var shown = function (b) { return !fi.hidden[b.id] && (edit || !!renderBlock(b, d, ctx, null)); };
-  var a = fi.hidden[id] || id, i = -1, j;
-  blocks.forEach(function (b, k) { if (b.id === a) i = k; });
-  if (i < 0 || shown(blocks[i])) return a;
-  for (j = i - 1; j >= 0; j--) if (shown(blocks[j])) return blocks[j].id;
-  for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
-  return a;
-}
 // haut utile de l'écran : sous la barre d'outils fixe de l'édition
 function viewTop() { var tb = $('.tb'); return tb ? tb.getBoundingClientRect().bottom : 0; }
-// élément affiché d'un bloc : .blk[data-id] en édition, [data-bid] en lecture
-function blockEl(id) { return $((mode === 'edit' ? '.blk[data-id="' : '[data-bid="') + id + '"]', app); }
+// marque d'un bloc affiché selon le mode : attribut d'id et sélecteur (.blk[data-id] en édition, [data-bid] en lecture), du bloc id ou de tous
+function blockMark(id) { var a = mode === 'edit' ? 'data-id' : 'data-bid'; return { attr: a, sel: (mode === 'edit' ? '.blk[' : '[') + a + (id == null ? '' : '="' + id + '"') + ']' }; }
+function blockEl(id) { return $(blockMark(id).sel, app); }
 // premier bloc affiché dont le bas passe sous le haut utile de l'écran, et son écart à ce haut
 function topBlock() {
-  var line = viewTop(), els = $$(mode === 'edit' ? '.blk[data-id]' : '[data-bid]', app);
+  var line = viewTop(), mk = blockMark(), els = $$(mk.sel, app);
   for (var i = 0; i < els.length; i++) {
     if (!els[i].getClientRects().length) continue;   // masqué (section pliée en lecture)
     var r = els[i].getBoundingClientRect();
-    if (r.bottom > line) return { id: els[i].getAttribute(mode === 'edit' ? 'data-id' : 'data-bid'), dy: r.top - line };
+    if (r.bottom > line) return { id: els[i].getAttribute(mk.attr), dy: r.top - line };
   }
   return null;
 }

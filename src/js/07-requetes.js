@@ -26,14 +26,13 @@ function docTags(d) {
   });
   return out;
 }
-function qPageAt(pages, pid) { for (var i = 0; i < pages.length; i++) if (pages[i].id === pid) return i; return -1; }
 function queryBlocks(b, d, pi) {
   // blocs de la portée, vue depuis la page pi : [{ blk, pi, sec }] (sec : titre de section qui contient le bloc, ou null)
   var pages = d.pages, s = b.scope || 'doc', m, list = [], from = 0, to = 0, region = null;
   if (s === 'doc') { from = 0; to = pages.length; }
-  else if (s === 'here' || (m = s.match(/^pg:(.+)$/))) { var p = s === 'here' ? pi : qPageAt(pages, m[1]); if (p < 0) return []; from = p; to = b.sub ? pageEnd(pages, p) : p + 1; }
+  else if (s === 'here' || (m = s.match(/^pg:(.+)$/))) { var p = s === 'here' ? pi : pageIndex(pages, m[1]); if (p < 0) return []; from = p; to = b.sub ? pageEnd(pages, p) : p + 1; }
   else if ((m = s.match(/^sec:([^/]+)\/(.+)$/))) {
-    var sp = qPageAt(pages, m[1]); if (sp < 0) return [];
+    var sp = pageIndex(pages, m[1]); if (sp < 0) return [];
     var bl = pages[sp].blocks, hi = -1; for (var k = 0; k < bl.length; k++) if (bl[k].id === m[2]) hi = k;
     if (hi < 0) return [];
     var hl = foldLevel(bl[hi]), end = hi + 1; while (end < bl.length) { var l = foldLevel(bl[end]); if (l >= 0 && l <= hl) break; end++; }
@@ -177,7 +176,7 @@ function qCardLabel(b, c, names) {
   return base + (t.length ? ' · ' + t.join(c.match === 'all' ? ' + ' : ' ou ') : '');
 }
 function qCards(b, d, ctx, recs) {
-  var pi = ctx.page, e = ctx.view === 'edit';
+  var pi = ctx.page, e = ctx.edit;
   // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui ont ses
   // propres pastilles (et, pour les cases, leur état), éventuellement rapportés à un total
   var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
@@ -226,7 +225,7 @@ function qCompare(a, b) {
   var x = a.s != null ? a.s : String(a.n != null ? a.n : a.d), y = b.s != null ? b.s : String(b.n != null ? b.n : b.d);
   return x.localeCompare(y, 'fr', { numeric: true, sensitivity: 'base' });
 }
-function qSortSpec(b, ctx) { var v = rctx(ctx).sort[b.id]; return v || { by: b.sortBy || '', dir: b.sortDir || 'asc' }; }   // tri de session : vue 'read' seulement
+function qSortSpec(b, ctx) { var v = ctx.sort[b.id]; return v || { by: b.sortBy || '', dir: b.sortDir || 'asc' }; }   // tri de session : vue 'read' seulement
 function qSortOptions(b, recs) {
   // choix de tri : colonnes (fiches, lignes) ou élément / état (cases), et source
   if ((b.src || 'facts') === 'check') return [['txt', 'Élément'], ['done', 'État (cochées)'], ['src', 'Source']];
@@ -254,13 +253,13 @@ function qSorted(b, d, ctx, recs) {
 function qBox(d, ctx, r) {
   // case cochable depuis la requête (sauf dans l'export statique) : coche la vraie case dans sa liste
   var lab = r.done ? 'Décocher' : 'Cocher';
-  return ctx.view === 'export' ? '<span class="q-box" aria-label="' + (r.done ? 'cochée' : 'non cochée') + '">' + (r.done ? '☑' : '☐') + '</span>'
+  return ctx.static ? '<span class="q-box" aria-label="' + (r.done ? 'cochée' : 'non cochée') + '">' + (r.done ? '☑' : '☐') + '</span>'
     : '<button type="button" class="q-box" data-qchk="' + esc(d.pages[r.x.pi].id + '|' + r.x.blk.id + '|' + r.path) + '" aria-pressed="' + r.done + '" title="' + lab + ' (dans sa liste d’origine)">' + (r.done ? '☑' : '☐') + '</button>';
 }
 function qTh(b, ctx, key, label) {
   // en-tête de tableau : un clic trie (enregistré en édition, pour la lecture en cours seulement en lecture)
   var sp = qSortSpec(b, ctx), on = sp.by === key;
-  if (ctx.view === 'export') return '<th>' + esc(label) + '</th>';
+  if (ctx.static) return '<th>' + esc(label) + '</th>';
   return '<th><button type="button" class="q-th" data-qsort="' + esc(key) + '" title="Trier">' + esc(label) + (on ? '<span class="q-dir">' + (sp.dir === 'desc' ? ' ↓' : ' ↑') + '</span>' : '') + '</button></th>';
 }
 function qKanban(b, d, ctx, recs) {
@@ -289,7 +288,7 @@ function qKanban(b, d, ctx, recs) {
 }
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
-  ctx = rctx(ctx);
+  ctx = renderCtx(d, ctx);
   var recs = queryRecords(b, d, ctx.page), src = b.src || 'facts', view = b.view || 'table';
   if (view === 'count') return qCards(b, d, ctx, recs);
   if (!recs.length) return '<p class="muted q-empty">Aucun résultat.</p>';

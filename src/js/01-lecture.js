@@ -1,6 +1,5 @@
 /* ---------- Runtime de lecture (autonome : recopié tel quel dans l'export statique, fermeture vérifiée par build.mjs) ---------- */
-// Tout ce que la page exportée exécute : pliage, sommaire, pages, impression, frises. L'éditeur s'en sert par Reader ;
-// rien ici ne cite un nom de premier niveau du bundle, et rien ne touche au DOM avant un appel
+// tout ce que la page exportée exécute (pliage, sommaire, pages, impression, frises), utilisé aussi par l'éditeur (Reader) ; aucun nom du bundle, aucun accès au DOM avant un appel
 function ardoiseReader() {
   function tlFit(root) {
     // marge au-dessus de la frise = hauteur réelle du titre incliné le plus long ; marges latérales = débord du dernier titre
@@ -64,8 +63,7 @@ function ardoiseReader() {
     window.addEventListener('resize', hide);
   }
   function foldHidden(levels, folded) {
-    // la règle de pliage, pour l'éditeur et la page exportée : un titre plié (niveau > 0) masque ce qui le suit jusqu'au
-    // prochain titre de même niveau ou de niveau inférieur (0 : en-tête, pied) ; r[i] = indice du titre plié le plus extérieur, ou -1
+    // règle de pliage (éditeur et page exportée) : un titre plié (niveau > 0) masque la suite jusqu'au prochain titre de niveau égal ou inférieur (0 : en-tête, pied) ; r[i] = titre plié le plus extérieur qui masque i, ou -1
     var r = [], cur = -1;
     for (var i = 0; i < levels.length; i++) {
       var lv = levels[i];

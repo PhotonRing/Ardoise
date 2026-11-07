@@ -103,7 +103,7 @@ app.addEventListener('click', function (e) {
   var qc = t.closest('[data-qchk]');
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
-    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
+    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
     if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
     return;
   }

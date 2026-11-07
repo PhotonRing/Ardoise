@@ -28,7 +28,7 @@ function kbWho(name) {
 }
 function kanbanHTML(b, ctx, f) {
   // vue 'export' : cartes sans commandes de déplacement (page exportée sans script d'édition)
-  var cols = b.cols || [], e = ctx.view === 'edit', st = ctx.view === 'export';
+  var cols = b.cols || [], e = ctx.edit, st = ctx.static;
   return '<div class="kb' + (e ? ' kb-edit' : '') + '" data-kb="' + b.id + '"><div class="kb-cols">' + cols.map(function (c, ci) {
     var last = ci === cols.length - 1, cards = c.cards || [];
     return '<section class="kb-col" data-ci="' + ci + '"><div class="kb-head">' + f('span', 'kb-title', 'cols.' + ci + '.title', c.title, { rich: false, ph: 'Colonne', nl: 1 }) +

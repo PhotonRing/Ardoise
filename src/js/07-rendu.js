@@ -3,17 +3,15 @@ function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
-/* Le rendu est une fonction du document et d'un contexte, sans état de l'éditeur :
-   ctx = { page: indice de la page, view: 'edit' | 'read' | 'export', folds: plis de lecture de la session (id → plié),
-           sort: tris de lecture de la session (id → { by, dir }), navFolds: plis du sommaire latéral (id de page → ouvert),
-           editor: { bar, map, panelMin, paste } (vue 'edit' seulement) } ; un champ absent prend la valeur neutre */
-function rctx(ctx, d) {
+// contexte du rendu, normalisé aux entrées publiques : page bornée au document, vue et ses booléens, plis et tris de session (lecture), plis du sommaire, état d'interface (édition) ; champ absent = valeur neutre
+function renderCtx(d, ctx) {
   ctx = ctx || {};
   var view = ctx.view === 'edit' || ctx.view === 'export' ? ctx.view : 'read';
-  var page = d ? Math.max(0, Math.min(d.pages.length - 1, +ctx.page || 0)) : +ctx.page || 0;   // indice borné aux pages du document
-  return { page: page, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
-    navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
+  return { page: Math.max(0, Math.min(d.pages.length - 1, +ctx.page || 0)), view: view, edit: view === 'edit', static: view === 'export',
+    folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {}, navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
 }
+// un titre est-il plié : pli de lecture de la session, sinon l'état enregistré
+function foldedIn(ctx) { var vf = ctx.folds; return function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; }; }
 // numéro affiché de chaque étape (id → numéro) : le numéro saisi, sinon le dernier numéro saisi recopié avec son dernier nombre augmenté (« 5. 2 » → « 5. 3 ») ; étapes nonum exclues
 function stepNums(blocks) {
   var out = {}, pre = '', counter = 0, post = '';
@@ -26,10 +24,8 @@ function stepNums(blocks) {
   return out;
 }
 function renderPage(d, ctx) {
-  ctx = rctx(ctx, d);
-  var edit = ctx.view === 'edit', vf = ctx.folds, blocks = d.pages[ctx.page].blocks;
-  // plis de lecture de la session ; sinon l'état enregistré
-  var isF = function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; };
+  ctx = renderCtx(d, ctx);
+  var edit = ctx.edit, blocks = d.pages[ctx.page].blocks, isF = foldedIn(ctx);
   var out = [], open = false, nums = stepNums(blocks), fi = foldInfo(blocks, edit ? null : isF), reg = edit ? null : foldRegions(blocks);
   blocks.forEach(function (b) {
     if (edit && fi.hidden[b.id]) return;   // dans une section pliée (édition)
@@ -43,7 +39,7 @@ function renderPage(d, ctx) {
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
-      if (ctx.view === 'read') at += ' data-bid="' + b.id + '"';   // ancrage de la bascule vers l'édition (19-mode-lecture-edition.js)
+      if (!ctx.static) at += ' data-bid="' + b.id + '"';   // ancrage de la bascule vers l'édition (19-mode-lecture-edition.js)
       inner = inner.replace(/^<(\w+)/, '<$1' + at);
       if (fold) inner = inner.replace(/^(<\w+[^>]*>)/, '$1<button type="button" class="fold-v" data-vfold aria-expanded="' + !folded + '" title="Plier / déplier la section"></button>');
     }
@@ -53,9 +49,20 @@ function renderPage(d, ctx) {
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
   return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>');
 }
+// bloc d'ancrage de la bascule dans la vue ctx : le bloc, sinon le titre plié qui le masque, sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
+function anchorBlock(d, ctx, id) {
+  ctx = renderCtx(d, ctx);
+  var blocks = d.pages[ctx.page].blocks, edit = ctx.edit, fi = foldInfo(blocks, edit ? null : foldedIn(ctx));
+  var shown = function (b) { return !fi.hidden[b.id] && (edit || !!renderBlock(b, d, ctx, null)); };
+  var a = fi.hidden[id] || id, i = -1, j;
+  blocks.forEach(function (b, k) { if (b.id === a) i = k; });
+  if (i < 0 || shown(blocks[i])) return a;
+  for (j = i - 1; j >= 0; j--) if (shown(blocks[j])) return blocks[j].id;
+  for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
+  return a;
+}
 function renderBlock(b, d, ctx, num) {
-  ctx = rctx(ctx);
-  var e = ctx.view === 'edit', ued = ctx.editor;
+  var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
     o = o || {};
     var rich = o.rich !== false, body = rich ? R(val) : esc(val);
@@ -176,17 +183,17 @@ function renderBlock(b, d, ctx, num) {
         return '<div class="mapblk">' + mapEl + ((b.list && li.length) ? '<ol class="map-list">' + li.join('') + '</ol>' : '') + '</div>';
       }
       var colorSel = function (cls, attr, cur) { return '<select class="' + cls + '" data-b="' + b.id + '" ' + attr + ' title="Couleur">' + MK_COLORS.map(function (c) { return opt(c[0], cur || 'accent', c[1]); }).join('') + '</select>'; };
-      var mu = ued.map || {}, dk = mu.draw === b.id ? mu.kind : null, ed = mu.editOf === b.id ? mu.edit : null;
+      var mapState = editorUi.map || {}, dk = mapState.draw === b.id ? mapState.kind : null, ed = mapState.editOf === b.id ? mapState.edit : null;
       var tool = function (kind, label, title) { return '<button type="button" class="ub out" data-act="map-draw" data-kind="' + kind + '" aria-pressed="' + (dk === kind) + '" title="' + title + '">' + label + '</button>'; };
       var edBtn = function (kind, i) { return '<button type="button" class="mk-b" data-act="shape-edit" data-kind="' + kind + '" data-i="' + i + '" aria-pressed="' + (!!ed && ed.kind === kind && ed.i === i) + '" title="Modifier sur la carte">✎</button>'; };
       return '<div class="mapblk">' + mapEl +
         '<div class="map-tools"><div class="map-search"><input type="text" class="map-q" data-b="' + b.id + '" placeholder="Ajouter un point : ville, port, ou « 48.38, -4.47 »" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
-        '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mu.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
+        '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mapState.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
         tool('poly', '▱ Zone', 'Dessiner une zone sommet par sommet') + tool('circle', '○ Cercle', 'Dessiner une zone circulaire : centre puis rayon') + tool('route', '⤳ Itinéraire', 'Tracer un itinéraire étape par étape') +
         '<button type="button" class="ub out" data-act="ch-on" aria-pressed="' + !!b.choro + '" title="Colorer les pays selon une valeur (carte choroplèthe)">▦ Pays</button></div>' +
         '<p class="muted map-sum">' + (mks.length + zns.length + rts.length ? [mks.length ? mks.length + ' point' + (mks.length > 1 ? 's' : '') : '', zns.length ? zns.length + ' zone' + (zns.length > 1 ? 's' : '') : '', rts.length ? rts.length + ' itinéraire' + (rts.length > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') + ' — cliquez sur la carte pour afficher la liste à gauche.' : 'Rien sur la carte : cherchez une ville ou un port, placez un point, dessinez une zone, un cercle ou un itinéraire.') + '</p>' +
-        '<div class="mk-panel' + (ued.panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (ued.panelMin ? '▸' : '–') + '</button></div>' +
-        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b, d, ued) +
+        '<div class="mk-panel' + (editorUi.panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (editorUi.panelMin ? '▸' : '–') + '</button></div>' +
+        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b, d, editorUi) +
           (mks.length ? '<div class="mk-h">Points</div>' : '') + mks.map(function (m, i) {
             return '<div class="mk-item' + (ed && ed.kind === 'marker' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' +
               '<input class="mk-in" data-b="' + b.id + '" data-mk="' + i + '" data-p="label" value="' + esc(m.label) + '" placeholder="Libellé du point">' +
@@ -360,9 +367,9 @@ function revealBlock(id) {
   // déplie les sections qui masquent ce bloc
   for (var n = 0; n < 20; n++) { var h = foldInfo(doc.blocks).hidden[id], hb = h && byId(h); if (!hb) return; delete hb.folded; }
 }
-function wrapEdit(b, inner, nHidden, ued) {
+function wrapEdit(b, inner, nHidden, editorUi) {
   var s = settings(b), fl = foldLevel(b) > 0;
-  return '<div class="blk' + (ued && ued.bar != null && b.id === ued.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
+  return '<div class="blk' + (editorUi && editorUi.bar != null && b.id === editorUi.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
@@ -389,6 +396,7 @@ function sectionsOf(pg) {
 }
 /* Arborescence des pages : liste à plat (ordre de lecture), chaque page a un niveau (lv, absent = 0) ;
    les sous-pages d'une page la suivent directement, avec un niveau de plus */
+function pageIndex(pages, pid) { for (var i = 0; i < pages.length; i++) if (pages[i].id === pid) return i; return -1; }
 function pageLv(pages, i) { return +pages[i].lv || 0; }
 function pageEnd(pages, i) { var lv = pageLv(pages, i), j = i + 1; while (j < pages.length && pageLv(pages, j) > lv) j++; return j; }   // fin de la page et de ses sous-pages (exclue)
 function pageParent(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) if (pageLv(pages, j) < lv) return j; return -1; }
@@ -403,8 +411,8 @@ function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
 function navHTML(d, ctx) {
   // vue 'export' : toutes les pages sont présentes et le script de la page exportée bascule de l'une à l'autre
-  ctx = rctx(ctx, d);
-  var edit = ctx.view === 'edit', all = ctx.view === 'export', nf = ctx.navFolds;
+  ctx = renderCtx(d, ctx);
+  var edit = ctx.edit, all = ctx.static, nf = ctx.navFolds;
   var pages = d.pages, cur = ctx.page, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
   var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
   var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
@@ -516,8 +524,8 @@ function fileAppHTML(d, page) {
 function viewCtx() {
   // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, état d'interface de l'édition
   var ed = mode === 'edit';
-  return { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
-    editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste } : null };
+  return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
+    editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste } : null });
 }
 function render(focus) {
   var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
@@ -585,7 +593,7 @@ function chView(b, d) {
   out.data = data; Object.defineProperty(out, 'info', { value: info, enumerable: false });
   return out;
 }
-function choroPanel(b, d, ued) {
+function choroPanel(b, d, editorUi) {
   if (!b.choro) return '';
   if (!MapKit) MapKit = ardoiseMapKit();
   var K = MapKit.choro, vw = chView(b, d), c = K.clean(vw), S = K.scale(c), I = K.index(), id = b.id, src = b.choro.src, info = vw.info;
@@ -618,9 +626,9 @@ function choroPanel(b, d, ued) {
       tg('ch-sov', c.sov, 'Territoires rattachés', 'Colorer les territoires sans valeur propre (Nouvelle-Calédonie, Groenland, Porto Rico…) comme leur pays souverain') + '</div>' +
     '<div class="ch-r">' + tg('ch-legend', c.legend, 'Légende', 'Afficher la légende sur la carte') +
       tg('ch-unitlab', c.unitLab, 'Unité sur la carte', 'Ajouter l’unité après chaque valeur affichée sur les pays (elle reste dans la légende et l’infobulle)') +
-      (src ? '' : tg('ch-paste', ued.paste === id, 'Coller un tableau…', 'Importer deux colonnes copiées d’un tableur')) +
+      (src ? '' : tg('ch-paste', editorUi.paste === id, 'Coller un tableau…', 'Importer deux colonnes copiées d’un tableur')) +
       '<button type="button" class="mk-b mk-t ch-off" data-act="ch-off" title="Retirer les couleurs et toutes les données par pays">Retirer</button></div>' +
-    (!src && ued.paste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
+    (!src && editorUi.paste === id ? '<div class="ch-paste"><textarea class="ch-ta" data-b="' + id + '" rows="5" spellcheck="false" placeholder="Une ligne par pays : nom (ou code ISO) puis valeur, séparés par une tabulation ou un point-virgule. Copiez deux colonnes d’un tableur."></textarea>' +
       '<div class="ch-r"><button type="button" class="ub" data-act="ch-import">Importer</button><label class="ch-repl"><input type="checkbox"> Remplacer les données existantes</label></div></div>' : '') +
     (src ? '' : '<div class="map-search ch-search"><input type="text" class="ch-q" data-b="' + id + '" placeholder="Ajouter un pays…" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>') +
     (rows.length ? '' : '<p class="muted">' + (src ? 'Aucun pays reconnu dans le tableau.' : 'Aucun pays : ajoutez-en un, cliquez sur un pays de la carte ou collez un tableau.') + '</p>') +
