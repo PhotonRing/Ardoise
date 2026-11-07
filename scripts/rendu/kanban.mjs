@@ -56,9 +56,23 @@ test('dépendances : carte supprimée ignorée au rendu et retirée par la norma
 test('dépendances : cartes proposables sans la carte elle-même ni les cycles directs et indirects', () => {
   const { ctx, d } = monter(KB(COLS()));
   const b = d.pages[0].blocks[0];
-  const ids = (kid) => JSON.parse(JSON.stringify(ctx.kbProposables(b, kid))).map((g) => [g.ci, g.cards.map((k) => k.id)]);
+  const ids = (kid) => JSON.parse(JSON.stringify(ctx.kbDepCandidates(b, kid))).map((g) => [g.ci, g.cards.map((k) => k.id)]);
   // k4 attend k1 qui attend k2 et k3 : ni k2 ni k3 ne peuvent attendre k1 ou k4
   egal(ids('k2'), [[0, []], [1, []], [2, ['k3']]]);
   egal(ids('k1'), [[0, []], [1, ['k2']], [2, ['k3']]]);
   egal(ids('k4'), [[0, ['k1']], [1, ['k2']], [2, ['k3']]]);
+});
+
+test('dépendances : cycle déjà présent dans les données, les cartes cochées restent proposées pour être décochées', () => {
+  const cols = COLS(); cols[1].cards[0].dep = ['k1'];
+  const { ctx, d } = monter(KB(cols));
+  const ids = (kid) => JSON.parse(JSON.stringify(ctx.kbDepCandidates(d.pages[0].blocks[0], kid))).map((g) => [g.ci, g.cards.map((k) => k.id)]);
+  // k1 attend k2 qui attend k1 : chacune garde l'autre, déjà cochée
+  egal(ids('k1'), [[0, []], [1, ['k2']], [2, ['k3']]]);
+  egal(ids('k2'), [[0, ['k1']], [1, []], [2, ['k3']]]);
+});
+
+test('dépendances : un ancien fichier sans dépendances ressort identique après normalisation', () => {
+  const cols = [{ id: 'c1', title: 'À faire', cards: [{ id: 'k1', title: 'Écrire', html: '', due: '2026-11-07', who: 'Théo' }, { id: 'k2', title: 'Relire', html: '', due: '', who: '' }] }];
+  egal(monter(KB(cols)).d.pages[0].blocks[0].cols, cols);
 });

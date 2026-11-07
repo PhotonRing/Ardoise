@@ -12,9 +12,10 @@ app.addEventListener('click', function (e) {
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
     case 'kb-card-add': var n0 = (b.cols[i].cards || []).length; session.modifier(function () { (b.cols[i].cards = b.cols[i].cards || []).push(kbNewCard()); }, { b: b.id, k: 'cols.' + i + '.cards.' + n0 + '.title' }); break;
     case 'kb-due-cal':
-      // sélecteur natif du champ date caché ; repli pour un navigateur sans showPicker
-      var pk = a.parentNode.querySelector('.kb-due-pick'); e.preventDefault();
-      try { pk.showPicker(); } catch (_) { pk.focus(); pk.click(); } break;
+      // sélecteur natif ; sans showPicker, le clic reste au champ date transparent posé sur le bouton, qui s'ouvre de lui-même
+      var picker = a.parentNode.querySelector('.kb-due-pick');
+      if (picker && picker.showPicker) try { picker.showPicker(); e.preventDefault(); } catch (_) {}
+      break;
     case 'kb-card-del': session.modifier(function () { b.cols[+a.dataset.ci].cards.splice(+a.dataset.ki, 1); }); break;
     case 'kb-col-add': session.modifier(function () { b.cols.push({ id: uid(), title: '', cards: [] }); }, { b: b.id, k: 'cols.' + b.cols.length + '.title' }); break;
     case 'kb-col-del':

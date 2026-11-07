@@ -17,7 +17,7 @@ test('échéance : formats acceptés, jour avant mois, année complétée', () =
 test('échéance : vide retire, date impossible refusée', () => {
   egal(lire(''), '');
   egal(lire('   '), '');
-  for (const t of ['31/02', '29/02/2025', '0/1', '1/13', '32/1', 'abc', '7/11/202', '7', '7/11/2026/1', '2026-11-07'])
+  for (const t of ['31/02', '29/02/2025', '0/1', '1/13', '13/13','32/1', 'abc', '7/11/202', '7', '7/11/2026/1', '2026-11-07'])
     egal(lire(t), null, t);
 });
 

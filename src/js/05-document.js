@@ -26,13 +26,15 @@ function normBlocks(arr, newer) {
   });
   return out;
 }
+// dépendances d'une carte : une liste vide retire la clé, pour qu'un fichier sans dépendances reste inchangé
+function kbSetDeps(k, list) { if (list.length) k.dep = list; else delete k.dep; }
 // dépendances d'un kanban : identifiants uniques de cartes du même kanban, sans la carte elle-même ; liste vide retirée
 function kbCleanDeps(b) {
   var ids = {}; b.cols.forEach(function (c) { c.cards.forEach(function (k) { ids['$' + k.id] = 1; }); });
   b.cols.forEach(function (c) { c.cards.forEach(function (k) {
     if (!('dep' in k)) return;
-    var vus = {}, l = (Array.isArray(k.dep) ? k.dep : []).filter(function (d) { var ok = typeof d === 'string' && d !== k.id && ids['$' + d] && !vus['$' + d]; if (ok) vus['$' + d] = 1; return ok; });
-    if (l.length) k.dep = l; else delete k.dep;
+    var seen = {}, list = (Array.isArray(k.dep) ? k.dep : []).filter(function (d) { var ok = typeof d === 'string' && d !== k.id && ids['$' + d] && !seen['$' + d]; if (ok) seen['$' + d] = 1; return ok; });
+    kbSetDeps(k, list);
   }); });
 }
 function normalize(d) {

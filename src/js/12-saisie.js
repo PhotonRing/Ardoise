@@ -68,10 +68,10 @@ app.addEventListener('change', function (e) {
   if (el.matches('input.kb-due-in, input.kb-due-pick')) {
     // échéance : texte jj/mm/aaaa validé à la sortie du champ (ou sélecteur natif, ISO) ; le fichier garde l'ISO
     var bk = byId(el.dataset.b); if (!bk) return;
-    var dOld = getPath(bk, el.dataset.k) || '', dv = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
-    if (dv === null) { el.value = kbDate(dOld); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return; }
-    if (dv === dOld) { el.value = kbDate(dOld); return; }
-    session.modifier(function () { if (dv) setPath(bk, el.dataset.k, dv); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
+    var oldDue = getPath(bk, el.dataset.k) || '', newDue = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
+    if (newDue === null) { el.value = kbDate(oldDue); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return; }
+    if (newDue === oldDue) { el.value = kbDate(oldDue); return; }
+    session.modifier(function () { if (newDue) setPath(bk, el.dataset.k, newDue); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
   }
   if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); session.modifier(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
