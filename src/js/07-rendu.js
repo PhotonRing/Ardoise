@@ -500,12 +500,20 @@ function refreshDerived() {
       if (navSpyFn) navSpyFn();
     }
   }
-  // blocs requête de la page : résultats recalculés après la saisie
+  // blocs requête de la page : résultats et formulaire recalculés après la saisie (une pastille ajoutée ou retirée
+  // d'un texte change les puces du filtre, un titre change la liste des portées)
   doc.blocks.forEach(function (b) {
     if (b.type !== 'query') return;
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
-    var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
-    var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) box.innerHTML = h;
+    var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
+    if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
+      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) box.innerHTML = h;
+    }
+    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-form', app);
+    if (form && !form.contains(document.activeElement)) {   // pas pendant le choix d'une liste
+      var tmp = document.createElement('div'); tmp.innerHTML = queryForm(b, doc, vc);
+      var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) form.replaceWith(nf);
+    }
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   doc.blocks.forEach(function (b) {
@@ -704,30 +712,28 @@ function chImport(b, text, replace) {
   if (n) { keepView(b); session.modifier(function () { if (replace) { b.choro.data = {}; b.choro.lp = {}; } for (var k in ok) b.choro.data[k] = ok[k]; }); }
   return { n: n, bad: bad };
 }
-function routeImport(text, d, except) {
+function parseRoutePaste(text, d, except) {
   // liste collée, une ligne par point : coordonnées puis libellé facultatif (après tabulation ou point-virgule) ; except = itinéraire remplacé
   var pts = [], names = [], bad = [];
+  // coupe au premier séparateur : [avant, reste], le reste garde ses autres séparateurs ; sans séparateur, [texte, '']
+  var cut = function (s) { var j = s.search(/[\t;]/); return j < 0 ? [s, ''] : [s.slice(0, j), s.slice(j + 1)]; };
   String(text || '').split(/\r?\n/).forEach(function (line, li) {
     if (!line.trim()) return;
     // deux colonnes de nombres (lat puis lon) d'abord : « 48,38 ; -4,47 » ne doit pas se lire 48 puis 38
-    var f = line.split(/[\t;]/), two = f.length > 1 && /^\s*-?\d+(?:[.,]\d+)?\s*°?\s*[EWO]?\s*$/i.test(f[1]);
-    var c = two ? parseLL(f[0] + ' ' + f[1]) : null, k = 2;
-    if (!c) { c = parseLL(f[0]); k = 1; }
+    var f1 = cut(line), f2 = cut(f1[1]), two = /^\s*-?\d+(?:[.,]\d+)?\s*°?\s*[EWO]?\s*$/i.test(f2[0]);
+    var c = two ? parseLL(f1[0] + ' ' + f2[0]) : null, lab = f2[1];
+    if (!c) { c = parseLL(f1[0]); lab = f1[1]; }
     if (!c) { bad.push(li + 1); return; }
-    var lab = f.slice(k).join(' ').trim();
+    lab = lab.trim();
     pts.push([c.lat, c.lon]); names.push(lab || routeNear(d, c.lat, c.lon, except));
   });
   return { pts: pts, names: names, bad: bad };
 }
 function routeNear(d, lat, lon, except) {
   // nom du lieu du document le plus proche à moins de 50 m : points de toutes les cartes, étapes nommées des autres itinéraires
-  var best = '', bd = 50, rad = Math.PI / 180;
-  var see = function (n, la, lo) {
-    if (!n) return;
-    var s = Math.sin((la - lat) * rad / 2), t = Math.sin((lo - lon) * rad / 2);
-    var m = 2 * 6371008.8 * Math.asin(Math.sqrt(s * s + Math.cos(lat * rad) * Math.cos(la * rad) * t * t));
-    if (m < bd) { bd = m; best = n; }
-  };
+  if (!MapKit) MapKit = ardoiseMapKit();
+  var best = '', bd = 50;
+  var see = function (n, la, lo) { if (!n) return; var m = MapKit.gcDist([lat, lon], [la, lo]); if (m < bd) { bd = m; best = n; } };
   d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) {
     if (x.type !== 'map') return;
     (x.markers || []).forEach(function (mk) { see(String(mk.label || '').trim(), +mk.lat, +mk.lon); });
@@ -738,13 +744,16 @@ function routeNear(d, lat, lon, except) {
   }); });
   return best;
 }
-function rtImport(b, text, i) {
-  // crée un itinéraire (i < 0) ou remplace les points de b.routes[i], en gardant nom et couleur ; rien sous deux points
-  var rep = routeImport(text, doc, i >= 0 ? { b: b.id, i: i } : null), ok = rep.pts.length >= 2;
+function applyRoutePaste(b, text, i) {
+  // crée un itinéraire (i < 0) ou remplace les points de b.routes[i], en gardant nom et couleur ; rien sous deux points,
+  // ni sur un itinéraire disparu pendant que la zone de collage était ouverte (annulation, modification reçue) : gone
+  if (i >= 0 && !b.routes[i]) return { n: 0, bad: [], ok: false, gone: true };
+  var rep = parseRoutePaste(text, doc, i >= 0 ? { b: b.id, i: i } : null), ok = rep.pts.length >= 2;
   if (ok) {
     keepView(b);
     session.modifier(function () {
       if (i < 0) { b.routes.push({ label: '', color: 'accent', pts: rep.pts, names: rep.names }); return; }
+      // positions d'étiquettes posées pour les anciens points : noms d'étapes (np), nom de l'itinéraire (lp), ancien décalage (no)
       var r = b.routes[i]; r.pts = rep.pts; r.names = rep.names; delete r.np; delete r.no; delete r.lp;
     });
   }

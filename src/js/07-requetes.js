@@ -4,8 +4,8 @@
 var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'], kanban: ['Cartes de kanban', 'carte', 'cartes'] };
 function pillKeys(html) {
   // noms des pastilles d'un texte enrichi
-  var out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g, m;
-  while ((m = re.exec(String(html || '')))) { var k = tagKey(htmlText(m[1])); if (k && out.indexOf(k) < 0) out.push(k); }
+  var out = [];
+  eachPill(html, function (inner) { var k = tagKey(htmlText(inner)); if (k && out.indexOf(k) < 0) out.push(k); });   // eachPill : 05-migrations.js
   return out;
 }
 function eachText(blocks, fn) {
@@ -17,28 +17,27 @@ function eachText(blocks, fn) {
 }
 function docTags(d) {
   // pastilles utilisées dans le document : [{ key, name }] dans l'ordre d'apparition (nom tel qu'écrit la première fois)
-  var seen = {}, out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g;
+  var seen = {}, out = [];
   d.pages.forEach(function (pg) {
     eachText(pg.blocks, function (s) {
-      var m; re.lastIndex = 0;
-      while ((m = re.exec(s))) { var name = htmlText(m[1]).replace(/\s+/g, ' ').trim(), k = tagKey(name); if (k && !seen[k]) { seen[k] = 1; out.push({ key: k, name: name }); } }
+      eachPill(s, function (inner) { var name = htmlText(inner).replace(/\s+/g, ' ').trim(), k = tagKey(name); if (k && !seen[k]) { seen[k] = 1; out.push({ key: k, name: name }); } });
     });
   });
   return out;
 }
-function tagShade(d, key) { var t = d.tags && d.tags[key]; return t ? t.c : null; }   // couleur du registre, sans y inscrire le nom
+function knownTagColor(d, key) { var t = d.tags && d.tags[key]; return t ? t.c : null; }   // couleur du registre, sans y inscrire le nom
 function tagUsage(d) {
-  // noms du registre : [{ key, name, n, pages: [{ pi, title }] }] ; n compte les pastilles des textes (exceptions comprises)
-  var by = {}, out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g;
-  for (var k in d.tags || {}) { by[k] = { key: k, name: k, n: 0, pages: [] }; out.push(by[k]); }
+  // noms du registre : [{ key, name, n, pages: [{ pi, title }] }] ; n compte les pastilles des textes (exceptions comprises) ;
+  // le nom est celui du texte, sinon celui vu au rendu pendant la session, sinon la clé
+  var by = {}, out = [];
+  for (var k in d.tags || {}) { by[k] = { key: k, name: seenTagName(k), n: 0, pages: [] }; out.push(by[k]); }
   docTags(d).forEach(function (t) { if (by[t.key]) by[t.key].name = t.name; });
   d.pages.forEach(function (pg, pi) {
     eachText(pg.blocks, function (s) {
-      var m; re.lastIndex = 0;
-      while ((m = re.exec(s))) {
-        var u = by[tagKey(htmlText(m[1]))]; if (!u) continue;
+      eachPill(s, function (inner) {
+        var u = by[tagKey(htmlText(inner))]; if (!u) return;
         u.n++; if (!u.pages.length || u.pages[u.pages.length - 1].pi !== pi) u.pages.push({ pi: pi, title: pageTitle(pg, pi) });
-      }
+      });
     });
   });
   return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
@@ -177,7 +176,7 @@ function qChips(d, act, i, avail, want, title) {
   (want || []).forEach(function (k) { if (!list.some(function (t) { return t.key === k; })) list.push({ key: k, name: k, gone: true }); });
   if (!list.length) return '<span class="muted q-hint">Aucune pastille ici.</span>';
   return list.map(function (t) {
-    var on = (want || []).indexOf(t.key) >= 0, c = tagShade(d, t.key);
+    var on = (want || []).indexOf(t.key) >= 0, c = knownTagColor(d, t.key);
     var gone = t.gone ? (c == null ? 'Absente du document · ' : 'Absente de la portée choisie · ') : '';
     return '<button type="button" class="pill' + (c == null ? '' : ' pa-' + c) + ' q-chip' + (t.gone ? ' q-gone' : '') + '" data-act="' + act + '"' + (i != null ? ' data-i="' + i + '"' : '') + ' data-tag="' + esc(t.key) + '" aria-pressed="' + on + '" title="' + gone + (on ? 'Retirer de ' : 'Ajouter à ') + title + '">' + esc(t.name) + '</button>';
   }).join('');

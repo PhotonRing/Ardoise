@@ -1,6 +1,6 @@
 // Banc d'essai de la session du document (src/js/05-session.js) : annuler, rétablir, regroupement de la frappe,
 // troncature de l'historique, réception des autres copies. La session est chargée dans node:vm avec l'en-tête, le
-// document, les types de blocs, les migrations, l'adaptateur et le moteur de synchronisation, un faux `document`, une
+// document, les types de blocs, les migrations, l'adaptateur et le moteur de synchronisation, les requêtes (noms des pastilles des libellés), un faux `document`, une
 // horloge factice et de faux abonnés ; soit avec un faux adaptateur qui enregistre ses appels, soit, à deux copies,
 // avec le vrai adaptateur et un faux relais. Les tests ne passent que par l'interface de la session.  node scripts/test-session.mjs
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ const OUVERTURE = '\n(function () {\n';
 const entete = js('00-entete.js');
 if (!entete.startsWith(OUVERTURE)) throw new Error('00-entete.js : ouverture de l\'IIFE introuvable, adapter le banc');
 const SOURCE = entete.slice(OUVERTURE.length) +
-  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js'].map(js).join('\n');
+  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '07-requetes.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'session.js' });
 
 // Un contexte neuf : faux document, horloge factice ; toast et synFlush appartiennent à l'interface (17, 24)
@@ -845,6 +845,26 @@ test('libellé : réglage modifié, couleur de pastille, pastille supprimée ; u
   egal(libelles(m)[0], 'pastille « ok » : couleur modifiée');
   m.s.modifier(() => { delete m.doc.tags.ok; });
   egal(libelles(m)[0], 'pastille « ok » supprimée');
+});
+
+test('libellé : une pastille est nommée comme dans le texte, sinon par le nom vu au rendu pendant la session, sinon par sa clé', () => {
+  const m = monter();
+  m.s.modifier(() => { ecrire(m, 'a <span class="pill">Prod  Web</span>'); m.doc.tags = { 'prod web': { c: 2 }, ko: { c: 1 }, ok: { c: 0 } }; });
+  m.s.modifier(() => { m.doc.tags['prod web'].c = 5; });
+  egal(libelles(m)[0], 'pastille « Prod Web » : couleur modifiée', 'nom du texte');
+  m.ctx.noteTagName('ko', 'KO');
+  m.s.modifier(() => { delete m.doc.tags.ko; });
+  egal(libelles(m)[0], 'pastille « KO » supprimée', 'nom vu au rendu');
+  m.s.modifier(() => { delete m.doc.tags.ok; });
+  egal(libelles(m)[0], 'pastille « ok » supprimée', 'jamais vue : la clé');
+});
+
+test('libellé : une étape qui ne change aucun champ décrit (mot de passe…) se dit « document modifié »', () => {
+  const m = monter();
+  m.s.modifier(() => { m.doc.lock = { salt: 'x', check: 'y' }; });
+  egal(libelles(m), ['document modifié', '']);
+  m.s.annuler();
+  egal(libelles(m), ['', 'document modifié']);
 });
 
 test('libellé : vide quand rien n\'est possible ; après annuler puis rétablir, chaque bouton décrit sa propre étape', () => {

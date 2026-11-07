@@ -1,4 +1,6 @@
 /* ---------- Clics sur les actions des blocs ---------- */
+// zone de collage ouverte ou fermée hors historique : nouveau rendu à la même vue de la carte b, fiche de raccourcis sur b
+function redrawMapBlock(b) { keepView(b); render(); cheatBlock = b.id; updateCheat(); }
 app.addEventListener('click', function (e) {
   var cp = e.target.closest('[data-copy]');
   if (cp && mode === 'view') { copyCode(cp); return; }
@@ -91,21 +93,24 @@ app.addEventListener('click', function (e) {
     case 'ch-unitlab': keepView(b); session.modifier(function () { if (b.choro.unitLab) delete b.choro.unitLab; else b.choro.unitLab = true; }); break;
     case 'ch-legend': keepView(b); session.modifier(function () { b.choro.legend = b.choro.legend === false; }); break;
     case 'ch-paste':
-      chPaste = chPaste === b.id ? null : b.id; keepView(b); render(); cheatBlock = b.id; updateCheat();
+      chPaste = chPaste === b.id ? null : b.id; redrawMapBlock(b);
       var ta = $('.ch-ta[data-b="' + b.id + '"]', app); if (ta) ta.focus({ preventScroll: true });
       break;
     case 'ch-import':
       var box = a.closest('.ch-paste'), rep = chImport(b, box.querySelector('.ch-ta').value, box.querySelector('.ch-repl input').checked);
-      if (rep.n) { chPaste = null; keepView(b); render(); cheatBlock = b.id; updateCheat(); }
+      if (rep.n) { chPaste = null; redrawMapBlock(b); }
       toast(rep.n || rep.bad.length ? (rep.n ? rep.n + ' pays importé' + (rep.n > 1 ? 's' : '') : 'Aucun pays importé') + (rep.bad.length ? '. Non reconnu' + (rep.bad.length > 1 ? 's' : '') + ' : ' + rep.bad.slice(0, 6).join(', ') + (rep.bad.length > 6 ? '… (+' + (rep.bad.length - 6) + ')' : '') : '') : 'Rien à importer : collez deux colonnes (pays, valeur).', rep.bad.length ? 9000 : 3500);
       break;
     case 'rt-paste':
-      var ri = +a.dataset.i; rtPaste = rtPaste && rtPaste.b === b.id && rtPaste.i === ri ? null : { b: b.id, i: ri }; keepView(b); render(); cheatBlock = b.id; updateCheat();
+      var ri = +a.dataset.i; rtPaste = rtPaste && rtPaste.b === b.id && rtPaste.i === ri ? null : { b: b.id, i: ri }; redrawMapBlock(b);
       var rta = $('.rt-ta[data-b="' + b.id + '"]', app); if (rta) rta.focus({ preventScroll: true });
       break;
     case 'rt-import':
-      var rbox = a.closest('.rt-paste'), rr = rtImport(b, rbox.querySelector('.rt-ta').value, +a.dataset.i);
-      if (rr.ok) { rtPaste = null; keepView(b); render(); cheatBlock = b.id; updateCheat(); }
+      // la zone a pu disparaître avec un nouveau rendu (annulation, modification reçue) entre l'affichage et le clic
+      var rbox = a.closest('.rt-paste'), rta2 = rbox && rbox.querySelector('.rt-ta'); if (!b || !rta2) break;
+      var rr = applyRoutePaste(b, rta2.value, +a.dataset.i);
+      if (rr.gone) { rtPaste = null; redrawMapBlock(b); toast('Rien d’importé : cet itinéraire n’existe plus', 6000); break; }
+      if (rr.ok) { rtPaste = null; redrawMapBlock(b); }
       var rbad = rr.bad.length ? ' · lignes ignorées : ' + rr.bad.slice(0, 12).join(', ') + (rr.bad.length > 12 ? '… (+' + (rr.bad.length - 12) + ')' : '') : '';
       toast((rr.ok ? rr.n + ' points importés' : 'Rien d’importé : il faut au moins deux points valides (latitude, longitude)') + rbad, rr.bad.length || !rr.ok ? 9000 : 3500);
       break;

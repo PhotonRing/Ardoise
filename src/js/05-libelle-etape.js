@@ -77,16 +77,24 @@ function libellesDifferences(avant, apres) {
   });
   LIBELLE_REGLAGES.forEach(function (r) { if (JSON.stringify(avant[r[0]]) !== JSON.stringify(apres[r[0]])) out.push(r[1] + ' : réglage modifié'); });
   // pastilles : une nouvelle s'inscrit avec le texte qui la cite, déjà compté
-  var ta = avant.tags || {}, tb = apres.tags || {};
+  // nom d'une pastille : tel qu'écrit dans le texte (après l'étape, sinon avant), sinon vu au rendu pendant la session, sinon sa clé
+  // (docTags : 07-requetes.js, seenTagName : 05-migrations.js, appelés à l'exécution)
+  var ta = avant.tags || {}, tb = apres.tags || {}, noms = null;
+  var nom = function (k) {
+    if (!noms) { noms = {}; docTags(avant).concat(docTags(apres)).forEach(function (t) { noms['$' + t.key] = t.name; }); }   // seulement si une pastille change
+    return noms['$' + k] || seenTagName(k);
+  };
   Object.keys(ta).forEach(function (k) {
-    if (!tb[k]) out.push('pastille « ' + k + ' » supprimée');
-    else if (ta[k].c !== tb[k].c) out.push('pastille « ' + k + ' » : couleur modifiée');
+    if (!tb[k]) out.push('pastille « ' + nom(k) + ' » supprimée');
+    else if (ta[k].c !== tb[k].c) out.push('pastille « ' + nom(k) + ' » : couleur modifiée');
   });
   return out;
 }
-// libellé d'une étape : la première modification, puis le nombre des autres
+// libellé d'une étape : la première modification, puis le nombre des autres ; un champ qu'aucune nature ne décrit
+// (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu
 function libelleEtape(avant, apres) {
   var l = libellesDifferences(avant, apres);
-  if (l.length < 2) return l[0] || '';
+  if (!l.length) return JSON.stringify(avant) === JSON.stringify(apres) ? '' : 'document modifié';
+  if (l.length < 2) return l[0];
   return l[0] + ' et ' + (l.length - 1) + (l.length === 2 ? ' autre modification' : ' autres modifications');
 }

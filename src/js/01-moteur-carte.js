@@ -1103,7 +1103,7 @@ function ardoiseMapKit() {
     instances.push(api);
     return api;
   }
-  return { mount: mount, data: load, merc: merc, pathLen: pathLen, fmtDist: fmtDist,
+  return { mount: mount, data: load, merc: merc, gcDist: gcDist, pathLen: pathLen, fmtDist: fmtDist,
     choro: { pals: PALS, scales: CH_SCALES, clean: cleanCh, scale: chScale, fmt: fmtVal, num: chNum, match: matchCountry, index: countryIndex, norm: nrm } };
 }
 

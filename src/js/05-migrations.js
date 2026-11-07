@@ -54,6 +54,15 @@ function htmlText(html) {
   return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 }
 function tagKey(text) { return String(text || '').replace(/[\s ​]+/g, ' ').trim().toLowerCase(); }   // nom d'une pastille, sans casse ni espaces superflus
+// une pastille dans un texte enrichi : classes après « pill », autres attributs, contenu ; seule reconnaissance des
+// pastilles, partagée par leur coloration au rendu (15-pastilles.js) et le registre (07-requetes.js)
+var PILL_RE = /<span class="pill([^"]*)"((?:\s[^>]*)?)>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g;
+function eachPill(html, fn) { String(html || '').replace(PILL_RE, function (m, cls, attrs, inner) { fn(inner); return m; }); }   // fn(contenu) par pastille
+// noms des pastilles tels qu'écrits, notés à leur rendu pendant la session (clé → nom) : une pastille retirée de tous
+// les textes garde son nom dans la fenêtre des pastilles et les libellés d'Annuler ; au rechargement, on retombe sur la clé
+var tagNamesSeen = {};
+function noteTagName(key, text) { if (key) tagNamesSeen['$' + key] = String(text).replace(/\s+/g, ' ').trim(); }
+function seenTagName(key) { return tagNamesSeen['$' + key] || key; }
 var TAG_COLORS = 16;
 function nextTagColor(tags) {
   // couleur d'une nouvelle pastille : la moins utilisée (à égalité, la première)

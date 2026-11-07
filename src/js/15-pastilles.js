@@ -4,23 +4,24 @@
 // (classe pc-N, « exception ») ; la couleur du registre est posée au rendu (pa-N, jamais enregistrée).
 var TAG_NAMES = ['Vert', 'Rouge', 'Orange', 'Bleu', 'Violet', 'Rose', 'Turquoise', 'Indigo', 'Olive', 'Cyan', 'Terre', 'Prune', 'Sapin', 'Gris', 'Moutarde', 'Corail'];
 function tagColor(key, d) {
-  // seule inscription au registre : réservée aux pastilles d'un texte (les puces des requêtes lisent par tagShade)
-  d = d || doc; var c = tagShade(d, key); if (c != null) return c;
+  // seule inscription au registre : réservée aux pastilles d'un texte (les puces des requêtes lisent par knownTagColor)
+  d = d || doc; var c = knownTagColor(d, key); if (c != null) return c;
   if (!d.tags) d.tags = {};
   d.tags[key] = { c: nextTagColor(d.tags) }; return d.tags[key].c;
 }
 function pillOwn(el) { var m = el.className.match(/\bpc-(\d+)\b/); return m ? +m[1] : null; }
 function paintPill(el) {
   el.className = el.className.replace(/\s*\bpa-\d+\b/g, '');
+  var key = tagKey(el.textContent); noteTagName(key, el.textContent);   // nom gardé pour la session (05-migrations.js)
   if (pillOwn(el) != null) return;
-  var key = tagKey(el.textContent); if (key) el.classList.add('pa-' + tagColor(key));
+  if (key) el.classList.add('pa-' + tagColor(key));
 }
 function paintPills(html, d) {
-  // pose la couleur du registre du document d sur les pastilles d'un rendu (texte HTML)
+  // pose la couleur du registre du document d sur les pastilles d'un rendu (texte HTML) ; une exception (classe en plus) garde la sienne
   if (html.indexOf('class="pill') < 0) return html;
-  return html.replace(/<span class="pill"((?:\s[^>]*)?)>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g, function (m, attrs, inner) {
-    var key = tagKey(htmlText(inner));
-    return key ? '<span class="pill pa-' + tagColor(key, d) + '"' + attrs + '>' + inner + '</span>' : m;
+  return html.replace(PILL_RE, function (m, cls, attrs, inner) {   // PILL_RE : 05-migrations.js
+    var text = htmlText(inner), key = tagKey(text); noteTagName(key, text);
+    return key && !cls ? '<span class="pill pa-' + tagColor(key, d) + '"' + attrs + '>' + inner + '</span>' : m;
   });
 }
 function repaintPills() { $$('span.pill', app).forEach(paintPill); }
@@ -68,7 +69,7 @@ function tagsWinHTML() {
   var list = tagUsage(doc);
   if (!list.length) return '<p class="muted">Aucune pastille dans ce document.</p>';
   return list.map(function (t) {
-    var c = tagShade(doc, t.key), k = esc(t.key);
+    var c = knownTagColor(doc, t.key), k = esc(t.key);
     var where = t.n ? t.n + (t.n > 1 ? ' apparitions' : ' apparition') + ' · ' + t.pages.map(function (p) { return esc(p.title); }).join(', ') : 'N’apparaît plus dans le document';
     return '<div class="tgw-r"><div class="tgw-h"><span class="pill pa-' + c + '">' + esc(t.name) + '</span><span class="tgw-n muted">' + where + '</span>' +
       (t.n ? '' : '<button type="button" class="tgw-del" data-tdel="' + k + '" title="Retirer « ' + esc(t.name) + ' » du registre">Supprimer</button>') + '</div>' +
@@ -89,7 +90,7 @@ function openTagsWindow() {
       return;
     }
     var tk = b.dataset.tk, c = +b.dataset.tc;
-    if (tagShade(doc, tk) !== c) session.modifier(function () { doc.tags[tk] = { c: c }; });
+    if (knownTagColor(doc, tk) !== c) session.modifier(function () { doc.tags[tk] = { c: c }; });
   });
   // le raccourci global d'annulation est coupé sous une fenêtre : celle-ci le reprend
   bg.addEventListener('keydown', function (e) {
