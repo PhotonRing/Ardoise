@@ -27,7 +27,7 @@ test('échéance : champ texte dd/mm/aaaa, bouton calendrier et sélecteur natif
   const h = ctx.renderPage(d, { page: 0, view: 'edit' });
   const champ = h.match(/<input[^>]*class="kb-due-in"[^>]*>/);
   vrai(champ, 'champ d\'échéance');
-  vrai(/type="text"/.test(champ[0]) && /placeholder="jj\/mm\/aaaa"/.test(champ[0]) && /value="07\/11\/2026"/.test(champ[0]), champ[0]);
+  vrai(/type="text"/.test(champ[0]) && /placeholder="dd\/mm\/aaaa"/.test(champ[0]) && /value="07\/11\/2026"/.test(champ[0]), champ[0]);
   vrai(/<button[^>]*class="kb-due-cal"/.test(h), 'bouton calendrier');
   vrai(/<input type="date" class="kb-due-pick"[^>]*value="2026-11-07"/.test(h), 'sélecteur natif');
   const v = monter(kb(undefined));
