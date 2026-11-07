@@ -42,6 +42,7 @@ function renderPage(d, ctx) {
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
+      if (ctx.view === 'read') at += ' data-bid="' + b.id + '"';   // ancrage de la bascule vers l'édition (19-mode-lecture-edition.js)
       inner = inner.replace(/^<(\w+)/, '<$1' + at);
       if (fold) inner = inner.replace(/^(<\w+[^>]*>)/, '$1<button type="button" class="fold-v" data-vfold aria-expanded="' + !folded + '" title="Plier / déplier la section"></button>');
     }
