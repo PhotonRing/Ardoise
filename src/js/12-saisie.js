@@ -65,7 +65,14 @@ app.addEventListener('change', function (e) {
     holdBar(bq2.id); session.modifier(function () { bq2[el.dataset.prop] = nv2; }); return;
   }
   if (el.matches('select.kb-prio-in')) { var bp = byId(el.dataset.b); if (bp) { var pv = el.value || ''; session.modifier(function () { if (pv) setPath(bp, el.dataset.k, pv); else { var o = getPath(bp, el.dataset.k.replace(/\.prio$/, '')); if (o) delete o.prio; } }); } return; }
-  if (el.matches('input.kb-due-in')) { var bk = byId(el.dataset.b); if (bk) { var dv = el.value || ''; session.modifier(function () { setPath(bk, el.dataset.k, dv); }); } return; }
+  if (el.matches('input.kb-due-in, input.kb-due-pick')) {
+    // échéance : texte jj/mm/aaaa validé à la sortie du champ (ou sélecteur natif, ISO) ; le fichier garde l'ISO
+    var bk = byId(el.dataset.b); if (!bk) return;
+    var dOld = getPath(bk, el.dataset.k) || '', dv = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
+    if (dv === null) { el.value = kbDate(dOld); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return; }
+    if (dv === dOld) { el.value = kbDate(dOld); return; }
+    session.modifier(function () { if (dv) setPath(bk, el.dataset.k, dv); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
+  }
   if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); session.modifier(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
@@ -179,6 +186,7 @@ app.addEventListener('keydown', function (e) {
     if (nx) { nx.focus(); nx.select(); } else el.blur();
     return;
   }
+  if (el.matches('input.kb-due-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.preventDefault(); var bd0 = byId(el.dataset.b); el.value = kbDate(bd0 && getPath(bd0, el.dataset.k)); el.blur(); } return; }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
   if (el.matches('.img-url-in')) { if (e.key === 'Enter') { e.preventDefault(); var bi = byId(el.dataset.b); if (bi) imageUrlAction(bi, el); } return; }
   if (!el.classList || !el.classList.contains('fld')) return;
