@@ -1,6 +1,6 @@
 // Banc d'essai de la session du document (src/js/05-session.js) : annuler, rétablir, regroupement de la frappe,
 // troncature de l'historique, réception des autres copies. La session est chargée dans node:vm avec l'en-tête, le
-// document, les types de blocs, les migrations, l'adaptateur et le moteur de synchronisation, un faux `document`, une
+// document, les types de blocs, les migrations, l'adaptateur et le moteur de synchronisation, les requêtes (noms des pastilles des libellés), un faux `document`, une
 // horloge factice et de faux abonnés ; soit avec un faux adaptateur qui enregistre ses appels, soit, à deux copies,
 // avec le vrai adaptateur et un faux relais. Les tests ne passent que par l'interface de la session.  node scripts/test-session.mjs
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ const OUVERTURE = '\n(function () {\n';
 const entete = js('00-entete.js');
 if (!entete.startsWith(OUVERTURE)) throw new Error('00-entete.js : ouverture de l\'IIFE introuvable, adapter le banc');
 const SOURCE = entete.slice(OUVERTURE.length) +
-  ['03-types-de-blocs.js', '05-document.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js'].map(js).join('\n');
+  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '07-requetes.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'session.js' });
 
 // Un contexte neuf : faux document, horloge factice ; toast et synFlush appartiennent à l'interface (17, 24)
@@ -66,13 +66,15 @@ const tests = [];
 const test = (nom, fn) => tests.push([nom, fn]);
 const egal = (a, b, msg) => { const ja = JSON.stringify(a), jb = JSON.stringify(b); if (ja !== jb) throw new Error(`${msg || ''}\n  obtenu  : ${ja}\n  attendu : ${jb}`); };
 const ecrire = (m, html) => { m.doc.pages[0].blocks[0].html = html; };
+// possibilité d'annuler et de rétablir, sans les libellés (sujet de leurs propres tests)
+const possible = (e) => ({ annuler: e.annuler, retablir: e.retablir });
 
 test('modifier valide une étape et prévient rendu (avec le focus), modifié et historique', () => {
   const m = monter();
   m.s.modifier(() => ecrire(m, 'b'), { b: 'b1', k: 'html' });
   egal(m.recu.rendu.map((r) => r.focus), [{ b: 'b1', k: 'html' }]);
   egal(m.recu.modifie, [[]]);
-  egal(m.recu.historique, [{ annuler: true, retablir: false }]);
+  egal(m.recu.historique.map(possible), [{ annuler: true, retablir: false }]);
   m.s.annuler();
   egal(m.texte(), 'a');
 });
@@ -81,7 +83,7 @@ test('une modification qui ne change rien ne crée pas d\'étape, mais redessine
   const m = monter();
   m.s.modifier(() => {});
   egal(m.recu.rendu.length, 1);
-  egal(m.recu.historique, [{ annuler: false, retablir: false }]);
+  egal(m.recu.historique.map(possible), [{ annuler: false, retablir: false }]);
   egal(m.sync, [], 'rien ne part vers les autres copies');
 });
 
@@ -93,9 +95,9 @@ test('saisir prévient « modifié » tout de suite, sans redessiner, et valide 
   m.avancer(300);
   m.s.saisir(() => ecrire(m, 'abc'));
   m.avancer(499);
-  egal(m.s.historique(), { annuler: false, retablir: false }, 'pas encore d\'étape à 499 ms du dernier caractère');
+  egal(possible(m.s.historique()), { annuler: false, retablir: false }, 'pas encore d\'étape à 499 ms du dernier caractère');
   m.avancer(1);
-  egal(m.recu.historique, [{ annuler: true, retablir: false }]);
+  egal(m.recu.historique.map(possible), [{ annuler: true, retablir: false }]);
   egal(m.sync.filter((x) => x === 'envoyer'), ['envoyer']);
   m.s.annuler();
   egal(m.texte(), 'a', 'une seule étape pour toute la frappe');
@@ -107,11 +109,11 @@ test('valider valide tout de suite la frappe en attente ; sans frappe en attente
   egal(m.recu.historique, [], 'rien sans frappe');
   m.s.saisir(() => ecrire(m, 'ab'));
   m.s.valider();
-  egal(m.s.historique(), { annuler: true, retablir: false });
+  egal(possible(m.s.historique()), { annuler: true, retablir: false });
   m.avancer(1000);
   m.s.annuler();
   egal(m.texte(), 'a');
-  egal(m.s.historique(), { annuler: false, retablir: true }, 'le délai ne crée pas d\'étape en double');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true }, 'le délai ne crée pas d\'étape en double');
 });
 
 test('annuler et rétablir restaurent l\'état exact et respectent les bornes', () => {
@@ -127,7 +129,7 @@ test('annuler et rétablir restaurent l\'état exact et respectent les bornes', 
   m.s.annuler();
   egal(m.texte(), 'a', 'rien avant le premier état');
   egal(m.recu.rendu.length, 0, 'aucun rendu hors des bornes');
-  egal(m.recu.historique, [{ annuler: false, retablir: true }]);
+  egal(m.recu.historique.map(possible), [{ annuler: false, retablir: true }]);
   m.s.retablir(); m.s.retablir(); m.vider(); m.s.retablir();
   egal(JSON.stringify(m.doc), apres, 'rétablir refait exactement');
   egal(m.recu.rendu.length, 0, 'rien après le dernier état');
@@ -173,7 +175,7 @@ test('une nouvelle modification après des annulations efface les étapes « ré
   m.s.modifier(() => ecrire(m, 'c'));
   m.s.annuler(); m.s.annuler();
   m.s.modifier(() => ecrire(m, 'z'));
-  egal(m.s.historique(), { annuler: true, retablir: false });
+  egal(possible(m.s.historique()), { annuler: true, retablir: false });
   m.s.retablir();
   egal(m.texte(), 'z');
   m.s.annuler();
@@ -185,7 +187,7 @@ test('l\'historique garde les 300 derniers états', () => {
   for (let i = 1; i <= 310; i++) m.s.modifier(() => ecrire(m, 'v' + i));
   for (let i = 0; i < 400; i++) m.s.annuler();
   egal(m.texte(), 'v11', '300 états : v11 à v310');
-  egal(m.s.historique(), { annuler: false, retablir: true });
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
 });
 
 test('modification en place : saisir puis valider donne une étape tout de suite, sans redessiner', () => {
@@ -195,7 +197,7 @@ test('modification en place : saisir puis valider donne une étape tout de suite
   egal(m.recu.rendu.length, 0, 'pas de rendu');
   egal(m.recu.modifie.length, 1, '« modifié » prévenu');
   egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'un seul envoi');
-  egal(m.s.historique(), { annuler: true, retablir: false });
+  egal(possible(m.s.historique()), { annuler: true, retablir: false });
   m.avancer(1000);
   egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'le délai ne valide rien de plus');
   m.s.annuler();
@@ -264,7 +266,7 @@ test('une modification reçue s\'applique sans créer d\'étape d\'annulation, e
   egal(m.doc.title, 'Reçu');
   egal(m.recu.rendu, [{ focus: null, info: { distant: true } }]);
   egal(m.recu.modifie, [[]]);
-  egal(m.recu.historique, [{ annuler: true, retablir: false }]);
+  egal(m.recu.historique.map(possible), [{ annuler: true, retablir: false }]);
   egal(m.sync, [], 'rien ne repart vers les autres copies');
   m.s.annuler();
   egal(m.texte(), 'a', 'annuler revient d\'une seule étape locale');
@@ -326,7 +328,7 @@ test('deux copies : annuler ses propres modifications garde celles reçues entre
   egal([a.bloc('b1'), a.bloc('b2'), b.bloc('b1'), b.bloc('b2')], ['a-A', 'b-B', 'a-A', 'b-B']);
   a.s.annuler();
   egal([a.bloc('b1'), a.bloc('b2')], ['a', 'b-B'], 'l\'annulation garde la modification de B');
-  egal(a.s.historique(), { annuler: false, retablir: true }, 'l\'arrivée n\'a pas créé d\'étape chez A');
+  egal(possible(a.s.historique()), { annuler: false, retablir: true }, 'l\'arrivée n\'a pas créé d\'étape chez A');
   echanger(a, b);
   egal([b.bloc('b1'), b.bloc('b2')], ['a', 'b-B'], 'l\'annulation part vers B');
   a.s.retablir();
@@ -344,7 +346,7 @@ test('deux copies : la frappe en cours n\'est pas écrasée par une arrivée, pa
   b.avancer(1000);
   b.s.annuler();
   egal([b.bloc('b1'), b.bloc('b2')], ['a-A', 'b'], 'B n\'annule que sa frappe');
-  egal(b.s.historique(), { annuler: false, retablir: true });
+  egal(possible(b.s.historique()), { annuler: false, retablir: true });
 });
 
 test('deux copies : la troncature de l\'historique fait oublier les modifications reçues trop anciennes', () => {
@@ -486,7 +488,7 @@ test('deux copies : limite connue, une ligne ajoutée par l\'autre copie dans la
   const { a } = ligneVoisine({ type: 'check', items: [{ html: 'un', done: false }, { html: 'deux', done: false }] },
     (x) => { x.items[1].html = 'deux-A'; }, (x) => { x.items.push({ html: 'trois-B', done: false }); },
     (x) => x.items.map((e) => e.html), ['un', 'deux-A', 'trois-B'], ['un', 'deux-A', 'trois-B']);
-  egal(a.s.historique(), { annuler: true, retablir: false }, 'l\'étape locale reste à annuler');
+  egal(possible(a.s.historique()), { annuler: true, retablir: false }, 'l\'étape locale reste à annuler');
 });
 
 test('deux copies : annuler l\'ajout local d\'une ligne l\'emporte sur la ligne voisine modifiée par l\'autre copie', () => {
@@ -542,7 +544,7 @@ test('démarrage : garde ce qui vient du fichier, et un annuler immédiat ne cha
   m.vider();
   egal(m.s.remplacer(FICHIER(), 'demarrage'), { ok: true });
   egal([m.doc.id, m.doc.savedAt, m.doc.mapKey, m.doc.lock.hash, m.doc.sync.relay, m.doc.cur], ['fichier', '2026-11-01T10:00:00.000Z', 'cle-carte', 'h', 'ws://relais', 0]);
-  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
   m.s.annuler();
   egal(m.doc.pages[0].blocks[0].html, 'un');
   egal(m.recu.rendu.length, 1, 'le document ouvert est dessiné');
@@ -565,7 +567,7 @@ test('déverrouillage : l\'historique repart du document déchiffré', () => {
   m.s.modifier(() => ecrire(m, 'b'));
   egal(m.s.remplacer(FICHIER(), 'deverrouillage', { page: 2 }), { ok: true });
   egal([m.doc.id, m.doc.lock.hash, m.doc.cur], ['fichier', 'h', 2]);
-  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
   m.s.modifier(() => { m.doc.pages[0].blocks[0].html = 'deux'; });
   m.s.annuler(); m.s.annuler();
   egal(m.doc.pages[0].blocks[0].html, 'un', 'on ne remonte pas avant le document déchiffré');
@@ -582,7 +584,7 @@ test('nouveau : nouvel identifiant, ni date d\'enregistrement, ni mot de passe, 
   egal([m.doc.savedAt, m.doc.lock, m.doc.mapKey, m.doc.sync, m.doc.cur], [null, undefined, undefined, undefined, 0]);
   egal(m.doc.pages[0].blocks[0].html, 'un', 'le contenu du modèle');
   egal(nf.length, 1, '« nouveau fichier » prévenu');
-  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
   egal(m.recu.modifie, [], 'un nouveau document n\'est pas marqué modifié');
   const autre = m.doc.id;
   m.s.remplacer(FICHIER(), 'nouveau');
@@ -615,7 +617,7 @@ test('remplacer valide d\'abord la frappe en attente, qui ne passe pas dans le n
   m.s.saisir(() => ecrire(m, 'ab'));
   m.s.remplacer(FICHIER(), 'demarrage');
   m.avancer(1000);
-  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
   egal(m.doc.pages[0].blocks[0].html, 'un');
 });
 
@@ -643,7 +645,7 @@ test('import : garde identifiant, mot de passe, clé de carte et date d\'enregis
   egal([m.doc.title, m.doc.pages[0].blocks[0].html, m.doc.cur], ['Importé', 'importé', 0]);
   egal(m.recu.modifie, [[]]);
   egal(m.recu.rendu.length, 1);
-  egal(m.recu.historique, [{ annuler: true, retablir: false }]);
+  egal(m.recu.historique.map(possible), [{ annuler: true, retablir: false }]);
   egal(m.sync.filter((x) => x === 'envoyer').length, 1, 'l\'import part vers les autres copies');
   m.s.annuler();
   egal([m.doc.title, m.doc.pages[0].blocks[0].html], ['Fichier', 'un']);
@@ -696,7 +698,7 @@ test('brouillon : garde identifiant et mot de passe, prend clé de carte et date
   egal(propres(m), ['fichier', '2020-01-01T00:00:00.000Z', 'cle-entrante', 'h']);
   egal([m.doc.pages[0].blocks[0].html, m.doc.cur], ['importé', 1]);
   egal(m.recu.modifie, [[]]);
-  egal(m.s.historique(), { annuler: true, retablir: false });
+  egal(possible(m.s.historique()), { annuler: true, retablir: false });
   m.s.annuler();
   egal(m.doc.pages[0].blocks[0].html, 'un');
 });
@@ -707,7 +709,7 @@ test('refus : un format plus récent, pour l\'import, le chargement externe et l
     const avant = JSON.stringify(m.doc);
     egal(m.s.remplacer(Object.assign(ENTRANT(), { v: 999 }), origine, { deverrouille: true }), { refus: 'plus-recent', format: 999 }, origine);
     egal(JSON.stringify(m.doc), avant, origine);
-    egal(m.s.historique(), { annuler: false, retablir: false }, origine);
+    egal(possible(m.s.historique()), { annuler: false, retablir: false }, origine);
     egal([m.recu.rendu.length, m.recu.modifie.length, m.recu.historique.length, m.sync.length], [0, 0, 0, 0], origine);
   }
 });
@@ -765,7 +767,152 @@ test('import d\'un contenu identique au document courant : aucune étape', () =>
   const m = ouvert();
   const d = JSON.parse(JSON.stringify(m.doc));
   m.s.remplacer(d, 'import');
-  egal(m.s.historique(), { annuler: false, retablir: false });
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
+});
+
+// Libellé de ce qu'annuler défait et de ce que rétablir refait : du plus large au plus précis, puis la nature
+const libelles = (m) => { const e = m.s.historique(); return [e.libelleAnnuler, e.libelleRetablir]; };
+
+test('libellé : texte modifié, avec la page, le type de bloc et ses premiers mots sans balise', () => {
+  const m = monter();
+  m.s.modifier(() => { ecrire(m, 'Bonjour <b>tout</b> le monde'); });
+  egal(libelles(m), ['Accueil · Paragraphe « Bonjour tout le monde » : texte modifié', '']);
+  egal(m.recu.historique.map((e) => e.libelleAnnuler), ['Accueil · Paragraphe « Bonjour tout le monde » : texte modifié'], 'l\'abonné le reçoit');
+});
+
+const blocsDe = (m) => m.doc.pages[0].blocks;
+test('libellé : plusieurs modifications dans une étape, la première puis le nombre des autres', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Deux' }, { id: 'b3', type: 'p', html: 'Trois' }); });
+  m.s.modifier(() => { blocsDe(m)[0].html = 'Un'; blocsDe(m)[1].html = 'Deux bis'; blocsDe(m)[2].html = 'Trois bis'; });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « Un » : texte modifié et 2 autres modifications');
+  m.s.modifier(() => { blocsDe(m)[0].html = 'Un ter'; blocsDe(m)[1].html = 'Deux ter'; });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « Un ter » : texte modifié et 1 autre modification');
+});
+
+test('libellé : bloc ajouté, supprimé, déplacé', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Section' }); });
+  egal(libelles(m)[0], 'Accueil · Titre de section « Section » : bloc ajouté');
+  m.s.modifier(() => { blocsDe(m).reverse(); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « a » : bloc déplacé', 'un seul déplacement, hors de la plus longue sous-suite commune');
+  m.s.modifier(() => { blocsDe(m).splice(1, 1); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « a » : bloc supprimé', 'premiers mots de l\'état d\'avant');
+  m.s.modifier(() => { blocsDe(m).push({ id: 'b4', type: 'divider' }); });
+  egal(libelles(m)[0], 'Accueil · Séparateur : bloc ajouté', 'sans texte : le type seul');
+});
+
+test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['', '']] }, { id: 'c', type: 'check', items: [{ html: 'Pain', done: false }, { html: 'Lait', done: false }] }); });
+  m.s.modifier(() => { blocsDe(m)[1].rows[1][0] = 'Lyon'; });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Lyon » : cellule modifiée');
+  m.s.modifier(() => { blocsDe(m)[2].items[1].done = true; });
+  egal(libelles(m)[0], 'Accueil · Liste à cocher « Pain Lait » : case cochée');
+  m.s.modifier(() => { blocsDe(m)[2].items[1].done = false; });
+  egal(libelles(m)[0], 'Accueil · Liste à cocher « Pain Lait » : case décochée');
+  m.s.modifier(() => { blocsDe(m)[2].items[0].html = 'Pain complet'; });
+  egal(libelles(m)[0], 'Accueil · Liste à cocher « Pain complet Lait » : texte modifié', 'texte d\'un élément');
+  m.s.modifier(() => { blocsDe(m)[0].type = 'h2'; });
+  egal(libelles(m)[0], 'Accueil · Titre de section « a » : bloc modifié', 'type de bloc changé');
+});
+
+test('libellé : page ajoutée, renommée, déplacée, changée de niveau, supprimée', () => {
+  const m = monter();
+  m.s.modifier(() => { m.doc.pages.push({ id: 'p2', title: 'Annexe', blocks: [{ id: 'x', type: 'p', html: 'x' }] }); });
+  egal(libelles(m)[0], 'page « Annexe » ajoutée', 'une seule modification, ses blocs compris');
+  m.s.modifier(() => { m.doc.pages[1].title = 'Annexes'; });
+  egal(libelles(m)[0], 'page « Annexe » renommée en « Annexes »');
+  m.s.modifier(() => { m.doc.pages.reverse(); });
+  egal(libelles(m)[0], 'page « Accueil » déplacée');
+  m.s.modifier(() => { m.doc.pages[1].lv = 1; });
+  egal(libelles(m)[0], 'page « Accueil » : niveau modifié');
+  m.s.modifier(() => { m.doc.pages.splice(0, 1); });
+  egal(libelles(m)[0], 'page « Annexes » supprimée');
+  m.s.modifier(() => { m.doc.pages.push({ id: 'p3', title: '', blocks: [] }); });
+  egal(libelles(m)[0], 'page sans titre ajoutée');
+});
+
+test('libellé : réglage modifié, couleur de pastille, pastille supprimée ; une pastille inscrite par un texte ne compte pas à part', () => {
+  const m = monter();
+  m.s.modifier(() => { m.doc.theme = 'dark'; });
+  egal(libelles(m)[0], 'Thème : réglage modifié');
+  m.s.modifier(() => { m.doc.title = 'Carnet'; m.doc.width = 900; });
+  egal(libelles(m)[0], 'Titre du document : réglage modifié et 1 autre modification');
+  m.s.modifier(() => { ecrire(m, 'a <span class="tag">OK</span>'); m.doc.tags = { ok: { c: 2 } }; });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « a OK » : texte modifié');
+  m.s.modifier(() => { m.doc.tags.ok.c = 5; });
+  egal(libelles(m)[0], 'pastille « ok » : couleur modifiée');
+  m.s.modifier(() => { delete m.doc.tags.ok; });
+  egal(libelles(m)[0], 'pastille « ok » supprimée');
+});
+
+test('libellé : une pastille est nommée comme dans le texte, sinon par le nom vu au rendu pendant la session, sinon par sa clé', () => {
+  const m = monter();
+  m.s.modifier(() => { ecrire(m, 'a <span class="pill">Prod  Web</span>'); m.doc.tags = { 'prod web': { c: 2 }, ko: { c: 1 }, ok: { c: 0 } }; });
+  m.s.modifier(() => { m.doc.tags['prod web'].c = 5; });
+  egal(libelles(m)[0], 'pastille « Prod Web » : couleur modifiée', 'nom du texte');
+  m.ctx.noteTagName('ko', 'KO');
+  m.s.modifier(() => { delete m.doc.tags.ko; });
+  egal(libelles(m)[0], 'pastille « KO » supprimée', 'nom vu au rendu');
+  m.s.modifier(() => { delete m.doc.tags.ok; });
+  egal(libelles(m)[0], 'pastille « ok » supprimée', 'jamais vue : la clé');
+});
+
+test('libellé : une étape qui ne change aucun champ décrit (mot de passe…) se dit « document modifié »', () => {
+  const m = monter();
+  m.s.modifier(() => { m.doc.lock = { salt: 'x', check: 'y' }; });
+  egal(libelles(m), ['document modifié', '']);
+  m.s.annuler();
+  egal(libelles(m), ['', 'document modifié']);
+});
+
+test('libellé : vide quand rien n\'est possible ; après annuler puis rétablir, chaque bouton décrit sa propre étape', () => {
+  const m = monter();
+  egal(libelles(m), ['', ''], 'rien à annuler ni à rétablir');
+  m.s.modifier(() => { ecrire(m, 'un'); });
+  m.s.modifier(() => { ecrire(m, 'deux'); });
+  m.s.annuler();
+  egal(libelles(m), ['Accueil · Paragraphe « un » : texte modifié', 'Accueil · Paragraphe « deux » : texte modifié']);
+  egal(m.recu.historique.at(-1).libelleRetablir, 'Accueil · Paragraphe « deux » : texte modifié', 'l\'abonné le reçoit');
+  m.s.annuler();
+  egal(libelles(m), ['', 'Accueil · Paragraphe « un » : texte modifié']);
+  m.s.retablir(); m.s.retablir();
+  egal(libelles(m), ['Accueil · Paragraphe « deux » : texte modifié', '']);
+});
+
+test('libellé : la frappe n\'a de libellé qu\'une fois validée ; un import en étape décrit la différence entière', () => {
+  const m = monter();
+  m.s.saisir(() => { ecrire(m, 'frappe'); });
+  egal(libelles(m), ['', '']);
+  m.avancer(500);
+  egal(libelles(m)[0], 'Accueil · Paragraphe « frappe » : texte modifié');
+  m.s.remplacer({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'b1', type: 'p', html: 'importé' }] }, { id: 'p9', title: 'Neuve', blocks: [] }] }, 'import');
+  egal(libelles(m)[0], 'Accueil · Paragraphe « importé » : texte modifié et 1 autre modification');
+});
+
+test('libellé : la troncature de l\'historique garde chaque libellé avec son étape', () => {
+  const m = monter();
+  for (let i = 1; i <= 305; i++) m.s.modifier(() => { ecrire(m, 'v' + i); });
+  for (let i = 0; i < 299; i++) m.s.annuler();
+  egal(libelles(m), ['', 'Accueil · Paragraphe « v7 » : texte modifié'], 'le plus ancien état restant est v6');
+});
+
+test('libellé, deux copies : une modification reçue n\'apparaît jamais, ni pour annuler ni pour rétablir', () => {
+  const { a, b } = relier();
+  const lib = (c) => { const e = c.s.historique(); return [e.libelleAnnuler, e.libelleRetablir]; };
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'a-A'; });
+  b.s.modifier(() => { b.ctx.doc.pages[0].blocks[1].html = 'b-B'; });
+  echanger(a, b);
+  egal(lib(a), ['Accueil · Paragraphe « a-A » : texte modifié', ''], 'chez A, rien de B');
+  b.s.modifier(() => { b.ctx.doc.pages[0].blocks.push({ id: 'b3', type: 'p', html: 'c-B' }); });
+  echanger(a, b);
+  egal(lib(a), ['Accueil · Paragraphe « a-A » : texte modifié', ''], 'après une seconde arrivée');
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'a-A2'; });
+  egal(lib(a)[0], 'Accueil · Paragraphe « a-A2 » : texte modifié', 'l\'étape suivante ne reprend pas les arrivées d\'avant');
+  a.s.annuler(); a.s.annuler();
+  egal(lib(a), ['', 'Accueil · Paragraphe « a-A » : texte modifié'], 'rétablir ne décrit que l\'étape locale');
+  egal(lib(b), ['Accueil · Paragraphe « c-B » : bloc ajouté', ''], 'chez B, rien de A');
 });
 
 for (const [nom, fn] of tests) {

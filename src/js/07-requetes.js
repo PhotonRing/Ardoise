@@ -4,8 +4,8 @@
 var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'], kanban: ['Cartes de kanban', 'carte', 'cartes'] };
 function pillKeys(html) {
   // noms des pastilles d'un texte enrichi
-  var out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g, m;
-  while ((m = re.exec(String(html || '')))) { var k = tagKey(htmlText(m[1])); if (k && out.indexOf(k) < 0) out.push(k); }
+  var out = [];
+  eachPill(html, function (inner) { var k = tagKey(htmlText(inner)); if (k && out.indexOf(k) < 0) out.push(k); });   // eachPill : 05-migrations.js
   return out;
 }
 function eachText(blocks, fn) {
@@ -17,14 +17,30 @@ function eachText(blocks, fn) {
 }
 function docTags(d) {
   // pastilles utilisées dans le document : [{ key, name }] dans l'ordre d'apparition (nom tel qu'écrit la première fois)
-  var seen = {}, out = [], re = /<span class="pill[^"]*"[^>]*>((?:(?!<\/?span\b)[\s\S])*?)<\/span>/g;
+  var seen = {}, out = [];
   d.pages.forEach(function (pg) {
     eachText(pg.blocks, function (s) {
-      var m; re.lastIndex = 0;
-      while ((m = re.exec(s))) { var name = htmlText(m[1]).replace(/\s+/g, ' ').trim(), k = tagKey(name); if (k && !seen[k]) { seen[k] = 1; out.push({ key: k, name: name }); } }
+      eachPill(s, function (inner) { var name = htmlText(inner).replace(/\s+/g, ' ').trim(), k = tagKey(name); if (k && !seen[k]) { seen[k] = 1; out.push({ key: k, name: name }); } });
     });
   });
   return out;
+}
+function knownTagColor(d, key) { var t = d.tags && d.tags[key]; return t ? t.c : null; }   // couleur du registre, sans y inscrire le nom
+function tagUsage(d) {
+  // noms du registre : [{ key, name, n, pages: [{ pi, title }] }] ; n compte les pastilles des textes (exceptions comprises) ;
+  // le nom est celui du texte, sinon celui vu au rendu pendant la session, sinon la clé
+  var by = {}, out = [];
+  for (var k in d.tags || {}) { by[k] = { key: k, name: seenTagName(k), n: 0, pages: [] }; out.push(by[k]); }
+  docTags(d).forEach(function (t) { if (by[t.key]) by[t.key].name = t.name; });
+  d.pages.forEach(function (pg, pi) {
+    eachText(pg.blocks, function (s) {
+      eachPill(s, function (inner) {
+        var u = by[tagKey(htmlText(inner))]; if (!u) return;
+        u.n++; if (!u.pages.length || u.pages[u.pages.length - 1].pi !== pi) u.pages.push({ pi: pi, title: pageTitle(pg, pi) });
+      });
+    });
+  });
+  return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
 }
 function queryBlocks(b, d, pi) {
   // blocs de la portée, vue depuis la page pi : [{ blk, pi, sec }] (sec : titre de section qui contient le bloc, ou null)
@@ -153,14 +169,16 @@ function qColSel(b, prop, cur, cols) {
   var list = cols.slice(); if (cur && !list.some(function (x) { return x.key === cur; })) list.push({ key: cur, name: cur });
   return '<select data-act="set" data-prop="' + prop + '" title="Colonne du kanban">' + o('', 'toutes les colonnes') + list.map(function (x) { return o(x.key, 'en « ' + esc(x.name) + ' »'); }).join('') + '</select>';
 }
-function qChips(act, i, avail, want, title) {
+function qChips(d, act, i, avail, want, title) {
   // pastilles cliquables d'un filtre ; une pastille choisie mais absente de la portée reste affichée (barrée)
+  // la couleur est lue au registre sans y inscrire le nom : hors registre, la puce reste grise
   var list = avail.slice();
   (want || []).forEach(function (k) { if (!list.some(function (t) { return t.key === k; })) list.push({ key: k, name: k, gone: true }); });
   if (!list.length) return '<span class="muted q-hint">Aucune pastille ici.</span>';
   return list.map(function (t) {
-    var on = (want || []).indexOf(t.key) >= 0;
-    return '<button type="button" class="pill pa-' + tagColor(t.key) + ' q-chip' + (t.gone ? ' q-gone' : '') + '" data-act="' + act + '"' + (i != null ? ' data-i="' + i + '"' : '') + ' data-tag="' + esc(t.key) + '" aria-pressed="' + on + '" title="' + (t.gone ? 'Absente de la portée choisie · ' : '') + (on ? 'Retirer de ' : 'Ajouter à ') + title + '">' + esc(t.name) + '</button>';
+    var on = (want || []).indexOf(t.key) >= 0, c = knownTagColor(d, t.key);
+    var gone = t.gone ? (c == null ? 'Absente du document · ' : 'Absente de la portée choisie · ') : '';
+    return '<button type="button" class="pill' + (c == null ? '' : ' pa-' + c) + ' q-chip' + (t.gone ? ' q-gone' : '') + '" data-act="' + act + '"' + (i != null ? ' data-i="' + i + '"' : '') + ' data-tag="' + esc(t.key) + '" aria-pressed="' + on + '" title="' + gone + (on ? 'Retirer de ' : 'Ajouter à ') + title + '">' + esc(t.name) + '</button>';
   }).join('');
 }
 function qScopeHref(b) {
@@ -191,10 +209,10 @@ function qCards(b, d, ctx, recs) {
     var lab = e ? '<span class="fld q-lab" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="cards.' + i + '.label" data-nl data-ph="' + esc(def) + '">' + esc(c.label || '') + '</span>'
       : '<span class="q-lab">' + esc(String(c.label || '').trim() || def) + '</span>';
     var form = !e ? '' : '<div class="q-cform">' +
-      '<div class="q-row"><span class="q-lbl">Compter</span>' + stSel('cards.' + i + '.state', c.state) + qChips('q-ctag', i, avail, c.tags, 'cette carte') +
+      '<div class="q-row"><span class="q-lbl">Compter</span>' + stSel('cards.' + i + '.state', c.state) + qChips(d, 'q-ctag', i, avail, c.tags, 'cette carte') +
       ((c.tags || []).length > 1 ? '<select data-act="set" data-prop="cards.' + i + '.match">' + o('any', c.match || 'any', 'au moins une') + o('all', c.match, 'toutes') + '</select>' : '') + '</div>' +
       '<div class="q-row"><span class="q-lbl">sur</span><select data-act="set" data-prop="cards.' + i + '.total">' + o('none', c.total || 'none', 'rien (nombre seul)') + o('all', c.total, 'tous les résultats') + o('filter', c.total, 'un autre filtre…') + '</select>' +
-      (c.total === 'filter' ? stSel('cards.' + i + '.tstate', c.tstate) + qChips('q-ttag', i, avail, c.ttags, 'ce total') +
+      (c.total === 'filter' ? stSel('cards.' + i + '.tstate', c.tstate) + qChips(d, 'q-ttag', i, avail, c.ttags, 'ce total') +
         ((c.ttags || []).length > 1 ? '<select data-act="set" data-prop="cards.' + i + '.tmatch">' + o('any', c.tmatch || 'any', 'au moins une') + o('all', c.tmatch, 'toutes') + '</select>' : '') : '') + '</div>' +
       (cards.length > 1 ? '<button type="button" class="q-cdel" data-act="q-card-del" data-i="' + i + '" title="Supprimer cette carte">×</button>' : '') + '</div>';
     var href = qScopeHref(b), tag = href && !e ? 'a' : 'div';
@@ -327,7 +345,7 @@ function queryForm(b, d, ctx) {
     scopes += o('pg:' + pg.id, sc, pad + 'Page « ' + esc(pageTitle(pg, i)) + ' »');
     sectionsOf(pg).forEach(function (x) { scopes += o('sec:' + pg.id + '/' + x.id, sc, pad + '   ' + (x.lv > 1 ? '   ' : '') + '§ ' + esc((x.n ? x.n + ' · ' : '') + x.t)); });
   });
-  var want = b.tags || [], chips = qChips('q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
+  var want = b.tags || [], chips = qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   return '<div class="q-form">' +
     '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + '</select></label>' +

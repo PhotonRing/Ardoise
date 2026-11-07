@@ -20,9 +20,11 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '07-kanban.js', '07-rendu.js', '07-requetes.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });
 
-// Un contexte neuf, sans DOM : seul `document.querySelector` existe (l'en-tête cherche #app au chargement)
+// Un contexte neuf, sans DOM : seul `document.querySelector` existe (l'en-tête cherche #app au chargement) ;
+// `window` et `document` n'écoutent rien, pour que le moteur de carte se construise (distances de l'import d'itinéraire)
 export function contexte() {
-  const ctx = vm.createContext({ document: { querySelector: () => null, querySelectorAll: () => [] } });
+  const sourd = () => {};
+  const ctx = vm.createContext({ document: { querySelector: () => null, querySelectorAll: () => [], addEventListener: sourd }, window: { addEventListener: sourd } });
   SCRIPT.runInContext(ctx);
   return ctx;
 }

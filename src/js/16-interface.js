@@ -60,13 +60,13 @@ function closeSheet() { if (sheet) { sheet.remove(); sheet = null; document.docu
 function openSheet() {
   closePop(); closeSheet();
   var ed = mode === 'edit', stEl = $('#st'), stTxt = stEl ? stEl.title : '';
-  var big = function (k, ic, label, extra) { return '<button type="button" class="sh-big' + (extra || '') + '" data-sh="' + k + '"><span class="ic">' + ic + '</span><span>' + label + '</span></button>'; };
+  var big = function (k, ic, label, extra, sub) { return '<button type="button" class="sh-big' + (extra || '') + '" data-sh="' + k + '"><span class="ic">' + ic + '</span><span class="sh-l">' + label + (sub ? '<small class="sub"></small>' : '') + '</span></button>'; };
   var lockEd = doc.lock && !unlocked;
   sheet = document.createElement('div'); sheet.className = 'sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', 'Menu');
   sheet.innerHTML = '<div class="sh-h"><span class="logo">' + LOGO_SVG + '</span><span class="sh-t">' + esc(curTitle()) + '</span><button type="button" class="sh-x" data-sh="close" aria-label="Fermer le menu">×</button></div>' +
     '<div class="sh-st"><span class="syn"></span><span class="st ' + (stEl ? stEl.className.replace(/\bst\b/, '') : '') + '"><i></i><span>' + esc(stTxt) + '</span></span></div>' +
     '<div class="sh-grid">' + (ed
-      ? big('save', '⤓', 'Enregistrer', ' primary') + big('mode', '◉', 'Lecture') + big('undo', '↶', 'Annuler') + big('redo', '↷', 'Rétablir') + big('add', '+', 'Ajouter un bloc') + big('style', '◐', 'Style')
+      ? big('save', '⤓', 'Enregistrer', ' primary') + big('mode', '◉', 'Lecture') + big('undo', '↶', 'Annuler', '', true) + big('redo', '↷', 'Rétablir', '', true) + big('add', '+', 'Ajouter un bloc') + big('style', '◐', 'Style')
       : big('mode', lockEd ? '🔒' : '✎', 'Modifier', ' primary') + (dirty ? big('save', '⤓', 'Enregistrer') : '')) + '</div>' +
     '<div class="sh-list">' + (ed ? fileMenuHTML() : viewMenuHTML()) + '</div>';
   ui.appendChild(sheet); document.documentElement.classList.add('sheet-on');
@@ -141,6 +141,7 @@ function openStyle(anchor) {
       '<h4>Largeur</h4>' + seg('width', doc.width, [[720, 'Étroite'], [820, 'Normale'], [960, 'Large'], [1200, 'Très large']]) +
       '<h4>Thème</h4>' + seg('theme', doc.theme, [['auto', 'Auto'], ['light', 'Clair'], ['dark', 'Sombre']]) +
       '<h4>Navigation entre pages</h4>' + seg('nav', doc.nav || 'auto', [['auto', 'Auto'], ['tabs', 'Onglets'], ['side', 'Sommaire']]) +
+      (mode === 'edit' ? '<div class="hr"></div><h4>Pastilles</h4><div style="padding:0 8px 8px"><button type="button" class="ub out" data-tagswin>Pastilles du document…</button></div>' : '') +
       '<div class="hr"></div><h4>Enregistrement automatique</h4>' + seg('autosave', autosaveOn ? 1 : 0, [[1, 'Activé'], [0, 'Désactivé']]) +
       '<div class="hr"></div><h4>Cartes : fond « Plan »</h4><div style="padding:0 8px 8px;display:flex;flex-direction:column;gap:6px;max-width:300px">' +
       '<input class="menu-q" data-mapkey placeholder="Clé CARTO (optionnelle)" value="' + esc(doc.mapKey || '') + '" spellcheck="false" autocomplete="off">' +
@@ -155,6 +156,7 @@ function openStyle(anchor) {
   });
   p.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches('[data-mapkey]')) e.target.blur(); });
   p.addEventListener('click', function (e) {
+    if (e.target.closest('[data-tagswin]')) { openTagsWindow(); return; }
     var b = e.target.closest('[data-set]'); if (!b) return;
     var k = b.dataset.set, v = b.dataset.v;
     if (k === 'autosave') { autosaveOn = v === '1'; try { localStorage.setItem(LS + 'autosave', autosaveOn ? '1' : '0'); } catch (_) {} setStatus(); draw(); return; }
