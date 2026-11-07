@@ -98,6 +98,10 @@ app.addEventListener('click', function (e) {
   if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
   if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; session.modifier(function () { revealBlock(sid); }); }
+  var kd = t.closest('[data-kbdep]');
+  if (kd) { var dp = kd.dataset.kbdep.split('|'); kbDepMenu(kd, dp[0], dp[1]); return; }
+  var kg = t.closest('[data-kbgo]');
+  if (kg) { var gp = kg.dataset.kbgo.split('|'); kbGo(gp[0], gp[1]); return; }
   var km = t.closest('[data-kbmove]');
   if (km) { var kp = km.dataset.kbmove.split('|'), kb = byId(kp[0]); if (kb) kbMoveMenu(km, kb, +kp[1], +kp[2]); return; }
   var qc = t.closest('[data-qchk]');

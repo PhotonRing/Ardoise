@@ -26,9 +26,37 @@ function kbWho(name) {
   var n = String(name || '').trim(); if (!n) return '';
   return '<span class="kb-who"><i aria-hidden="true">' + esc(n.charAt(0).toUpperCase()) + '</i>' + esc(n) + '</span>';
 }
+// dépendances : k.dep liste les identifiants des cartes attendues, du même kanban ; le sens inverse se calcule au rendu
+function kbCards(b) { var t = {}; (b.cols || []).forEach(function (c, ci) { (c.cards || []).forEach(function (k, ki) { t['$' + k.id] = { k: k, ci: ci, ki: ki }; }); }); return t; }
+// une carte est finie dans la dernière colonne (même règle que l'échéance)
+function kbDeps(b, id, t) {
+  t = t || kbCards(b);
+  var last = (b.cols || []).length - 1, me = t['$' + id], attend = [], bloque = [];
+  if (me) (me.k.dep || []).forEach(function (d) { var x = t['$' + d]; if (x && d !== id) attend.push(x.k); });
+  Object.keys(t).forEach(function (key) { var x = t[key]; if ((x.k.dep || []).indexOf(id) >= 0 && x.k.id !== id) bloque.push(x.k); });
+  return { attend: attend, bloque: bloque, bloquee: attend.some(function (k) { return t['$' + k.id].ci !== last; }) };
+}
+// cartes proposables comme dépendances de id, par colonne : ni elle-même, ni une carte qui l'attend déjà, directement ou non
+function kbProposables(b, id) {
+  var t = kbCards(b), exclues = {}, file = [id];
+  exclues['$' + id] = 1;
+  while (file.length) {
+    var cur = file.shift();
+    Object.keys(t).forEach(function (key) { var k = t[key].k; if (!exclues[key] && (k.dep || []).indexOf(cur) >= 0) { exclues[key] = 1; file.push(k.id); } });
+  }
+  return (b.cols || []).map(function (c, ci) { return { ci: ci, title: c.title, cards: (c.cards || []).filter(function (k) { return !exclues['$' + k.id]; }) }; });
+}
+function kbCardTitle(k) { return textOf(k.title) || 'Carte sans titre'; }
+// lignes « Attend » et « Bloque » ; titres cliquables hors export (défilement jusqu'à la carte)
+function kbDepLines(b, k, t, st) {
+  var r = kbDeps(b, k.id, t);
+  var noms = function (l) { return l.map(function (x) { var n = esc(kbCardTitle(x)); return st ? '<span class="kb-dref">' + n + '</span>' : '<button type="button" class="kb-dref" data-kbgo="' + b.id + '|' + x.id + '">' + n + '</button>'; }).join(', '); };
+  return { bloquee: r.bloquee, html: (r.attend.length ? '<div class="kb-wait' + (r.bloquee ? ' blocked' : '') + '">Attend : ' + noms(r.attend) + '</div>' : '') +
+    (r.bloque.length ? '<div class="kb-blocks">Bloque : ' + noms(r.bloque) + '</div>' : '') };
+}
 function kanbanHTML(b, ctx, f) {
   // vue 'export' : cartes sans commandes de déplacement (page exportée sans script d'édition)
-  var cols = b.cols || [], e = ctx.edit, st = ctx.static;
+  var cols = b.cols || [], e = ctx.edit, st = ctx.static, t = kbCards(b);
   return '<div class="kb' + (e ? ' kb-edit' : '') + '" data-kb="' + b.id + '"><div class="kb-cols">' + cols.map(function (c, ci) {
     var last = ci === cols.length - 1, cards = c.cards || [];
     return '<section class="kb-col" data-ci="' + ci + '"><div class="kb-head">' + f('span', 'kb-title', 'cols.' + ci + '.title', c.title, { rich: false, ph: 'Colonne', nl: 1 }) +
@@ -37,18 +65,19 @@ function kanbanHTML(b, ctx, f) {
         '<button type="button" data-act="kb-col-right" data-i="' + ci + '" title="Déplacer la colonne à droite"' + (last ? ' disabled' : '') + '>→</button>' +
         '<button type="button" data-act="kb-col-del" data-i="' + ci + '" title="Supprimer la colonne">×</button></span>' : '') + '</div>' +
       '<div class="kb-list" data-ci="' + ci + '">' + cards.map(function (k, ki) {
-        var base = 'cols.' + ci + '.cards.' + ki, meta;
+        var base = 'cols.' + ci + '.cards.' + ki, meta, dl = kbDepLines(b, k, t, st);
         if (e) meta = '<div class="kb-meta"><select class="kb-prio-in' + (KB_PRIO[k.prio] ? ' ' + k.prio : '') + '" data-b="' + b.id + '" data-k="' + base + '.prio" title="Priorité (facultative)">' +
             [['', 'Priorité'], ['p1', 'P1 · haute'], ['p2', 'P2 · moyenne'], ['p3', 'P3 · basse']].map(function (o) { return '<option value="' + o[0] + '"' + ((k.prio || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
           '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="date" class="kb-due-in" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
-          f('span', 'kb-whoi', base + '.who', k.who, { rich: false, ph: 'Responsable', nl: 1 }) + '</div>';
+          f('span', 'kb-whoi', base + '.who', k.who, { rich: false, ph: 'Responsable', nl: 1 }) +
+          '<button type="button" class="kb-depb" data-kbdep="' + b.id + '|' + k.id + '" title="Cartes à finir avant celle-ci">Dépend de…</button>' + '</div>';
         else meta = k.due || k.who || KB_PRIO[k.prio] ? '<div class="kb-meta">' + kbPrio(k.prio) + (k.due ? '<span class="kb-due' + (kbLate(k.due, last) ? ' late' : '') + '" title="Échéance">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '';
-        return '<article class="kb-card' + (KB_PRIO[k.prio] ? ' prio-' + k.prio : '') + '" data-ci="' + ci + '" data-ki="' + ki + '"' + (e || st ? '' : ' draggable="true"') + '>' +
+        return '<article class="kb-card' + (KB_PRIO[k.prio] ? ' prio-' + k.prio : '') + (dl.bloquee ? ' kb-blocked' : '') + '" data-ci="' + ci + '" data-ki="' + ki + '" data-kid="' + esc(k.id) + '"' + (e || st ? '' : ' draggable="true"') + '>' +
           (st ? '' : '<div class="kb-ctl">' + (e ? '<span class="kb-grip" title="Glisser pour déplacer">⋮⋮</span>' : '') +
           '<button type="button" class="kb-mv" data-kbmove="' + b.id + '|' + ci + '|' + ki + '" title="Déplacer vers…" aria-label="Déplacer vers une autre colonne">⇄</button>' +
           (e ? '<button type="button" class="kb-del" data-act="kb-card-del" data-ci="' + ci + '" data-ki="' + ki + '" title="Supprimer la carte">×</button>' : '') + '</div>') +
           f('div', 'kb-ct', base + '.title', k.title, { ph: 'Titre de la carte', nl: 1 }) +
-          ((e || !isBlank(k.html)) ? f('div', 'kb-tx', base + '.html', k.html, { ph: 'Description (facultative)', ml: 1, soft: 1 }) : '') + meta + '</article>';
+          ((e || !isBlank(k.html)) ? f('div', 'kb-tx', base + '.html', k.html, { ph: 'Description (facultative)', ml: 1, soft: 1 }) : '') + dl.html + meta + '</article>';
       }).join('') + (!cards.length && !e ? '<p class="kb-empty">—</p>' : '') + '</div>' +
       (e ? '<button type="button" class="kb-add" data-act="kb-card-add" data-i="' + ci + '">+ Carte</button>' : '') + '</section>';
   }).join('') + (e ? '<button type="button" class="kb-addcol" data-act="kb-col-add" title="Ajouter une colonne">+ Colonne</button>' : '') + '</div></div>';
@@ -70,4 +99,32 @@ function kbMoveMenu(anchor, b, ci, ki) {
   }).join('');
   p.addEventListener('click', function (e) { var x = e.target.closest('[data-tc]'); if (!x || x.disabled) return; closePop(); kbMove(b, ci, ki, +x.dataset.tc); });
   placePop(p, anchor);
+}
+// panneau « Dépend de » : une case par carte proposable, regroupées par colonne ; chaque coche est une étape annulable
+function kbDepMenu(anchor, bid, kid) {
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop kb-depmenu'; pop = p;
+  var remplir = function () {
+    var b = byId(bid), x = b && kbCards(b)['$' + kid]; if (!x) { closePop(); return; }
+    var dep = x.k.dep || [], groupes = kbProposables(b, kid).filter(function (g) { return g.cards.length; });
+    p.innerHTML = '<h4>Dépend de</h4>' + (groupes.length ? groupes.map(function (g) {
+      return '<div class="kb-depg"><div class="kb-depc">' + esc(textOf(g.title) || 'Colonne ' + (g.ci + 1)) + '</div>' + g.cards.map(function (k) {
+        return '<label class="kb-depi"><input type="checkbox" value="' + esc(k.id) + '"' + (dep.indexOf(k.id) >= 0 ? ' checked' : '') + '> ' + esc(kbCardTitle(k)) + '</label>';
+      }).join('') + '</div>';
+    }).join('') : '<p class="kb-depv">Aucune autre carte possible.</p>');
+  };
+  p.addEventListener('change', function (e) {
+    var c = e.target, b = byId(bid), x = b && kbCards(b)['$' + kid]; if (!x || c.type !== 'checkbox') return;
+    var k = x.k, v = c.value, on = c.checked;
+    session.modifier(function () { var l = (k.dep || []).filter(function (d) { return d !== v; }); if (on) l.push(v); if (l.length) k.dep = l; else delete k.dep; });
+    remplir();
+  });
+  remplir(); placePop(p, anchor);
+}
+// défile jusqu'à la carte et la met brièvement en surbrillance
+function kbGo(bid, kid) {
+  var el = $('.kb[data-kb="' + bid + '"] .kb-card[data-kid="' + kid + '"]', app); if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.remove('kb-flash'); void el.offsetWidth; el.classList.add('kb-flash');
+  setTimeout(function () { el.classList.remove('kb-flash'); }, 1600);
 }

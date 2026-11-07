@@ -802,6 +802,18 @@ test('libellé : bloc ajouté, supprimé, déplacé', () => {
   egal(libelles(m)[0], 'Accueil · Séparateur : bloc ajouté', 'sans texte : le type seul');
 });
 
+test('libellé : dépendance entre cartes de kanban ajoutée puis retirée', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'kb', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [{ id: 'k1', title: 'Écrire' }, { id: 'k2', title: 'Relire' }] }] }); });
+  const carte = () => blocsDe(m)[1].cols[0].cards[0];
+  m.s.modifier(() => { carte().dep = ['k2']; });
+  egal(libelles(m)[0], 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée');
+  m.s.modifier(() => { delete carte().dep; });
+  egal(libelles(m)[0], 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'retirée');
+  m.s.annuler();
+  egal(libelles(m), ['Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée']);
+});
+
 test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['', '']] }, { id: 'c', type: 'check', items: [{ html: 'Pain', done: false }, { html: 'Lait', done: false }] }); });

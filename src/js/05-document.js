@@ -20,10 +20,20 @@ function normBlocks(arr, newer) {
       o.cards = (Array.isArray(c.cards) ? c.cards : []).filter(function (k) { return k && typeof k === 'object'; }).map(function (k) { var q = kbNewCard(); for (var kk in k) q[kk] = k[kk]; return q; });
       return o;
     });
+    if (nb.type === 'kanban') kbCleanDeps(nb);
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
   });
   return out;
+}
+// dépendances d'un kanban : identifiants uniques de cartes du même kanban, sans la carte elle-même ; liste vide retirée
+function kbCleanDeps(b) {
+  var ids = {}; b.cols.forEach(function (c) { c.cards.forEach(function (k) { ids['$' + k.id] = 1; }); });
+  b.cols.forEach(function (c) { c.cards.forEach(function (k) {
+    if (!('dep' in k)) return;
+    var vus = {}, l = (Array.isArray(k.dep) ? k.dep : []).filter(function (d) { var ok = typeof d === 'string' && d !== k.id && ids['$' + d] && !vus['$' + d]; if (ok) vus['$' + d] = 1; return ok; });
+    if (l.length) k.dep = l; else delete k.dep;
+  }); });
 }
 function normalize(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
