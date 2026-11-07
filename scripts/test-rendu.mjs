@@ -179,6 +179,24 @@ test('fichier enregistré : le même en lecture et en édition, avec des tris et
   egal(session.ctx.fileAppHTML(session.d, 1), neutre.ctx.fileAppHTML(neutre.d, 1), 'page 2');
 });
 
+// carte : la clé CARTO du document rendu passe à la page de lecture ; en édition, l'état de dessin vient du contexte
+const CARTE = { title: 'Doc', mapKey: 'CLE-DOC', pages: [{ id: 'p1', title: 'Carte', blocks: [{ id: 'c1', type: 'map', markers: [{ lat: 48.4, lon: -4.5, label: 'Brest' }], list: true }] }] };
+
+test('carte : la clé du document rendu en lecture et en export, l\'outil de dessin du contexte en édition', () => {
+  const { ctx, d } = monter(CARTE);
+  for (const view of ['read', 'export']) vrai(ctx.renderPage(d, { page: 0, view }).includes('&quot;key&quot;:&quot;CLE-DOC&quot;'), view + ' : clé du document attendue');
+  const ed = ctx.renderPage(d, { page: 0, view: 'edit', editor: { map: { draw: 'c1', kind: 'route' } } });
+  vrai(/data-kind="route" aria-pressed="true"/.test(ed) && /data-kind="poly" aria-pressed="false"/.test(ed), 'édition : itinéraire en cours de dessin');
+});
+
+test('indice de page hors du document : la dernière page, comme le sommaire latéral', () => {
+  const { ctx, d } = monter(DEUX_PAGES);
+  vrai(ctx.renderPage(d, { page: 7, view: 'read' }).includes('Deuxième page'), 'renderPage');
+  vrai(ctx.renderPage(d, { page: -1, view: 'read' }).includes('Première page'), 'renderPage, indice négatif');
+  egal(ctx.anchorBlock(d, { page: 7, view: 'read' }, 'b2'), 'b2', 'anchorBlock');
+  vrai(/<li class="toc-p on[^"]*" data-pgi="1"/.test(ctx.navHTML(d, { page: 7, view: 'read' })), 'navHTML');
+});
+
 // Vérification de fermeture (scripts/fermeture.mjs, lancée par build.mjs) : un mini-bundle ouvert par l'IIFE commune
 const BUNDLE = `
 (function () {
@@ -197,6 +215,24 @@ test('fermeture : nomme la globale citée, ignore locales, paramètres, chaînes
   egal(closureLeaks(BUNDLE.replace('cfg: cfg', 'cfg: mode ? cfg : doc'), 'ardoiseKit'), ['mode', 'doc', 'liste'], 'ternaire : pas une clé');
   let err = ''; try { closureLeaks(BUNDLE, 'absente'); } catch (e) { err = e.message; }
   vrai(/absente/.test(err), 'fonction introuvable : erreur qui la nomme');
+});
+
+// noms déclarés dans une fonction de la fabrique : ne masquent pas une fuite du même nom dans une autre
+const PORTEES = `
+(function () {
+var liste = [], doc = {}, mode = 'view', render = 0;
+function ardoiseKit() {
+  function a() { var liste = 1; return liste; }
+  function b() { return liste; }
+  function c(doc) { return doc; }
+  function e() { return doc; }
+  var f = function mode() { return mode; };
+  function g() { try { return 1; } catch (render) { return render; } return render; }
+  return { a: a, b: b, c: c, e: e, f: f, g: g, h: mode };
+}
+})();`;
+test('fermeture : une déclaration locale ne vaut que dans sa fonction (var, paramètre, nom d\'une expression, catch)', () => {
+  egal(closureLeaks(PORTEES, 'ardoiseKit'), ['liste', 'doc', 'render', 'mode']);
 });
 
 test('fermeture : ardoiseReader et ardoiseMapKit ne citent aucune globale de l\'éditeur', () => {

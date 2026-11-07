@@ -2,7 +2,7 @@
 // bloc d'ancrage dans la vue cible (ctx comme renderPage) : le bloc lui-même, sinon le titre plié qui le masque,
 // sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
 function anchorBlock(d, ctx, id) {
-  ctx = rctx(ctx);
+  ctx = rctx(ctx, d);
   var blocks = d.pages[ctx.page].blocks, vf = ctx.folds, edit = ctx.view === 'edit';
   var fi = foldInfo(blocks, edit ? null : function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; });
   var shown = function (b) { return !fi.hidden[b.id] && (edit || !!renderBlock(b, d, ctx, null)); };
@@ -27,12 +27,16 @@ function topBlock() {
   }
   return null;
 }
-var anchorHold = null;   // ancrage en cours de la dernière bascule, recalé au chargement des images au-dessus
-function anchorStop() { anchorHold = null; }
+var anchorHold = null, anchorT = 0;   // ancrage en cours de la dernière bascule, recalé au chargement des images au-dessus
+var ANCHOR_STOP = ['wheel', 'touchstart', 'keydown', 'mousedown'];   // gestes du lecteur qui font céder l'ancrage
+function anchorStop() { anchorHold = null; anchorListen(false); }
+function anchorListen(on) { ANCHOR_STOP.forEach(function (t) { if (on) addEventListener(t, anchorStop, { once: true, passive: true }); else removeEventListener(t, anchorStop); }); }
 function toggleMode() {
   session.valider();
   if (mode === 'view' && doc.lock && !unlocked) { askPassword(function () { toggleMode(); }); return; }
   if (mode === 'view' && doc.newer) { newerNotice(true); return; }
+  // les écouteurs de la bascule précédente partent : la touche Ctrl+E en cours ne doit pas couper le nouvel ancrage
+  clearTimeout(anchorT); anchorListen(false);
   var y = scrollY, top = topBlock();
   mode = mode === 'edit' ? 'view' : 'edit';
   closePop(); itb.style.display = 'none';
@@ -47,6 +51,6 @@ function toggleMode() {
     if (!im.complete && el.compareDocumentPosition(im) & Node.DOCUMENT_POSITION_PRECEDING) im.addEventListener('load', fix, { once: true });
   });
   // l'ancrage cède dès que le lecteur agit sur la page ; après la touche Ctrl+E en cours, qui remonte encore jusqu'à window
-  setTimeout(function () { ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (t) { addEventListener(t, anchorStop, { once: true, passive: true }); }); });
+  anchorT = setTimeout(function () { anchorListen(true); });
 }
 

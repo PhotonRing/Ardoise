@@ -1,7 +1,4 @@
-// Vérification de fermeture, lancée par build.mjs : une fonction recopiée par toString() dans la page exportée ne doit citer
-// aucun nom déclaré au premier niveau du bundle (fonctions et var du corps de l'IIFE commune). Simple recherche de mots,
-// sans dépendance : faux positif possible sur un nom local identique ; les noms après un point et les clés d'objet
-// (« { x: » ou « , x: ») ne comptent pas. src/js est en ES5 : ni gabarits, ni let, ni const, ni flèches.
+// Fermeture (build.mjs) : une fonction recopiée par toString() ne cite aucun nom de premier niveau du bundle hors des noms déclarés dans ses portées (src/js en ES5, sans let ni const)
 
 const KEYWORDS_BEFORE_REGEX = /^(return|typeof|case|in|of|else|do|void|delete|new|instanceof)$/;
 
@@ -64,20 +61,28 @@ export function closureLeaks(js, name) {
   if (k0 < 0) throw new Error('vérification de fermeture : fonction ' + name + ' introuvable');
   let e = 0, k1 = k0;
   for (; k1 < T.length; k1++) { if (T[k1].t === '{') e++; else if (T[k1].t === '}' && --e === 0) break; }
-  const F = T.slice(k0, k1 + 1);
-  // ses propres déclarations : fonctions, paramètres, var, catch
-  const own = new Set([name]);
+  const F = T.slice(k0, k1 + 1), match = [], open = [];
+  F.forEach((x, a) => { if (OPEN.includes(x.t)) open.push(a); else if (CLOSE.includes(x.t)) match[open.pop()] = a; });
+  // portées : chaque fonction (de « function » à son accolade fermante) et chaque bloc catch, avec les noms qu'elles déclarent
+  const scopes = [], decls = [];
   for (let a = 0; a < F.length - 1; a++) {
     if (F[a].t === 'function') {
-      let b = a + 1; if (F[b].id) { own.add(F[b].t); b++; }
-      for (b++; b < F.length && F[b].t !== ')'; b++) if (F[b].id) own.add(F[b].t);
-    } else if (F[a].t === 'var') varNames(F, a, (n) => own.add(n));
-    else if (F[a].t === 'catch' && F[a + 2]) own.add(F[a + 2].t);
+      let b = a + 1; const nm = F[b].id ? F[b++].t : null, sc = { from: a, to: match[match[b] + 1], fn: true, names: new Set() };
+      for (let p = b + 1; p < match[b]; p++) if (F[p].id) sc.names.add(F[p].t);
+      // nom d'une déclaration : dans la fonction englobante ; nom d'une expression : dans sa propre fonction
+      if (nm && a > 0 && '{};'.includes(F[a - 1].t)) decls.push([a, nm]); else if (nm) sc.names.add(nm);
+      scopes.push(sc);
+    } else if (F[a].t === 'catch' && F[a + 4]) scopes.push({ from: a, to: match[a + 4], fn: false, names: new Set([F[a + 2].t]) });
   }
+  // fonction la plus intérieure qui contient la position a (sans compter celle qui commence en a)
+  const fnAt = (a) => scopes.reduce((s, sc) => (sc.fn && sc.from < a && a <= sc.to && (!s || sc.from > s.from) ? sc : s), null);
+  decls.forEach(([a, nm]) => fnAt(a).names.add(nm));
+  for (let a = 0; a < F.length; a++) if (F[a].t === 'var') varNames(F, a, (n) => fnAt(a).names.add(n));
+  const local = (a, n) => scopes.some((sc) => sc.from <= a && a <= sc.to && sc.names.has(n));
   const leaks = [];
   for (let a = 1; a < F.length; a++) {
     const x = F[a];
-    if (!x.id || !top.has(x.t) || own.has(x.t) || leaks.includes(x.t)) continue;
+    if (!x.id || !top.has(x.t) || local(a, x.t) || leaks.includes(x.t)) continue;
     if (F[a - 1].t === '.') continue;   // propriété
     if ((F[a - 1].t === '{' || F[a - 1].t === ',') && F[a + 1] && F[a + 1].t === ':') continue;   // clé d'objet
     leaks.push(x.t);

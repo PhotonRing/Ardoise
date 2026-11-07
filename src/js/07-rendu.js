@@ -7,10 +7,11 @@ function hlLine(line) {
    ctx = { page: indice de la page, view: 'edit' | 'read' | 'export', folds: plis de lecture de la session (id → plié),
            sort: tris de lecture de la session (id → { by, dir }), navFolds: plis du sommaire latéral (id de page → ouvert),
            editor: { bar, map, panelMin, paste } (vue 'edit' seulement) } ; un champ absent prend la valeur neutre */
-function rctx(ctx) {
+function rctx(ctx, d) {
   ctx = ctx || {};
   var view = ctx.view === 'edit' || ctx.view === 'export' ? ctx.view : 'read';
-  return { page: +ctx.page || 0, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
+  var page = d ? Math.max(0, Math.min(d.pages.length - 1, +ctx.page || 0)) : +ctx.page || 0;   // indice borné aux pages du document
+  return { page: page, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
     navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
 }
 // numéro affiché de chaque étape (id → numéro) : le numéro saisi, sinon un compteur qui repart du dernier nombre saisi ; étapes nonum exclues
@@ -25,7 +26,7 @@ function stepNums(blocks) {
   return out;
 }
 function renderPage(d, ctx) {
-  ctx = rctx(ctx);
+  ctx = rctx(ctx, d);
   var edit = ctx.view === 'edit', vf = ctx.folds, blocks = d.pages[ctx.page].blocks;
   // plis de lecture de la session ; sinon l'état enregistré
   var isF = function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; };
@@ -163,7 +164,7 @@ function renderBlock(b, d, ctx, num) {
       var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
       var rdist = function (r) { if (!MapKit) MapKit = ardoiseMapKit(); return MapKit.fmtDist(MapKit.pathLen(r.pts)); };
       var zdesc = function (z) { return z.shape === 'circle' ? 'cercle de ' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + ' km' : z.pts.length + ' sommets'; };
-      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b, d) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: doc.mapKey || undefined })) + '"') +
+      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b, d) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: d.mapKey || undefined })) + '"') +
         ' tabindex="0" role="application" aria-label="Carte" style="height:' + mh + 'px"><div class="map-nojs">Carte interactive : JavaScript nécessaire pour l’afficher.</div></div>';
       if (!e) {
         var li = mks.map(function (m, i) { return '<li><button type="button" data-go="' + i + '"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' + esc(m.label || 'Point ' + (i + 1)) + '</button><span class="muted">' + mll(m) + '</span></li>'; })
@@ -402,9 +403,9 @@ function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
 function navHTML(d, ctx) {
   // vue 'export' : toutes les pages sont présentes et le script de la page exportée bascule de l'une à l'autre
-  ctx = rctx(ctx);
+  ctx = rctx(ctx, d);
   var edit = ctx.view === 'edit', all = ctx.view === 'export', nf = ctx.navFolds;
-  var pages = d.pages, cur = Math.min(ctx.page, pages.length - 1), w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
+  var pages = d.pages, cur = ctx.page, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
   var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
   var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
   var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
