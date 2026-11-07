@@ -42,9 +42,12 @@ function libelleFeuilles(a, b, k, rows, out) {
   }
   out.push({ k: typeof a === typeof b && typeof b !== 'object' ? k : '', rows: rows && typeof b === 'string', v: b });
 }
+// kanban sans les dépendances de ses cartes : une liste qui change de longueur perd sa clé dans libelleFeuilles
+function libelleHorsDependances(b) { return JSON.stringify(b, function (k, v) { return k === 'dep' && Array.isArray(v) ? undefined : v; }); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
+  if (b.type === 'kanban' && libelleHorsDependances(ba) === libelleHorsDependances(b)) return 'dépendance modifiée';
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';
