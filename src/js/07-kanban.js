@@ -17,6 +17,15 @@ function kbDate(iso, long) {
   if (!long) return m[3] + '/' + m[2] + '/' + m[1];
   try { return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); } catch (_) { return m[3] + '/' + m[2] + '/' + m[1]; }
 }
+function kbParseDate(text, today) {
+  // date saisie (j/m, j/m/aa, j/m/aaaa ; séparateurs / . - ; jour avant mois) → « aaaa-mm-jj », '' si vide, null si impossible
+  var t = String(text || '').trim(); if (!t) return '';
+  var m = t.match(/^(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2}|\d{4}))?$/); if (!m) return null;
+  var y = m[3] ? +m[3] + (m[3].length === 2 ? 2000 : 0) : +String(today).slice(0, 4), mo = +m[2], j = +m[1];
+  var d = new Date(Date.UTC(y, mo - 1, j)); d.setUTCFullYear(y);
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== j) return null;
+  return ('000' + y).slice(-4) + '-' + ('0' + mo).slice(-2) + '-' + ('0' + j).slice(-2);
+}
 function kbLate(iso, last) {
   // échéance passée (hors dernière colonne, considérée comme « terminé »)
   if (!iso || last) return false;
@@ -68,7 +77,9 @@ function kanbanHTML(b, ctx, f) {
         var base = 'cols.' + ci + '.cards.' + ki, meta, dl = kbDepLines(b, k, t, st);
         if (e) meta = '<div class="kb-meta"><select class="kb-prio-in' + (KB_PRIO[k.prio] ? ' ' + k.prio : '') + '" data-b="' + b.id + '" data-k="' + base + '.prio" title="Priorité (facultative)">' +
             [['', 'Priorité'], ['p1', 'P1 · haute'], ['p2', 'P2 · moyenne'], ['p3', 'P3 · basse']].map(function (o) { return '<option value="' + o[0] + '"' + ((k.prio || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
-          '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="date" class="kb-due-in" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
+          '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="text" class="kb-due-in" inputmode="numeric" autocomplete="off" placeholder="jj/mm/aaaa" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(kbDate(k.due)) + '">' +
+            '<button type="button" class="kb-due-cal" data-act="kb-due-cal" title="Choisir dans le calendrier" aria-label="Choisir dans le calendrier">📅</button>' +
+            '<input type="date" class="kb-due-pick" tabindex="-1" aria-hidden="true" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
           f('span', 'kb-whoi', base + '.who', k.who, { rich: false, ph: 'Responsable', nl: 1 }) +
           '<button type="button" class="kb-depb" data-kbdep="' + b.id + '|' + k.id + '" title="Cartes à finir avant celle-ci">Dépend de…</button>' + '</div>';
         else meta = k.due || k.who || KB_PRIO[k.prio] ? '<div class="kb-meta">' + kbPrio(k.prio) + (k.due ? '<span class="kb-due' + (kbLate(k.due, last) ? ' late' : '') + '" title="Échéance">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '';
