@@ -47,7 +47,7 @@ app.addEventListener('input', function (e) {
     $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { x.textContent = ct; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
-  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, false, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
+  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
 });

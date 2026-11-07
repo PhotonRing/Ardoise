@@ -1,6 +1,10 @@
 /* ---------- Démarrage ---------- */
-tlTips();
-navSpyFn = navSpy();
+// un clic en cours sur le sommaire : refreshDerived attend sa fin pour reconstruire (07-rendu.js)
+document.addEventListener('pointerdown', function () { pointerBusy = true; }, true);
+document.addEventListener('pointerup', function () { setTimeout(function () { pointerBusy = false; if (navPending) { navPending = false; refreshDerived(); } }, 0); }, true);
+try { panelMin = localStorage.getItem(LS + 'panelmin') === '1'; } catch (_) {}
+Reader.tlTips();
+navSpyFn = Reader.navSpy();
 function boot(d, origine) {
   // le mode et l'état replié de la navigation avant le remplacement : le rendu prévenu par la session en dépend
   loadNavFold(d);

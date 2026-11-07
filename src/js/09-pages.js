@@ -103,7 +103,7 @@ app.addEventListener('click', function (e) {
   var qc = t.closest('[data-qchk]');
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
-    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
+    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
     if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
     return;
   }
@@ -111,15 +111,15 @@ app.addEventListener('click', function (e) {
   if (qs) {
     var qhost = qs.closest('[data-qid]'), qblk = qhost && byId(qhost.dataset.qid);
     if (!qblk) return;
-    var cur = qSortSpec(qblk), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
+    var cur = qSortSpec(qblk, viewCtx()), by = qs.dataset.qsort, dir = cur.by === by && cur.dir === 'asc' ? 'desc' : 'asc', sy2 = scrollY;
     if (mode === 'edit') session.modifier(function () { qblk.sortBy = by; qblk.sortDir = dir; });
     else { viewSort[qblk.id] = { by: by, dir: dir }; render(); }   // lecture : rien n'est enregistré
     scrollTo(0, sy2); return;
   }
   var vfb = t.closest('[data-vfold]');
-  if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !foldToggle(hd); return; }   // lecture : rien n'est enregistré
+  if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !Reader.foldToggle(hd); return; }   // lecture : rien n'est enregistré
   var fb = t.closest('[data-pgfold]');
-  if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = tocFold(fb); saveNavFold(); return; }
+  if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = Reader.tocFold(fb); saveNavFold(); return; }
   var ps = t.closest('[data-pgsub]'); if (ps && mode === 'edit') { addSubPage(+ps.dataset.pgsub); return; }
   var pg = t.closest('[data-pg]'); if (pg && !t.closest('.pnav-in')) { e.preventDefault(); goPage(+pg.dataset.pg); return; }
   if (t.closest('[data-pgadd]') && mode === 'edit') { addPage(doc.cur); return; }
