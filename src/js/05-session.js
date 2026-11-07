@@ -27,16 +27,23 @@ var SESSION_ORIGINES = {
 function creerSession(adaptateur) {
   var sy = adaptateur;
   var pile = [], marques = [], pos = -1, minuteur = null;   // marques : repère des modifications reçues (synchronisation)
+  // libelles : ce que chaque étape a changé, calculé à sa validation entre deux états qui ont reçu les mêmes
+  // modifications des autres copies (recevoir réécrit l'état courant) : seule l'étape locale y figure
+  var libelles = [];
   var abonnes = { rendu: [], modifie: [], historique: [], nouveauFichier: [] };
   function prevenir(ev) { var a = Array.prototype.slice.call(arguments, 1); abonnes[ev].forEach(function (fn) { fn.apply(null, a); }); }
-  function etat() { return { annuler: pos > 0, retablir: pos < pile.length - 1 }; }
+  function etat() {
+    var a = pos > 0, r = pos < pile.length - 1;
+    return { annuler: a, retablir: r, libelleAnnuler: a ? libelles[pos] : '', libelleRetablir: r ? libelles[pos + 1] : '' };
+  }
   // une étape d'historique, seulement si l'état a changé ; renvoie vrai si elle a été ajoutée
   function etape() {
     clearTimeout(minuteur); minuteur = null;
     var s = JSON.stringify(doc);
     if (pile[pos] === s) return false;
+    libelles = libelles.slice(0, pos + 1); libelles.push(pos >= 0 ? libelleEtape(JSON.parse(pile[pos]), doc) : '');
     pile = pile.slice(0, pos + 1); pile.push(s); marques = marques.slice(0, pos + 1); marques.push(sy.marque());
-    if (pile.length > SESSION_MAX) { pile.shift(); marques.shift(); sy.oublier(marques[0]); }
+    if (pile.length > SESSION_MAX) { pile.shift(); marques.shift(); libelles.shift(); sy.oublier(marques[0]); }
     pos = pile.length - 1;
     sy.envoyer();   // synchronisation : la modification part vers les autres copies
     return true;
@@ -78,7 +85,7 @@ function creerSession(adaptateur) {
     // avant la remise à zéro de l'historique : la synchronisation du document précédent s'arrête sur « nouveau fichier »,
     // et la marque du nouvel état ne doit pas venir d'elle
     if (r.nouveauFichier) prevenir('nouveauFichier');
-    if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; pos = 0; }
+    if (r.historique === 'repart') { clearTimeout(minuteur); minuteur = null; pile = [JSON.stringify(doc)]; marques = [sy.marque()]; libelles = ['']; pos = 0; }
     if (r.historique === 'etape') { etape(); prevenir('rendu', null, {}); prevenir('modifie'); }
     else prevenir('rendu', null, {});
     prevenir('historique', etat());
