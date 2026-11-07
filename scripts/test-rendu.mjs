@@ -285,7 +285,7 @@ const ETAPES = {
     { id: 'e10', type: 'step', title: 'Quatre' },
   ] }],
 };
-const NUMEROS = ['1', '2', '5', '6', '7', '2b', '3', 'A', '4'];
+const NUMEROS = ['1', '2', '5', '6', '7', '2b', '3b', 'A', '4b'];
 const tocN = (h) => textes(h, /<span class="toc-n">([\s\S]*?)<\/span>/g);
 
 test('numérotation des étapes : la même dans la page, le bloc sommaire et le sommaire latéral', () => {
@@ -300,13 +300,28 @@ test('numérotation en édition : la pastille vide montre le numéro calculé, l
   const { ctx, d } = monter(ETAPES);
   const h = ctx.renderPage(d, { page: 0, view: 'edit' });
   egal([...h.matchAll(/<span class="num fld"[^>]*data-ph="([^"]*)">([^<]*)<\/span>/g)].map((m) => m[1] + '|' + m[2]),
-    ['1|', '2|', '5|5', '6|', '7|', '2b|2b', '3|', 'A|A', '4|']);
+    ['1|', '2|', '5|5', '6|', '7|', '2b|2b', '3b|', 'A|A', '4b|']);
 });
 
 test('stepNums : numéro affiché de chaque étape d\'une page, étapes nonum exclues', () => {
   const { ctx, d } = monter(ETAPES);
   egal(JSON.parse(JSON.stringify(ctx.stepNums(d.pages[0].blocks))),
-    { e1: '1', e2: '2', e3: '5', e4: '6', e6: '7', e7: '2b', e8: '3', e9: 'A', e10: '4' });
+    { e1: '1', e2: '2', e3: '5', e4: '6', e6: '7', e7: '2b', e8: '3b', e9: 'A', e10: '4b' });
+});
+
+// numéro saisi à plusieurs niveaux : l'étape automatique suivante le recopie en augmentant son dernier nombre
+const suite = (num) => {
+  const blocks = [{ id: 's', type: 'step', num }, { id: 'u', type: 'step' }, { id: 'v', type: 'step' }];
+  const { ctx, d } = monter({ title: 'Doc', pages: [{ id: 'p1', blocks }] }), r = ctx.stepNums(d.pages[0].blocks);
+  return [r.u, r.v];
+};
+test('stepNums : la suite d\'un numéro saisi garde sa forme et augmente son dernier nombre', () => {
+  egal(suite('5. 2'), ['5. 3', '5. 4'], '« 5. 2 »');
+  egal(suite('5.2.'), ['5.3.', '5.4.'], '« 5.2. »');
+  egal(suite('5'), ['6', '7'], '« 5 »');
+  egal(suite('5.'), ['6.', '7.'], '« 5. »');
+  egal(suite('Étape 4'), ['Étape 5', 'Étape 6'], '« Étape 4 »');
+  egal(suite('1.9'), ['1.10', '1.11'], 'retenue');
 });
 
 // pliage : niveaux de foldLevel (étape et h2 = 1, h3 = 2, en-tête et pied = 0, autres = -1) ; r[i] = titre plié qui masque i, ou -1

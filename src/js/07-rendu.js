@@ -14,13 +14,13 @@ function rctx(ctx, d) {
   return { page: page, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
     navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
 }
-// numéro affiché de chaque étape (id → numéro) : le numéro saisi, sinon un compteur qui repart du dernier nombre saisi ; étapes nonum exclues
+// numéro affiché de chaque étape (id → numéro) : le numéro saisi, sinon le dernier numéro saisi recopié avec son dernier nombre augmenté (« 5. 2 » → « 5. 3 ») ; étapes nonum exclues
 function stepNums(blocks) {
-  var out = {}, counter = 0;
+  var out = {}, pre = '', counter = 0, post = '';
   blocks.forEach(function (b) {
     if (b.type !== 'step' || b.nonum) return;
-    var n = String(b.num || '').trim(), m = n.match(/(\d+)\D*$/);
-    if (!n) n = String(++counter); else if (m) counter = +m[1];
+    var n = String(b.num || '').trim(), m = n.match(/^(.*?)(\d+)(\D*)$/);
+    if (!n) n = pre + (++counter) + post; else if (m) { pre = m[1]; counter = +m[2]; post = m[3]; }
     out[b.id] = n;
   });
   return out;
