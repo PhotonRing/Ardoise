@@ -385,3 +385,12 @@ button.tl-dot:hover{transform:scale(1.2)}
 .kb-add,.kb-addcol{border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;padding:7px 10px;cursor:pointer;font:500 12.5px var(--f-body)}
 .kb-add:hover,.kb-addcol:hover{border-color:var(--accent);color:var(--accent)}
 .kb-addcol{flex:0 0 auto;align-self:flex-start}
+.tgw{display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0}
+.tgw-r{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.tgw-r:last-child{border-bottom:0}
+.tgw-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tgw-n{flex:1;min-width:0;font-size:12.5px}
+.tgw-del{border:1px solid var(--line);background:none;color:var(--fg);height:26px;padding:0 9px;border-radius:6px;cursor:pointer;font:500 12px var(--f-body)}
+.tgw-del:hover{background:var(--accent-soft)}
+.tgw-sw{grid-template-columns:repeat(16,1fr);max-width:520px}
+@media (max-width:560px){.tgw-sw{grid-template-columns:repeat(8,1fr)}}

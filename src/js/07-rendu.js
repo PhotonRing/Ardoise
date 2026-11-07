@@ -47,7 +47,7 @@ function renderPage(d, ctx) {
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
-  return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>');
+  return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>', d);
 }
 // bloc d'ancrage de la bascule dans la vue ctx : le bloc, sinon le titre plié qui le masque, sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
 function anchorBlock(d, ctx, id) {
@@ -505,7 +505,7 @@ function refreshDerived() {
     if (b.type !== 'query') return;
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app); if (!box || box.contains(document.activeElement)) return;   // pas pendant la saisie d'un texte de carte
-    var h = paintPills(queryResult(b, doc, vc)); if (box.innerHTML !== h) box.innerHTML = h;
+    var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   doc.blocks.forEach(function (b) {
