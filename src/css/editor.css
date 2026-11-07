@@ -52,6 +52,9 @@ html.sheet-on{overflow:hidden}
 .sh-big .ic{width:22px;text-align:center;font-size:18px;opacity:.85}
 .sh-big.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)!important}
 .sh-big:disabled{opacity:.4;cursor:default}
+.sh-big .sh-l{display:flex;flex-direction:column;min-width:0}
+.sh-big .sub{font-size:12px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-big .sub:empty{display:none}
 .sh-list{padding:4px 8px 24px}
 .sh-list h4{margin:16px 10px 6px;font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .sh-list .mi{width:100%;min-height:48px;font-size:15px}
