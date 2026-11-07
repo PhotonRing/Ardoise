@@ -435,12 +435,6 @@ function navHTML(d, ctx) {
     (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
   return tabs + side;
 }
-function tocFold(btn, open) {
-  // déplie / replie un groupe de sous-pages du sommaire (repris tel quel dans l'export statique)
-  var li = btn.closest('.toc-p'); if (open == null) open = !li.classList.contains('open');
-  li.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
-  return open;
-}
 function navReveal(keep) {
   // garde visible la page affichée dans le sommaire (qui défile) et dans les onglets
   var side = $('.pnav-side', app), tabs = $('.pnav-tabs .tabs-in', app), sub = $('.pnav-tabs .tabs-sub:not([hidden])', app);
@@ -452,35 +446,6 @@ function navReveal(keep) {
     if (z[2] === 'x' && (r.left < br.left || r.right > br.right)) box.scrollLeft += r.left - br.left - 24;
   });
 }
-function navLayout() {
-  // sommaire à gauche s'il y a la place à côté de la colonne, sinon onglets ; réglage forcé dans Style
-  var h = document.documentElement, n = +h.getAttribute('data-npages') || 1, pref = h.getAttribute('data-nav') || 'auto';
-  var edit = h.classList.contains('is-edit'), w = +h.getAttribute('data-w') || 820, iw = window.innerWidth, room = (iw - w) / 2;
-  var none = n < 2 && !edit, side = pref === 'tabs' ? false : pref === 'side' ? iw >= 760 : room >= 250;
-  var push = !none && side && room < 250;
-  h.classList.toggle('nav-none', none); h.classList.toggle('nav-side', !none && side); h.classList.toggle('nav-tabs', !none && !side); h.classList.toggle('nav-push', push);
-  h.style.setProperty('--navw', (push ? 220 : Math.max(190, Math.min(260, room - 40))) + 'px');
-}
-function navSpy() {
-  // section en cours surlignée dans le sommaire ; clic sur une section : défilement sans changer l'adresse
-  function target(id) { return document.getElementById('b-' + id) || document.querySelector('.blk[data-id="' + id + '"]'); }
-  var tick = 0;
-  function spy() {
-    tick = 0;
-    var links = Array.prototype.slice.call(document.querySelectorAll('.pnav-side .toc-p.on a[data-sec]')), act = null;
-    links.forEach(function (a) { var t = target(a.getAttribute('data-sec')); if (t && t.offsetParent !== null && t.getBoundingClientRect().top <= 140) act = a; });
-    if (!act && links.length) act = links[0];
-    links.forEach(function (a) { a.classList.toggle('on', a === act); });
-  }
-  window.addEventListener('scroll', function () { if (!tick) tick = requestAnimationFrame(spy); }, { passive: true });
-  document.addEventListener('click', function (e) {
-    var a = e.target.closest && e.target.closest('a[data-sec]'); if (!a) return;
-    var t = target(a.getAttribute('data-sec')); if (!t) return;
-    e.preventDefault(); if (typeof foldReveal === 'function') foldReveal(t); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  });
-  window.addEventListener('resize', navLayout);
-  return spy;
-}
 function applyTheme() {
   var r = document.documentElement;
   r.setAttribute('data-palette', doc.palette);
@@ -489,7 +454,7 @@ function applyTheme() {
   if (th === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', th);
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
-  navLayout(); paintFavicon();
+  Reader.navLayout(); paintFavicon();
   document.title = curTitle();
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
@@ -566,7 +531,7 @@ function render(focus) {
   if (navSpyFn) navSpyFn();
   if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
   mountMaps();
-  tlFit(app);
+  Reader.tlFit(app);
   renderChrome();
   updateCheat();
   synPaintPeers();

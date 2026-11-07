@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { closureLeaks } from './scripts/fermeture.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const src = (p) => readFileSync(join(root, 'src', p), 'utf8');
@@ -17,6 +18,11 @@ const geo = src('data/geo.json');
 if (/<\/script/i.test(js)) throw new Error('src/js contient « </script> » : écrire <\\/script> dans les chaînes.');
 JSON.parse(geo);
 if (/<\/script/i.test(geo)) throw new Error('src/data/geo.json contient « </script> ».');
+// Garde-fou : les fabriques recopiées par toString() dans la page exportée n'y retrouveraient pas les noms de l'éditeur
+for (const kit of ['ardoiseReader', 'ardoiseMapKit']) {
+  const leaks = closureLeaks(js, kit);
+  if (leaks.length) throw new Error(`${kit} cite ${leaks.map((n) => '« ' + n + ' »').join(', ')}${leaks.length > 1 ? ', déclarés' : ', déclaré'} au premier niveau du bundle : la page exportée ne l'aurait pas.`);
+}
 
 // Icône d'Ardoise (src/assets/ardoise.svg) : favicon du fichier, reprise aussi dans la barre de l'éditeur
 const logo = src('assets/ardoise.svg').trim();

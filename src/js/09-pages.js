@@ -117,9 +117,9 @@ app.addEventListener('click', function (e) {
     scrollTo(0, sy2); return;
   }
   var vfb = t.closest('[data-vfold]');
-  if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !foldToggle(hd); return; }   // lecture : rien n'est enregistré
+  if (vfb && mode === 'view') { var hd = vfb.parentNode; viewFold[hd.id.slice(2)] = !Reader.foldToggle(hd); return; }   // lecture : rien n'est enregistré
   var fb = t.closest('[data-pgfold]');
-  if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = tocFold(fb); saveNavFold(); return; }
+  if (fb) { var li = fb.closest('.toc-p'); navFold[doc.pages[+li.dataset.pgi].id] = Reader.tocFold(fb); saveNavFold(); return; }
   var ps = t.closest('[data-pgsub]'); if (ps && mode === 'edit') { addSubPage(+ps.dataset.pgsub); return; }
   var pg = t.closest('[data-pg]'); if (pg && !t.closest('.pnav-in')) { e.preventDefault(); goPage(+pg.dataset.pg); return; }
   if (t.closest('[data-pgadd]') && mode === 'edit') { addPage(doc.cur); return; }

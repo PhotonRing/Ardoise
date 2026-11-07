@@ -168,7 +168,7 @@ try { viewerTheme = localStorage.getItem(LS + 'viewtheme') || ''; } catch (_) {}
 function foldAll(open) {
   // lecture : plie ou déplie toutes les sections de la page (sans modifier le document)
   var hs = $$('.wrap [data-vfold]', app).map(function (b) { return b.parentNode; });
-  (open ? hs : hs.slice().reverse()).forEach(function (h) { foldToggle(h, open); viewFold[h.id.slice(2)] = !open; });
+  (open ? hs : hs.slice().reverse()).forEach(function (h) { Reader.foldToggle(h, open); viewFold[h.id.slice(2)] = !open; });
 }
 function viewMenuHTML() {
   var anyFold = !!$('.wrap [data-vfold]', app);
@@ -316,7 +316,7 @@ function goLink(href) {
   if (!L.bid) return;
   if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });
   var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
-  if (el && mode === 'view') foldReveal(el);
+  if (el && mode === 'view') Reader.foldReveal(el);
   if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');
 }
 function openLinkPop(kind, range, fld, a) {
