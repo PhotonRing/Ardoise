@@ -13,23 +13,28 @@ function rctx(ctx) {
   return { page: +ctx.page || 0, view: view, folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {},
     navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
 }
+// numéro affiché de chaque étape (id → numéro) : le numéro saisi, sinon un compteur qui repart du dernier nombre saisi ; étapes nonum exclues
+function stepNums(blocks) {
+  var out = {}, counter = 0;
+  blocks.forEach(function (b) {
+    if (b.type !== 'step' || b.nonum) return;
+    var n = String(b.num || '').trim(), m = n.match(/(\d+)\D*$/);
+    if (!n) n = String(++counter); else if (m) counter = +m[1];
+    out[b.id] = n;
+  });
+  return out;
+}
 function renderPage(d, ctx) {
   ctx = rctx(ctx);
   var edit = ctx.view === 'edit', vf = ctx.folds, blocks = d.pages[ctx.page].blocks;
   // plis de lecture de la session ; sinon l'état enregistré
   var isF = function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; };
-  var out = [], open = false, counter = 0, fi = foldInfo(blocks, edit ? null : isF), reg = edit ? null : foldRegions(blocks);
+  var out = [], open = false, nums = stepNums(blocks), fi = foldInfo(blocks, edit ? null : isF), reg = edit ? null : foldRegions(blocks);
   blocks.forEach(function (b) {
     if (edit && fi.hidden[b.id]) return;   // dans une section pliée (édition)
     if (b.type === 'step' || b.type === 'footer') { if (open) out.push('</section>'); open = false; }
     if (b.type === 'step') { out.push('<section class="step"' + (edit ? '' : ' data-fl="1"') + '>'); open = true; }
-    var num = null;
-    if (b.type === 'step' && !b.nonum) {
-      var n = String(b.num || '').trim();
-      if (n) { num = n; var m = n.match(/(\d+)\D*$/); if (m) counter = +m[1]; }
-      else { counter++; num = String(counter); }
-    }
-    var inner = renderBlock(b, d, ctx, num);
+    var inner = renderBlock(b, d, ctx, nums[b.id] || null);
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
@@ -376,13 +381,10 @@ function pageTitle(pg, i) {
 }
 function curTitle() { return pageTitle(doc.pages[doc.cur], doc.cur); }
 function sectionsOf(pg) {
-  var out = [], counter = 0;
+  var out = [], nums = stepNums(pg.blocks);
   pg.blocks.forEach(function (b) {
-    if (b.type === 'step') {
-      var num = null;
-      if (!b.nonum) { var n = String(b.num || '').trim(); if (n) { num = n; var m = n.match(/(\d+)\D*$/); if (m) counter = +m[1]; } else { counter++; num = String(counter); } }
-      out.push({ id: b.id, t: textOf(b.title) || 'Étape', n: num, lv: 1 });
-    } else if (b.type === 'h2') out.push({ id: b.id, t: textOf(b.html) || 'Section', lv: 1 });
+    if (b.type === 'step') out.push({ id: b.id, t: textOf(b.title) || 'Étape', n: nums[b.id] || null, lv: 1 });
+    else if (b.type === 'h2') out.push({ id: b.id, t: textOf(b.html) || 'Section', lv: 1 });
     else if (b.type === 'h3') out.push({ id: b.id, t: textOf(b.html) || 'Sous-section', lv: 2 });
   });
   return out;
@@ -499,12 +501,9 @@ function refreshDerived() {
     var h = summaryList(b, doc, vc.page) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
   });
   // numérotation automatique des étapes (pastilles vides qui affichent le numéro calculé)
-  var counter = 0;
-  doc.blocks.forEach(function (b) {
-    if (b.type !== 'step' || b.nonum) return;
-    var n = String(b.num || '').trim(), num;
-    if (n) { num = n; var m = n.match(/(\d+)\D*$/); if (m) counter = +m[1]; } else { counter++; num = String(counter); }
-    var badge = $('.blk[data-id="' + b.id + '"] .num', app); if (badge && badge.getAttribute('data-ph') !== num) badge.setAttribute('data-ph', num);
+  var nums = stepNums(doc.blocks);
+  Object.keys(nums).forEach(function (id) {
+    var badge = $('.blk[data-id="' + id + '"] .num', app); if (badge && badge.getAttribute('data-ph') !== nums[id]) badge.setAttribute('data-ph', nums[id]);
   });
   chRefreshLinked();   // cartes dont les valeurs viennent d'un tableau
   var ct = curTitle(); if (document.title !== ct) document.title = ct;
