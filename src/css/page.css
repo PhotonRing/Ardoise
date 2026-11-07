@@ -109,6 +109,8 @@ pre.cmd{font:13.5px/1.55 var(--f-mono);background:var(--code-soft);border:1px so
 .tablewrap th,.tablewrap td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 .tablewrap th{font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .tablewrap tr:last-child td{border-bottom:0}
+/* cellule vide : un espace sans chasse lui donne une boîte de ligne, donc la hauteur d'une ligne */
+.tablewrap td:empty::after,.tablewrap th:empty::after{content:"\200b"}
 .pill{display:inline-block;font:600 12px/1 var(--f-body);padding:4px 8px;border-radius:999px;white-space:nowrap}
 /* pastilles : couleur du nom (pa-N, posée au rendu) ou de la pastille (pc-N) */
 :root{--t4f:#52257e;--t4b:#ede1fa;--t5f:#832152;--t5b:#fbe0ed;--t6f:#1d877e;--t6b:#dffbf9;--t7f:#252c7e;--t7b:#e1e3fa;--t8f:#617e25;--t8b:#f1fae1;--t9f:#186e8b;--t9b:#def5fc;--t10f:#7e4a25;--t10b:#faebe1;--t11f:#762d76;--t11b:#f8e2f8;--t12f:#297a52;--t12b:#e2f9ed;--t13f:#405264;--t13b:#e7edf4;--t14f:#937910;--t14b:#fdf7dd;--t15f:#8b2818;--t15b:#fce2de}
