@@ -338,24 +338,20 @@ function settings(b) {
 function foldLevel(b) { return b.type === 'step' || b.type === 'h2' ? 1 : b.type === 'h3' ? 2 : b.type === 'header' || b.type === 'footer' ? 0 : -1; }
 function foldRegions(blocks) {
   // nombre de blocs de chaque section (titre de section, étape, sous-section), pliée ou non
-  var n = {};
+  var n = {}, levels = blocks.map(foldLevel);
   blocks.forEach(function (b, i) {
-    var lv = foldLevel(b); if (lv <= 0) return;
-    var c = 0; for (var j = i + 1; j < blocks.length; j++) { var l = foldLevel(blocks[j]); if (l >= 0 && l <= lv) break; c++; }
-    n[b.id] = c;
+    if (levels[i] <= 0) return;
+    // ce que ce titre masquerait s'il était seul plié (règle de Reader.foldHidden)
+    n[b.id] = Reader.foldHidden(levels, levels.map(function (_, j) { return j === i; })).filter(function (h) { return h === i; }).length;
   });
   return n;
 }
 function foldInfo(blocks, isFolded) {
-  // blocs masqués par une section pliée : jusqu'au prochain titre de même niveau ou de niveau supérieur
+  // blocs masqués par une section pliée (règle de Reader.foldHidden, la même que la page exportée)
   // hidden : id du bloc → id du titre plié qui le masque ; count : nombre de blocs masqués par titre
-  var hidden = {}, count = {}, cur = null;
-  blocks.forEach(function (b) {
-    var lv = foldLevel(b);
-    if (cur && lv >= 0 && lv <= cur.lv) cur = null;
-    if (cur) { hidden[b.id] = cur.id; count[cur.id] = (count[cur.id] || 0) + 1; return; }
-    if (lv > 0 && (isFolded ? isFolded(b) : b.folded)) cur = { lv: lv, id: b.id };
-  });
+  var hidden = {}, count = {};
+  var r = Reader.foldHidden(blocks.map(foldLevel), blocks.map(function (b) { return isFolded ? isFolded(b) : b.folded; }));
+  r.forEach(function (h, i) { if (h < 0) return; var hid = blocks[h].id; hidden[blocks[i].id] = hid; count[hid] = (count[hid] || 0) + 1; });
   return { hidden: hidden, count: count };
 }
 function revealBlock(id) {

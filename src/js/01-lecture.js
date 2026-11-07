@@ -63,35 +63,51 @@ function ardoiseReader() {
     window.addEventListener('scroll', hide, true);
     window.addEventListener('resize', hide);
   }
+  function foldHidden(levels, folded) {
+    // la règle de pliage, pour l'éditeur et la page exportée : un titre plié (niveau > 0) masque ce qui le suit jusqu'au
+    // prochain titre de même niveau ou de niveau inférieur (0 : en-tête, pied) ; r[i] = indice du titre plié le plus extérieur, ou -1
+    var r = [], cur = -1;
+    for (var i = 0; i < levels.length; i++) {
+      var lv = levels[i];
+      if (cur >= 0 && lv >= 0 && lv <= levels[cur]) cur = -1;
+      r.push(cur);
+      if (cur < 0 && lv > 0 && folded[i]) cur = i;
+    }
+    return r;
+  }
+  function foldList(el) {
+    // blocs de la page de el, dans l'ordre : ceux d'une section d'étape suivent la section, qui reste une frontière de niveau 1
+    var out = [], wrap = el.closest('.wrap') || el.parentNode;
+    Array.prototype.forEach.call(wrap.children, function (c) {
+      out.push(c);
+      if (c.tagName === 'SECTION' && c.classList.contains('step')) Array.prototype.forEach.call(c.children, function (x) { out.push(x); });
+    });
+    return out;
+  }
+  function foldApply(list) {
+    // data-fh selon foldHidden, d'après data-fl et data-folded ; rend l'indice du titre qui masque chaque bloc
+    var r = foldHidden(list.map(function (x) { return x.hasAttribute('data-fl') ? +x.getAttribute('data-fl') : -1; }),
+      list.map(function (x) { return x.hasAttribute('data-folded'); }));
+    list.forEach(function (x, i) { if (r[i] >= 0) x.setAttribute('data-fh', ''); else x.removeAttribute('data-fh'); });
+    return r;
+  }
   function foldToggle(h, open) {
     // lecture : plie / déplie la section du titre h, sans toucher au document (les sections pliées à l'intérieur restent pliées)
-    var lv = +h.getAttribute('data-fl'), skip = 0, n = h.nextElementSibling, btn = h.querySelector('[data-vfold]');
+    var btn = h.querySelector('[data-vfold]');
     if (open == null) open = h.hasAttribute('data-folded');
     if (open) h.removeAttribute('data-folded'); else h.setAttribute('data-folded', '');
     if (btn) btn.setAttribute('aria-expanded', String(open));
-    for (; n; n = n.nextElementSibling) {
-      var l = n.hasAttribute('data-fl') ? +n.getAttribute('data-fl') : -1;
-      if (l >= 0 && l <= lv) break;
-      if (!open) { n.setAttribute('data-fh', ''); continue; }
-      if (skip && !(l >= 0 && l <= skip)) continue;
-      skip = 0; n.removeAttribute('data-fh');
-      if (l > 0 && n.hasAttribute('data-folded')) skip = l;
-    }
+    foldApply(foldList(h));
     if (open) window.dispatchEvent(new Event('resize'));   // cartes et chronologies révélées : remise en page
     return open;
   }
   function foldReveal(el) {
-    // lecture : déplie les sections qui masquent el
+    // lecture : déplie les sections qui masquent el, la plus extérieure d'abord (comme revealBlock dans l'éditeur)
+    var x = el.closest('[data-fh]'); if (!x) return;
     for (var k = 0; k < 20; k++) {
-      var x = el.closest('[data-fh]'); if (!x) return;
-      var lv = x.hasAttribute('data-fl') ? +x.getAttribute('data-fl') : 99, h = null;
-      for (var p = x.previousElementSibling; p; p = p.previousElementSibling) {
-        if (!p.hasAttribute('data-fl')) continue;
-        var l = +p.getAttribute('data-fl');
-        if (l > 0 && l < lv && p.hasAttribute('data-folded')) { h = p; break; }
-        if (l < lv) lv = l;
-      }
-      if (!h) return; foldToggle(h, true);
+      var list = foldList(x), h = foldApply(list)[list.indexOf(x)];
+      if (!(h >= 0)) return;
+      foldToggle(list[h], true);
     }
   }
   function printKeep(on) {
@@ -224,7 +240,7 @@ function ardoiseReader() {
     tlTips();
     exportPages();
   }
-  return { tlFit: tlFit, tlTips: tlTips, foldToggle: foldToggle, foldReveal: foldReveal, printKeep: printKeep, printPrep: printPrep,
+  return { tlFit: tlFit, tlTips: tlTips, foldHidden: foldHidden, foldToggle: foldToggle, foldReveal: foldReveal, printKeep: printKeep, printPrep: printPrep,
     viewScript: viewScript, exportPages: exportPages, tocFold: tocFold, navLayout: navLayout, navSpy: navSpy, startExport: startExport };
 }
 var Reader = ardoiseReader();
