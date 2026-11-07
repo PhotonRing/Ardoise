@@ -79,7 +79,7 @@ function kanbanHTML(b, ctx, f) {
         var base = 'cols.' + ci + '.cards.' + ki, meta, deps = kbDepLines(b, k, index, st);
         if (e) meta = '<div class="kb-meta"><select class="kb-prio-in' + (KB_PRIO[k.prio] ? ' ' + k.prio : '') + '" data-b="' + b.id + '" data-k="' + base + '.prio" title="Priorité (facultative)">' +
             [['', 'Priorité'], ['p1', 'P1 · haute'], ['p2', 'P2 · moyenne'], ['p3', 'P3 · basse']].map(function (o) { return '<option value="' + o[0] + '"' + ((k.prio || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
-          '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="text" class="kb-due-in" inputmode="numeric" autocomplete="off" placeholder="jj/mm/aaaa" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(kbDate(k.due)) + '">' +
+          '<label class="kb-duei" title="Échéance (facultative)"><span aria-hidden="true">Échéance</span><input type="text" class="kb-due-in" inputmode="numeric" autocomplete="off" placeholder="dd/mm/aaaa" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(kbDate(k.due)) + '">' +
             '<button type="button" class="kb-due-cal" data-act="kb-due-cal" title="Choisir dans le calendrier" aria-label="Choisir dans le calendrier">📅</button>' +
             '<input type="date" class="kb-due-pick" data-act="kb-due-cal" tabindex="-1" aria-hidden="true" data-b="' + b.id + '" data-k="' + base + '.due" value="' + esc(k.due || '') + '"></label>' +
           f('span', 'kb-whoi', base + '.who', k.who, { rich: false, ph: 'Responsable', nl: 1 }) +

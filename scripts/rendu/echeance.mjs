@@ -21,7 +21,7 @@ test('échéance : vide retire, date impossible refusée', () => {
     egal(lire(t), null, t);
 });
 
-test('échéance : champ texte jj/mm/aaaa, bouton calendrier et sélecteur natif en édition', () => {
+test('échéance : champ texte dd/mm/aaaa, bouton calendrier et sélecteur natif en édition', () => {
   const kb = (due) => ({ title: 'Doc', pages: [{ id: 'p1', blocks: [{ id: 'k1', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [{ id: 'x', title: 'Tâche', due }] }] }] }] });
   const { ctx, d } = monter(kb('2026-11-07'));
   const h = ctx.renderPage(d, { page: 0, view: 'edit' });
