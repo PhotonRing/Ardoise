@@ -437,15 +437,32 @@ app.addEventListener('paste', function (e) {
   e.preventDefault();
   var html = cd.getData('text/html'), text = cd.getData('text/plain');
   if (el.hasAttribute('data-rich') && html) {
-    var clean = sanitize(html.replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
+    var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
     if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
     // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
     if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
+    $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
   } else {
     if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
   }
 });
+// Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée
+// et marquées du document d'origine ; text/plain les écrit « #nom ». Sans pastille, la copie reste celle du navigateur.
+function copierPastilles(e) {
+  var sel = window.getSelection(), cd = e.clipboardData;
+  if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
+  var r = sel.getRangeAt(0);
+  if (!app.contains(r.commonAncestorContainer)) return;
+  var boite = document.createElement('div'); boite.appendChild(r.cloneContents());
+  if (!boite.querySelector('span.pill')) return;
+  var html = pastillesSansCouleur(boite.innerHTML, doc.id);
+  e.preventDefault();
+  cd.setData('text/html', html); cd.setData('text/plain', texteBrutDePresse(html));
+  if (e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld')) document.execCommand('delete');
+}
+app.addEventListener('copy', copierPastilles);
+app.addEventListener('cut', copierPastilles);
 function b0type(el) { var b = byId(el.dataset.b); return b ? b.type : ''; }
 
