@@ -42,6 +42,18 @@ function tagUsage(d) {
   });
   return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
 }
+function sansAccents(s) { return tagKey(s).normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }   // comparaison sans casse ni accents
+function pastillesProposees(d, saisie) {
+  // liste de la pastille au clavier : [{ nom, cle, couleur, creer? }] ; préfixe avant sous-chaîne, puis apparitions, puis
+  // alphabet ; 8 lignes au plus, dont la ligne « Créer » si aucun nom n'est identique (en tête si aucun ne correspond)
+  var s = sansAccents(saisie), cle = tagKey(saisie), egal = false;
+  var l = tagUsage(d).map(function (t) { var i = sansAccents(t.name).indexOf(s); if (t.key === cle) egal = true; return { t: t, p: i === 0 ? 0 : 1, i: i }; })
+    .filter(function (x) { return x.i >= 0; })
+    .sort(function (a, b) { return a.p - b.p || b.t.n - a.t.n || a.t.name.localeCompare(b.t.name, 'fr', { sensitivity: 'base' }); })
+    .map(function (x) { return { nom: x.t.name, cle: x.t.key, couleur: knownTagColor(d, x.t.key) }; });
+  if (!cle || egal) return l.slice(0, 8);
+  return l.slice(0, 7).concat([{ nom: String(saisie).replace(/\s+/g, ' ').trim(), cle: cle, couleur: nextTagColor(d.tags || {}), creer: true }]);
+}
 function queryBlocks(b, d, pi) {
   // blocs de la portée, vue depuis la page pi : [{ blk, pi, sec }] (sec : titre de section qui contient le bloc, ou null)
   var pages = d.pages, s = b.scope || 'doc', m, list = [], from = 0, to = 0, region = null;
