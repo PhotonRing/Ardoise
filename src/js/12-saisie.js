@@ -437,9 +437,11 @@ app.addEventListener('paste', function (e) {
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(html.replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
     if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
+    // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
+    if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
   } else {
-    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = text.replace(/\s*\n\s*/g, ' ');
+    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterLigne(text);
     document.execCommand('insertText', false, text);
   }
 });
