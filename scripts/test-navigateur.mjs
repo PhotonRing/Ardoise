@@ -23,12 +23,14 @@ if (typeof WebSocket !== 'function') ignorer('WebSocket absent de Node ' + proce
 
 const page = 'file://' + fileURLToPath(new URL('../dist/ardoise.html', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'ardoise-cdp-'));
-const chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+const chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+let journal = ''; chr.stderr.on('data', (d) => { journal = (journal + d).slice(-4000); });   // montré si Chromium ne démarre pas
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const fin = (code) => { try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } process.exit(code); };
 
-let port; for (let i = 0; i < 150 && !port; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
-if (!port) { console.error('navigateur : Chromium ne répond pas'); fin(1); }
+// démarrage à froid lent sur les machines de CI : jusqu'à 45 s
+let port; for (let i = 0; i < 450 && !port && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
+if (!port) { console.error('navigateur : Chromium ne répond pas (' + binaire + (chr.exitCode !== null ? ', sorti avec le code ' + chr.exitCode : '') + ')\n' + journal.trim()); fin(1); }
 const cibles = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const ws = new WebSocket(cibles.find((c) => c.type === 'page').webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r));
