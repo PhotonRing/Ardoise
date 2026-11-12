@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "check": "node build.mjs && node scripts/check.mjs && node scripts/test-synchro.mjs 300 && node scripts/test-relais.mjs && node scripts/test-session.mjs && node scripts/test-rendu.mjs",
+    "check": "node build.mjs && node scripts/check.mjs && node scripts/test-synchro.mjs 300 && node scripts/test-relais.mjs && node scripts/test-session.mjs && node scripts/test-rendu.mjs && node scripts/test-navigateur.mjs",
     "relais": "node relais/relais.mjs"
   },
   "engines": {
