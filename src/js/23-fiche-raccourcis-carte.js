@@ -51,17 +51,50 @@ document.addEventListener('pointerdown', function (e) {
   var t = e.target; if (!t || !t.closest) return;
   if (t.closest('.cheat') || t.closest('#ui')) return;
   var mb = t.closest('.blk[data-type=map]');
+  // clic hors de la carte active et de sa liste : on quitte l'édition de forme et l'ajout de points ;
+  // un dessin en cours est gardé (un clic égaré ne le perd pas)
+  var act = mapUi.editOf || mapUi.add;
+  if (act && !(mb && mb.dataset.id === act)) setMapMode(null, null);
   var busy = mapUi.draw || mapUi.edit || mapUi.add;
   cheatBlock = mb ? mb.dataset.id : (busy ? cheatBlock : null);
   setTimeout(updateCheat);
 }, true);
+function setMapMode(id, want) {
+  // seul passage d'un mode de carte à l'autre (boutons, Échap, clic ailleurs, remontage) : want vaut null, { add: true },
+  // { draw: genre } ou { edit: { kind, i } } (voir mapModeNext). Tient ensemble l'état d'interface, le moteur de chaque
+  // carte, les boutons enfoncés, la surbrillance de la liste et l'aide des raccourcis. Rend vrai si un mode était actif.
+  var old = mapUi, nu = mapModeNext(old, id, want), was = !!(old.draw || old.edit || old.add);
+  var same = function (a, b) { return !!a && !!b && a.kind === b.kind && a.i === b.i; };
+  var editOf = function (u, bid) { return u.editOf === bid ? u.edit : null; };
+  mapUi = nu;
+  maps.forEach(function (m) {
+    var bid = m.blockId, oe = editOf(old, bid), ne = editOf(nu, bid);
+    // l'ajout d'abord : setDrawMode recalcule ensuite l'aspect de la carte avec les deux modes
+    if ((old.add === bid) !== (nu.add === bid)) m.setAddMode(nu.add === bid);
+    var od = old.draw === bid ? old.kind : null, nd = nu.draw === bid ? nu.kind : null;
+    if (od !== nd) m.setDrawMode(nd);
+    if (!same(oe, ne) && (oe || ne)) m.setEdit(ne ? ne.kind : null, ne ? ne.i : 0);
+  });
+  var blkOf = function (x) { var k = x.closest('.blk[data-type=map]'); return k ? k.dataset.id : null; };
+  $$('[data-act=map-addmode]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!nu.add && blkOf(x) === nu.add)); });
+  $$('[data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!nu.draw && blkOf(x) === nu.draw && x.dataset.kind === nu.kind)); });
+  $$('[data-act=shape-edit]', app).forEach(function (x) {
+    var on = !!nu.edit && blkOf(x) === nu.editOf && x.dataset.kind === nu.edit.kind && +x.dataset.i === nu.edit.i;
+    x.setAttribute('aria-pressed', String(on));
+    var it = x.closest('.mk-item'); if (it) it.classList.toggle('on', on);
+  });
+  if (id != null) cheatBlock = id;
+  var oldRoute = old.edit && old.edit.kind === 'route' ? old : null, newRoute = nu.edit && nu.edit.kind === 'route' ? nu : null;
+  var routeChanged = (oldRoute || newRoute) && !(oldRoute && newRoute && oldRoute.editOf === newRoute.editOf && same(oldRoute.edit, newRoute.edit));
+  // fin d'une édition d'itinéraire : ses lignes d'étapes sont retirées sans nouveau rendu, qui perdrait la cible
+  // et le focus d'un clic ailleurs ; l'entrée en édition les fait apparaître par un rendu
+  if (routeChanged && oldRoute) $$('.mk-panel[data-b="' + oldRoute.editOf + '"] .st-row', app).forEach(function (r) { r.remove(); });
+  if (routeChanged && newRoute) { var br = byId(newRoute.editOf); if (br) keepView(br); render(); }
+  updateCheat();
+  return was;
+}
 function endMapModes() {
   // Échap : termine le mode de carte en cours (dessin, modification, placement de points)
-  var done = false;
-  if (mapUi.draw) { var md = mapOf(mapUi.draw); if (md) md.setDrawMode(null); $$('[data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); mapUi.draw = null; done = true; }
-  if (mapUi.add) { var ma = mapOf(mapUi.add); if (ma) ma.setAddMode(false); $$('[data-act=map-addmode]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); mapUi.add = null; done = true; }
-  if (mapUi.edit) { var be = byId(mapUi.editOf); mapUi.edit = null; mapUi.editOf = null; if (be) keepView(be); render(); done = true; }
-  if (done) updateCheat();
-  return done;
+  return setMapMode(null, null);
 }
 

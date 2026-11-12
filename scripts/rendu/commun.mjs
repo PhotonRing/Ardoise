@@ -37,6 +37,7 @@ export function monter(brut, vue) {
   Object.assign(ctx.viewFold, (vue && vue.folds) || {});
   Object.assign(ctx.viewSort, (vue && vue.sort) || {});
   Object.assign(ctx.navFold, (vue && vue.navFolds) || {});
+  Object.assign(ctx.viewCol, (vue && vue.kbCols) || {});
   return { ctx, d };
 }
 

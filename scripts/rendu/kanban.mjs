@@ -76,3 +76,64 @@ test('dépendances : un ancien fichier sans dépendances ressort identique aprè
   const cols = [{ id: 'c1', title: 'À faire', cards: [{ id: 'k1', title: 'Écrire', html: '', due: '2026-11-07', who: 'Théo' }, { id: 'k2', title: 'Relire', html: '', due: '', who: '' }] }];
   egal(monter(KB(cols)).d.pages[0].blocks[0].cols, cols);
 });
+
+// Colonne réduite : bande verticale (titre, nombre de cartes), état de vue du contexte puis champ collapsed du fichier.
+const reduit = (cols, vue, kbCols) => { const { ctx, d } = monter(KB(cols)); return ctx.renderPage(d, { page: 0, view: vue || 'read', kbCols }); };
+// HTML de la colonne d'indice ci
+const colonne = (html, ci) => { const m = html.match(new RegExp('<section class="kb-col"[^>]*data-ci="' + ci + '"[\\s\\S]*?</section>')); vrai(m, 'colonne ' + ci + ' introuvable'); return m[0]; };
+const bande = (col) => /data-red/.test(col.match(/^<section[^>]*>/)[0]);
+const COLS_REDUITE = () => { const c = COLS(); c[2].collapsed = true; return c; };
+
+test('colonne réduite : bande avec titre et nombre de cartes, sans les cartes, en lecture et en édition', () => {
+  ['read', 'edit'].forEach((v) => {
+    const h = reduit(COLS_REDUITE(), v), c = colonne(h, 2);
+    vrai(bande(c), v + ' : bande');
+    egal(textes(c, /<span class="kb-title">([\s\S]*?)<\/span>/g), ['Fait'], v + ' : titre');
+    egal(textes(c, /<span class="kb-n">([\s\S]*?)<\/span>/g), ['1'], v + ' : nombre');
+    vrai(!c.includes('data-kid="k3"'), v + ' : carte non rendue');
+    vrai(c.includes('data-kbfold="b1|c3"'), v + ' : bande cliquable');
+    vrai(!bande(colonne(h, 0)) && colonne(h, 0).includes('data-kid="k1"'), v + ' : autre colonne dépliée');
+  });
+  // l'état de vue de l'éditeur (globale viewCol) est ignoré : seul le contexte compte
+  const { ctx, d } = monter(KB(COLS()), { kbCols: { c1: true } });
+  vrai(!bande(colonne(ctx.renderPage(d, { page: 0, view: 'read' }), 0)), 'globale de session ignorée');
+});
+
+test('colonne réduite : l\'état de la session l\'emporte sur le fichier, dans les deux sens, en lecture et en édition', () => {
+  ['read', 'edit'].forEach((v) => {
+    const ouverte = reduit(COLS_REDUITE(), v, { c3: false });
+    vrai(!bande(colonne(ouverte, 2)) && colonne(ouverte, 2).includes('data-kid="k3"'), v + ' : rouverte pour soi');
+    const fermee = reduit(COLS(), v, { c1: true });
+    vrai(bande(colonne(fermee, 0)) && !colonne(fermee, 0).includes('data-kid="k1"'), v + ' : réduite pour soi');
+  });
+});
+
+test('colonne réduite : à l\'export, bande et cartes masquées (le runtime de lecture l\'ouvre), état de la session ignoré', () => {
+  const h = reduit(COLS_REDUITE(), 'export', { c3: false, c1: true }), c = colonne(h, 2);
+  vrai(bande(c), 'bande');
+  egal(textes(c, /<span class="kb-title">([\s\S]*?)<\/span>/g), ['Fait', 'Fait'], 'titre de la bande et de l\'en-tête');
+  vrai(c.includes('data-kid="k3"'), 'cartes présentes pour le runtime et l\'impression');
+  vrai(c.includes('data-kbfold="b1|c3"') && !c.includes('draggable'), 'bascule, sans déplacement');
+  vrai(!bande(colonne(h, 0)), 'état de la session ignoré');
+});
+
+test('colonne réduite : un ancien kanban sans le champ se rend comme avant, toutes colonnes affichées', () => {
+  ['read', 'edit', 'export'].forEach((v) => {
+    const h = reduit(COLS(), v);
+    [0, 1, 2].forEach((ci) => vrai(!bande(colonne(h, ci)), v + ' : colonne ' + ci + ' affichée'));
+    egal(textes(h, /<article[^>]*data-kid="(k\d)"/g), ['k1', 'k4', 'k2', 'k3'], v + ' : toutes les cartes');
+  });
+  egal(monter(KB(COLS())).d.pages[0].blocks[0].cols.map((c) => 'collapsed' in c), [false, false, false], 'aucun champ ajouté');
+  egal(monter(KB(COLS_REDUITE())).d.pages[0].blocks[0].cols[2].collapsed, true, 'champ gardé par la normalisation');
+});
+
+test('colonne réduite : « Attend », « Bloque » et l\'état bloquée inchangés', () => {
+  // « Maquette » (en cours) réduite : Écrire l'attend toujours et reste bloquée ; Relire (finie) réduite aussi
+  const cols = COLS(); cols[1].collapsed = true; cols[2].collapsed = true;
+  ['read', 'edit'].forEach((v) => {
+    const h = carte(reduit(cols, v), 'k1');
+    egal(ligne(h, 'kb-wait'), ['Attend : Maquette, Relire'], v);
+    egal(ligne(h, 'kb-blocks'), ['Bloque : Publier'], v);
+    vrai(/class="kb-card[^"]* kb-blocked/.test(h), v + ' : bloquée');
+  });
+});

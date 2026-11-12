@@ -44,9 +44,16 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // kanban sans les dépendances de ses cartes : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleHorsDependances(b) { return JSON.stringify(b, function (k, v) { return k === 'dep' && Array.isArray(v) ? undefined : v; }); }
+// kanban sans l'état réduit de ses colonnes
+function libelleHorsReduction(b) { return JSON.stringify(b, function (k, v) { return k === 'collapsed' ? undefined : v; }); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
+  if (b.type === 'kanban' && libelleHorsReduction(ba) === libelleHorsReduction(b)) {
+    // une seule colonne bascule par étape : réduite si l'une l'est devenue
+    var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
+    return reduite ? 'colonne réduite' : 'colonne affichée';
+  }
   if (b.type === 'kanban' && libelleHorsDependances(ba) === libelleHorsDependances(b)) return 'dépendance modifiée';
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';

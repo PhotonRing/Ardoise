@@ -3,12 +3,13 @@ function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
-// contexte du rendu, normalisé aux entrées publiques : page bornée au document, vue et ses booléens, plis et tris de session (lecture), plis du sommaire, état d'interface (édition) ; champ absent = valeur neutre
+// contexte du rendu, normalisé aux entrées publiques : page bornée au document, vue et ses booléens, plis et tris de session (lecture), plis du sommaire, état d'interface (édition), colonnes de kanban réduites ou affichées dans la session (hors export) ; champ absent = valeur neutre
 function renderCtx(d, ctx) {
   ctx = ctx || {};
   var view = ctx.view === 'edit' || ctx.view === 'export' ? ctx.view : 'read';
   return { page: Math.max(0, Math.min(d.pages.length - 1, +ctx.page || 0)), view: view, edit: view === 'edit', static: view === 'export',
-    folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {}, navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
+    folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {}, navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {},
+    kbCols: (view !== 'export' && ctx.kbCols) || {} };
 }
 // un titre est-il plié : pli de lecture de la session, sinon l'état enregistré
 function foldedIn(ctx) { var vf = ctx.folds; return function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; }; }
@@ -183,7 +184,7 @@ function renderBlock(b, d, ctx, num) {
         return '<div class="mapblk">' + mapEl + ((b.list && li.length) ? '<ol class="map-list">' + li.join('') + '</ol>' : '') + '</div>';
       }
       var colorSel = function (cls, attr, cur) { return '<select class="' + cls + '" data-b="' + b.id + '" ' + attr + ' title="Couleur">' + MK_COLORS.map(function (c) { return opt(c[0], cur || 'accent', c[1]); }).join('') + '</select>'; };
-      var mapState = editorUi.map || {}, dk = mapState.draw === b.id ? mapState.kind : null, ed = mapState.editOf === b.id ? mapState.edit : null;
+      var mapState = editorUi.map || {}, dk = mapState.draw === b.id ? mapState.kind : null, ed = mapState.editOf === b.id && mapShapeAlive(b, mapState.edit) ? mapState.edit : null;
       var tool = function (kind, label, title) { return '<button type="button" class="ub out" data-act="map-draw" data-kind="' + kind + '" aria-pressed="' + (dk === kind) + '" title="' + title + '">' + label + '</button>'; };
       var rtp = editorUi.routePaste, rtOpen = function (i) { return !!rtp && rtp.b === b.id && rtp.i === i; };
       var rtBox = function (i) {
@@ -413,6 +414,7 @@ function pageKids(pages, i) { var out = [], lv = pageLv(pages, i), end = pageEnd
 function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) { var l = pageLv(pages, j); if (l === lv) return j; if (l < lv) return -1; } return -1; }
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
 var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
+var viewCol = {};   // colonnes de kanban réduites / affichées pour soi (id de colonne → réduite) : jamais enregistré
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
 function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
@@ -537,9 +539,9 @@ function fileAppHTML(d, page) {
   return navHTML(d, ctx) + renderPage(d, ctx);
 }
 function viewCtx() {
-  // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, état d'interface de l'édition
+  // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, colonnes réduites de la session, état d'interface de l'édition
   var ed = mode === 'edit';
-  return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
+  return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold, kbCols: viewCol,
     editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste, routePaste: rtPaste } : null });
 }
 function render(focus) {
@@ -762,6 +764,24 @@ function applyRoutePaste(b, text, i) {
 var panelMin = false;   // panneau « Éléments de la carte » réduit (préférence de ce navigateur, lue au démarrage)
 var MapKit = null, maps = [], mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }, cheatBlock = null;
 var MK_COLORS = [['accent', 'Accent'], ['ok', 'Vert'], ['bad', 'Rouge'], ['warn', 'Orange'], ['info', 'Bleu']];
+function mapModeNext(ui, id, want) {
+  // un seul mode de carte actif sur la page, toutes cartes confondues : ajout de points, dessin d'un genre ou édition
+  // d'une forme. want vaut null, { add: true }, { draw: genre } ou { edit: { kind, i } } ; en activer un coupe les autres,
+  // redemander le mode actif le coupe, null les coupe tous
+  var nu = { draw: null, kind: null, editOf: null, edit: null, add: null };
+  if (!want || id == null) return nu;
+  if (want.add) { if (ui.add !== id) nu.add = id; return nu; }
+  if (want.draw) { if (!(ui.draw === id && ui.kind === want.draw)) { nu.draw = id; nu.kind = want.draw; } return nu; }
+  var w = want.edit, cur = ui.editOf === id && ui.edit;
+  if (w && !(cur && cur.kind === w.kind && cur.i === w.i)) { nu.editOf = id; nu.edit = { kind: w.kind, i: w.i }; }
+  return nu;
+}
+function mapShapeAlive(b, ed) {
+  // la forme en cours d'édition existe-t-elle encore ? chacune se cherche dans sa liste (un marqueur parmi les marqueurs)
+  if (!b || !ed) return false;
+  var list = ed.kind === 'marker' ? b.markers : ed.kind === 'zone' ? b.zones : b.routes;
+  return !!(list && list[ed.i]);
+}
 function mapOf(id) { for (var i = 0; i < maps.length; i++) if (maps[i].blockId === id) return maps[i]; return null; }
 function keepView(b) { var m = b && mapOf(b.id); if (m && mode === 'edit') b.view = m.getView(); }
 function mountMaps() {
@@ -791,7 +811,7 @@ function mountMaps() {
         session.modifier(function () { b.routes.push({ label: '', color: 'accent', pts: pts, names: pts.map(function () { return ''; }) }); });
         focusIn('.rt-in[data-b="' + b.id + '"][data-rt="' + (b.routes.length - 1) + '"]');
       },
-      onDrawEnd: function () { mapUi.draw = null; setTimeout(updateCheat); $$('.blk[data-id="' + b.id + '"] [data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); },
+      onDrawEnd: function () { if (mapUi.draw === b.id) setMapMode(null, null); },
       onZoneEdit: function (i, z) {
         keepView(b);
         session.modifier(function () { var t = b.zones[i]; t.shape = z.shape; if (z.shape === 'circle') { t.c = z.c; t.r = z.r; delete t.pts; } else { t.pts = z.pts; delete t.c; delete t.r; } });
@@ -823,8 +843,8 @@ function mountMaps() {
     });
     inst.blockId = b.id; maps.push(inst);
     if (ed && mapUi.editOf === b.id && mapUi.edit) {
-      var list = mapUi.edit.kind === 'zone' ? b.zones : b.routes;
-      if (list[mapUi.edit.i]) inst.setEdit(mapUi.edit.kind, mapUi.edit.i); else { mapUi.editOf = null; mapUi.edit = null; }
+      // forme disparue (annulation, modification reçue) : le rendu a déjà relâché son ✎, on quitte l'édition
+      if (mapShapeAlive(b, mapUi.edit)) inst.setEdit(mapUi.edit.kind, mapUi.edit.i); else setMapMode(null, null);
     }
     if (ed && mapUi.draw === b.id) inst.setDrawMode(mapUi.kind);
     if (ed && mapUi.add === b.id) inst.setAddMode(true);

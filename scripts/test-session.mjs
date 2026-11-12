@@ -814,6 +814,24 @@ test('libellé : dépendance entre cartes de kanban ajoutée puis retirée', () 
   egal(libelles(m), ['Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée']);
 });
 
+test('libellé : colonne de kanban réduite puis affichée, annulée puis rétablie', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'kb', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [] }, { id: 'c2', title: 'Fait', cards: [{ id: 'k1', title: 'Écrire' }] }] }); });
+  const col = () => blocsDe(m)[1].cols[1];
+  m.s.modifier(() => { col().collapsed = true; });
+  egal(libelles(m)[0], 'Accueil · Kanban « À faire Fait Écrire » : colonne réduite');
+  m.s.modifier(() => { delete col().collapsed; });
+  egal(libelles(m)[0], 'Accueil · Kanban « À faire Fait Écrire » : colonne affichée');
+  m.s.annuler();
+  egal(col().collapsed, true, 'annuler : de nouveau réduite');
+  egal(libelles(m), ['Accueil · Kanban « À faire Fait Écrire » : colonne réduite', 'Accueil · Kanban « À faire Fait Écrire » : colonne affichée']);
+  m.s.annuler();
+  egal('collapsed' in col(), false, 'annuler : affichée, sans le champ');
+  m.s.retablir();
+  egal(col().collapsed, true, 'rétablir : réduite');
+  egal(libelles(m), ['Accueil · Kanban « À faire Fait Écrire » : colonne réduite', 'Accueil · Kanban « À faire Fait Écrire » : colonne affichée']);
+});
+
 test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['', '']] }, { id: 'c', type: 'check', items: [{ html: 'Pain', done: false }, { html: 'Lait', done: false }] }); });

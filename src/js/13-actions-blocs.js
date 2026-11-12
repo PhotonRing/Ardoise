@@ -58,24 +58,13 @@ app.addEventListener('click', function (e) {
     case 'col-del': tableOp(b, 'col-del'); break;
     case 'img-pick': pickImage(b); break;
     case 'img-url': imageUrlAction(b, a); break;
-    case 'map-addmode': var ma = mapOf(b.id), on = a.getAttribute('aria-pressed') !== 'true'; a.setAttribute('aria-pressed', on ? 'true' : 'false'); mapUi.add = on ? b.id : null; mapUi.draw = null; cheatBlock = b.id; setTimeout(updateCheat); $$('.blk[data-id="' + b.id + '"] [data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (ma) { ma.setDrawMode(null); ma.setAddMode(on); } break;
-    case 'mk-del': keepView(b); session.modifier(function () { b.markers.splice(i, 1); }); break;
-    case 'map-draw':
-      var md = mapOf(b.id), kind = a.dataset.kind, dOn = a.getAttribute('aria-pressed') !== 'true';
-      mapUi.draw = dOn ? b.id : null; mapUi.kind = dOn ? kind : null; mapUi.add = null; cheatBlock = b.id; setTimeout(updateCheat);
-      $$('.blk[data-id="' + b.id + '"] [data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(dOn && x.dataset.kind === kind)); });
-      var am = $('.blk[data-id="' + b.id + '"] [data-act=map-addmode]', app); if (am) am.setAttribute('aria-pressed', 'false');
-      if (md) { md.setAddMode(false); md.setDrawMode(dOn ? kind : null); }
-      break;
+    case 'map-addmode': setMapMode(b.id, { add: true }); break;
+    case 'mk-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } session.modifier(function () { b.markers.splice(i, 1); }); break;
+    case 'map-draw': setMapMode(b.id, { draw: a.dataset.kind }); break;
     case 'shape-edit':
-      var sk = a.dataset.kind, on2 = !(mapUi.editOf === b.id && mapUi.edit && mapUi.edit.kind === sk && mapUi.edit.i === i);
-      mapUi.editOf = on2 ? b.id : null; mapUi.edit = on2 ? { kind: sk, i: i } : null; mapUi.add = null; mapUi.draw = null; cheatBlock = b.id; setTimeout(updateCheat);
-      $$('.blk[data-id="' + b.id + '"] [data-act=shape-edit]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(on2 && x.dataset.kind === sk && +x.dataset.i === i)); });
-      var mze = mapOf(b.id);
-      if (mze) mze.setEdit(on2 ? sk : null, i);
-      $$('.mk-panel[data-b="' + b.id + '"] .mk-item', app).forEach(function (it) { it.classList.remove('on'); }); if (on2) { var bt2 = a.closest('.mk-item'); if (bt2) bt2.classList.add('on'); }
-      if (sk === 'route') { keepView(b); render(); }
-      if (on2) {
+      var sk = a.dataset.kind;
+      setMapMode(b.id, { edit: { kind: sk, i: i } });
+      if (mapUi.editOf === b.id) {
         var circ = sk === 'zone' && b.zones[i] && b.zones[i].shape === 'circle';
         if (sk === 'marker') toast('Glissez le point pour le déplacer, son étiquette pour la déplacer ; double-clic sur l’étiquette pour la remettre ; Échap pour terminer.', 5000); else
         toast(circ ? 'Glissez le carré pour déplacer le cercle, le rond pour changer le rayon (Alt : sans aimantation)' : 'Glissez les carrés pour déplacer, les ronds pour ajouter ; double-clic sur un carré pour supprimer ; Alt : sans aimantation. Les autres éléments sont figés ; Échap pour terminer.', 5500);
