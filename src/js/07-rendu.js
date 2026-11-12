@@ -380,9 +380,9 @@ function wrapEdit(b, inner, nHidden, editorUi) {
   return '<div class="blk' + (editorUi && editorUi.bar != null && b.id === editorUi.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
-    '<div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
+    '<div class="collant" style="--recul:33px"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
     act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') +
-    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div>' + inner +
+    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
 
@@ -496,7 +496,7 @@ function refreshDerived() {
       navPending = true;   // structure changée pendant un clic : reconstruction juste après le clic
     } else {
       var st = side ? side.scrollTop : 0;
-      if (ot && nt) ot.replaceWith(nt);
+      if (ot && nt) { ot.replaceWith(nt); suivreHautEcran(); }
       if (side && ns) { side.replaceWith(ns); ns.scrollTop = st; }
       lastNav = nh;
       if (navSpyFn) navSpyFn();
@@ -558,6 +558,7 @@ function render(focus) {
   mountMaps();
   Reader.tlFit(app);
   renderChrome();
+  suivreHautEcran();
   updateCheat();
   synPaintPeers();
   navReveal(keep);
