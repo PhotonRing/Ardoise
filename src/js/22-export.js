@@ -1,7 +1,4 @@
-// impression depuis Ardoise : les éléments interactifs (en-têtes triables, cases de requête) deviennent du texte et les
-// colonnes de kanban réduites s'affichent, dans la
-// page affichée, sans la redessiner : le navigateur imprime tout de suite après, et une carte recréée n'aurait pas eu le
-// temps de se dessiner. La page est redessinée après l'impression
+// impression : requêtes en texte et colonnes réduites affichées sur place, sans rendu de la page (une carte recréée n'aurait pas le temps de se dessiner)
 var printing = false;
 window.addEventListener('beforeprint', function () {
   if (!doc) return; printing = true;
@@ -10,7 +7,7 @@ window.addEventListener('beforeprint', function () {
   // kanban à colonne réduite : redessiné en place, toutes colonnes affichées (un kanban n'a pas de carte géographique à attendre)
   $$('.kb[data-kb]', app).forEach(function (el) {
     var b = byId(el.dataset.kb); if (!b || !$('[data-red]', el)) return;
-    var ctx = viewCtx(); ctx.kbCols = {}; b.cols.forEach(function (c) { ctx.kbCols[c.id] = false; });
+    var ctx = viewCtx(); ctx.kbCols = {}; b.cols.forEach(function (c) { ctx.kbCols[c.id] = { red: false, base: !!c.collapsed }; });
     el.outerHTML = renderBlock(b, doc, ctx, null);
   });
   Reader.printPrep(true);

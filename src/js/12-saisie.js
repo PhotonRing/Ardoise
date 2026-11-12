@@ -441,7 +441,7 @@ app.addEventListener('paste', function (e) {
     if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
   } else {
-    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterLigne(text);
+    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
   }
 });

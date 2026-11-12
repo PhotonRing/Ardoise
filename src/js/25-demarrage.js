@@ -20,7 +20,7 @@ function boot(d, origine) {
     if (!h) return; fileHandle = h; poigneeReprise = h;
     perm(h, false).then(function (ok) {
       if (!ok) { handleGranted = false; setStatus(); return; }
-      return verifierPoignee(h).then(function () { handleGranted = true; }, function () { if (fileHandle === h) { dropHandle(); nomEcarte = nomFichierOuvert(location.href); } });
+      return verifierPoignee(h).then(function () { handleGranted = true; }, function (e) { if (fileHandle === h && staleHandle(e)) dropHandle(h); });
     }).then(function () { setStatus(); });
   });
 }

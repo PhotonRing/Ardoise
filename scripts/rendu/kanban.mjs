@@ -95,21 +95,21 @@ test('colonne réduite : bande avec titre et nombre de cartes, sans les cartes, 
     vrai(!bande(colonne(h, 0)) && colonne(h, 0).includes('data-kid="k1"'), v + ' : autre colonne dépliée');
   });
   // l'état de vue de l'éditeur (globale viewCol) est ignoré : seul le contexte compte
-  const { ctx, d } = monter(KB(COLS()), { kbCols: { c1: true } });
+  const { ctx, d } = monter(KB(COLS()), { kbCols: { c1: { red: true, base: false } } });
   vrai(!bande(colonne(ctx.renderPage(d, { page: 0, view: 'read' }), 0)), 'globale de session ignorée');
 });
 
 test('colonne réduite : l\'état de la session l\'emporte sur le fichier, dans les deux sens, en lecture et en édition', () => {
   ['read', 'edit'].forEach((v) => {
-    const ouverte = reduit(COLS_REDUITE(), v, { c3: false });
+    const ouverte = reduit(COLS_REDUITE(), v, { c3: { red: false, base: true } });
     vrai(!bande(colonne(ouverte, 2)) && colonne(ouverte, 2).includes('data-kid="k3"'), v + ' : rouverte pour soi');
-    const fermee = reduit(COLS(), v, { c1: true });
+    const fermee = reduit(COLS(), v, { c1: { red: true, base: false } });
     vrai(bande(colonne(fermee, 0)) && !colonne(fermee, 0).includes('data-kid="k1"'), v + ' : réduite pour soi');
   });
 });
 
 test('colonne réduite : à l\'export, bande et cartes masquées (le runtime de lecture l\'ouvre), état de la session ignoré', () => {
-  const h = reduit(COLS_REDUITE(), 'export', { c3: false, c1: true }), c = colonne(h, 2);
+  const h = reduit(COLS_REDUITE(), 'export', { c3: { red: false, base: true }, c1: { red: true, base: false } }), c = colonne(h, 2);
   vrai(bande(c), 'bande');
   egal(textes(c, /<span class="kb-title">([\s\S]*?)<\/span>/g), ['Fait', 'Fait'], 'titre de la bande et de l\'en-tête');
   vrai(c.includes('data-kid="k3"'), 'cartes présentes pour le runtime et l\'impression');
@@ -136,4 +136,26 @@ test('colonne réduite : « Attend », « Bloque » et l\'état bloquée inchang
     egal(ligne(h, 'kb-blocks'), ['Bloque : Publier'], v);
     vrai(/class="kb-card[^"]* kb-blocked/.test(h), v + ' : bloquée');
   });
+});
+
+test('colonne réduite : l\'état pour soi cède dès que le fichier change (réduction reçue par synchronisation)', () => {
+  ['read', 'edit'].forEach((v) => {
+    // ouverte pour soi quand le fichier l'affichait ; le fichier la réduit ensuite : la réduction se voit
+    vrai(bande(colonne(reduit(COLS_REDUITE(), v, { c3: { red: false, base: false } }), 2)), v + ' : réduction reçue visible');
+    // réduite pour soi quand le fichier la réduisait ; le fichier l'affiche ensuite : elle s'affiche
+    vrai(!bande(colonne(reduit(COLS(), v, { c1: { red: true, base: true } }), 0)), v + ' : affichage reçu visible');
+  });
+});
+
+test('colonne réduite : les états pour soi périmés ou de colonnes disparues sont retirés', () => {
+  const { ctx, d } = monter(KB(COLS_REDUITE()));
+  const vc = { c3: { red: false, base: true }, c1: { red: true, base: true }, cx: { red: true, base: false } };
+  ctx.kbColsPerimes(vc, d);
+  egal(Object.keys(vc), ['c3']);
+});
+
+test('colonne réduite : aria-expanded de la bande et du bouton ⇤ suit l\'état de la colonne, à l\'export', () => {
+  const h = reduit(COLS_REDUITE(), 'export');
+  egal(textes(colonne(h, 2), /data-kbfold="[^"]*"[^>]*aria-expanded="(\w+)"/g), ['false', 'false'], 'réduite');
+  egal(textes(colonne(h, 0), /data-kbfold="[^"]*"[^>]*aria-expanded="(\w+)"/g), ['true', 'true'], 'affichée');
 });

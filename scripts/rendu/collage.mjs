@@ -40,6 +40,20 @@ test('collage : chaîne vide ou absente', () => {
   egal(compacter(null), '');
 });
 
+// texte brut : compacterTexte, sans découpe sur des balises (un < ou un > y est du texte)
+const texte = (s) => ctx.compacterTexte(s);
+
 test('collage : texte brut d\'Excel sans espace de fin', () => {
-  egal(compacter('valeur\r\n'), 'valeur');
+  egal(texte('valeur\r\n'), 'valeur');
+});
+
+test('collage : texte brut contenant < et > compacté comme du texte', () => {
+  egal(texte('  a < b\n  et c > d  '), 'a < b et c > d');
+  egal(texte('\n<b> pas une balise </b>\n'), '<b> pas une balise </b>');
+  egal(texte(null), '');
+});
+
+test('collage : un > dans un attribut entre guillemets reste dans la balise', () => {
+  egal(compacter(' <a title="a > b"> lien </a> '), '<a title="a > b">lien</a>');
+  egal(compacter("<span data-x='1>2'>  un   deux </span>"), "<span data-x='1>2'>un deux</span>");
 });

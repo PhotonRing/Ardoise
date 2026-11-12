@@ -59,7 +59,7 @@ app.addEventListener('click', function (e) {
     case 'img-pick': pickImage(b); break;
     case 'img-url': imageUrlAction(b, a); break;
     case 'map-addmode': setMapMode(b.id, { add: true }); break;
-    case 'mk-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } session.modifier(function () { b.markers.splice(i, 1); }); break;
+    case 'mk-del': keepView(b); if (mapUi.editOf === b.id) setMapMode(null, null); session.modifier(function () { b.markers.splice(i, 1); }); break;
     case 'map-draw': setMapMode(b.id, { draw: a.dataset.kind }); break;
     case 'shape-edit':
       var sk = a.dataset.kind;
@@ -113,8 +113,8 @@ app.addEventListener('click', function (e) {
       panelMin = !panelMin; try { localStorage.setItem(LS + 'panelmin', panelMin ? '1' : '0'); } catch (_) {}
       $$('.mk-panel', app).forEach(function (pn) { pn.classList.toggle('min', panelMin); var bt = pn.querySelector('[data-act=panel-min]'); if (bt) bt.textContent = panelMin ? '▸' : '–'; });
       break;
-    case 'route-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } if (rtPaste && rtPaste.b === b.id) rtPaste = null; session.modifier(function () { b.routes.splice(i, 1); }); break;
-    case 'zone-del': keepView(b); if (mapUi.editOf === b.id) { mapUi.editOf = null; mapUi.edit = null; } session.modifier(function () { b.zones.splice(i, 1); }); break;
+    case 'route-del': keepView(b); if (mapUi.editOf === b.id) setMapMode(null, null); if (rtPaste && rtPaste.b === b.id) rtPaste = null; session.modifier(function () { b.routes.splice(i, 1); }); break;
+    case 'zone-del': keepView(b); if (mapUi.editOf === b.id) setMapMode(null, null); session.modifier(function () { b.zones.splice(i, 1); }); break;
     case 'img-alt': var v = prompt('Texte alternatif de l’image :', b.alt || ''); if (v !== null) session.modifier(function () { b.alt = v; }); break;
   }
 });

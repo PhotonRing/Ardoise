@@ -105,6 +105,8 @@ function nomFichierOuvert(adresse) {
   try { nom = decodeURIComponent(nom); } catch (_) {}
   return nom.normalize('NFC');
 }
+// nom proposé au sélecteur : la poignée gardée ; poignée écartée, le fichier ouvert (sinon son ancien nom) ; sinon le titre
+function nomPropose(nomPoignee, nomEcarte, adresse, nomTitre) { return nomPoignee || (nomEcarte != null ? nomFichierOuvert(adresse) || nomEcarte : nomTitre); }
 // la poignée porte-t-elle le nom du fichier ouvert ? Casse ignorée (Windows, macOS), accents comparés en NFC (macOS les décompose)
 function memeNomQueFichierOuvert(nomPoignee, adresse) {
   var nom = nomFichierOuvert(adresse); if (nom === null) return true;

@@ -414,7 +414,7 @@ function pageKids(pages, i) { var out = [], lv = pageLv(pages, i), end = pageEnd
 function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) { var l = pageLv(pages, j); if (l === lv) return j; if (l < lv) return -1; } return -1; }
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
 var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
-var viewCol = {};   // colonnes de kanban réduites / affichées pour soi (id de colonne → réduite) : jamais enregistré
+var viewCol = {};   // colonnes de kanban réduites / affichées pour soi (id de colonne → { red, base : valeur du fichier }) : jamais enregistré, vidé à chaque bascule de mode
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
 function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
@@ -546,6 +546,9 @@ function viewCtx() {
 }
 function render(focus) {
   var os = $('.pnav-side', app), ot = $('.pnav-tabs .tabs-in', app), keep = { side: os ? os.scrollTop : 0, tabs: ot ? ot.scrollLeft : 0 };
+  kbColsPerimes(viewCol, doc);
+  // forme en édition décalée dans sa liste (annulation, modification reçue) : suivie ; disparue : l'édition s'arrête
+  if (mapUi.edit) { var suivie = mapShapeFollow(byId(mapUi.editOf), mapUi.edit); if (suivie) mapUi.edit = suivie; else mapUi = mapModeNext(mapUi, null, null); }
   var vc = viewCtx();
   lastNav = navHTML(doc, vc);
   app.innerHTML = lastNav + renderPage(doc, vc);
@@ -764,23 +767,29 @@ function applyRoutePaste(b, text, i) {
 var panelMin = false;   // panneau « Éléments de la carte » réduit (préférence de ce navigateur, lue au démarrage)
 var MapKit = null, maps = [], mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }, cheatBlock = null;
 var MK_COLORS = [['accent', 'Accent'], ['ok', 'Vert'], ['bad', 'Rouge'], ['warn', 'Orange'], ['info', 'Bleu']];
+// un seul mode de carte sur la page (want : null, { add }, { draw: genre }, { edit: { kind, i } }) ; redemander l'actif le coupe
 function mapModeNext(ui, id, want) {
-  // un seul mode de carte actif sur la page, toutes cartes confondues : ajout de points, dessin d'un genre ou édition
-  // d'une forme. want vaut null, { add: true }, { draw: genre } ou { edit: { kind, i } } ; en activer un coupe les autres,
-  // redemander le mode actif le coupe, null les coupe tous
-  var nu = { draw: null, kind: null, editOf: null, edit: null, add: null };
-  if (!want || id == null) return nu;
-  if (want.add) { if (ui.add !== id) nu.add = id; return nu; }
-  if (want.draw) { if (!(ui.draw === id && ui.kind === want.draw)) { nu.draw = id; nu.kind = want.draw; } return nu; }
+  var suivant = { draw: null, kind: null, editOf: null, edit: null, add: null };
+  if (!want || id == null) return suivant;
+  if (want.add) { if (ui.add !== id) suivant.add = id; return suivant; }
+  if (want.draw) { if (!(ui.draw === id && ui.kind === want.draw)) { suivant.draw = id; suivant.kind = want.draw; } return suivant; }
   var w = want.edit, cur = ui.editOf === id && ui.edit;
-  if (w && !(cur && cur.kind === w.kind && cur.i === w.i)) { nu.editOf = id; nu.edit = { kind: w.kind, i: w.i }; }
-  return nu;
+  if (w && !(cur && cur.kind === w.kind && cur.i === w.i)) { suivant.editOf = id; suivant.edit = { kind: w.kind, i: w.i }; }
+  return suivant;
 }
-function mapShapeAlive(b, ed) {
-  // la forme en cours d'édition existe-t-elle encore ? chacune se cherche dans sa liste (un marqueur parmi les marqueurs)
-  if (!b || !ed) return false;
-  var list = ed.kind === 'marker' ? b.markers : ed.kind === 'zone' ? b.zones : b.routes;
-  return !!(list && list[ed.i]);
+function mapShapeList(b, kind) { return kind === 'marker' ? b.markers : kind === 'zone' ? b.zones : b.routes; }
+// la forme en cours d'édition existe-t-elle encore ? chacune se cherche dans sa liste (un marqueur parmi les marqueurs)
+function mapShapeAlive(b, ed) { var list = b && ed && mapShapeList(b, ed.kind); return !!(list && list[ed.i]); }
+function mapShapeGeo(s) { return JSON.stringify([s.lat, s.lon, s.shape, s.c, s.r, s.pts]); }
+// forme en édition suivie d'un rendu à l'autre : par sa géométrie, sinon à son rang si la liste garde sa longueur ; null si disparue
+function mapShapeFollow(b, ed) {
+  var list = b && ed && mapShapeList(b, ed.kind); if (!list) return null;
+  var i = ed.i, geo = function (j) { return list[j] ? mapShapeGeo(list[j]) : null; };
+  if (ed.geo != null && geo(i) !== ed.geo) {
+    var j = -1; for (var k = 0; k < list.length && j < 0; k++) if (geo(k) === ed.geo) j = k;
+    i = j >= 0 ? j : list.length === ed.n ? i : -1;
+  }
+  return list[i] ? { kind: ed.kind, i: i, n: list.length, geo: geo(i) } : null;
 }
 function mapOf(id) { for (var i = 0; i < maps.length; i++) if (maps[i].blockId === id) return maps[i]; return null; }
 function keepView(b) { var m = b && mapOf(b.id); if (m && mode === 'edit') b.view = m.getView(); }

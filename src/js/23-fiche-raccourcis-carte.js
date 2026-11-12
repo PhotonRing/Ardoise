@@ -49,45 +49,46 @@ ui.addEventListener('click', function (e) {
 document.addEventListener('pointerdown', function (e) {
   if (mode !== 'edit') return;
   var t = e.target; if (!t || !t.closest) return;
-  if (t.closest('.cheat') || t.closest('#ui')) return;
-  var mb = t.closest('.blk[data-type=map]');
-  // clic hors de la carte active et de sa liste : on quitte l'édition de forme et l'ajout de points ;
-  // un dessin en cours est gardé (un clic égaré ne le perd pas)
+  if (t.closest('.cheat')) return;
+  // interface (barre du haut, menus, toasts) : hors de la carte, sauf un popup ouvert depuis la carte elle-même
+  var pp = t.closest('#ui') && t.closest('.pop'), src = pp && pp.ancre && pp.ancre.closest && pp.ancre.closest('.blk[data-type=map]');
+  var mb = t.closest('#ui') ? src || null : t.closest('.blk[data-type=map]');
+  // clic hors de la carte active et de sa liste : on quitte l'édition de forme et l'ajout de points ; un dessin en cours est gardé
   var act = mapUi.editOf || mapUi.add;
   if (act && !(mb && mb.dataset.id === act)) setMapMode(null, null);
+  if (t.closest('#ui')) return;
   var busy = mapUi.draw || mapUi.edit || mapUi.add;
   cheatBlock = mb ? mb.dataset.id : (busy ? cheatBlock : null);
   setTimeout(updateCheat);
 }, true);
+// seul passage d'un mode de carte à l'autre (voir mapModeNext) : état, moteurs, boutons, liste et aide ; vrai si un mode était actif
 function setMapMode(id, want) {
-  // seul passage d'un mode de carte à l'autre (boutons, Échap, clic ailleurs, remontage) : want vaut null, { add: true },
-  // { draw: genre } ou { edit: { kind, i } } (voir mapModeNext). Tient ensemble l'état d'interface, le moteur de chaque
-  // carte, les boutons enfoncés, la surbrillance de la liste et l'aide des raccourcis. Rend vrai si un mode était actif.
-  var old = mapUi, nu = mapModeNext(old, id, want), was = !!(old.draw || old.edit || old.add);
+  var avant = mapUi, apres = mapModeNext(avant, id, want), was = !!(avant.draw || avant.edit || avant.add);
   var same = function (a, b) { return !!a && !!b && a.kind === b.kind && a.i === b.i; };
-  var editOf = function (u, bid) { return u.editOf === bid ? u.edit : null; };
-  mapUi = nu;
+  var formeDe = function (u, bid) { return u.editOf === bid ? u.edit : null; };
+  // forme mémorisée par sa géométrie, pour la suivre si une annulation la décale dans sa liste
+  if (apres.edit) apres.edit = mapShapeFollow(byId(apres.editOf), apres.edit) || apres.edit;
+  mapUi = apres;
   maps.forEach(function (m) {
-    var bid = m.blockId, oe = editOf(old, bid), ne = editOf(nu, bid);
+    var bid = m.blockId, oe = formeDe(avant, bid), ne = formeDe(apres, bid);
     // l'ajout d'abord : setDrawMode recalcule ensuite l'aspect de la carte avec les deux modes
-    if ((old.add === bid) !== (nu.add === bid)) m.setAddMode(nu.add === bid);
-    var od = old.draw === bid ? old.kind : null, nd = nu.draw === bid ? nu.kind : null;
-    if (od !== nd) m.setDrawMode(nd);
+    if ((avant.add === bid) !== (apres.add === bid)) m.setAddMode(apres.add === bid);
+    var dessinAvant = avant.draw === bid ? avant.kind : null, dessinApres = apres.draw === bid ? apres.kind : null;
+    if (dessinAvant !== dessinApres) m.setDrawMode(dessinApres);
     if (!same(oe, ne) && (oe || ne)) m.setEdit(ne ? ne.kind : null, ne ? ne.i : 0);
   });
   var blkOf = function (x) { var k = x.closest('.blk[data-type=map]'); return k ? k.dataset.id : null; };
-  $$('[data-act=map-addmode]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!nu.add && blkOf(x) === nu.add)); });
-  $$('[data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!nu.draw && blkOf(x) === nu.draw && x.dataset.kind === nu.kind)); });
+  $$('[data-act=map-addmode]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!apres.add && blkOf(x) === apres.add)); });
+  $$('[data-act=map-draw]', app).forEach(function (x) { x.setAttribute('aria-pressed', String(!!apres.draw && blkOf(x) === apres.draw && x.dataset.kind === apres.kind)); });
   $$('[data-act=shape-edit]', app).forEach(function (x) {
-    var on = !!nu.edit && blkOf(x) === nu.editOf && x.dataset.kind === nu.edit.kind && +x.dataset.i === nu.edit.i;
+    var on = !!apres.edit && blkOf(x) === apres.editOf && x.dataset.kind === apres.edit.kind && +x.dataset.i === apres.edit.i;
     x.setAttribute('aria-pressed', String(on));
     var it = x.closest('.mk-item'); if (it) it.classList.toggle('on', on);
   });
   if (id != null) cheatBlock = id;
-  var oldRoute = old.edit && old.edit.kind === 'route' ? old : null, newRoute = nu.edit && nu.edit.kind === 'route' ? nu : null;
+  var oldRoute = avant.edit && avant.edit.kind === 'route' ? avant : null, newRoute = apres.edit && apres.edit.kind === 'route' ? apres : null;
   var routeChanged = (oldRoute || newRoute) && !(oldRoute && newRoute && oldRoute.editOf === newRoute.editOf && same(oldRoute.edit, newRoute.edit));
-  // fin d'une édition d'itinéraire : ses lignes d'étapes sont retirées sans nouveau rendu, qui perdrait la cible
-  // et le focus d'un clic ailleurs ; l'entrée en édition les fait apparaître par un rendu
+  // fin d'une édition d'itinéraire : lignes d'étapes retirées sans rendu (il perdrait la cible et le focus d'un clic ailleurs)
   if (routeChanged && oldRoute) $$('.mk-panel[data-b="' + oldRoute.editOf + '"] .st-row', app).forEach(function (r) { r.remove(); });
   if (routeChanged && newRoute) { var br = byId(newRoute.editOf); if (br) keepView(br); render(); }
   updateCheat();

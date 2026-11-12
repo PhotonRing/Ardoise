@@ -140,7 +140,11 @@ function ardoiseReader() {
       var f = e.target.closest && e.target.closest('[data-vfold]'); if (f) foldToggle(f.parentNode);
       // colonne de kanban réduite ou affichée pour soi (ses cartes sont dans la page, masquées)
       var k = e.target.closest && e.target.closest('[data-kbfold]'), col = k && k.closest('.kb-col');
-      if (col) { if (col.hasAttribute('data-red')) col.removeAttribute('data-red'); else col.setAttribute('data-red', ''); }
+      if (col) {
+        var red = !col.hasAttribute('data-red');
+        if (red) col.setAttribute('data-red', ''); else col.removeAttribute('data-red');
+        Array.prototype.forEach.call(col.querySelectorAll('[data-kbfold]'), function (bt) { bt.setAttribute('aria-expanded', String(!red)); });
+      }
     });
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-copy]'); if (!b) return;

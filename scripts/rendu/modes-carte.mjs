@@ -76,3 +76,39 @@ test('rendu en édition d\'une forme absente : aucun ✎ enfoncé ni ligne en su
   egal(enfonces(h), []);
   egal((h.match(/class="mk-item on"/g) || []).length, 0);
 });
+
+// Forme en édition suivie d'un rendu à l'autre (mapShapeFollow) : l'édition ne passe jamais en silence à la forme voisine.
+const suivre = (b, ed) => { const { ctx } = monter(DOC([b])); const r = ctx.mapShapeFollow(b, ed); return r && r.i; };
+const M1 = { ...M0, lat: 47, label: 'Nantes' }, M2 = { ...M0, lat: 45, label: 'Lyon' };
+
+test('édition suivie : annuler l\'ajout d\'un marqueur placé avant garde l\'édition sur le même marqueur', () => {
+  const { ctx } = monter(DOC([carte('c1')]));
+  const avant = carte('c1', { markers: [M0, M1, M2] });
+  const ed = ctx.mapShapeFollow(avant, { kind: 'marker', i: 2 });
+  egal(ed.i, 2, 'entrée en édition');
+  egal(ctx.mapShapeFollow(carte('c1', { markers: [M1, M2] }), ed).i, 1, 'M0 retiré : Lyon passe au rang 1');
+});
+
+test('édition suivie : la forme déplacée par l\'édition elle-même garde son rang', () => {
+  const { ctx } = monter(DOC([carte('c1')]));
+  const ed = ctx.mapShapeFollow(carte('c1', { markers: [M0, M1] }), { kind: 'marker', i: 1 });
+  egal(ctx.mapShapeFollow(carte('c1', { markers: [M0, { ...M1, lat: 46.5 }] }), ed).i, 1);
+});
+
+test('édition suivie : forme disparue, ou liste raccourcie sans elle, quitte l\'édition', () => {
+  const { ctx } = monter(DOC([carte('c1')]));
+  const ed = ctx.mapShapeFollow(carte('c1', { markers: [M0, M1] }), { kind: 'marker', i: 0 });
+  egal(ctx.mapShapeFollow(carte('c1', { markers: [M1] }), ed), null, 'le voisin ne la remplace pas');
+  egal(ctx.mapShapeFollow(carte('c1', { markers: [] }), ed), null);
+  egal(suivre(carte('c1', { routes: [R0] }), { kind: 'marker', i: 0 }), null, 'liste absente');
+});
+
+test('édition suivie : zones et itinéraires suivis par leur géométrie', () => {
+  const { ctx } = monter(DOC([carte('c1')]));
+  const Z1 = { ...Z0, r: 2000 };
+  const ez = ctx.mapShapeFollow(carte('c1', { zones: [Z0, Z1] }), { kind: 'zone', i: 1 });
+  egal(ctx.mapShapeFollow(carte('c1', { zones: [Z1] }), ez).i, 0);
+  const R1 = { ...R0, pts: [[45, 5], [44, 6]] };
+  const er = ctx.mapShapeFollow(carte('c1', { routes: [R0, R1] }), { kind: 'route', i: 0 });
+  egal(ctx.mapShapeFollow(carte('c1', { routes: [R1, R0] }), er).i, 1, 'ordre changé');
+});

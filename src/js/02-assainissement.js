@@ -15,15 +15,16 @@ function sanitize(html) {
   sanCache.set(html, s);
   return s;
 }
+// collage HTML dans un champ d'une ligne : blancs hors balises compactés (l'insertion en ferait des espaces insécables)
 function compacterLigne(html) {
-  // collage dans un champ d'une ligne : les blancs de mise en page du HTML copié (et les \r\n qui entourent le fragment
-  // dans le presse-papiers) deviendraient des espaces insécables à l'insertion. Seuls les textes hors balises sont touchés
-  var morceaux = String(html == null ? '' : html).split(/(<[^>]*>)/), i;
+  var morceaux = String(html == null ? '' : html).split(/(<(?:[^>"']|"[^"]*"|'[^']*')*>)/), i;
   for (i = 0; i < morceaux.length; i += 2) morceaux[i] = morceaux[i].replace(/[ \t\n\r\f]+/g, ' ');
   for (i = 0; i < morceaux.length; i += 2) { morceaux[i] = morceaux[i].replace(/^ /, ''); if (morceaux[i]) break; }
   for (i = morceaux.length - 1; i >= 0; i -= 2) { morceaux[i] = morceaux[i].replace(/ $/, ''); if (morceaux[i]) break; }
   return morceaux.join('');
 }
+// collage de texte brut dans un champ d'une ligne : un < ou un > y est du texte, pas une balise
+function compacterTexte(texte) { return String(texte == null ? '' : texte).replace(/\s+/g, ' ').trim(); }
 function walk(src, dst) {
   var kids = Array.prototype.slice.call(src.childNodes);
   for (var i = 0; i < kids.length; i++) {

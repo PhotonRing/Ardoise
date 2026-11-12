@@ -7,6 +7,7 @@ function goPage(i, keepScroll) {
   maps.forEach(function (m) { var b = byId(m.blockId); if (b && mode === 'edit') b.view = m.getView(); });
   mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }; cheatBlock = null;
   closePop(); itb.style.display = 'none';
+  if (mode === 'edit') viewCol = {};   // colonne rouverte par un saut vers une carte : refermée en quittant la page
   pageAncestors(doc.pages, i).forEach(function (a) { if (navFold[doc.pages[a].id] === false) delete navFold[doc.pages[a].id]; });
   doc.cur = i; render(); if (!keepScroll) scrollTo(0, 0); pageHash(i);
 }
