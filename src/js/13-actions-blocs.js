@@ -136,17 +136,15 @@ app.addEventListener('mouseout', function (e) {
   if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) releaseBar();
 });
 document.addEventListener('mousedown', function (e) { if (barHold && !(e.target.closest && e.target.closest('.blk.bar-on'))) releaseBar(); }, true);
-function tableOp(b, op) {
-  var rows = b.rows, cols = rows[0].length;
-  var cur = lastCell && lastCell.b === b.id ? lastCell : { r: rows.length - 1, c: cols - 1 };
-  session.modifier(function () {
-    if (op === 'row-add') rows.splice(cur.r + 1, 0, rows[0].map(function () { return ''; }));
-    if (op === 'col-add') rows.forEach(function (r, j) { r.splice(cur.c + 1, 0, j === 0 ? 'Colonne' : ''); });
-    if (op === 'row-del' && rows.length > 2 && cur.r > 0) rows.splice(cur.r, 1);
-    if (op === 'col-del' && cols > 1) rows.forEach(function (r) { r.splice(cur.c, 1); });
-  });
-  var nr = rows.length, nc = rows[0].length;
-  lastCell = { b: b.id, r: Math.min(nr - 1, op === 'row-add' ? cur.r + 1 : cur.r), c: Math.min(nc - 1, op === 'col-add' ? cur.c + 1 : cur.c) };
+// opération sur la grille d'un tableau (opTableau, 05-tableau.js) à la cellule (r, c) ; sans cellule, celle qui a eu le
+// focus en dernier (boutons +L, −L, +C, −C), à défaut la dernière ; le curseur va dans la ligne ou la colonne qui en résulte
+var TABLE_BOUTONS = { 'row-add': 'ligne-apres', 'col-add': 'col-apres', 'row-del': 'ligne-suppr', 'col-del': 'col-suppr' };
+function tableOp(b, op, r, c) {
+  var rows = b.rows;
+  if (r == null) { var cur = lastCell && lastCell.b === b.id ? lastCell : { r: rows.length - 1, c: rows[0].length - 1 }; r = cur.r; c = cur.c; }
+  var x = opTableau(rows, TABLE_BOUTONS[op] || op, r, c); if (!x) return;
+  session.modifier(function () { b.rows = x.rows; }, { b: b.id, k: 'rows.' + x.r + '.' + x.c, end: false });
+  lastCell = { b: b.id, r: x.r, c: x.c };
 }
 function copyCode(btn) {
   var box = btn.closest('.code, .codebox'), pre = box && box.querySelector('pre'); if (!pre) return;

@@ -832,6 +832,22 @@ test('libellé : colonne de kanban réduite puis affichée, annulée puis rétab
   egal(libelles(m), ['Accueil · Kanban « À faire Fait Écrire » : colonne réduite', 'Accueil · Kanban « À faire Fait Écrire » : colonne affichée']);
 });
 
+test('libellé : ligne ou colonne ajoutée ou supprimée dans un tableau, à l\'annulation comme au rétablissement', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France']] }); });
+  const t = () => blocsDe(m)[1];
+  m.s.modifier(() => { t().rows.splice(1, 0, ['', '']); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Lyon France » : ligne ajoutée');
+  m.s.modifier(() => { t().rows.splice(2, 1); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays » : ligne supprimée');
+  m.s.modifier(() => { t().rows.forEach((r, j) => r.splice(1, 0, j ? '' : 'Colonne')); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Colonne Pays » : colonne ajoutée');
+  m.s.modifier(() => { t().rows.forEach((r) => r.splice(0, 1)); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Colonne Pays » : colonne supprimée');
+  m.s.annuler();
+  egal(libelles(m), ['Accueil · Tableau « Ville Colonne Pays » : colonne ajoutée', 'Accueil · Tableau « Colonne Pays » : colonne supprimée']);
+});
+
 test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['', '']] }, { id: 'c', type: 'check', items: [{ html: 'Pain', done: false }, { html: 'Lait', done: false }] }); });
