@@ -156,8 +156,11 @@ app.addEventListener('dragover', function (e) {
   if (!kbDrag) return;
   var col = e.target.closest && e.target.closest('[data-kb="' + kbDrag.b + '"] .kb-col');
   if (!kbLine) { kbLine = document.createElement('div'); kbLine.className = 'drop-line'; ui.appendChild(kbLine); }
+  kbMark(col && col.hasAttribute('data-red') ? col : null);
   if (!col) { kbLine.style.display = 'none'; kbDrop = null; return; }
   e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  // colonne réduite : la carte va en fin de colonne, la bande est mise en surbrillance
+  if (col.hasAttribute('data-red')) { kbLine.style.display = 'none'; kbDrop = { tc: +col.dataset.ci, tk: null }; return; }
   var cards = $$('.kb-card', col), k = cards.length, list = $('.kb-list', col);
   for (var i = 0; i < cards.length; i++) { var r = cards[i].getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { k = i; break; } }
   kbDrop = { tc: +col.dataset.ci, tk: k };
@@ -169,8 +172,11 @@ app.addEventListener('drop', function (e) {
   e.preventDefault(); var d = kbDrag, t = kbDrop; kbEnd();
   var b = byId(d.b); if (b && t) kbMove(b, d.ci, d.ki, t.tc, t.tk);
 });
+// bande de colonne réduite survolée pendant un glisser (aucune : null)
+function kbMark(col) { $$('.kb-col.kb-drop', app).forEach(function (c) { if (c !== col) c.classList.remove('kb-drop'); }); if (col) col.classList.add('kb-drop'); }
 function kbEnd() {
   if (kbLine) kbLine.style.display = 'none';
+  kbMark(null);
   $$('.kb-card.dragging', app).forEach(function (c) { c.classList.remove('dragging'); });
   $$('.kb-edit .kb-card[draggable]', app).forEach(function (c) { c.removeAttribute('draggable'); });
   kbDrag = null; kbDrop = null;

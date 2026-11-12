@@ -3,12 +3,13 @@ function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
 }
-// contexte du rendu, normalisé aux entrées publiques : page bornée au document, vue et ses booléens, plis et tris de session (lecture), plis du sommaire, état d'interface (édition) ; champ absent = valeur neutre
+// contexte du rendu, normalisé aux entrées publiques : page bornée au document, vue et ses booléens, plis et tris de session (lecture), plis du sommaire, état d'interface (édition), colonnes de kanban réduites ou affichées dans la session (hors export) ; champ absent = valeur neutre
 function renderCtx(d, ctx) {
   ctx = ctx || {};
   var view = ctx.view === 'edit' || ctx.view === 'export' ? ctx.view : 'read';
   return { page: Math.max(0, Math.min(d.pages.length - 1, +ctx.page || 0)), view: view, edit: view === 'edit', static: view === 'export',
-    folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {}, navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {} };
+    folds: (view === 'read' && ctx.folds) || {}, sort: (view === 'read' && ctx.sort) || {}, navFolds: ctx.navFolds || {}, editor: (view === 'edit' && ctx.editor) || {},
+    kbCols: (view !== 'export' && ctx.kbCols) || {} };
 }
 // un titre est-il plié : pli de lecture de la session, sinon l'état enregistré
 function foldedIn(ctx) { var vf = ctx.folds; return function (b) { return vf[b.id] != null ? vf[b.id] : !!b.folded; }; }
@@ -413,6 +414,7 @@ function pageKids(pages, i) { var out = [], lv = pageLv(pages, i), end = pageEnd
 function prevSibling(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) { var l = pageLv(pages, j); if (l === lv) return j; if (l < lv) return -1; } return -1; }
 function nextSibling(pages, i) { var j = pageEnd(pages, i); return j < pages.length && pageLv(pages, j) === pageLv(pages, i) ? j : -1; }
 var viewFold = {};   // sections pliées / dépliées en lecture (id → plié) : jamais enregistré
+var viewCol = {};   // colonnes de kanban réduites / affichées pour soi (id de colonne → réduite) : jamais enregistré
 var navFold = {};   // pages dépliées (true) ou repliées (false) à la main dans le sommaire, mémorisé par document dans ce navigateur
 function loadNavFold(d) { d = d || doc; try { navFold = JSON.parse(localStorage.getItem(LS + 'fold:' + d.id) || '{}') || {}; } catch (_) { navFold = {}; } }
 function saveNavFold() { try { localStorage.setItem(LS + 'fold:' + doc.id, JSON.stringify(navFold)); } catch (_) {} }
@@ -537,9 +539,9 @@ function fileAppHTML(d, page) {
   return navHTML(d, ctx) + renderPage(d, ctx);
 }
 function viewCtx() {
-  // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, état d'interface de l'édition
+  // contexte du rendu à l'écran : page affichée, mode, plis et tris de la session, colonnes réduites de la session, état d'interface de l'édition
   var ed = mode === 'edit';
-  return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold,
+  return renderCtx(doc, { page: doc.cur, view: ed ? 'edit' : 'read', folds: viewFold, sort: viewSort, navFolds: navFold, kbCols: viewCol,
     editor: ed ? { bar: barHold, map: mapUi, panelMin: panelMin, paste: chPaste, routePaste: rtPaste } : null });
 }
 function render(focus) {

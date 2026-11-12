@@ -102,6 +102,8 @@ app.addEventListener('click', function (e) {
   if (kd) { var dp = kd.dataset.kbdep.split('|'); kbDepMenu(kd, dp[0], dp[1]); return; }
   var kg = t.closest('[data-kbgo]');
   if (kg) { var gp = kg.dataset.kbgo.split('|'); kbGo(gp[0], gp[1]); return; }
+  var kf = t.closest('[data-kbfold]');
+  if (kf) { var fp = kf.dataset.kbfold.split('|'); kbFold(fp[0], fp[1]); return; }
   var km = t.closest('[data-kbmove]');
   if (km) { var kp = km.dataset.kbmove.split('|'), kb = byId(kp[0]); if (kb) kbMoveMenu(km, kb, +kp[1], +kp[2]); return; }
   var qc = t.closest('[data-qchk]');
