@@ -25,6 +25,10 @@ html.is-edit section.step{gap:40px}
 .st.ok i{background:var(--ok)} .st.warn i{background:var(--warn)} .st.busy i{background:var(--accent);animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.3}}
 @media (max-width:760px){.st span,.ub .lbl,.ub kbd{display:none}.tb{gap:2px;padding:0 6px}}
+/* palier intermédiaire : sous 900 px, la barre d'édition et celle de lecture gardent tous leurs boutons, réduits à leur icône
+   (info-bulle gardée) ; le texte d'état disparaît, sa pastille reste. Le nom du document rétrécit avec points de suspension. */
+.ub .ic-seul{display:none}
+@media (max-width:900px){.tb .st span,.fab .st span,.tb .ub .lbl,.fab .ub .lbl{display:none}.ub .ic-seul{display:inline}.tb{gap:4px}}
 /* petits écrans : la barre ne garde que le nom, l'état (synchronisation, enregistrement) et le menu ☰ plein écran */
 .burger{display:none}
 @media (max-width:760px){
@@ -47,13 +51,14 @@ html.sheet-on{overflow:hidden}
 .sh-st{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 16px 4px}
 .sh-st .st{max-width:none;font-size:13px}
 .sh-st .st span{display:inline!important}
-.sh-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 16px}
-.sh-big{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);cursor:pointer;font:500 15px var(--f-body)!important;text-align:left}
+.sh-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px}
+.sh-big{min-width:0;display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);cursor:pointer;font:500 15px var(--f-body)!important;text-align:left}
 .sh-big .ic{width:22px;text-align:center;font-size:18px;opacity:.85}
 .sh-big.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)!important}
 .sh-big:disabled{opacity:.4;cursor:default}
 .sh-big .sh-l{display:flex;flex-direction:column;min-width:0}
-.sh-big .sub{font-size:12px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* sous-libellé (étape d'annulation, parfois très longue) : deux lignes au plus, le texte complet reste dans l'info-bulle */
+.sh-big .sub{font-size:12px;opacity:.7;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .sh-big .sub:empty{display:none}
 .sh-list{padding:4px 8px 24px}
 .sh-list h4{margin:16px 10px 6px;font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -63,7 +68,7 @@ html.sheet-on{overflow:hidden}
 .syn-l{display:none}
 .sh-st .syn-l{display:inline;margin:0 4px 0 2px;font-size:13px;color:var(--muted)}
 .sh-st .syn-b{height:auto;min-height:34px;padding:6px 12px;border-radius:12px;text-align:left}
-.fab{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:6px;padding:5px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.14);opacity:.7;transition:opacity .15s}
+.fab{position:fixed;right:16px;bottom:16px;max-width:calc(100vw - 32px);z-index:50;display:flex;align-items:center;gap:6px;padding:5px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.14);opacity:.7;transition:opacity .15s}
 .fab:hover,.fab:focus-within,.fab.dirty{opacity:1}
 .fab .ub{border-radius:999px}
 /* synchronisation : état et personnes présentes */

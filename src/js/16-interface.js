@@ -22,14 +22,14 @@ function renderChrome() {
       '<button class="ub wide" data-ui="file" title="Fichier">☰ <span class="lbl">Fichier</span></button><span class="vsep wide"></span>' +
       '<span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
       '<button class="ub out wide" data-ui="mode" title="Lecture (Ctrl+E)">◉ <span class="lbl">Lecture</span></button>' +
-      '<button class="ub primary wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="lbl" style="display:none">⤓</span></button>' +
+      '<button class="ub primary wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="ic-seul">⤓</span></button>' +
       '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   } else {
     chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
-      (dirty ? '<button class="ub wide" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
+      (dirty ? '<button class="ub wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="ic-seul">⤓</span></button>' : '') +
       '<button class="ub wide" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
       '<button class="ub wide" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
-      '<button class="ub primary wide" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button>' +
+      '<button class="ub primary wide" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒' : '✎') + ' <span class="lbl">Modifier</span>' + '</button>' +
       '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   }
   updateUndo(); setStatus(); synPaint();
