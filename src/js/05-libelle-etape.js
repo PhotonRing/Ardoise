@@ -53,6 +53,11 @@ function libelleNature(ba, b) {
     return reduite ? 'colonne réduite' : 'colonne affichée';
   }
   if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
+  // tableau : dimensions de la grille avant et après (lignes, puis colonnes de l'en-tête)
+  if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
+    if (ba.rows.length !== b.rows.length) return b.rows.length > ba.rows.length ? 'ligne ajoutée' : 'ligne supprimée';
+    if (ba.rows[0].length !== b.rows[0].length) return b.rows[0].length > ba.rows[0].length ? 'colonne ajoutée' : 'colonne supprimée';
+  }
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';

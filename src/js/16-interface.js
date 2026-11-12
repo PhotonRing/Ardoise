@@ -90,8 +90,10 @@ document.addEventListener('keydown', function (e) { if (sheet && e.key === 'Esca
 window.addEventListener('resize', function () { if (sheet && innerWidth > 760) closeSheet(); });
 
 function closePop() { if (pop) { pop.remove(); pop = null; var c = popClose; popClose = null; if (c) c(); } }
-function placePop(p, anchor) {
-  var r = anchor.getBoundingClientRect(); ui.appendChild(p); p.ancre = anchor;   // ancre : un clic dans un popup ouvert depuis une carte reste sur la carte
+// point { x, y } facultatif : le menu s'ouvre à ce point (clic droit) plutôt que sous l'ancre
+function placePop(p, anchor, point) {
+  var r = anchor.getBoundingClientRect(); if (point) r = { left: point.x, top: point.y, bottom: point.y };
+  ui.appendChild(p); p.ancre = anchor;   // ancre : un clic dans un popup ouvert depuis une carte reste sur la carte
   var w = p.offsetWidth, h = p.offsetHeight;
   var left = Math.min(Math.max(8, r.left), innerWidth - w - 8);
   var top = r.bottom + 6; if (top + h > innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
