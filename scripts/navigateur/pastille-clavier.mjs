@@ -26,7 +26,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers });
     await attendre(60);
   };
-  // une seule navigation : la page modifiée retiendrait la suivante (avertissement de sortie)
+  // une seule navigation ici : la page modifiée demande confirmation avant d'être quittée (voir la fin)
   const debut = async () => { if (!(await evalue(CHARGE))) throw new Error('document refusé'); await attendre(100); await evalue(vider(PARA)); await attendre(30); };
   await ecran(1000, false);
   await charger();
@@ -77,4 +77,9 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     mesure();
     if (await evalue(LISTE)) echec(cas + ' : la liste s\'ouvre');
   }
+
+  // la page est modifiée : la quitter en acceptant l'avertissement de sortie, pour que le sujet suivant puisse naviguer
+  await cdp('Page.enable');
+  const part = cdp('Page.navigate', { url: 'about:blank' });
+  await attendre(300); await cdp('Page.handleJavaScriptDialog', { accept: true }); await part;
 }
