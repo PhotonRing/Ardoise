@@ -111,6 +111,27 @@ pre.cmd{font:13.5px/1.55 var(--f-mono);background:var(--code-soft);border:1px so
 .tablewrap tr:last-child td{border-bottom:0}
 /* cellule vide : un espace sans chasse lui donne une boîte de ligne, donc la hauteur d'une ligne */
 .tablewrap td:empty::after,.tablewrap th:empty::after{content:"\200b"}
+/* filtre des lignes (session) : loupe en haut à droite du tableau, visible au survol, au focus et sur écran tactile */
+.filtre{position:relative;height:0}
+.q-blk>.filtre:not(.ouvert){margin-bottom:-10px}
+.filtre.sans-table:not(.ouvert){display:none}
+.filtre-b{position:absolute;top:5px;right:5px;z-index:2;display:grid;place-items:center;width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);cursor:pointer;opacity:0;transition:opacity .15s}
+.filtre-b:hover{color:var(--accent);border-color:var(--accent)}
+.filtrable:hover .filtre-b,.blk:hover .filtre-b,.blk:focus-within .filtre-b,.q-blk:hover .filtre-b,.q-blk:focus-within .filtre-b,.filtre-b:focus-visible{opacity:1}
+@media (hover:none){.filtre-b{opacity:1}}
+.filtre.ouvert{height:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px 8px;margin-bottom:8px}
+.q-blk>.filtre.ouvert{margin-bottom:0}
+.filtre.ouvert .filtre-b{display:none}
+.filtre-q{flex:0 1 240px;min-width:0;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--fg);font:14px var(--f-body)}
+.filtre-q:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:0;border-color:var(--accent)}
+.filtre-n{font:12px var(--f-body);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.filtre-x{width:28px;height:28px;padding:0;border:0;border-radius:6px;background:none;color:var(--muted);font:18px/1 var(--f-body);cursor:pointer}
+.filtre-x:hover{background:var(--accent-soft);color:var(--accent)}
+.filtre-vide{flex-basis:100%;margin:0;text-align:right;font:13px var(--f-body);color:var(--muted)}
+.filtre-vide[hidden]{display:none}
+table.filtrable thead th:last-child{padding-right:40px}
+.tablewrap tbody>tr[hidden]{display:none}
+@media print{.filtre{display:none!important}table.filtrable thead th:last-child{padding-right:12px}}
 .pill{display:inline-block;font:600 12px/1 var(--f-body);padding:4px 8px;border-radius:999px;white-space:nowrap}
 /* pastilles : couleur du nom (pa-N, posée au rendu) ou de la pastille (pc-N) */
 :root{--t4f:#52257e;--t4b:#ede1fa;--t5f:#832152;--t5b:#fbe0ed;--t6f:#1d877e;--t6b:#dffbf9;--t7f:#252c7e;--t7b:#e1e3fa;--t8f:#617e25;--t8b:#f1fae1;--t9f:#186e8b;--t9b:#def5fc;--t10f:#7e4a25;--t10b:#faebe1;--t11f:#762d76;--t11b:#f8e2f8;--t12f:#297a52;--t12b:#e2f9ed;--t13f:#405264;--t13b:#e7edf4;--t14f:#937910;--t14b:#fdf7dd;--t15f:#8b2818;--t15b:#fce2de}

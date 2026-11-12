@@ -79,7 +79,7 @@ function fieldValue(el) {
   return el.textContent.replace(/\s*\n\s*/g, ' ');
 }
 function nextField(el, dir) {
-  var all = $$('.fld, textarea.code-ta', app), i = all.indexOf(el);
+  var all = $$('.fld, textarea.code-ta', app).filter(function (x) { return x === el || !x.closest('tr[hidden]'); }), i = all.indexOf(el);   // lignes filtrées sautées
   var n = all[i + (dir || 1)]; if (n) { n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0); }
 }
 

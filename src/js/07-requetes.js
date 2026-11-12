@@ -226,6 +226,17 @@ function qSource(d, x) {
   return '<a class="q-src" href="#pg-' + esc(pg.id) + (x.sec ? '/' + esc(x.sec.id) : '') + '">' + esc(t) + (st ? ' › ' + esc(st) : '') + '</a>';
 }
 var viewSort = {};   // tri choisi en lecture d'un clic sur un en-tête (id du bloc → { by, dir }) : jamais enregistré
+var viewFiltre = {};   // filtre des lignes d'un tableau ou d'une requête (id du bloc → texte cherché ; champ ouvert si la clé existe) : jamais enregistré
+function sansAccents(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+function ligneCorrespond(cellules, terme) {
+  // une ligne correspond si l'une de ses cellules (HTML, pastilles comprises) contient le terme, sans casse ni accents
+  var t = sansAccents(terme); if (!t) return true;
+  return cellules.some(function (c) { return sansAccents(textOf(c)).indexOf(t) >= 0; });
+}
+function lignesAffichees(lignes, terme, connues, gardees) {
+  // affichée : correspond, ou ajoutée depuis le dernier changement du terme (absente de connues), ou gardée (focus pendant la saisie)
+  return lignes.map(function (l) { return connues.indexOf(l) < 0 || gardees.indexOf(l) >= 0 || ligneCorrespond(l, terme); });
+}
 function qSortKey(v) {
   // valeur de tri : nombre, date (jj/mm/aaaa, aaaa-mm-jj) ou texte ; vide : toujours à la fin
   var t = htmlText(v).replace(/\s+/g, ' ').trim(), m;

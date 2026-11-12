@@ -202,7 +202,8 @@ app.addEventListener('keydown', function (e) {
     if (el.hasAttribute('data-cell')) {
       // cellule du dessous ; sur la dernière ligne : cellule suivante, ou nouvelle ligne depuis la fin de la dernière cellule
       var m = k.split('.'), cr = +m[1], cc = +m[2];
-      if (cellAt(b, cr + 1, cc)) { focusCell(b, cr + 1, cc, true); return; }
+      var rn = ligneVoisine(b, cr, 1);   // les lignes masquées par un filtre sont sautées
+      if (rn > 0) { focusCell(b, rn, cc, true); return; }
       if (cc < b.rows[0].length - 1) { focusCell(b, cr, cc + 1, true); return; }
       if (caretAtEnd(el)) addRowAfter(b, cr);
       return;
@@ -321,11 +322,12 @@ function leaveTable(el, b, dir) {
 }
 function cellArrow(e, el, b, k) {
   // flèches au bord d'une cellule : cellule voisine (gauche / droite en début / fin de texte, haut / bas sur la première / dernière ligne)
-  var m = k.split('.'), r = +m[1], c = +m[2], nr = b.rows.length, nc = b.rows[0].length;
-  if (e.key === 'ArrowLeft' && caretAtStart(el)) { e.preventDefault(); if (!(c > 0 ? focusCell(b, r, c - 1, true) : r > 0 && focusCell(b, r - 1, nc - 1, true))) leaveTable(el, b, -1); return true; }
-  if (e.key === 'ArrowRight' && caretAtEnd(el)) { e.preventDefault(); if (!(c < nc - 1 ? focusCell(b, r, c + 1, false) : r < nr - 1 && focusCell(b, r + 1, 0, false))) leaveTable(el, b, 1); return true; }
-  if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(r > 0 && focusCell(b, r - 1, c, true))) leaveTable(el, b, -1); return true; }
-  if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(r < nr - 1 && focusCell(b, r + 1, c, false))) leaveTable(el, b, 1); return true; }
+  // lignes voisines visibles : celles qu'un filtre masque sont sautées
+  var m = k.split('.'), r = +m[1], c = +m[2], nc = b.rows[0].length, up = ligneVoisine(b, r, -1), dn = ligneVoisine(b, r, 1);
+  if (e.key === 'ArrowLeft' && caretAtStart(el)) { e.preventDefault(); if (!(c > 0 ? focusCell(b, r, c - 1, true) : up >= 0 && focusCell(b, up, nc - 1, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowRight' && caretAtEnd(el)) { e.preventDefault(); if (!(c < nc - 1 ? focusCell(b, r, c + 1, false) : dn > 0 && focusCell(b, dn, 0, false))) leaveTable(el, b, 1); return true; }
+  if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(up >= 0 && focusCell(b, up, c, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(dn > 0 && focusCell(b, dn, c, false))) leaveTable(el, b, 1); return true; }
   return false;
 }
 function lineBefore(el) {
