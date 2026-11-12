@@ -464,6 +464,15 @@ span.kb-dref{text-decoration:none;cursor:auto}
 .kb-grip{cursor:grab;letter-spacing:-2px}
 .kb-ctl button:hover{color:var(--accent);background:var(--accent-soft)}
 .kb-empty{margin:0;color:var(--muted);text-align:center;font-size:12px}
+/* colonne réduite : bande étroite, titre vertical et nombre de cartes ; l'export y garde les cartes, masquées */
+.kb-fold{border:0;background:none;color:var(--muted);width:20px;height:20px;border-radius:4px;cursor:pointer;padding:0;font:600 12px/20px var(--f-body)}
+.kb-fold:hover{background:var(--accent-soft);color:var(--accent)}
+.kb-col[data-red]{flex:0 0 40px;padding:4px}
+.kb-col[data-red]>:not(.kb-band),.kb-col:not([data-red])>.kb-band{display:none}
+.kb-band{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;min-height:140px;border:0;border-radius:6px;background:none;color:inherit;padding:6px 0;cursor:pointer;font:inherit}
+.kb-band:hover{background:var(--accent-soft)}
+.kb-band .kb-title{flex:none;writing-mode:vertical-rl;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:320px}
+.kb-col.kb-drop{outline:2px dashed var(--accent);outline-offset:-2px}
 .kb-q .kb-card .q-src{align-self:flex-start}
 @media (hover:none){.kb-ctl{opacity:1}}
 
@@ -492,7 +501,12 @@ span.kb-dref{text-decoration:none;cursor:auto}
   thead{display:table-header-group}
   /* kanban : colonnes à la ligne plutôt qu'en défilement */
   .kb-cols{flex-wrap:wrap;overflow:visible}
-  .kb-col{flex:1 1 30%;min-width:0}
+  .kb-col,.kb-col[data-red]{flex:1 1 30%;min-width:0;padding:8px}
+  /* colonnes réduites imprimées dépliées */
+  .kb-col[data-red]>:not(.kb-band){display:revert}
+  .kb-col[data-red]>.kb-head{display:flex}
+  .kb-col[data-red]>.kb-list{display:flex}
+  .kb-band,.kb-fold{display:none!important}
   .kb-ctl,.q-go,.q-cdel,.q-cadd{display:none!important}
   /* pas d'ombres ni d'effets d'écran */
   .kb-card,.q-count,.sub,.facts{box-shadow:none}

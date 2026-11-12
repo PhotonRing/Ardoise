@@ -1,4 +1,5 @@
-// impression depuis Ardoise : les éléments interactifs (en-têtes triables, cases de requête) deviennent du texte dans la
+// impression depuis Ardoise : les éléments interactifs (en-têtes triables, cases de requête) deviennent du texte et les
+// colonnes de kanban réduites s'affichent, dans la
 // page affichée, sans la redessiner : le navigateur imprime tout de suite après, et une carte recréée n'aurait pas eu le
 // temps de se dessiner. La page est redessinée après l'impression
 var printing = false;
@@ -6,6 +7,12 @@ window.addEventListener('beforeprint', function () {
   if (!doc) return; printing = true;
   $$('button.q-th', app).forEach(function (bt) { var sp = document.createElement('span'); sp.innerHTML = bt.innerHTML; bt.replaceWith(sp); });
   $$('button.q-box', app).forEach(function (bt) { var sp = document.createElement('span'); sp.className = 'q-box'; sp.textContent = bt.textContent; bt.replaceWith(sp); });
+  // kanban à colonne réduite : redessiné en place, toutes colonnes affichées (un kanban n'a pas de carte géographique à attendre)
+  $$('.kb[data-kb]', app).forEach(function (el) {
+    var b = byId(el.dataset.kb); if (!b || !$('[data-red]', el)) return;
+    var ctx = viewCtx(); ctx.kbCols = {}; b.cols.forEach(function (c) { ctx.kbCols[c.id] = false; });
+    el.outerHTML = renderBlock(b, doc, ctx, null);
+  });
   Reader.printPrep(true);
 });
 window.addEventListener('afterprint', function () { if (!printing) return; printing = false; var sy = scrollY; render(); scrollTo(0, sy); });
