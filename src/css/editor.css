@@ -105,6 +105,7 @@ html.sheet-on{overflow:hidden}
 .mi .ic{width:30px;height:30px;border:1px solid var(--line);border-radius:7px;display:grid;place-items:center;font:600 12px var(--f-mono);color:var(--accent);background:var(--bg);flex:none}
 .mi small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
 .mi kbd{margin-left:auto;font:11px var(--f-mono);color:var(--muted)}
+.diese-pop{min-width:180px}.diese-pop .mi{padding:6px 8px}.diese-creer{color:var(--muted)}
 .mi.danger{color:var(--bad)}
 .menu-q{width:100%;height:34px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);padding:0 10px;font:13px var(--f-body);margin-bottom:4px;outline:none}
 .menu-q:focus{border-color:var(--accent)}
@@ -133,9 +134,14 @@ html.sheet-on{overflow:hidden}
 .blk::after{content:"";position:absolute;inset:-6px -8px;border:1px dashed transparent;border-radius:8px;pointer-events:none}
 .blk:hover::after{border-color:var(--line)}
 .blk:focus-within::after{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-.blk-bar{position:absolute;top:-33px;right:-6px;z-index:6;display:flex;opacity:0;visibility:hidden;transition:opacity .15s ease .6s,visibility 0s linear .75s;align-items:center;gap:1px;padding:2px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 3px 10px rgba(0,0,0,.1);font:500 12px/1 var(--f-body);color:var(--fg)}
-.blk.bar-on>.blk-bar{transition:none}
-.blk:hover>.blk-bar,.blk:focus-within>.blk-bar,.blk.bar-on>.blk-bar,.blk-bar:hover{opacity:1;visibility:visible;transition-delay:0s;z-index:7}
+/* menu de bloc collant : l'ancre .collant (hauteur nulle, en flux, en tête du bloc) colle sous le haut d'écran
+   (--haut-ecran, mesuré par 13-collant.js) et ne sort pas du bloc ; la barre est posée --recul px au-dessus d'elle.
+   Bloc court : l'ancre ne colle pas, la barre reste au-dessus du bloc. Mécanisme repris par toute barre collante. */
+.collant{position:sticky;top:calc(var(--haut-ecran,52px) + var(--recul,0px));height:0;z-index:6}
+.blk:hover>.collant,.blk:focus-within>.collant,.blk.bar-on>.collant,.collant:hover{z-index:7}
+.blk-bar{position:absolute;top:calc(-1 * var(--recul,33px));right:-6px;display:flex;opacity:0;visibility:hidden;transition:opacity .15s ease .6s,visibility 0s linear .75s;align-items:center;gap:1px;padding:2px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 3px 10px rgba(0,0,0,.1);font:500 12px/1 var(--f-body);color:var(--fg)}
+.blk.bar-on>.collant>.blk-bar{transition:none}
+.blk:hover>.collant>.blk-bar,.blk:focus-within>.collant>.blk-bar,.blk.bar-on>.collant>.blk-bar,.blk-bar:hover{opacity:1;visibility:visible;transition-delay:0s}
 .blk-bar::before{content:"";position:absolute;inset:-8px -14px -10px -14px;z-index:-1}
 /* sous 800 px, la barre d'outils du bloc et sa zone de survol restent dans le bloc */
 @media (max-width:800px){.blk-bar{right:0}.blk-bar::before{right:0}}
