@@ -1,6 +1,6 @@
 // Banc navigateur : dist/ardoise.html ouvert dans Chromium sans affichage, piloté par le protocole DevTools (sans dépendance).
 // Les sujets sont rangés dans scripts/navigateur/ : un fichier par sujet, qui exporte `nom` et une fonction par défaut
-// recevant les outils ci-dessous (ecran, charger, evalue, cdp, attendre, mesure, echec), pour que des tickets parallèles n'éditent pas le même fichier.
+// recevant les outils ci-dessous (ecran, charger, evalue, cdp, attendre, dialogues, mesure, echec), pour que des tickets parallèles n'éditent pas le même fichier.
 // Sans Chromium (ou sans WebSocket dans Node), le banc est ignoré en local et échoue en CI.  node scripts/test-navigateur.mjs [sujet…]
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
@@ -35,8 +35,19 @@ const cibles = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const ws = new WebSocket(cibles.find((c) => c.type === 'page').webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r));
 let id = 0; const attente = new Map();
-ws.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.id && attente.has(m.id)) { attente.get(m.id)(m); attente.delete(m.id); } });
-const cdp = (method, params = {}) => new Promise((r) => { const n = ++id; attente.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
+// boîtes de dialogue (avertissement de sortie d'une page modifiée, confirm, prompt) : acceptées d'office et notées,
+// sinon la page reste bloquée et le banc avec elle ; un sujet lit `dialogues` pour vérifier qu'une boîte est apparue
+const dialogues = [];
+ws.addEventListener('message', (e) => {
+  const m = JSON.parse(e.data);
+  if (m.method === 'Page.javascriptDialogOpening') { dialogues.push({ type: m.params.type, message: m.params.message }); ws.send(JSON.stringify({ id: ++id, method: 'Page.handleJavaScriptDialog', params: { accept: true } })); return; }
+  if (m.id && attente.has(m.id)) { attente.get(m.id)(m); attente.delete(m.id); }
+});
+// chaque appel a un délai : un sujet bloqué échoue en nommant l'appel au lieu de suspendre tout le banc
+const cdp = (method, params = {}, delai = 30000) => new Promise((r, rej) => {
+  const n = ++id, t = setTimeout(() => { attente.delete(n); rej(new Error('pas de réponse de Chromium en ' + delai / 1000 + ' s à ' + method)); }, delai);
+  attente.set(n, (m) => { clearTimeout(t); r(m); }); ws.send(JSON.stringify({ id: n, method, params }));
+});
 const evalue = async (expr) => { const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); if (r.result.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails)); return r.result.result.value; };
 const charger = async () => { await cdp('Page.navigate', { url: page }); for (let i = 0; i < 100; i++) { await attendre(50); if (await evalue('!!document.querySelector(".tb .doc-name") && document.readyState === "complete"')) return; } throw new Error('la barre du haut n\'apparaît pas'); };
 const ecran = (largeur, mobile, hauteur = 760) => cdp('Emulation.setDeviceMetricsOverride', { width: largeur, height: hauteur, deviceScaleFactor: mobile ? 2.625 : 1, mobile });
@@ -45,10 +56,10 @@ const dossier = new URL('./navigateur/', import.meta.url);
 const choisis = process.argv.slice(2);
 const fichiers = readdirSync(dossier).filter((f) => f.endsWith('.mjs')).sort().filter((f) => !choisis.length || choisis.includes(f.replace(/\.mjs$/, '')));
 const echecs = []; let n = 0;
-await cdp('Runtime.enable');
+await cdp('Runtime.enable'); await cdp('Page.enable');
 for (const f of fichiers) {
   const sujet = await import(new URL(f, dossier)), nom = sujet.nom || f.replace(/\.mjs$/, '');
-  const outils = { ecran, charger, evalue, cdp, attendre, mesure: () => { n++; }, echec: (m) => echecs.push(`[${nom}] ${m}`) };
+  const outils = { ecran, charger, evalue, cdp, attendre, dialogues, mesure: () => { n++; }, echec: (m) => echecs.push(`[${nom}] ${m}`) };
   try { await sujet.default(outils); } catch (e) { echecs.push(`[${nom}] erreur : ${e.stack || e.message}`); }
 }
 ws.close();

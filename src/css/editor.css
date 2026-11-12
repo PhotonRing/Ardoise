@@ -105,6 +105,7 @@ html.sheet-on{overflow:hidden}
 .mi .ic{width:30px;height:30px;border:1px solid var(--line);border-radius:7px;display:grid;place-items:center;font:600 12px var(--f-mono);color:var(--accent);background:var(--bg);flex:none}
 .mi small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
 .mi kbd{margin-left:auto;font:11px var(--f-mono);color:var(--muted)}
+.diese-pop{min-width:180px}.diese-pop .mi{padding:6px 8px}.diese-creer{color:var(--muted)}
 .mi.danger{color:var(--bad)}
 .menu-q{width:100%;height:34px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);padding:0 10px;font:13px var(--f-body);margin-bottom:4px;outline:none}
 .menu-q:focus{border-color:var(--accent)}
