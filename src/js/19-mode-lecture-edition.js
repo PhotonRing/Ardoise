@@ -26,6 +26,8 @@ function toggleMode() {
   clearTimeout(anchorT); anchorListen(false);
   var y = scrollY, top = topBlock();
   mode = mode === 'edit' ? 'view' : 'edit';
+  // les colonnes réduites pour soi ne passent pas d'un mode à l'autre : l'édition montre le fichier
+  viewCol = {};
   closePop(); itb.style.display = 'none';
   render();
   var el = top && blockEl(anchorBlock(doc, viewCtx(), top.id));

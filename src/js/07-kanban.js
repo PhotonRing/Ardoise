@@ -65,13 +65,26 @@ function kbDepLines(b, k, index, isStatic) {
   return { blocked: r.blocked, html: (r.waits.length ? '<div class="kb-wait' + (r.blocked ? ' blocked' : '') + '">Attend : ' + names(r.waits) + '</div>' : '') +
     (r.blocks.length ? '<div class="kb-blocks">Bloque : ' + names(r.blocks) + '</div>' : '') };
 }
+// colonne réduite : état pour soi ({ red, base }) tant que le fichier garde la valeur base, sinon le champ du fichier
+function kbCollapsed(c, ctx) { var v = (ctx.kbCols || {})[c.id], f = !!c.collapsed; return v && v.base === f ? !!v.red : f; }
+// retire les états pour soi dont la colonne a changé dans le fichier (synchronisation, annulation) ou a disparu
+function kbColsPerimes(vc, d) {
+  var ids = Object.keys(vc), cols = {}; if (!ids.length) return;
+  d.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (b.type === 'kanban') (b.cols || []).forEach(function (c) { cols[c.id] = !!c.collapsed; }); }); });
+  ids.forEach(function (id) { if (cols[id] !== vc[id].base) delete vc[id]; });
+}
 function kanbanHTML(b, ctx, f) {
-  // vue 'export' : cartes sans commandes de déplacement (page exportée sans script d'édition)
+  // vue 'export' : cartes sans commandes de déplacement (page exportée sans script d'édition) ; une colonne réduite y garde
+  // ses cartes, masquées, que le runtime de lecture affiche au clic sur la bande et l'impression toujours
   var cols = b.cols || [], e = ctx.edit, st = ctx.static, index = kbCards(b);
   return '<div class="kb' + (e ? ' kb-edit' : '') + '" data-kb="' + b.id + '"><div class="kb-cols">' + cols.map(function (c, ci) {
-    var last = ci === cols.length - 1, cards = c.cards || [];
-    return '<section class="kb-col" data-ci="' + ci + '"><div class="kb-head">' + f('span', 'kb-title', 'cols.' + ci + '.title', c.title, { rich: false, ph: 'Colonne', nl: 1 }) +
+    var last = ci === cols.length - 1, cards = c.cards || [], red = kbCollapsed(c, ctx), fold = b.id + '|' + esc(c.id);
+    var band = '<button type="button" class="kb-band" data-kbfold="' + fold + '" title="Afficher la colonne" aria-expanded="' + !red + '">' +
+      '<span class="kb-title">' + esc(c.title || 'Colonne ' + (ci + 1)) + '</span><span class="kb-n">' + cards.length + '</span></button>';
+    if (red && !st) return '<section class="kb-col" data-ci="' + ci + '" data-red>' + band + '</section>';
+    return '<section class="kb-col" data-ci="' + ci + '"' + (red ? ' data-red' : '') + '>' + (st ? band : '') + '<div class="kb-head">' + f('span', 'kb-title', 'cols.' + ci + '.title', c.title, { rich: false, ph: 'Colonne', nl: 1 }) +
       '<span class="kb-n">' + cards.length + '</span>' +
+      '<button type="button" class="kb-fold" data-kbfold="' + fold + '" title="Réduire la colonne" aria-expanded="' + !red + '">⇤</button>' +
       (e ? '<span class="kb-ctools"><button type="button" data-act="kb-col-left" data-i="' + ci + '" title="Déplacer la colonne à gauche"' + (ci ? '' : ' disabled') + '>←</button>' +
         '<button type="button" data-act="kb-col-right" data-i="' + ci + '" title="Déplacer la colonne à droite"' + (last ? ' disabled' : '') + '>→</button>' +
         '<button type="button" data-act="kb-col-del" data-i="' + ci + '" title="Supprimer la colonne">×</button></span>' : '') + '</div>' +
@@ -134,8 +147,21 @@ function kbDepMenu(anchor, bid, kid) {
   });
   fill(); placePop(p, anchor);
 }
-// défile jusqu'à la carte et la met brièvement en surbrillance
+// bascule une colonne : enregistrée en édition (seule la colonne rouverte par un saut se referme sans étape), pour soi en lecture
+function kbFold(bid, cid) {
+  var b = byId(bid), c = b && (b.cols || []).filter(function (x) { return x.id === cid; })[0]; if (!c) return;
+  var red = !kbCollapsed(c, viewCtx()), sy = scrollY;
+  if (mode === 'edit') {
+    viewCol = {};
+    if (red === !!c.collapsed) render();
+    else session.modifier(function () { if (red) c.collapsed = true; else delete c.collapsed; });
+  } else { viewCol[cid] = { red: red, base: !!c.collapsed }; render(); }
+  scrollTo(0, sy);
+}
+// défile jusqu'à la carte et la met brièvement en surbrillance ; sa colonne, si elle est réduite, est d'abord rouverte pour soi
 function kbGo(bid, kid) {
+  var b = byId(bid), entry = b && kbCards(b)['$' + kid], c = entry && b.cols[entry.ci];
+  if (c && kbCollapsed(c, viewCtx())) { var sy = scrollY; viewCol[c.id] = { red: false, base: !!c.collapsed }; render(); scrollTo(0, sy); }
   var el = $('.kb[data-kb="' + bid + '"] .kb-card[data-kid="' + kid + '"]', app); if (!el) return;
   el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   el.classList.remove('kb-flash'); void el.offsetWidth; el.classList.add('kb-flash');

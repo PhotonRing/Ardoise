@@ -42,12 +42,17 @@ function libelleFeuilles(a, b, k, rows, out) {
   }
   out.push({ k: typeof a === typeof b && typeof b !== 'object' ? k : '', rows: rows && typeof b === 'string', v: b });
 }
-// kanban sans les dépendances de ses cartes : une liste qui change de longueur perd sa clé dans libelleFeuilles
-function libelleHorsDependances(b) { return JSON.stringify(b, function (k, v) { return k === 'dep' && Array.isArray(v) ? undefined : v; }); }
+// bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
+function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
-  if (b.type === 'kanban' && libelleHorsDependances(ba) === libelleHorsDependances(b)) return 'dépendance modifiée';
+  if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
+    // une seule colonne bascule par étape : réduite si l'une l'est devenue
+    var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
+    return reduite ? 'colonne réduite' : 'colonne affichée';
+  }
+  if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';

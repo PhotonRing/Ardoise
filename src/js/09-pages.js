@@ -7,6 +7,7 @@ function goPage(i, keepScroll) {
   maps.forEach(function (m) { var b = byId(m.blockId); if (b && mode === 'edit') b.view = m.getView(); });
   mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }; cheatBlock = null;
   closePop(); itb.style.display = 'none';
+  if (mode === 'edit') viewCol = {};   // colonne rouverte par un saut vers une carte : refermée en quittant la page
   pageAncestors(doc.pages, i).forEach(function (a) { if (navFold[doc.pages[a].id] === false) delete navFold[doc.pages[a].id]; });
   doc.cur = i; render(); if (!keepScroll) scrollTo(0, 0); pageHash(i);
 }
@@ -102,6 +103,8 @@ app.addEventListener('click', function (e) {
   if (kd) { var dp = kd.dataset.kbdep.split('|'); kbDepMenu(kd, dp[0], dp[1]); return; }
   var kg = t.closest('[data-kbgo]');
   if (kg) { var gp = kg.dataset.kbgo.split('|'); kbGo(gp[0], gp[1]); return; }
+  var kf = t.closest('[data-kbfold]');
+  if (kf) { var fp = kf.dataset.kbfold.split('|'); kbFold(fp[0], fp[1]); return; }
   var km = t.closest('[data-kbmove]');
   if (km) { var kp = km.dataset.kbmove.split('|'), kb = byId(kp[0]); if (kb) kbMoveMenu(km, kb, +kp[1], +kp[2]); return; }
   var qc = t.closest('[data-qchk]');

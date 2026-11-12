@@ -14,9 +14,14 @@ function boot(d, origine) {
   if (freshDoc) setStatus('warn', 'Ctrl+S pour créer votre fichier');
   if (doc.newer) newerNotice(false); else checkDraft();
   synStart();   // synchronisation entre copies, si le fichier l'a activée
+  // poignée reprise : si la permission est déjà accordée, on écarte tout de suite celle qui ne désigne pas le fichier ouvert ;
+  // sinon le contrôle attend le prochain enregistrement (Ctrl+S demande la permission)
   getHandle().then(function (h) {
-    if (!h) return; fileHandle = h;
-    perm(h, false).then(function (ok) { handleGranted = ok; setStatus(); });
+    if (!h) return; fileHandle = h; poigneeReprise = h;
+    perm(h, false).then(function (ok) {
+      if (!ok) { handleGranted = false; setStatus(); return; }
+      return verifierPoignee(h).then(function () { handleGranted = true; }, function (e) { if (fileHandle === h && staleHandle(e)) dropHandle(h); });
+    }).then(function () { setStatus(); });
   });
 }
 var initial = loadInitial();

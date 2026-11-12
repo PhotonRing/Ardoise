@@ -98,4 +98,18 @@ function fileName() {
   if (!/\.html?$/i.test(s)) s = (s || 'page') + '.html';
   return s;
 }
+// nom du fichier local d'où la page est ouverte (dernier segment décodé de l'adresse) ; null hors d'un fichier local
+function nomFichierOuvert(adresse) {
+  var m = /^file:\/\/[^?#]*/i.exec(String(adresse || '')); if (!m) return null;
+  var nom = m[0].slice(m[0].lastIndexOf('/') + 1);
+  try { nom = decodeURIComponent(nom); } catch (_) {}
+  return nom.normalize('NFC');
+}
+// nom proposé au sélecteur : la poignée gardée ; poignée écartée, le fichier ouvert (sinon son ancien nom) ; sinon le titre
+function nomPropose(nomPoignee, nomEcarte, adresse, nomTitre) { return nomPoignee || (nomEcarte != null ? nomFichierOuvert(adresse) || nomEcarte : nomTitre); }
+// la poignée porte-t-elle le nom du fichier ouvert ? Casse ignorée (Windows, macOS), accents comparés en NFC (macOS les décompose)
+function memeNomQueFichierOuvert(nomPoignee, adresse) {
+  var nom = nomFichierOuvert(adresse); if (nom === null) return true;
+  return String(nomPoignee || '').normalize('NFC').toLowerCase() === nom.toLowerCase();
+}
 

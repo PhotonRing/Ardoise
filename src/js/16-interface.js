@@ -22,14 +22,14 @@ function renderChrome() {
       '<button class="ub wide" data-ui="file" title="Fichier">☰ <span class="lbl">Fichier</span></button><span class="vsep wide"></span>' +
       '<span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
       '<button class="ub out wide" data-ui="mode" title="Lecture (Ctrl+E)">◉ <span class="lbl">Lecture</span></button>' +
-      '<button class="ub primary wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="lbl" style="display:none">⤓</span></button>' +
+      '<button class="ub primary wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="ic-seul">⤓</span></button>' +
       '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   } else {
     chrome.innerHTML = '<div class="fab' + (dirty ? ' dirty' : '') + '"><span class="syn" hidden></span><span class="st" id="st"><i></i><span></span></span>' +
-      (dirty ? '<button class="ub wide" data-ui="save" title="Enregistrer (Ctrl+S)">Enregistrer</button>' : '') +
+      (dirty ? '<button class="ub wide" data-ui="save" title="Enregistrer (Ctrl+S)"><span class="lbl">Enregistrer</span><span class="ic-seul">⤓</span></button>' : '') +
       '<button class="ub wide" data-ui="print" title="Imprimer ou enregistrer en PDF">⎙ <span class="lbl">PDF</span></button>' +
       '<button class="ub wide" data-ui="vmenu" title="Autres actions de lecture" aria-label="Autres actions de lecture">⋯</button>' +
-      '<button class="ub primary wide" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒 Modifier' : '✎ Modifier') + '</button>' +
+      '<button class="ub primary wide" data-ui="mode" title="Modifier (Ctrl+E)">' + (doc.lock && !unlocked ? '🔒' : '✎') + ' <span class="lbl">Modifier</span>' + '</button>' +
       '<button class="ub burger" data-ui="burger" title="Menu" aria-label="Menu" aria-haspopup="dialog">☰</button></div>';
   }
   updateUndo(); setStatus(); synPaint();
@@ -60,7 +60,7 @@ function closeSheet() { if (sheet) { sheet.remove(); sheet = null; document.docu
 function openSheet() {
   closePop(); closeSheet();
   var ed = mode === 'edit', stEl = $('#st'), stTxt = stEl ? stEl.title : '';
-  var big = function (k, ic, label, extra, sub) { return '<button type="button" class="sh-big' + (extra || '') + '" data-sh="' + k + '"><span class="ic">' + ic + '</span><span class="sh-l">' + label + (sub ? '<small class="sub"></small>' : '') + '</span></button>'; };
+  var big = function (k, ic, label, extra, sub) { return '<button type="button" class="sh-big' + (extra || '') + '" data-sh="' + k + '"><span class="ic">' + ic + '</span><span class="sh-l"><span class="sh-n">' + label + '</span>' + (sub ? '<small class="sub"></small>' : '') + '</span></button>'; };
   var lockEd = doc.lock && !unlocked;
   sheet = document.createElement('div'); sheet.className = 'sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', 'Menu');
   sheet.innerHTML = '<div class="sh-h"><span class="logo">' + LOGO_SVG + '</span><span class="sh-t">' + esc(curTitle()) + '</span><button type="button" class="sh-x" data-sh="close" aria-label="Fermer le menu">×</button></div>' +
@@ -91,7 +91,7 @@ window.addEventListener('resize', function () { if (sheet && innerWidth > 760) c
 
 function closePop() { if (pop) { pop.remove(); pop = null; var c = popClose; popClose = null; if (c) c(); } }
 function placePop(p, anchor) {
-  var r = anchor.getBoundingClientRect(); ui.appendChild(p);
+  var r = anchor.getBoundingClientRect(); ui.appendChild(p); p.ancre = anchor;   // ancre : un clic dans un popup ouvert depuis une carte reste sur la carte
   var w = p.offsetWidth, h = p.offsetHeight;
   var left = Math.min(Math.max(8, r.left), innerWidth - w - 8);
   var top = r.bottom + 6; if (top + h > innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
