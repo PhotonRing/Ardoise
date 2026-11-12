@@ -1,8 +1,14 @@
 // Presse-papier (05-presse-papier.js) : texte brut d'une copie qui contient des pastilles (#nom), et marque de provenance
 // des pastilles copiées, pour qu'une couleur d'exception ne passe pas d'un document à l'autre.
-import { contexte, test, egal } from './commun.mjs';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { contexte, js, test, egal } from './commun.mjs';
 
 const ctx = contexte();
+// compacterLigne et compacterTexte sont purs, mais le contexte commun remplace l'assainisseur : on les prend du vrai module
+const asn = vm.createContext({});
+new vm.Script(js('02-assainissement.js'), { filename: '02-assainissement.js' }).runInContext(asn);
+ctx.compacterLigne = asn.compacterLigne; ctx.compacterTexte = asn.compacterTexte;
 
 test('texte brut : chaque pastille devient # suivi de son nom', () => {
   egal(ctx.texteBrutDePresse('Statut <span class="pill">OK</span> et <span class="pill pc-5">Très urgent</span> fin'), 'Statut #OK et #Très urgent fin');
@@ -30,4 +36,48 @@ test('collage : l\'exception reste dans le même document, part sinon', () => {
   egal(ctx.pastillesDuCollage(html, 'd1'), html);
   egal(ctx.pastillesDuCollage(html, 'd2'), '<span class="pill" data-ad="d1">Urgent</span> <span class="pill" data-ad="d1">OK</span>');
   egal(ctx.pastillesDuCollage('<span class="pill pc-5">Urgent</span>', 'd1'), '<span class="pill">Urgent</span>');
+});
+
+// Plage collée : grilleDuPressePapier lit le <table> du text/html, sinon le texte à tabulations. Fixtures dans
+// scripts/fixtures/presse-papier/ : Calc produite par LibreOffice, Excel et Sheets reconstituées (voir l'en-tête de chacune).
+const fixture = (n) => readFileSync(new URL('../fixtures/presse-papier/' + n + '.html', import.meta.url), 'utf8');
+const grille = (html, texte) => JSON.parse(JSON.stringify(ctx.grilleDuPressePapier(html, texte)));
+const valeurs = (g) => g && g.map((l) => l.map((h) => ctx.htmlText(h)));
+const PLAGE = [['Nom', 'Âge', 'Site'], ['Alice', '31', 'Exemple'], ['Bob & Co', '', 'deux lignes']];
+const TSV = 'Nom\tÂge\tSite\r\nAlice\t31\tExemple\r\nBob & Co\t\t"deux\nlignes"\r\n';
+
+test('plage : le tableau HTML d\'Excel, de Google Sheets et de LibreOffice Calc donne la même grille', () => {
+  for (const n of ['excel', 'sheets', 'calc']) egal(valeurs(grille(fixture(n), TSV)), PLAGE, n);
+});
+
+test('plage : le gras et les liens d\'une cellule restent dans son HTML, les cellules vides sont vides', () => {
+  const g = grille(fixture('calc'), TSV);
+  egal(/<b>[\s\S]*Alice/.test(g[1][0]), true, 'gras de Calc');
+  egal(g[1][2], '<a href="https://exemple.fr/">Exemple</a>');
+  egal(g[2][1], '');
+  egal(grille(fixture('excel'), '')[1][2], '<a href="https://exemple.fr/">Exemple</a>');
+});
+
+test('plage : sans tableau HTML, le texte à tabulations est découpé en lignes et en cellules', () => {
+  egal(grille('', 'a\tb\nc\td\n'), [['a', 'b'], ['c', 'd']]);
+  egal(grille('<span>a b c d</span>', 'a\tb\r\nc\td'), [['a', 'b'], ['c', 'd']], 'HTML sans tableau');
+  egal(valeurs(grille('', TSV)), PLAGE, 'cellule entre guillemets à la manière d\'Excel');
+  egal(grille('', 'dit\t"il a dit ""oui"""'), [['dit', 'il a dit &quot;oui&quot;']]);
+});
+
+test('plage : le texte d\'une cellule reste du texte (un < n\'est pas une balise)', () => {
+  egal(grille('', 'x < y\t<b>z</b>'), [['x &lt; y', '&lt;b&gt;z&lt;/b&gt;']]);
+});
+
+test('plage : lignes de longueurs différentes complétées, lignes vides de fin ignorées', () => {
+  egal(grille('', 'a\tb\tc\nd\n\t\n'), [['a', 'b', 'c'], ['d', '', '']]);
+  egal(grille('<table><tr><td>a</td><td>b</td></tr><tr><td>c</td></tr></table>', ''), [['a', 'b'], ['c', '']]);
+});
+
+test('plage : ni une cellule seule ni un texte sans tabulation ne forment une plage', () => {
+  egal(grille('<table><tr><td>seul</td></tr></table>', 'seul'), null, 'cellule seule en HTML');
+  egal(grille('', 'seul\r\n'), null, 'cellule seule en texte');
+  egal(grille('<p>un</p><p>deux</p>', 'un\ndeux\ntrois'), null, 'paragraphe multiligne');
+  egal(grille('', '\t\n'), null, 'rien que des cellules vides');
+  egal(grille('', ''), null);
 });

@@ -21,3 +21,14 @@ function opTableau(rows, op, r, c) {
   }
   return null;
 }
+// plage collée (grille de cellules) à partir de la cellule (r, c), vers la droite et le bas → nouvelle grille, agrandie
+// au besoin (nouvel en-tête « Colonne », nouvelles cellules vides, comme +C et +L), toujours rectangulaire
+function collerGrille(rows, r, c, grille) {
+  var nl = Math.max(rows.length, r + grille.length), nc = Math.max(rows[0].length, c + grille[0].length), g = [];
+  for (var i = 0; i < nl; i++) {
+    g.push([]);
+    for (var j = 0; j < nc; j++) g[i].push(rows[i] && j < rows[i].length ? rows[i][j] : i === 0 ? 'Colonne' : '');
+  }
+  grille.forEach(function (x, i) { x.forEach(function (v, j) { g[r + i][c + j] = v; }); });
+  return g;
+}

@@ -37,3 +37,26 @@ test('opTableau : la grille reçue n\'est pas modifiée', () => {
   for (const o of ['ligne-avant', 'ligne-apres', 'col-avant', 'col-apres', 'ligne-suppr', 'col-suppr']) ctx.opTableau(g, o, 1, 1);
   egal(g, GRILLE());
 });
+
+// collerGrille : une plage collée remplit le tableau à partir d'une cellule, vers la droite et le bas, et l'agrandit au besoin
+const coller = (rows, r, c, g) => JSON.parse(JSON.stringify(ctx.collerGrille(rows, r, c, g)));
+
+test('collerGrille : une plage qui tient dans le tableau remplace les cellules sous elle', () => {
+  egal(coller(GRILLE(), 1, 0, [['x', 'y'], ['z', 't']]), [['A', 'B'], ['x', 'y'], ['z', 't']]);
+  egal(coller(GRILLE(), 2, 1, [['x']]), [['A', 'B'], ['a1', 'b1'], ['a2', 'x']]);
+});
+
+test('collerGrille : une plage qui déborde ajoute lignes et colonnes, « Colonne » en en-tête, tableau rectangulaire', () => {
+  egal(coller(GRILLE(), 2, 1, [['x', 'y', 'z'], ['u', 'v', 'w']]),
+    [['A', 'B', 'Colonne', 'Colonne'], ['a1', 'b1', '', ''], ['a2', 'x', 'y', 'z'], ['', 'u', 'v', 'w']]);
+});
+
+test('collerGrille : depuis l\'en-tête, la première ligne de la plage remplace les en-têtes', () => {
+  egal(coller(GRILLE(), 0, 0, [['Nom', 'Âge'], ['Alice', '31']]), [['Nom', 'Âge'], ['Alice', '31'], ['a2', 'b2']]);
+});
+
+test('collerGrille : ni la grille ni la plage reçues ne sont modifiées', () => {
+  const g = GRILLE(), p = [['x', 'y', 'z']];
+  ctx.collerGrille(g, 2, 1, p);
+  egal(g, GRILLE()); egal(p, [['x', 'y', 'z']]);
+});

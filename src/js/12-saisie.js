@@ -436,6 +436,8 @@ app.addEventListener('paste', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   e.preventDefault();
   var html = cd.getData('text/html'), text = cd.getData('text/plain');
+  var plage = el.hasAttribute('data-rich') ? grilleDuPressePapier(html, text) : null;   // 05-presse-papier.js
+  if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
     if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
@@ -448,6 +450,23 @@ app.addEventListener('paste', function (e) {
     document.execCommand('insertText', false, text);
   }
 });
+// cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne
+function celluleCollee(h) { return compacterLigne(sanitize(pastillesDuCollage(h, doc.id)).replace(/<br>/g, ' ')); }
+// plage collée : dans une cellule, elle remplit le tableau à partir de cette cellule (collerGrille, 05-tableau.js) en une
+// étape, le curseur reste dans la cellule de départ ; ailleurs, elle devient un bloc tableau (première ligne en en-tête),
+// à la place d'un paragraphe vide, sinon après le bloc
+function collerPlage(el, g) {
+  var b = byId(el.dataset.b); if (!b) return;
+  if (el.hasAttribute('data-cell') && b.type === 'table') {
+    var m = el.dataset.k.split('.'), r = +m[1], c = +m[2], rows = collerGrille(b.rows, r, c, g);
+    session.modifier(function () { b.rows = rows; }, { b: b.id, k: el.dataset.k, end: false });
+    lastCell = { b: b.id, r: r, c: c }; return;
+  }
+  if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
+  var nb = mk('table', { rows: g });
+  session.modifier(function () { doc.blocks.splice(idx(b), 1, nb); revealBlock(nb.id); });
+  focusField(nb.id, null, false);
+}
 // Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée
 // et marquées du document d'origine ; text/plain les écrit « #nom ». Sans pastille, la copie reste celle du navigateur.
 function copierPastilles(e) {

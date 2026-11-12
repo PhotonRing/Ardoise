@@ -44,6 +44,29 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
+// tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; tout autre changement de taille, ou
+// plusieurs cellules changées sans simple déplacement d'une ligne ou d'une colonne, est un collage de plage ; sinon null
+function libelleGrille(ra, rb) {
+  var J = JSON.stringify, i;
+  var vide = function (l) { return l.every(function (v) { return !v; }); };
+  var sansLigne = function (g, k) { return J(g.slice(0, k).concat(g.slice(k + 1))); };
+  var sansCol = function (g, k) { return J(g.map(function (l) { return l.slice(0, k).concat(l.slice(k + 1)); })); };
+  var colonne = function (g, k) { return g.map(function (l) { return l[k]; }); };
+  var tri = function (ls) { return J(ls.map(J).sort()); };
+  var la = ra.length, lb = rb.length, ca = ra[0].length, cb = rb[0].length;
+  if (la !== lb || ca !== cb) {
+    if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (vide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
+    if (ca === cb && la === lb + 1) for (i = 1; i < la; i++) if (sansLigne(ra, i) === J(rb)) return 'ligne supprimée';
+    if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (vide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
+    if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
+    return 'cellules collées';
+  }
+  var n = 0; ra.forEach(function (l, r) { l.forEach(function (v, c) { if (v !== rb[r][c]) n++; }); });
+  if (n < 2) return null;
+  var cols = function (g) { return g[0].map(function (x, k) { return colonne(g, k); }); };
+  if (tri(ra) === tri(rb) || tri(cols(ra)) === tri(cols(rb))) return null;   // ligne ou colonne déplacée (glisser)
+  return 'cellules collées';
+}
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
@@ -53,10 +76,8 @@ function libelleNature(ba, b) {
     return reduite ? 'colonne réduite' : 'colonne affichée';
   }
   if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
-  // tableau : dimensions de la grille avant et après (lignes, puis colonnes de l'en-tête)
   if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
-    if (ba.rows.length !== b.rows.length) return b.rows.length > ba.rows.length ? 'ligne ajoutée' : 'ligne supprimée';
-    if (ba.rows[0].length !== b.rows[0].length) return b.rows[0].length > ba.rows[0].length ? 'colonne ajoutée' : 'colonne supprimée';
+    var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
   }
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';

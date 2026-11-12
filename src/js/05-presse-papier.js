@@ -23,3 +23,45 @@ function pastillesDuCollage(html, idDoc) {
     return '<span class="pill' + cls.replace(/\s*\bpc-\d+\b/g, '') + '"' + attrs + '>' + inner + '</span>';
   });
 }
+/* ---------- Plage de cellules collée ----------
+   Un tableur (Excel, Google Sheets, LibreOffice Calc), Word ou une page web mettent un <table> dans text/html et des
+   tabulations dans text/plain. Le découpage est pur ; l'assainissement (sanitize, qui demande le DOM) se fait au collage. */
+// cellules d'un texte à tabulations : un champ entre guillemets (à la manière d'Excel) peut contenir tabulations,
+// retours à la ligne et guillemets doublés
+function cellulesTsv(s) {
+  var lignes = [[]], v = '', i = 0, debut = true, j, fin;
+  function cellule() { lignes[lignes.length - 1].push(v); v = ''; debut = true; }
+  while (i < s.length) {
+    var ch = s.charAt(i);
+    if (debut && ch === '"' && (fin = s.indexOf('"', i + 1)) > 0) {
+      for (j = i + 1; j < s.length; j++) {
+        if (s.charAt(j) !== '"') { v += s.charAt(j); continue; }
+        if (s.charAt(j + 1) === '"') { v += '"'; j++; continue; }
+        break;
+      }
+      i = j + 1; debut = false; continue;
+    }
+    if (ch === '\t') { cellule(); i++; continue; }
+    if (ch === '\r' || ch === '\n') { cellule(); lignes.push([]); i += ch === '\r' && s.charAt(i + 1) === '\n' ? 2 : 1; continue; }
+    v += ch; debut = false; i++;
+  }
+  cellule();
+  return lignes;
+}
+// presse-papier (text/html, text/plain) → grille rectangulaire de cellules HTML d'une ligne, ou null si ce n'est pas une
+// plage : une cellule seule, ou un texte sans tabulation, se collent comme avant
+function grilleDuPressePapier(html, texte) {
+  var t = String(html || '').replace(/<!--[\s\S]*?-->/g, '').match(/<table\b[\s\S]*?<\/table\s*>/i), g = null;
+  if (t) g = t[0].split(/<tr\b(?:[^>"']|"[^"]*"|'[^']*')*>/i).slice(1).map(function (l) {
+    return l.split(/<t[dh]\b(?:[^>"']|"[^"]*"|'[^']*')*>/i).slice(1).map(function (c) {
+      return compacterLigne(c.replace(/<\/(t[dh]|tr|thead|tbody|tfoot|table)\s*>[\s\S]*$/i, '').replace(/<br\s*\/?>/gi, ' '));   // compacterLigne : 02-assainissement.js
+    });
+  });
+  else if (/\t/.test(texte || '')) g = cellulesTsv(String(texte)).map(function (l) { return l.map(function (v) { return esc(compacterTexte(v)); }); });
+  if (!g) return null;
+  var vide = function (l) { return l.every(function (v) { return !v; }); };
+  while (g.length && vide(g[g.length - 1])) g.pop();
+  var n = 0; g.forEach(function (l) { n = Math.max(n, l.length); });
+  if (!g.length || (g.length < 2 && n < 2)) return null;
+  return g.map(function (l) { while (l.length < n) l.push(''); return l; });
+}
