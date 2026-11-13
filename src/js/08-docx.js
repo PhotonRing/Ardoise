@@ -149,6 +149,7 @@ function docxDepuisElements(elts, d) {
         return P(pp, runs(e.segs, st));
       case 'liste': return liste(e);
       case 'tableau':
+        if (!e.lignes.length) return '';   // Word refuse un tableau sans ligne
         return tableau(e.lignes, e.entete, function (c, th, w) { return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + (th ? '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C.bg) + '"/>' : '') + '</w:tcPr>' + dansCellule(c, th ? { gras: true } : null) + '</w:tc>'; });
       case 'cadre':
         var bd = e.barre ? '<w:tcBorders><w:top w:val="nil"/><w:left w:val="single" w:sz="24" w:space="0" w:color="' + docxCouleur(e.barre) + '"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : bordures('w:tcBorders', C.line);

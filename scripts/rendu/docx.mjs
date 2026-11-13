@@ -181,3 +181,10 @@ test('docx : nom de fichier tiré du titre du bloc, sinon de la page, nettoyé',
   egal(nom(null, 1), 'Page-2.docx', 'page sans titre : son nom par défaut');
   egal(ctx.nomDeFichier('///'), 'page', 'rien de lisible');
 });
+
+test('docx : une fiche de faits ou un tableau sans ligne n\'écrit aucun tableau (Word refuse un tableau sans ligne)', () => {
+  const { doc } = produire({ title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'f', type: 'facts', items: [] }, { id: 't', type: 'table', rows: [] }, { id: 'x', type: 'p', html: 'fin' }] }] }, {});
+  for (const m of doc.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)) vrai(m[0].includes('<w:tr>'), 'tableau sans ligne : ' + m[0].slice(0, 200));
+  vrai(!doc.includes('<w:tbl>'), 'aucun tableau attendu : ' + doc.slice(0, 400));
+  vrai(doc.includes('>fin</w:t>'), 'le reste de la page');
+});

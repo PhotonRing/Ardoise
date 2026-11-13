@@ -169,3 +169,8 @@ test('office : modèle diamant en tableau, titre puis les quatre sommets nommés
   egal(pur(g.lignes[2][1][0].segs), [{ texte: '—', couleur: '#566573' }]);
   egal(pur(g.lignes[0][1][0].segs[1]), { texte: 'APT', pastille: { fond: '#fdecea', texte: '#b42318' } });
 });
+
+test('office : une fiche de faits ou un tableau sans ligne n\'écrit aucun tableau', () => {
+  const doc = { v: 6, title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'f', type: 'facts', items: [] }, { id: 't', type: 'table', rows: [] }] }] };
+  for (const id of ['f', 't']) { const { html, texte } = office(id, doc); vrai(!html.includes('<table'), id + ' : ' + html); egal(texte, '', id + ' : texte brut'); }
+});

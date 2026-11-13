@@ -276,6 +276,7 @@ function officeHtml(elts, d) {
       case 'para': return '<p style="' + P + (PARA[e.style] || '') + (e.retrait ? 'margin-left:' + 2 * e.retrait + 'em;' : '') + '">' + segs(e.segs) + '</p>';
       case 'liste': return liste(e);
       case 'tableau':
+        if (!e.lignes.length) return '';   // pas de tableau vide (fiche de faits ou tableau sans ligne)
         return '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt">' + e.lignes.map(function (l, i) {
           var th = e.entete && i === 0;
           return '<tr>' + l.map(function (c) { return th ? '<th style="' + cellule + 'font-weight:bold;background:' + C.bg + '">' + tous(c) + '</th>' : '<td style="' + cellule + '">' + tous(c) + '</td>'; }).join('') + '</tr>';
