@@ -55,8 +55,8 @@ test('deplacerVersPage : sans pied de page, le bloc arrive en fin de page ; la s
   egal(d.pages[2].blocks[0].folded, undefined, 'section d\'arrivée dépliée');
 });
 
-test('deplacerVersPage : en-tête, même page, bloc ou page absents refusés, document inchangé', () => {
-  for (const [de, bid, vers, cas] of [[0, 'hd1', 1, 'en-tête'], [0, 's1', 0, 'même page'], [0, 'nul', 1, 'bloc absent'], [0, 's1', 9, 'page absente']]) {
+test('deplacerVersPage : en-tête, pied de page, même page, bloc ou page absents refusés, document inchangé', () => {
+  for (const [de, bid, vers, cas] of [[0, 'hd1', 1, 'en-tête'], [0, 'f1', 1, 'pied de page'], [0, 's1', 0, 'même page'], [0, 'nul', 1, 'bloc absent'], [0, 's1', 9, 'page absente']]) {
     const { r, d } = deplacer(DOC(), de, bid, vers);
     egal(r, false, cas);
     egal(JSON.parse(JSON.stringify(d.pages.map(ids))), DOC().pages.map(ids), cas + ' : inchangé');
@@ -70,11 +70,11 @@ test('pageDuBloc : indice de la page qui contient le bloc, -1 sinon', () => {
   egal(ctx.pageDuBloc(d.pages, 'nul'), -1);
 });
 
-test('barre du bloc : « Déplacer vers la page… » sauf sur l\'en-tête, absente avec une seule page', () => {
+test('barre du bloc : « Déplacer vers la page… » sauf sur l\'en-tête et le pied de page, absente avec une seule page', () => {
   const { ctx, d } = monter(DOC());
   const h = ctx.renderPage(d, { page: 0, view: 'edit' });
   const avec = [...h.matchAll(/<div class="blk[^"]*" data-id="([^"]+)"[\s\S]*?(?=<div class="blk[ "]|$)/g)].filter((m) => m[0].includes('data-act="move-page"')).map((m) => m[1]);
-  egal(avec, ['s1', 'x1', 's2', 'x2', 's3', 'x3', 'f1']);
+  egal(avec, ['s1', 'x1', 's2', 'x2', 's3', 'x3']);
   const seule = DOC(); seule.pages = [seule.pages[0]];
   const u = monter(seule);
   vrai(!u.ctx.renderPage(u.d, { page: 0, view: 'edit' }).includes('move-page'), 'une seule page : absente');

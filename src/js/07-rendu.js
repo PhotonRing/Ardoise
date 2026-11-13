@@ -382,7 +382,7 @@ function wrapEdit(b, inner, nHidden, editorUi, nPages) {
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="collant"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
-    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && nPages > 1 ? act('move-page', '⇥', 'Déplacer vers la page…') : '') +
+    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && b.type !== 'footer' && nPages > 1 ? act('move-page', '⇥', 'Déplacer vers la page…') : '') +
     '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
@@ -416,11 +416,11 @@ function uniteDuBloc(blocks, i) {
   return 1 + Reader.foldHidden(levels, levels.map(function (_, j) { return j === i; })).filter(function (h) { return h === i; }).length;
 }
 // retire l'unité du bloc bid de la page de et l'ajoute à la fin de la page vers, avant son pied de page final ; la section
-// pliée qui la recevrait est dépliée. Rend le nombre de blocs déplacés, ou false (en-tête, même page, bloc ou page absents)
+// pliée qui la recevrait est dépliée. Rend le nombre de blocs déplacés, ou false (en-tête ou pied de page, même page, bloc ou page absents)
 function deplacerVersPage(pages, de, bid, vers) {
   var src = pages[de], dst = pages[vers]; if (!src || !dst || de === vers) return false;
   var i = -1; src.blocks.forEach(function (b, k) { if (b.id === bid) i = k; });
-  if (i < 0 || src.blocks[i].type === 'header') return false;
+  if (i < 0 || src.blocks[i].type === 'header' || src.blocks[i].type === 'footer') return false;
   var seg = src.blocks.splice(i, uniteDuBloc(src.blocks, i)), at = dst.blocks.length;
   while (at > 0 && dst.blocks[at - 1].type === 'footer') at--;
   Array.prototype.splice.apply(dst.blocks, [at, 0].concat(seg));
