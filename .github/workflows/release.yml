@@ -69,10 +69,14 @@ jobs:
             echo "Le tag $TAG existe déjà : pas de nouvelle release (augmentez la version dans package.json)."
             exit 0
           fi
+          # notes de version : le corps du commit « Ardoise X.Y.Z » (fusion en squash) ; à défaut, la liste générée par GitHub
+          notes="$RUNNER_TEMP/notes.md"
+          git log -1 --format=%b "$GITHUB_SHA" > "$notes"
+          if grep -q '[^[:space:]]' "$notes"; then source_notes=(--notes-file "$notes"); else source_notes=(--generate-notes); fi
           gh release create "$TAG" dist/ardoise.html dist/ardoise-obsidian.zip dist/ardoise-relais.mjs \
             --target "$GITHUB_SHA" \
             --title "Ardoise $TAG" \
-            --generate-notes
+            "${source_notes[@]}"
 
           # Dernière version lisible depuis une page (raw.githubusercontent.com) : Fichier → Mettre à jour Ardoise
           latest="$RUNNER_TEMP/latest"
