@@ -106,7 +106,7 @@ test('groupe (édition) : ouvert, ses blocs sont rendus dans le groupe, chacun a
   vrai(/data-b="g1" data-k="title"/.test(g), 'titre éditable');
   vrai(/data-act="fold"[^>]*aria-expanded="true"/.test(g), 'chevron ouvert');
   vrai(g.includes('data-act="grp-add"'), 'ajout dans le groupe');
-  vrai(!g.slice(g.indexOf('data-id="c1"'), g.indexOf('data-id="c2"')).includes('deplacer-page'), 'pas de « Déplacer vers la page » sur un bloc du groupe');
+  vrai(g.slice(g.indexOf('data-id="c1"'), g.indexOf('data-id="c2"')).includes('deplacer-page'), '« Déplacer vers la page » aussi sur un bloc du groupe');
   vrai(h.slice(h.indexOf('data-id="g1"'), h.indexOf('data-id="c1"')).includes('deplacer-page'), 'le groupe, lui, se déplace');
 });
 

@@ -1,7 +1,10 @@
 /* ---------- Menu d'un bloc (⋯ dans sa barre) ----------
    Une liste d'entrées { ic, label, quand(b) facultatif, fn(b) } : chaque fonction qui agit sur un bloc entier y ajoute la sienne. */
 var ENTREES_BLOC = [
-  { ic: '⎘', label: 'Copier pour Office', fn: function (b) { copierPourOffice(b); } }
+  { ic: '⎘', label: 'Copier pour Office', fn: function (b) { copierPourOffice(b); } },
+  { ic: '⊟', label: 'Mettre dans un groupe', quand: function (b) { var o = position(b); return !!o && !o.parent && !HORS_GROUPE[b.type]; }, fn: function (b) { mettreEnGroupe(b); } },
+  { ic: '⇱', label: 'Sortir du groupe', quand: function (b) { var o = position(b); return !!o && !!o.parent; }, fn: function (b) { sortirBloc(b); } },
+  { ic: '⊞', label: 'Dégrouper', quand: function (b) { return b.type === 'group'; }, fn: function (b) { degrouperBloc(b); } }
 ];
 function ouvrirMenuBloc(ancre, b) {
   closePop();

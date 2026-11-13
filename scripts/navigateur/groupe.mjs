@@ -45,7 +45,7 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   const plie = await evalue(`({ f: ${GROUPE}.folded, enfants: !!document.querySelector('.blk[data-id="c1"]'), n: (document.querySelector('.blk[data-id="g1"] .grp-n') || {}).textContent, annuler: document.querySelector('#ui [data-ui=undo]').title })`);
   mesure();
   if (plie.f !== true || plie.enfants || plie.n !== '2 blocs') echec('groupe plié en édition : ' + JSON.stringify(plie));
-  if (plie.annuler !== 'Annuler : Accueil · Groupe repliable « Détails premier » : groupe plié (Ctrl+Z)') echec('libellé du pli : ' + plie.annuler);
+  if (plie.annuler !== 'Annuler : Accueil · Groupe repliable « Détails » : groupe plié (Ctrl+Z)') echec('libellé du pli : ' + plie.annuler);
   await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(50);
   if (await evalue(`${GROUPE}.folded`) !== false || !(await evalue(`!!document.querySelector('.blk[data-id="c1"]')`))) echec('Ctrl+Z ne déplie pas le groupe');
 
