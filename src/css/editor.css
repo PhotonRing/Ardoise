@@ -204,6 +204,9 @@ span.fld,.facts .fld,.eyebrow.fld{display:inline-block}
 .fold-edit .sum{cursor:default}
 .tablewrap td.fld,.tablewrap th.fld{border-radius:0}
 .tablewrap .fld:focus{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+/* plage de cellules (14-plage-cellules.js) ; pas de sélection de texte pendant le glisser */
+.tablewrap .fld.plage{background:var(--accent-soft)}
+.plage-glisse .tablewrap .fld{user-select:none;-webkit-user-select:none}
 html.is-edit .copy{pointer-events:none;opacity:.5}
 .map-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
 .map-search{position:relative;flex:1;min-width:220px}

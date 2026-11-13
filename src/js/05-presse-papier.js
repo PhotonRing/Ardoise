@@ -65,3 +65,22 @@ function grilleDuPressePapier(html, texte) {
   if (!g.length || (g.length < 2 && n < 2)) return null;
   return g.map(function (l) { while (l.length < n) l.push(''); return l; });
 }
+/* ---------- Copie d'une plage de cellules ----------
+   plage { r1, c1, r2, c2 } : coins inclus, dans n'importe quel ordre ; sauf : lignes masquées par un filtre, exclues. */
+function cellulesDePlage(rows, plage) {
+  var r0 = Math.min(plage.r1, plage.r2), r1 = Math.max(plage.r1, plage.r2), c0 = Math.min(plage.c1, plage.c2), c1 = Math.max(plage.c1, plage.c2), out = [];
+  for (var r = r0; r <= r1; r++) if (!plage.sauf || plage.sauf.indexOf(r) < 0) out.push(rows[r].slice(c0, c1 + 1));
+  return out;
+}
+// texte à tabulations pour un tableur : une valeur par cellule, pastilles en #nom, sans tabulation ni retour à la ligne
+function grilleEnTexte(rows, plage) {
+  return cellulesDePlage(rows, plage).map(function (l) {
+    return l.map(function (h) { return texteBrutDePresse(h).replace(/[\t\r\n]+/g, ' '); }).join('\t');
+  }).join('\n');
+}
+// tableau HTML pour Ardoise : se recolle par grilleDuPressePapier, pastilles marquées du document (pastillesSansCouleur)
+function grilleEnHtml(rows, plage, idDoc) {
+  return '<table><tbody>' + cellulesDePlage(rows, plage).map(function (l) {
+    return '<tr>' + l.map(function (h) { return '<td>' + pastillesSansCouleur(h, idDoc) + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</tbody></table>';
+}

@@ -865,6 +865,20 @@ test('libellé : une plage collée dans un tableau est « cellules collées », 
   egal(t().rows, [['Ville', 'Pays', 'Colonne'], ['Paris', 'FR', 'Nord'], ['Liège', 'BE', 'Flandre']], 'annuler retire la plage d\'un coup');
 });
 
+test('libellé : une plage coupée (Ctrl+X) ou effacée est « cellules vidées », pas « cellules collées »', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });
+  const t = () => blocsDe(m)[1];
+  m.s.modifier(() => { t().rows[1][0] = ''; t().rows[2][0] = ''; });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées');
+  m.s.annuler();
+  egal(t().rows, [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']], 'annuler rend les cellules');
+  m.s.retablir();
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées', 'rétablir');
+  m.s.modifier(() => { t().rows[1][1] = ''; });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Belgique » : cellule modifiée', 'une seule cellule vidée');
+});
+
 test('libellé : une ligne ou une colonne déplacée, ou une seule cellule changée, ne sont pas des cellules collées', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });

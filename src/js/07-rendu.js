@@ -558,6 +558,7 @@ function render(focus) {
   mountMaps();
   Reader.tlFit(app);
   poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
+  poserPlage();   // plage de cellules surlignée, après le filtre qui décide des lignes visibles (14-plage-cellules.js)
   renderChrome();
   suivreHautEcran();
   updateCheat();

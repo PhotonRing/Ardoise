@@ -45,7 +45,8 @@ function libelleFeuilles(a, b, k, rows, out) {
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
 // tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; tout autre changement de taille, ou
-// plusieurs cellules changées sans simple déplacement d'une ligne ou d'une colonne, est un collage de plage ; sinon null
+// plusieurs cellules changées sans simple déplacement d'une ligne ou d'une colonne, est un collage de plage (ou une plage
+// vidée si toutes sont vides après) ; sinon null
 function libelleGrille(ra, rb) {
   var J = JSON.stringify, i;
   var vide = function (l) { return l.every(function (v) { return !v; }); };
@@ -61,8 +62,9 @@ function libelleGrille(ra, rb) {
     if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
     return 'cellules collées';
   }
-  var n = 0; ra.forEach(function (l, r) { l.forEach(function (v, c) { if (v !== rb[r][c]) n++; }); });
+  var n = 0, vides = 0; ra.forEach(function (l, r) { l.forEach(function (v, c) { if (v !== rb[r][c]) { n++; if (!rb[r][c]) vides++; } }); });
   if (n < 2) return null;
+  if (vides === n) return 'cellules vidées';   // plage coupée (Ctrl+X) ou effacée (Suppr)
   var cols = function (g) { return g[0].map(function (x, k) { return colonne(g, k); }); };
   if (tri(ra) === tri(rb) || tri(cols(ra)) === tri(cols(rb))) return null;   // ligne ou colonne déplacée (glisser)
   return 'cellules collées';

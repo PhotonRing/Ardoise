@@ -81,3 +81,26 @@ test('plage : ni une cellule seule ni un texte sans tabulation ne forment une pl
   egal(grille('', '\t\n'), null, 'rien que des cellules vides');
   egal(grille('', ''), null);
 });
+
+// Copie d'une plage de cellules d'Ardoise : texte à tabulations (pour un tableur) et tableau HTML (pour Ardoise).
+const TABLE = () => [['Nom', 'Statut', 'Note'], ['A &amp; B', '<span class="pill pa-3">OK</span>', '<b>bien</b>'], ['C', '<span class="pill pc-5">Très urgent</span>', 'deux<br>lignes'], ['D', 'x', 'y']];
+
+test('copie de plage : texte à tabulations, pastilles en #nom, entités décodées, dans les deux sens de sélection', () => {
+  egal(ctx.grilleEnTexte(TABLE(), { r1: 1, c1: 0, r2: 2, c2: 2 }), 'A & B\t#OK\tbien\nC\t#Très urgent\tdeux lignes');
+  egal(ctx.grilleEnTexte(TABLE(), { r1: 2, c1: 2, r2: 1, c2: 0 }), 'A & B\t#OK\tbien\nC\t#Très urgent\tdeux lignes', 'sens inverse');
+  egal(ctx.grilleEnTexte(TABLE(), { r1: 0, c1: 1, r2: 3, c2: 1 }), 'Statut\n#OK\n#Très urgent\nx', 'une colonne');
+  egal(ctx.grilleEnTexte(TABLE(), { r1: 3, c1: 0, r2: 3, c2: 2 }), 'D\tx\ty', 'une ligne');
+});
+
+test('copie de plage : les lignes masquées par un filtre sont exclues', () => {
+  egal(ctx.grilleEnTexte(TABLE(), { r1: 1, c1: 0, r2: 3, c2: 0, sauf: [2] }), 'A & B\nD');
+});
+
+test('copie de plage : le tableau HTML se recolle à l\'identique, pastilles comprises, sans couleur calculée', () => {
+  const html = ctx.grilleEnHtml(TABLE(), { r1: 1, c1: 0, r2: 2, c2: 2 }, 'd1');
+  egal(/pa-\d/.test(html), false, 'couleur calculée retirée');
+  egal(JSON.parse(JSON.stringify(ctx.grilleDuPressePapier(html, ''))), [
+    ['A &amp; B', '<span class="pill" data-ad="d1">OK</span>', '<b>bien</b>'],
+    ['C', '<span class="pill pc-5" data-ad="d1">Très urgent</span>', 'deux lignes']]);
+  egal(ctx.grilleEnHtml(TABLE(), { r1: 1, c1: 0, r2: 3, c2: 0, sauf: [2] }, 'd1'), '<table><tbody><tr><td>A &amp; B</td></tr><tr><td>D</td></tr></tbody></table>', 'ligne masquée exclue');
+});
