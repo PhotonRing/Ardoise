@@ -382,12 +382,17 @@ function qColonnesDispo(b, recs, liste) {
   var src = { cle: Q_SOURCE, nom: 'Source', source: true };
   if ((b.src || 'facts') === 'check') return { dispo: [{ cle: '✓', nom: '✓', coche: true }, { cle: 'élément', nom: 'Élément', element: true }, src], cellsOf: function () { return []; } };
   var cc = qColonnes(recs), dispo = cc.cols.map(function (n, j) { return { cle: qCleCol(n), nom: n, j: j }; });
-  var bouge = b.colonnes && Array.isArray(b.colonnes.ordre) && b.colonnes.ordre.indexOf(Q_SOURCE) >= 0;
-  return { dispo: dispo.concat([src]), tete: liste && !bouge ? src : null, cellsOf: cc.cellsOf };
+  return { dispo: liste && !qColSourceBougee(b) ? [src].concat(dispo) : dispo.concat([src]), cellsOf: cc.cellsOf };
+}
+// Source n'entre dans ordre que si l'auteur l'a déplacée elle-même ; sinon, en tête de dispo (vue liste), elle y reste
+function qColSourceBougee(b) { return !!(b.colonnes && Array.isArray(b.colonnes.ordre) && b.colonnes.ordre.indexOf(Q_SOURCE) >= 0); }
+function qColPlacees(b, dispo) {
+  var tete = dispo[0] && dispo[0].cle === Q_SOURCE && !qColSourceBougee(b) ? dispo[0] : null, r = qColonnesRangees(b, tete ? dispo.slice(1) : dispo);
+  return tete ? [tete].concat(r) : r;
 }
 function qColonnesAffichees(b, recs, liste) {
-  var x = qColonnesDispo(b, recs, liste), cols = qColonnesChoisies(b, x.dispo.filter(function (c) { return c !== x.tete; }));
-  return { cols: x.tete && qColonneVisible(b, Q_SOURCE) ? [x.tete].concat(cols) : cols, cellsOf: x.cellsOf };
+  var x = qColonnesDispo(b, recs, liste);
+  return { cols: qColPlacees(b, x.dispo).filter(function (c) { return qColonneVisible(b, c.cle); }), cellsOf: x.cellsOf };
 }
 // gestes du choix des colonnes : nouveau champ colonnes d'après les colonnes disponibles (dispo de qColonnesDispo, hors liste) ;
 // les clés qui n'y sont plus sont purgées ; le premier choix part de « Toutes sauf… »
@@ -409,9 +414,11 @@ function qColMode(b, dispo, mode) {
   return qColNeuf(dispo, mode, noms, ch.ordre);
 }
 function qColDeplacer(b, dispo, cle, vers) {
-  var ch = qColActuel(b), cles = qColonnesRangees(b, dispo).map(function (c) { return c.cle; }), at = cles.indexOf(cle);
+  // dispo dans l'ordre du réglage (vers : position dans ce réglage) ; Source reste hors de ordre si l'on déplace une autre colonne
+  var ch = qColActuel(b), cles = qColPlacees(b, dispo).map(function (c) { return c.cle; }), at = cles.indexOf(cle);
   if (at < 0) return qColNeuf(dispo, ch.mode, ch.noms, ch.ordre);
   cles.splice(at, 1); cles.splice(Math.max(0, Math.min(cles.length, vers)), 0, cle);
+  if (cle !== Q_SOURCE && !qColSourceBougee(b)) cles = cles.filter(function (k) { return k !== Q_SOURCE; });
   return qColNeuf(dispo, ch.mode, ch.noms, cles);
 }
 function qColTri(c) { return c.source ? 'src' : c.coche ? 'done' : c.element ? 'txt' : 'c:' + c.nom.toLowerCase(); }   // clé de tri d'une colonne
@@ -481,7 +488,7 @@ function qColForm(b, recs) {
   // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js
   var mode = (b.colonnes && b.colonnes.mode) || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
   return '<div class="q-colonnes"><label><span class="q-lbl">Colonnes</span> <select data-qcolmode title="Colonnes affichées">' + o('toutes', 'toutes') + o('sauf', 'toutes sauf…') + o('seulement', 'seulement…') + '</select></label>' +
-    '<ol class="q-cols">' + qColonnesRangees(b, qColonnesDispo(b, recs).dispo).map(function (c) {
+    '<ol class="q-cols">' + qColPlacees(b, qColonnesDispo(b, recs, b.view === 'list').dispo).map(function (c) {
       return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +
         '<label><input type="checkbox" data-qcol="' + esc(c.cle) + '"' + (qColonneVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
     }).join('') + '</ol></div>';

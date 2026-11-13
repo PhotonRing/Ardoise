@@ -78,7 +78,7 @@ test('colonnes : réglage dans le formulaire en édition seulement', () => {
 });
 
 // gestes du formulaire : fonctions pures qui rendent le nouveau champ colonnes à partir des colonnes disponibles
-const dispo = (q) => { const { ctx, d } = monter(doc(q)); const b = d.pages[0].blocks.find((x) => x.id === 'q'); return { ctx, b, dispo: ctx.qColonnesDispo(b, ctx.queryRecords(b, d, 0)).dispo }; };
+const dispo = (q) => { const { ctx, d } = monter(doc(q)); const b = d.pages[0].blocks.find((x) => x.id === 'q'); return { ctx, b, dispo: ctx.qColonnesDispo(b, ctx.queryRecords(b, d, 0), (b.view || 'table') === 'list').dispo }; };
 const pur = (x) => JSON.parse(JSON.stringify(x));
 
 test('colonnes, gestes : décocher part de « Toutes sauf… », recocher, mode « Seulement… » repris des colonnes visibles', () => {
@@ -93,12 +93,26 @@ test('colonnes, gestes : décocher part de « Toutes sauf… », recocher, mode 
   egal(pur(ctx.qColMode(b, dp, 'toutes')), { mode: 'toutes', noms: [], ordre: [] });
 });
 
-test('colonnes, gestes : déplacer une colonne range toutes les clés', () => {
+test('colonnes, gestes : déplacer une colonne range les clés ; Source n\'y entre que déplacée elle-même', () => {
   const { ctx, b, dispo: dp } = dispo({ colonnes: { mode: 'sauf', noms: ['état'], ordre: [] } });
   egal(pur(ctx.qColDeplacer(b, dp, '#source', 0)), { mode: 'sauf', noms: ['état'], ordre: ['#source', 'hôte', 'état', 'risque'] });
-  egal(pur(ctx.qColDeplacer(b, dp, 'hôte', 2)), { mode: 'sauf', noms: ['état'], ordre: ['état', 'risque', 'hôte', '#source'] }, 'vers le bas');
+  egal(pur(ctx.qColDeplacer(b, dp, 'hôte', 2)), { mode: 'sauf', noms: ['état'], ordre: ['état', 'risque', 'hôte'] }, 'vers le bas, Source hors de l\'ordre');
   const sans = dispo({});
-  egal(pur(sans.ctx.qColDeplacer(sans.b, sans.dispo, 'risque', 0)), { mode: 'toutes', noms: [], ordre: ['risque', 'hôte', 'état', '#source'] }, 'sans choix : toutes');
+  egal(pur(sans.ctx.qColDeplacer(sans.b, sans.dispo, 'risque', 0)), { mode: 'toutes', noms: [], ordre: ['risque', 'hôte', 'état'] }, 'sans choix : toutes');
+  const bougee = dispo({ colonnes: { mode: 'toutes', noms: [], ordre: ['hôte', '#source'] } });
+  egal(pur(bougee.ctx.qColDeplacer(bougee.b, bougee.dispo, 'risque', 0)), { mode: 'toutes', noms: [], ordre: ['risque', 'hôte', '#source', 'état'] }, 'Source déjà déplacée : gardée à sa place');
+});
+
+test('colonnes, vue liste : Source reste en tête après le déplacement d\'une autre colonne, réglage dans l\'ordre affiché', () => {
+  const l = dispo({ view: 'list' });
+  egal(l.dispo.map((c) => c.cle), ['#source', 'hôte', 'état', 'risque'], 'liste : Source en tête des colonnes disponibles');
+  const ch = pur(l.ctx.qColDeplacer(l.b, l.dispo, 'risque', 1));
+  egal(ch, { mode: 'toutes', noms: [], ordre: ['risque', 'hôte', 'état'] }, 'Risque juste après Source');
+  const liste = resultat(rendu({ view: 'list', colonnes: ch })).match(/<li>([\s\S]*?)<\/li>/)[1];
+  egal([...liste.matchAll(/class="q-src"|<span class="q-k">([^<]*)/g)].map((m) => m[1] || 'Source'), ['Source', 'Risque', 'Hôte', 'État']);
+  const ed = rendu({ view: 'list', colonnes: ch }, null, 'edit');
+  egal([...ed.matchAll(/data-qcol="([^"]*)"/g)].map((m) => m[1]), ['#source', 'risque', 'hôte', 'état'], 'réglage dans l\'ordre de la liste');
+  egal(entetes(rendu({ colonnes: ch })), ['Risque', 'Hôte', 'État', 'Source'], 'vue tableau : Source en fin');
 });
 
 test('colonnes : vue en colonnes des cases à cocher, case et élément ensemble, Source à sa place', () => {
