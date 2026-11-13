@@ -37,11 +37,11 @@ function creerSession(adaptateur) {
     return { annuler: a, retablir: r, libelleAnnuler: a ? libelles[pos] : '', libelleRetablir: r ? libelles[pos + 1] : '' };
   }
   // une étape d'historique, seulement si l'état a changé ; renvoie vrai si elle a été ajoutée
-  function etape() {
+  function etape(nature) {
     clearTimeout(minuteur); minuteur = null;
     var s = JSON.stringify(doc);
     if (pile[pos] === s) return false;
-    libelles = libelles.slice(0, pos + 1); libelles.push(pos >= 0 ? libelleEtape(JSON.parse(pile[pos]), doc) : '');
+    libelles = libelles.slice(0, pos + 1); libelles.push(pos >= 0 ? libelleEtape(JSON.parse(pile[pos]), doc, nature) : '');
     pile = pile.slice(0, pos + 1); pile.push(s); marques = marques.slice(0, pos + 1); marques.push(sy.marque());
     if (pile.length > SESSION_MAX) { pile.shift(); marques.shift(); libelles.shift(); sy.oublier(marques[0]); }
     pos = pile.length - 1;
@@ -92,8 +92,8 @@ function creerSession(adaptateur) {
     return { ok: true };
   }
   return {
-    // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés
-    modifier: function (fn, focus) { fn(); etape(); prevenir('rendu', focus, {}); prevenir('modifie'); prevenir('historique', etat()); },
+    // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés ; nature : celle du geste (« cellules collées »), sinon déduite
+    modifier: function (fn, focus, nature) { fn(); etape(nature); prevenir('rendu', focus, {}); prevenir('modifie'); prevenir('historique', etat()); },
     // modification de frappe (déjà écrite dans le champ) : pas de rendu, étape validée après SESSION_DELAI sans frappe
     saisir: function (fn) { if (fn) fn(); clearTimeout(minuteur); minuteur = setTimeout(function () { minuteur = null; etape(); prevenir('historique', etat()); }, SESSION_DELAI); prevenir('modifie'); },
     // valide tout de suite la frappe en attente, s'il y en a

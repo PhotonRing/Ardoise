@@ -202,7 +202,8 @@ app.addEventListener('keydown', function (e) {
     if (el.hasAttribute('data-cell')) {
       // cellule du dessous ; sur la dernière ligne : cellule suivante, ou nouvelle ligne depuis la fin de la dernière cellule
       var m = k.split('.'), cr = +m[1], cc = +m[2];
-      if (cellAt(b, cr + 1, cc)) { focusCell(b, cr + 1, cc, true); return; }
+      var rn = ligneVoisine(b, cr, 1);   // les lignes masquées par un filtre sont sautées
+      if (rn > 0) { focusCell(b, rn, cc, true); return; }
       if (cc < b.rows[0].length - 1) { focusCell(b, cr, cc + 1, true); return; }
       if (caretAtEnd(el)) addRowAfter(b, cr);
       return;
@@ -321,11 +322,12 @@ function leaveTable(el, b, dir) {
 }
 function cellArrow(e, el, b, k) {
   // flèches au bord d'une cellule : cellule voisine (gauche / droite en début / fin de texte, haut / bas sur la première / dernière ligne)
-  var m = k.split('.'), r = +m[1], c = +m[2], nr = b.rows.length, nc = b.rows[0].length;
-  if (e.key === 'ArrowLeft' && caretAtStart(el)) { e.preventDefault(); if (!(c > 0 ? focusCell(b, r, c - 1, true) : r > 0 && focusCell(b, r - 1, nc - 1, true))) leaveTable(el, b, -1); return true; }
-  if (e.key === 'ArrowRight' && caretAtEnd(el)) { e.preventDefault(); if (!(c < nc - 1 ? focusCell(b, r, c + 1, false) : r < nr - 1 && focusCell(b, r + 1, 0, false))) leaveTable(el, b, 1); return true; }
-  if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(r > 0 && focusCell(b, r - 1, c, true))) leaveTable(el, b, -1); return true; }
-  if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(r < nr - 1 && focusCell(b, r + 1, c, false))) leaveTable(el, b, 1); return true; }
+  // lignes voisines visibles : celles qu'un filtre masque sont sautées
+  var m = k.split('.'), r = +m[1], c = +m[2], nc = b.rows[0].length, up = ligneVoisine(b, r, -1), dn = ligneVoisine(b, r, 1);
+  if (e.key === 'ArrowLeft' && caretAtStart(el)) { e.preventDefault(); if (!(c > 0 ? focusCell(b, r, c - 1, true) : up >= 0 && focusCell(b, up, nc - 1, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowRight' && caretAtEnd(el)) { e.preventDefault(); if (!(c < nc - 1 ? focusCell(b, r, c + 1, false) : dn > 0 && focusCell(b, dn, 0, false))) leaveTable(el, b, 1); return true; }
+  if (e.key === 'ArrowUp' && caretLine(el, -1)) { e.preventDefault(); if (!(up >= 0 && focusCell(b, up, c, true))) leaveTable(el, b, -1); return true; }
+  if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(dn > 0 && focusCell(b, dn, c, false))) leaveTable(el, b, 1); return true; }
   return false;
 }
 function lineBefore(el) {
@@ -421,7 +423,10 @@ app.addEventListener('paste', function (e) {
   var el = e.target;
   if (mode !== 'edit') return;
   var cd = e.clipboardData; if (!cd) return;
-  var files = Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
+  var html = cd.getData('text/html'), text = cd.getData('text/plain');
+  // une plage de tableur (Calc, Excel) arrive aussi en image : la plage l'emporte
+  var plage = el.classList && el.classList.contains('fld') && el.hasAttribute('data-rich') ? grilleDuPressePapier(html, text) : null;   // 05-presse-papier.js
+  var files = plage ? [] : Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
   if (files.length && !el.matches('textarea')) {
     e.preventDefault();
     var host = el.closest && el.closest('.blk'); var b = host ? byId(host.dataset.id) : null;
@@ -433,17 +438,49 @@ app.addEventListener('paste', function (e) {
   }
   if (!el.classList || !el.classList.contains('fld')) return;
   e.preventDefault();
-  var html = cd.getData('text/html'), text = cd.getData('text/plain');
+  if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
   if (el.hasAttribute('data-rich') && html) {
-    var clean = sanitize(html.replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
+    var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
     if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
     // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
     if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
+    $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
   } else {
     if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
   }
 });
+// cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne
+function celluleCollee(h) { return compacterLigne(sanitize(pastillesDuCollage(h, doc.id)).replace(/<br>/g, ' ')); }
+// plage collée : remplit le tableau depuis la cellule (collerGrille, 05-tableau.js), ailleurs devient un bloc tableau (à la place d'un paragraphe vide)
+function collerPlage(el, g) {
+  var b = byId(el.dataset.b); if (!b) return;
+  if (el.hasAttribute('data-cell') && b.type === 'table') {
+    var x = posCellule(el), rows = collerGrille(b.rows, x.r, x.c, g, lignesMasquees(b));   // 13-menu-cellules.js, 14-plage-cellules.js
+    session.modifier(function () { b.rows = reprendreLignes(b.rows, rows); }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
+    lastCell = { b: b.id, r: x.r, c: x.c }; return;
+  }
+  if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
+  var nb = mk('table', { rows: g });
+  session.modifier(function () { doc.blocks.splice(idx(b), 1, nb); revealBlock(nb.id); });
+  focusField(nb.id, null, false);
+}
+// Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée
+// et marquées du document d'origine ; text/plain les écrit « #nom ». Sans pastille, la copie reste celle du navigateur.
+function copierPastilles(e) {
+  var sel = window.getSelection(), cd = e.clipboardData;
+  if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
+  var r = sel.getRangeAt(0);
+  if (!app.contains(r.commonAncestorContainer)) return;
+  var boite = document.createElement('div'); boite.appendChild(r.cloneContents());
+  if (!boite.querySelector('span.pill')) return;
+  var html = pastillesSansCouleur(boite.innerHTML, doc.id);
+  e.preventDefault();
+  cd.setData('text/html', html); cd.setData('text/plain', texteBrutDePresse(html));
+  if (e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld')) document.execCommand('delete');
+}
+app.addEventListener('copy', copierPastilles);
+app.addEventListener('cut', copierPastilles);
 function b0type(el) { var b = byId(el.dataset.b); return b ? b.type : ''; }
 

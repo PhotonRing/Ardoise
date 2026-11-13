@@ -115,9 +115,10 @@ function tgMove(e) {
   var trs = $$('tr', tb), tr = tb.getBoundingClientRect(), wr = tb.parentNode.getBoundingClientRect(), to, x, y;
   if (!tgLine) { tgLine = document.createElement('div'); tgLine.className = 'drop-line'; ui.appendChild(tgLine); }
   if (tgDrag.kind === 'row') {
-    to = trs.length;
-    for (var i = 1; i < trs.length; i++) { var rr = trs[i].getBoundingClientRect(); if (e.clientY < rr.top + rr.height / 2) { to = i; break; } }
-    y = to < trs.length ? trs[to].getBoundingClientRect().top : trs[trs.length - 1].getBoundingClientRect().bottom;
+    // lignes masquées par un filtre ignorées ; l'indice reste celui de la vraie ligne
+    to = trs.length; var der = trs[0];
+    for (var i = 1; i < trs.length; i++) { if (trs[i].hidden) continue; der = trs[i]; var rr = trs[i].getBoundingClientRect(); if (e.clientY < rr.top + rr.height / 2) { to = i; break; } }
+    y = to < trs.length ? trs[to].getBoundingClientRect().top : der.getBoundingClientRect().bottom;
     tgLine.style.left = wr.left + 'px'; tgLine.style.width = wr.width + 'px'; tgLine.style.height = '3px'; tgLine.style.top = (y - 1.5) + 'px';
   } else {
     var hs = $$('th,td', trs[0]); to = hs.length;

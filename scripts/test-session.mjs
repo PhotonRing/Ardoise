@@ -12,7 +12,7 @@ const OUVERTURE = '\n(function () {\n';
 const entete = js('00-entete.js');
 if (!entete.startsWith(OUVERTURE)) throw new Error('00-entete.js : ouverture de l\'IIFE introuvable, adapter le banc');
 const SOURCE = entete.slice(OUVERTURE.length) +
-  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '07-requetes.js'].map(js).join('\n');
+  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '05-tableau.js', '07-requetes.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'session.js' });
 
 // Un contexte neuf : faux document, horloge factice ; toast et synFlush appartiennent à l'interface (17, 24)
@@ -830,6 +830,69 @@ test('libellé : colonne de kanban réduite puis affichée, annulée puis rétab
   m.s.retablir();
   egal(col().collapsed, true, 'rétablir : réduite');
   egal(libelles(m), ['Accueil · Kanban « À faire Fait Écrire » : colonne réduite', 'Accueil · Kanban « À faire Fait Écrire » : colonne affichée']);
+});
+
+test('libellé : ligne ou colonne ajoutée ou supprimée dans un tableau, à l\'annulation comme au rétablissement', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France']] }); });
+  const t = () => blocsDe(m)[1];
+  m.s.modifier(() => { t().rows.splice(1, 0, ['', '']); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Lyon France » : ligne ajoutée');
+  m.s.modifier(() => { t().rows.splice(2, 1); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays » : ligne supprimée');
+  m.s.modifier(() => { t().rows.forEach((r, j) => r.splice(1, 0, j ? '' : 'Colonne')); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Colonne Pays » : colonne ajoutée');
+  m.s.modifier(() => { t().rows.forEach((r) => r.splice(0, 1)); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Colonne Pays » : colonne supprimée');
+  m.s.annuler();
+  egal(libelles(m), ['Accueil · Tableau « Ville Colonne Pays » : colonne ajoutée', 'Accueil · Tableau « Colonne Pays » : colonne supprimée']);
+});
+
+test('libellé : une plage collée dans un tableau est « cellules collées », qu\'elle l\'agrandisse, ne change qu\'une cellule ou en vide', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France']] }); });
+  const t = () => blocsDe(m)[1];
+  const coller = (r, c, g) => m.s.modifier(() => { t().rows = m.ctx.collerGrille(t().rows, r, c, g); }, null, 'cellules collées');
+  coller(1, 0, [['Lille', 'France'], ['Gand', 'Belgique']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Lille France Gand Belgique » : cellules collées', 'une ligne de plus');
+  coller(1, 1, [['FR', 'Nord'], ['BE', 'Flandre']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Lille FR Nord Gand BE… » : cellules collées', 'une colonne de plus');
+  coller(1, 0, [['Paris', 'FR'], ['Liège', 'BE']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Paris FR Nord Liège B… » : cellules collées', 'même taille');
+  coller(2, 2, [['Wallonie', 'x'], ['y', 'z']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Colonne Paris FR Nord » : cellules collées', 'ligne et colonne de plus');
+  m.s.annuler();
+  egal(t().rows, [['Ville', 'Pays', 'Colonne'], ['Paris', 'FR', 'Nord'], ['Liège', 'BE', 'Flandre']], 'annuler retire la plage d\'un coup');
+  coller(1, 0, [['Paris', 'BE']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Paris BE Nord Liège B… » : cellules collées', 'une seule cellule changée');
+  coller(1, 0, [['', ''], ['', '']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Nord Flandre » : cellules collées', 'cellules vidées par la plage');
+});
+
+test('libellé : une plage coupée (Ctrl+X) ou effacée est « cellules vidées », même si une seule cellule était pleine', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });
+  const t = () => blocsDe(m)[1];
+  m.s.modifier(() => { t().rows[1][0] = ''; t().rows[2][0] = ''; }, null, 'cellules vidées');
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées');
+  m.s.annuler();
+  egal(t().rows, [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']], 'annuler rend les cellules');
+  m.s.retablir();
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées', 'rétablir');
+  m.s.modifier(() => { t().rows[1][1] = ''; t().rows[2][1] = t().rows[2][1]; }, null, 'cellules vidées');
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Belgique » : cellules vidées', 'une seule cellule pleine dans la plage');
+  m.s.modifier(() => { t().rows[2][1] = ''; });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays » : cellule modifiée', 'une cellule vidée par la frappe');
+});
+
+test('libellé : une ligne ou une colonne déplacée n\'est pas un collage', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });
+  const t = () => blocsDe(m)[1];
+  m.s.modifier(() => { t().rows.splice(1, 0, t().rows.splice(2, 1)[0]); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Gand Belgique Lyon France » : cellule modifiée', 'ligne déplacée');
+  m.s.modifier(() => { t().rows.forEach((r) => r.reverse()); });
+  egal(libelles(m)[0], 'Accueil · Tableau « Pays Ville Belgique Gand France Lyon » : cellule modifiée', 'colonne déplacée');
 });
 
 test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {

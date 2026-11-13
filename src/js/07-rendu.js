@@ -380,9 +380,9 @@ function wrapEdit(b, inner, nHidden, editorUi) {
   return '<div class="blk' + (editorUi && editorUi.bar != null && b.id === editorUi.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
-    '<div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
+    '<div class="collant"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
     act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') +
-    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div>' + inner +
+    '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
 
@@ -496,7 +496,7 @@ function refreshDerived() {
       navPending = true;   // structure changée pendant un clic : reconstruction juste après le clic
     } else {
       var st = side ? side.scrollTop : 0;
-      if (ot && nt) ot.replaceWith(nt);
+      if (ot && nt) { ot.replaceWith(nt); suivreHautEcran(); }
       if (side && ns) { side.replaceWith(ns); ns.scrollTop = st; }
       lastNav = nh;
       if (navSpyFn) navSpyFn();
@@ -509,7 +509,7 @@ function refreshDerived() {
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
-      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) box.innerHTML = h;
+      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); }   // le champ du filtre est hors de .q-res
     }
     var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-form', app);
     if (form && !form.contains(document.activeElement)) {   // pas pendant le choix d'une liste
@@ -549,7 +549,7 @@ function render(focus) {
   kbColsPerimes(viewCol, doc);
   // forme en édition décalée dans sa liste (annulation, modification reçue) : suivie ; disparue : l'édition s'arrête
   if (mapUi.edit) { var suivie = mapShapeFollow(byId(mapUi.editOf), mapUi.edit); if (suivie) mapUi.edit = suivie; else mapUi = mapModeNext(mapUi, null, null); }
-  var vc = viewCtx();
+  var vc = viewCtx(), fq = filtreFocus();
   lastNav = navHTML(doc, vc);
   app.innerHTML = lastNav + renderPage(doc, vc);
   applyTheme();
@@ -557,7 +557,10 @@ function render(focus) {
   if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
   mountMaps();
   Reader.tlFit(app);
+  poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
+  poserPlage();   // plage de cellules surlignée, après le filtre qui décide des lignes visibles (14-plage-cellules.js)
   renderChrome();
+  suivreHautEcran();
   updateCheat();
   synPaintPeers();
   navReveal(keep);

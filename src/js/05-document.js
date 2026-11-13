@@ -88,6 +88,7 @@ function loadInitial() {
 function byId(id) { for (var i = 0; i < doc.blocks.length; i++) if (doc.blocks[i].id === id) return doc.blocks[i]; return null; }
 function idx(b) { return doc.blocks.indexOf(b); }
 function getPath(o, k) { var p = k.split('.'); for (var i = 0; i < p.length; i++) { if (o == null) return undefined; o = o[p[i]]; } return o; }
+function ligneVide(l) { return l.every(function (v) { return !v; }); }   // ligne (ou colonne) de tableau sans texte
 function setPath(o, k, v) { var p = k.split('.'); for (var i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v; }
 function docTitle() {
   var h = doc.pages[0].blocks.filter(function (b) { return b.type === 'header'; })[0];
