@@ -58,6 +58,15 @@ test('plage : le gras et les liens d\'une cellule restent dans son HTML, les cel
   egal(grille(fixture('excel'), '')[1][2], '<a href="https://exemple.fr/">Exemple</a>');
 });
 
+// captures du vrai presse-papier sous Linux (scripts/capturer-presse-papier.sh) : Calc 26.8 et Google Sheets dans Edge
+const capture = (source, f) => readFileSync(new URL('../fixtures/presse-papier/' + source + '/presse.' + f, import.meta.url), 'utf8');
+test('plage : les captures réelles de Calc et de Google Sheets donnent leur grille, par le HTML comme par le texte', () => {
+  for (const [source, attendu] of [['calc', [['a1', 'b1'], ['a2', 'b2']]], ['sheets', [['Lyon', 'France'], ['Gand', 'Belgique']]]]) {
+    egal(valeurs(grille(capture(source, 'html'), capture(source, 'txt'))), attendu, source + ' (HTML)');
+    egal(grille('', capture(source, 'txt')), attendu, source + ' (texte)');
+  }
+});
+
 test('plage : sans tableau HTML, le texte à tabulations est découpé en lignes et en cellules', () => {
   egal(grille('', 'a\tb\nc\td\n'), [['a', 'b'], ['c', 'd']]);
   egal(grille('<span>a b c d</span>', 'a\tb\r\nc\td'), [['a', 'b'], ['c', 'd']], 'HTML sans tableau');

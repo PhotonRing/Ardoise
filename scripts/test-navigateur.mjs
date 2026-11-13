@@ -27,6 +27,10 @@ const chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '
 let journal = ''; chr.stderr.on('data', (d) => { journal = (journal + d).slice(-4000); });   // montré si Chromium ne démarre pas
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const fin = (code) => { try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } process.exit(code); };
+// arrêté de l'extérieur ou bloqué : Chromium est fermé quand même, et le délai global nomme le sujet en cours
+let enCours = 'démarrage';
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { console.error('navigateur : interrompu pendant ' + enCours); fin(1); });
+setTimeout(() => { console.error('navigateur : ÉCHEC, plus de 240 s au total, bloqué dans ' + enCours); fin(1); }, 240000).unref();
 
 // démarrage à froid lent sur les machines de CI : jusqu'à 45 s
 let port; for (let i = 0; i < 450 && !port && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
@@ -59,6 +63,7 @@ const echecs = []; let n = 0;
 await cdp('Runtime.enable'); await cdp('Page.enable');
 for (const f of fichiers) {
   const sujet = await import(new URL(f, dossier)), nom = sujet.nom || f.replace(/\.mjs$/, '');
+  enCours = 'le sujet ' + nom;
   const outils = { ecran, charger, evalue, cdp, attendre, dialogues, mesure: () => { n++; }, echec: (m) => echecs.push(`[${nom}] ${m}`) };
   try { await sujet.default(outils); } catch (e) { echecs.push(`[${nom}] erreur : ${e.stack || e.message}`); }
 }
