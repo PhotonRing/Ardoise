@@ -14,6 +14,7 @@ function saisieDiese(fld) {
   var dans = n.parentNode.closest('span.pill, code, a'); if (dans && fld.contains(dans)) return null;
   var m = n.nodeValue.slice(0, off).match(/(^|[\s\u00a0])\u200B*#([^\s\u00a0\u200B#]+)$/); if (!m) return null;
   var saisie = m[2]; if (saisie.toLowerCase() === saisie.toUpperCase() && !/\d/.test(saisie)) return null;   // au moins une lettre ou un chiffre
+  if (/[,.;:!?)"»”’']$/.test(saisie)) return null;   // la ponctuation de fin n'est pas du nom : elle ferme la liste
   if (m.index === 0 && !m[1]) {
     var p = dieseAvant(n, fld);
     var bord = !p || p.nodeName === 'BR' || p.nodeName === 'DIV' || (p.nodeType === 1 && /\b(tab|ln)\b/.test(p.className)) || (p.nodeType === 3 && /(^|[\s\u00a0])$/.test(p.nodeValue));

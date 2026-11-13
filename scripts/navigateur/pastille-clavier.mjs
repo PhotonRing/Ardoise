@@ -78,6 +78,13 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     if (await evalue(LISTE)) echec(cas + ' : la liste s\'ouvre');
   }
 
+  // ponctuation de fin (, . ; : ! ? ) et guillemets) : hors de la saisie, elle ferme la liste
+  for (const p of [',', '.', ';', ':', '!', '?', ')', '"', '»']) {
+    await debut(); await taper('#pri' + p);
+    mesure();
+    if (await evalue(LISTE)) echec('#pri' + p + ' : la liste reste ouverte');
+  }
+
   // la page est modifiée : la quitter en acceptant l'avertissement de sortie, pour que le sujet suivant puisse naviguer
   await cdp('Page.enable');
   const part = cdp('Page.navigate', { url: 'about:blank' });
