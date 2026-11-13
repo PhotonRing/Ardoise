@@ -162,7 +162,8 @@ function ardoiseReader() {
     });
   }
   function lireAdresse(hash, pages) {
-    // copie autonome de lireAdresse (09-adresse.js), mêmes résultats (banc de rendu) : #pg-<page>[/<bloc>], ancienne forme #p<N>, #edit
+    // copie autonome de lireAdresse (09-adresse.js) : #pg-<page>[/<bloc>], ancienne forme #p<N>, #edit ; la section déplacée
+    // vers une autre page n'y est pas cherchée (pages sans blocs) mais dans la page exportée, par cible
     var h = String(hash || ''), r = { page: 0, bloc: '', mode: '', introuvable: false }, n = pages.length, m;
     if (h === '#edit') r.mode = 'edit';
     else if ((m = h.match(/^#pg-([^/]+)(?:\/(.+))?$/))) {
@@ -208,14 +209,17 @@ function ardoiseReader() {
     }
     function adresse(i, bloc) { return '#pg-' + ids[i].id + (bloc ? '/' + bloc : ''); }
     function noter() { if (!cadre) try { history.replaceState({ y: scrollY }, '', location.href); } catch (_) {} }
+    function remplacer(adr) { try { history.replaceState(history.state, '', adr); } catch (_) {} }
+    // adresse lue (ouverture, Précédent) réécrite sous sa forme #pg-<page>[/<bloc>], sans entrée : ancienne forme, section déplacée
+    function corriger(c) { var adr = ids.length ? adresse(c.page, c.bloc) : ''; if (adr && adr !== location.hash) remplacer(adr); }
     function aller(i, bloc) {
       // navigation voulue : la position de départ est notée, puis une seule entrée pour la page et la section
       var moved = i !== cur; if (!moved && !bloc) return;
       noter();
       if (moved) show(i);
       var adr = adresse(i, bloc && montrer(bloc, !moved) ? bloc : '');
-      if (!moved && adr === adresse(i)) return;
-      try { if (cadre) history.replaceState(history.state, '', adr); else history.pushState({ y: 0 }, '', adr); } catch (_) {}
+      if ((!moved && adr === adresse(i)) || adr === location.hash) return;   // adresse déjà affichée : pas d'entrée en double
+      if (cadre) remplacer(adr); else try { history.pushState({ y: 0 }, '', adr); } catch (_) {}
     }
     function sauter(id) {
       // section du sommaire latéral, sur la page affichée ou une autre
@@ -246,7 +250,7 @@ function ardoiseReader() {
       window.addEventListener('popstate', function (e) {
         clearTimeout(defilT);
         var c = ouvrir(location.hash), y = e.state && typeof e.state.y === 'number' ? e.state.y : null;
-        show(c.page, true);   // sans remonter en haut : la position de l'entrée est posée aussitôt
+        show(c.page, true); corriger(c);   // sans remonter en haut : la position de l'entrée est posée aussitôt
         if (y !== null) {
           scrollTo(0, y);
           requestAnimationFrame(function () { if (Math.abs(scrollY - y) > 1) scrollTo(0, y); });
@@ -254,7 +258,7 @@ function ardoiseReader() {
       });
     }
     var o = ouvrir(location.hash);
-    navLayout(); show(o.page, true); montrer(o.bloc, false);
+    navLayout(); show(o.page, true); montrer(o.bloc, false); corriger(o);
     noter();   // première entrée : sa position, pour y revenir par Précédent
   }
   function tocFold(btn, open) {

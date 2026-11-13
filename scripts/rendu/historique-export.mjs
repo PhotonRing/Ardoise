@@ -5,7 +5,7 @@ import { contexte, monter, test, egal, vrai, DEUX_PAGES } from './commun.mjs';
 import vm from 'node:vm';
 
 const ctx = contexte();
-const PAGES = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }];
+const PAGES = [{ id: 'p1', blocks: [] }, { id: 'p2', blocks: [] }, { id: 'p3', blocks: [] }];
 const lire = (f, h) => JSON.parse(JSON.stringify(f(h, PAGES)));
 const CAS = ['#pg-p2', '#pg-p3/b7', '#pg-p1/', '#p3', '#p99', '#p0', '#p', '#edit', '', '#pg-disparue', '#pg-disparue/b1', '#b-x1', '#pg-', 'pg-p2', '#P2'];
 
@@ -72,9 +72,19 @@ test('export : ouverture sur #pg-<page> et sur l\'ancienne adresse #p<N>', () =>
   egal(exportee(false, '#pg-disparue').visible(), 0);
 });
 
+test('export : à l\'ouverture, l\'adresse devient #pg-<page> sans entrée (sans adresse, ancienne forme #p<N>, page supprimée)', () => {
+  for (const [h, attendu] of [['', '#pg-p1'], ['#p2', '#pg-p2'], ['#pg-disparue', '#pg-p1'], ['#pg-p2', '#pg-p2']]) {
+    const p = exportee(false, h);
+    egal(p.location.hash, attendu, 'adresse ' + JSON.stringify(h));
+    egal(p.appels.filter((a) => a[0] === 'push'), [], 'aucune entrée ' + JSON.stringify(h));
+  }
+  egal(exportee(true, '#p2').location.hash, '#pg-p2', 'dans une iframe aussi');
+});
+
 test('export dans une iframe : aucune entrée, Précédent non écouté', () => {
   const p = exportee(true);
   vrai(!p.ecoute.popstate, 'pas d\'écouteur popstate');
+  p.appels.length = 0;
   p.clic(1);
   egal(p.visible(), 1, 'la page change');
   egal(p.appels, [['replace', '#pg-p2']], 'adresse remplacée, sans entrée');

@@ -10,10 +10,17 @@ function noterDefilement() {
   try { history.replaceState({ y: scrollY }, '', location.href); } catch (_) {}
 }
 function naviguer(adresse) {
+  if (adresse === location.hash) return;   // page et section déjà affichées : pas d'entrée en double
   if (dansCadre) { remplacerAdresse(adresse); return; }
   try { history.pushState({ y: 0 }, '', adresse); } catch (_) {}
 }
 function remplacerAdresse(adresse) { try { history.replaceState(history.state, '', adresse); } catch (_) {} }
+// adresse lue (ouverture, Précédent) réécrite sous sa forme #pg-<page>[/<bloc>], sans entrée ; #edit est gardé
+function corrigerAdresse(a) {
+  if (a.mode === 'edit') return;
+  var adr = adressePage(doc.pages, doc.cur, a.bloc && pageDuBloc(doc.pages, a.bloc) === doc.cur ? a.bloc : '');
+  if (adr !== location.hash) remplacerAdresse(adr);
+}
 if (!dansCadre) {
   // la position de l'entrée courante suit le défilement : Précédent la retrouve même sans geste de navigation
   var defilT = null;
@@ -26,7 +33,7 @@ if (!dansCadre) {
     var a = lireAdresse(location.hash, doc.pages), y = e.state && typeof e.state.y === 'number' ? e.state.y : null;
     if (a.introuvable) toast('Page introuvable : elle a sans doute été supprimée');
     // rendu sans remonter en haut : la position de l'entrée est posée avant l'affichage, sans clignotement
-    goPage(a.page, true, true);
+    goPage(a.page, true, true); corrigerAdresse(a);
     if (y !== null) {
       scrollTo(0, y);
       requestAnimationFrame(function () { if (Math.abs(scrollY - y) > 1) scrollTo(0, y); });   // page encore trop courte au premier essai

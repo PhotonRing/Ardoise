@@ -80,6 +80,9 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     await evalue(`(() => { const a = document.querySelector('.pnav-side a[data-sec="s3"]'); a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); return true; })()`); await attendre(150);
     const b1 = await etat(), sb = await evalue(HAUT_SECTION);
     attendu('section de la barre latérale sur une autre page : page 3, section en haut, une entrée', b1.pg === 'p3' && b1.h === '#pg-p3/s3' && b1.n === b0.n + 1 && Math.abs(sb) < 120, { b0, b1, sb });
+    await evalue(`(() => { const a = document.querySelector('.pnav-side a[data-sec="s3"]'); a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); return true; })()`); await attendre(150);
+    const b3 = await etat();
+    attendu('même section une deuxième fois : pas d\'entrée en double', b3.h === '#pg-p3/s3' && b3.n === b1.n, { b1, b3 });
     const b2 = await retour('back');
     attendu('Précédent : retour en page 1', b2.pg === 'p1' && b2.h === '#pg-p1', b2);
 
@@ -94,7 +97,15 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
 
     // ouverture sur une adresse : ancienne forme #p2, section, page supprimée
     const o1 = await ouvrir('#p2');
-    attendu('ouverture sur #p2 : deuxième page', o1.pg === 'p2', o1);
+    attendu('ouverture sur #p2 : deuxième page, adresse réécrite #pg-p2', o1.pg === 'p2' && o1.h === '#pg-p2', o1);
+    const o0 = await ouvrir('');
+    attendu('ouverture sans adresse : adresse réécrite #pg-p1', o0.pg === 'p1' && o0.h === '#pg-p1', o0);
+    const o5 = await ouvrir('#pg-p1/s3'), so5 = await evalue(HAUT_SECTION);
+    attendu('ouverture sur une section déplacée : sa page, section en haut, adresse corrigée', o5.pg === 'p3' && o5.h === '#pg-p3/s3' && Math.abs(so5) < 120, { o5, so5 });
+    await ouvrir('');
+    await evalue(`location.hash = '#pg-p1/s3'; true`); await attendre(250);
+    const o6 = await etat();
+    attendu('retour vers l\'adresse d\'une section déplacée : sa page, adresse corrigée', o6.pg === 'p3' && o6.h === '#pg-p3/s3', o6);
     const o2 = await ouvrir('#pg-p3/s3'), so2 = await evalue(HAUT_SECTION);
     attendu('ouverture sur #pg-p3/s3 : page 3, section en haut', o2.pg === 'p3' && Math.abs(so2) < 120, { o2, so2 });
     const o3 = await ouvrir('#pg-supprimee');

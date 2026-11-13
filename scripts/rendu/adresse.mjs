@@ -38,3 +38,10 @@ test('adresse : celle d\'une page ou d\'une section se relit à l\'identique', (
   egal(ctx.adressePage(PAGES, 2, 'b7'), '#pg-p3/b7');
   egal(lire(ctx.adressePage(PAGES, 2, 'b7')), { page: 2, bloc: 'b7', mode: '', introuvable: false });
 });
+
+test('adresse : une section déplacée vers une autre page ouvre sa page réelle, même si la page nommée a disparu', () => {
+  const pages = [{ id: 'p1', blocks: [] }, { id: 'p2', blocks: [{ id: 's1', type: 'h2', html: 'Section' }] }];
+  egal(JSON.parse(JSON.stringify(ctx.lireAdresse('#pg-p1/s1', pages))), { page: 1, bloc: 's1', mode: '', introuvable: false });
+  egal(JSON.parse(JSON.stringify(ctx.lireAdresse('#pg-disparue/s1', pages))), { page: 1, bloc: 's1', mode: '', introuvable: false });
+  egal(ctx.pageDuLien(pages, { pid: 'p1', bid: 'inconnu' }), 0, 'section inconnue : la page nommée');
+});

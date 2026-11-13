@@ -61,14 +61,26 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const sec4 = await evalue(`Math.round(document.querySelector('.blk[data-id="s3"]').getBoundingClientRect().top)`);
   attendu('Suivant : page 3, adresse de la section, section en haut', r4.pg === 'p3' && r4.h === '#pg-p3/s3' && Math.abs(sec4) < 120, { r4, sec4 });
 
-  // saut vers une section de la même page : une entrée ; Précédent remonte au point de départ
-  await evalue('scrollTo(0, 0); true'); await attendre(50);
+  // saut vers une section de la même page, depuis l'adresse de la page : une entrée ; Précédent remonte au point de départ
+  await evalue(cliquerPage(1)); await attendre(100); await evalue(cliquerPage(2)); await attendre(100);
   const avant = await etat();
   await evalue(lien('.blk[data-id="l3"] a', true)); await attendre(600);
   const e5 = await etat();
-  attendu('section de la même page : une entrée', e5.n === avant.n + 1 && e5.h === '#pg-p3/s3' && e5.y > 500, { avant, e5 });
+  attendu('section de la même page : une entrée', avant.h === '#pg-p3' && e5.n === avant.n + 1 && e5.h === '#pg-p3/s3' && e5.y > 500, { avant, e5 });
   const r5 = await retour('back');
   attendu('Précédent après un saut sur la même page : haut de la page 3', r5.pg === 'p3' && r5.y < 2, r5);
+
+  // section de la barre latérale, puis la même section ou le lien vers elle : une seule entrée
+  const secLat = `(() => { document.querySelector('.pnav-side a[data-sec="s3"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); return true; })()`;
+  await evalue(secLat); await attendre(150);
+  const d1 = await etat();
+  attendu('section de la barre latérale : adresse de la section', d1.h === '#pg-p3/s3', { r5, d1 });
+  await evalue(secLat); await attendre(150);
+  await evalue(lien('.blk[data-id="l3"] a', true)); await attendre(150);
+  const d2 = await etat();
+  attendu('même section une deuxième fois (barre latérale, lien) : pas d\'entrée en double', d2.h === '#pg-p3/s3' && d2.n === d1.n, { d1, d2 });
+  const d3 = await retour('back');
+  attendu('Précédent après la même section cliquée trois fois : adresse de la page', d3.h === '#pg-p3', d3);
 
   // Alt+Page↓ : un changement de page voulu, une entrée
   const a0 = await etat();
@@ -116,14 +128,24 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
       return evalue(`({ pg: window.ardoise.doc.pages[window.ardoise.doc.cur].id, h: location.hash, y: Math.round(scrollY), toast: (document.querySelector('.toast') || {}).textContent || '', edit: document.documentElement.classList.contains('is-edit') })`);
     };
     const o1 = await ouvrir('#p2');
-    attendu('ouverture sur #p2 : deuxième page', o1.pg === 'p2', o1);
+    attendu('ouverture sur #p2 : deuxième page, adresse réécrite #pg-p2', o1.pg === 'p2' && o1.h === '#pg-p2', o1);
+    const o0 = await ouvrir('');
+    attendu('ouverture sans adresse : adresse réécrite #pg-p1', o0.pg === 'p1' && o0.h === '#pg-p1', o0);
     const o2 = await ouvrir('#pg-p3/s3');
     const sec2 = await evalue(`Math.round(document.querySelector('[data-id="s3"], #b-s3').getBoundingClientRect().top)`);
     attendu('ouverture sur #pg-p3/s3 : page 3, section en haut', o2.pg === 'p3' && Math.abs(sec2) < 120, { o2, sec2 });
+    // section déplacée vers une autre page : sa page réelle s'ouvre, l'adresse est corrigée
+    const o5 = await ouvrir('#pg-p1/s3');
+    const sec5 = await evalue(`Math.round(document.querySelector('[data-id="s3"], #b-s3').getBoundingClientRect().top)`);
+    attendu('ouverture sur une section déplacée : sa page, section en haut, adresse corrigée', o5.pg === 'p3' && o5.h === '#pg-p3/s3' && Math.abs(sec5) < 120, { o5, sec5 });
+    await ouvrir('');
+    await evalue(`location.hash = '#pg-p1/s3'; true`); await attendre(250);
+    const o6 = await evalue(`({ pg: window.ardoise.doc.pages[window.ardoise.doc.cur].id, h: location.hash })`);
+    attendu('retour vers l\'adresse d\'une section déplacée : sa page, adresse corrigée', o6.pg === 'p3' && o6.h === '#pg-p3/s3', o6);
     const o3 = await ouvrir('#pg-supprimee');
     attendu('ouverture sur une page supprimée : première page et « Page introuvable »', o3.pg === 'p1' && /Page introuvable/.test(o3.toast), o3);
     const o4 = await ouvrir('#edit');
-    attendu('ouverture sur #edit : édition', o4.edit && o4.pg === 'p1', o4);
+    attendu('ouverture sur #edit : édition, adresse gardée', o4.edit && o4.pg === 'p1' && o4.h === '#edit', o4);
     // plugin Obsidian : Ardoise dans une iframe ; changer de page n'ajoute rien à l'historique du haut
     await ouvrir('');
     const n0 = await evalue('history.length');

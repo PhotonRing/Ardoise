@@ -13,6 +13,7 @@ function boot(d, origine) {
   mode = (freshDoc || (a.mode === 'edit' && (!d.lock || unlocked) && !d.newer)) ? 'edit' : 'view';
   session.remplacer(d, origine || 'demarrage', { page: a.page });
   if (a.introuvable) toast('Page introuvable : elle a sans doute été supprimée'); else if (a.bloc) montrerBloc(a.bloc, false);
+  corrigerAdresse(a);
   noterDefilement();   // première entrée : sa position, pour y revenir par Précédent
   if (freshDoc) setStatus('warn', 'Ctrl+S pour créer votre fichier');
   if (doc.newer) newerNotice(false); else checkDraft();
