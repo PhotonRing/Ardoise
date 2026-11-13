@@ -30,6 +30,7 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '07-kanban.js',
     '07-rendu.js',
     '07-requetes.js',
+    '08-office.js',
     '09-adresse.js',
   ].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });
