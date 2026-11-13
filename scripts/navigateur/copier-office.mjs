@@ -12,6 +12,9 @@ const DOC = { v: 6, id: 'doc-copier-office', title: 'Office', theme: 'dark', tag
   { id: 't1', type: 'table', rows: [['Nom', 'État'], ['Serveur', P('OK')]] },
   { id: 'tl', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }, { date: '2025', title: 'Fin', text: '', color: 'ok' }] },
   { id: 'mp', type: 'map', height: 300, bg: 'vector', view: { lat: 48, lon: 2, z: 4 }, markers: [{ lat: 48.85, lon: 2.35, label: 'Paris', color: 'bad' }], zones: [], routes: [], list: false },
+  { id: 'g1', type: 'group', title: 'Événement', folded: false, blocks: [
+    { id: 'dm', type: 'diamond', title: 'Campagne X', adversaire: 'APT', capacite: '', infrastructure: '', victime: '' },
+    { id: 'gt', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }] }] },
 ] }] };
 
 export const nom = 'copier pour Office';
@@ -86,6 +89,12 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     await copier('tl'); const i4 = await image(['#1f7a4d', '#5fd09a'], 4);
     if (!i4 || i4.l !== 1392) echec('image de la chronologie : ' + JSON.stringify(i4));
     else if (i4.n['#1f7a4d'] < 100 || i4.n['#5fd09a'] > 0) echec('points de la chronologie hors du thème clair : ' + JSON.stringify(i4.n));
+
+    // groupe (ticket 05) : titre en gras, diamant en tableau, sa chronologie en image intégrée au HTML
+    mesure();
+    await copier('g1'); const p6 = await presse(), h6 = p6['text/html'] || '';
+    if (!/<b>Événement<\/b>[\s\S]*<table[\s\S]*<b>Adversaire<\/b>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
+    if (!(p6['text/plain'] || '').startsWith('Événement\nTitre\tCampagne X\nAdversaire\tAPT')) echec('texte brut du groupe : ' + JSON.stringify(p6['text/plain']));
 
     // presse-papier qui refuse : message d'erreur, pas « Copié »
     mesure();

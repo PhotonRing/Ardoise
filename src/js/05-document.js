@@ -127,9 +127,11 @@ function docTitle() {
   var h = doc.pages[0].blocks.filter(function (b) { return b.type === 'header'; })[0];
   return (h && textOf(h.title)) || doc.title || 'Sans titre';
 }
+// nom de fichier lisible tiré d'un titre : sans accents ni caractère interdit, 60 caractères au plus ('page' s'il ne reste rien)
+function nomDeFichier(titre) { return String(titre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page'; }
 function fileName() {
-  var s = docTitle().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
-  if (!/\.html?$/i.test(s)) s = (s || 'page') + '.html';
+  var s = nomDeFichier(docTitle());
+  if (!/\.html?$/i.test(s)) s = s + '.html';
   return s;
 }
 // nom du fichier local d'où la page est ouverte (dernier segment décodé de l'adresse) ; null hors d'un fichier local

@@ -180,12 +180,13 @@ function viewMenuHTML() {
   var anyFold = !!$('.wrap [data-vfold]', app);
   function mi(k, ic, label, sub, on) { return '<button class="mi" type="button" data-vm="' + k + '"' + (on ? ' aria-pressed="true"' : '') + '><span class="ic">' + ic + '</span><span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + (on ? '<kbd>✓</kbd>' : '') + '</button>'; }
   return '<h4>Lecture</h4>' + mi('print', '⎙', 'Imprimer / PDF') + mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
+    mi('word', 'W', 'Exporter la page en Word (.docx)', 'Titres, listes, tableaux et images') +
     (anyFold ? '<div class="hr"></div>' + mi('unfold', '⌄', 'Tout déplier') + mi('fold', '›', 'Tout plier') : '') +
     '<div class="hr"></div><h4>Thème (pour vous seulement)</h4>' + mi('th-', '◐', 'Celui du document', '', !viewerTheme) + mi('th-light', '☀', 'Clair', '', viewerTheme === 'light') + mi('th-dark', '☾', 'Sombre', '', viewerTheme === 'dark') +
     '<div class="hr"></div>' + mi('help', '⌨', 'Raccourcis clavier');
 }
 function viewMenuAct(k) {
-  if (k === 'print') printPage(); else if (k === 'export') exportStatic(); else if (k === 'help') showHelp();
+  if (k === 'print') printPage(); else if (k === 'export') exportStatic(); else if (k === 'word') exporterPageWord(); else if (k === 'help') showHelp();
   else if (k === 'fold' || k === 'unfold') foldAll(k === 'unfold');
   else if (k.indexOf('th-') === 0) { viewerTheme = k.slice(3); try { if (viewerTheme) localStorage.setItem(LS + 'viewtheme', viewerTheme); else localStorage.removeItem(LS + 'viewtheme'); } catch (_) {} applyTheme(); }
 }
@@ -205,6 +206,7 @@ function fileMenuHTML() {
     mi('save', '⤓', 'Enregistrer', fsa ? (fileHandle ? 'Dans ' + fileHandle.name : 'Choisir le fichier une fois, puis auto-save') : 'Télécharge le fichier à jour', 'Ctrl+S') +
     mi('saveas', '⧉', 'Enregistrer sous…', 'Nouvel emplacement ou copie') +
     mi('export', '◉', 'Exporter en page statique', 'Lecture seule, sans éditeur') +
+    mi('word', 'W', 'Exporter la page en Word (.docx)', 'Titres, listes, tableaux et images') +
     mi('print', '⎙', 'Imprimer / PDF') +
     '<div class="hr"></div>' +
     mi('sync', '⇄', 'Synchronisation…', doc.sync ? 'Active · ' + doc.sync.relay : 'Garder plusieurs copies à jour, en direct') +
@@ -225,6 +227,7 @@ function fileMenuAct(k) {
   else if (k === 'save') save(false);
   else if (k === 'saveas') save(true);
   else if (k === 'export') exportStatic();
+  else if (k === 'word') exporterPageWord();
   else if (k === 'print') printPage();
   else if (k === 'json-copy') copyJSON();
   else if (k === 'json-import') importJSON();

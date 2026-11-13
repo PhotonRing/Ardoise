@@ -11,7 +11,8 @@ function copierPourOffice(b) {
     var img = imageDeBloc(b);
     item = { 'image/png': img.then(function (r) { horsLigne = r.horsLigne; return r.blob; }), 'text/plain': img.then(function () { return texte(officeTexte(officeBloc(b, doc, { page: doc.cur }))); }) };
   } else {
-    var elts = officeImages(b).then(function (images) { return officeBloc(b, doc, { page: doc.cur, images: images }); });
+    // un groupe emporte en images les cartes et chronologies de ses blocs
+    var elts = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return officeBloc(b, doc, { page: doc.cur, images: r.images }); });
     item = { 'text/html': elts.then(function (e) { return new Blob([officeHtml(e, doc)], { type: 'text/html' }); }), 'text/plain': elts.then(function (e) { return texte(officeTexte(e)); }) };
   }
   return navigator.clipboard.write([new ClipboardItem(item)]).then(function () {
@@ -19,14 +20,37 @@ function copierPourOffice(b) {
     return true;
   }, function () { refus(); return false; });
 }
-// image d'un bloc image : dimensions lues au décodage, pour que le collage garde la taille
-function officeImages(b) {
-  if (b.type !== 'image' || !b.src) return Promise.resolve({});
+/* Images des blocs pour l'export Office, enfants des groupes compris : { images: { idBloc: { src, mime, l, h } }, horsLigne }.
+   o.png : une image ni PNG ni JPEG (WebP, GIF, SVG…) est redessinée en PNG (le .docx ne prend que ces deux formats) ;
+   o.cartes : cartes et chronologies dessinées en PNG, l'une après l'autre (un seul montage hors écran à la fois). */
+function imagesOffice(blocs, o) {
+  o = o || {}; var images = {}, horsLigne = false, suite = Promise.resolve();
+  tousBlocs(blocs).forEach(function (b) {
+    if (b.type === 'image' && b.src) suite = suite.then(function () { return imageDocument(b, o.png).then(function (r) { images[b.id] = r; }); });
+    else if (o.cartes && (b.type === 'map' || b.type === 'timeline')) suite = suite.then(function () {
+      return imageDeBloc(b).then(function (r) {
+        horsLigne = horsLigne || r.horsLigne;
+        return enDataUrl(r.blob).then(function (src) { images[b.id] = { src: src, mime: 'image/png', l: r.l, h: r.h }; });
+      }, function () { /* dessin impossible : équivalent texte */ });
+    });
+  });
+  return suite.then(function () { return { images: images, horsLigne: horsLigne }; });
+}
+// image du document : dimensions lues au décodage (le collage et le .docx gardent la taille), PNG si demandé
+function imageDocument(b, png) {
   return new Promise(function (ok) {
-    var im = new Image(), fin = function (l, h) { var o = {}; o[b.id] = { src: b.src, mime: (String(b.src).match(/^data:([^;,]+)/) || [])[1] || '', l: l, h: h }; ok(o); };
-    im.onload = function () { fin(im.naturalWidth, im.naturalHeight); }; im.onerror = function () { fin(0, 0); }; im.src = b.src;
+    var im = new Image(), mime = (String(b.src).match(/^data:([^;,]+)/) || [])[1] || '';
+    var fin = function (src, m, l, h) { ok({ src: src, mime: m, l: l, h: h }); };
+    im.onload = function () {
+      var l = im.naturalWidth, h = im.naturalHeight;
+      if (!png || /^image\/(png|jpe?g)$/i.test(mime) || !l || !h) return fin(b.src, mime, l, h);
+      try { var cv = document.createElement('canvas'); cv.width = l; cv.height = h; cv.getContext('2d').drawImage(im, 0, 0); fin(cv.toDataURL('image/png'), 'image/png', l, h); }
+      catch (_) { fin(b.src, mime, l, h); }   // canvas sali (image d'une autre origine) : l'export la remplace par sa légende
+    };
+    im.onerror = function () { fin(b.src, mime, 0, 0); }; im.src = b.src;
   });
 }
+function enDataUrl(blob) { return new Promise(function (ok, ko) { var r = new FileReader(); r.onload = function () { ok(r.result); }; r.onerror = ko; r.readAsDataURL(blob); }); }
 // conteneur hors écran : variables du thème clair posées sur lui, donc styles calculés de son contenu en thème clair
 function conteneurClair(b) {
   var c = document.createElement('div'), v = officeVariables(doc), k;

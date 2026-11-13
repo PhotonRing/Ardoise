@@ -1,7 +1,8 @@
 /* ---------- Menu d'un bloc (⋯ dans sa barre) ----------
    Une liste d'entrées { ic, label, quand(b) facultatif, fn(b) } : chaque fonction qui agit sur un bloc entier y ajoute la sienne. */
 var ENTREES_BLOC = [
-  { ic: '⎘', label: 'Copier pour Office', fn: function (b) { copierPourOffice(b); } }
+  { ic: '⎘', label: 'Copier pour Office', fn: function (b) { copierPourOffice(b); } },
+  { ic: 'W', label: 'Exporter en Word (.docx)', fn: function (b) { exporterBlocWord(b); } }
 ];
 function ouvrirMenuBloc(ancre, b) {
   closePop();

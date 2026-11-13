@@ -166,9 +166,10 @@ function autoSave() {
     }, saveFailed);
   });
 }
-function download(text, name) {
+// téléchargement d'un texte ou d'octets (type : HTML par défaut)
+function download(data, name, type) {
   var a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/html' })); a.download = name;
+  a.href = URL.createObjectURL(new Blob([data], { type: type || 'text/html' })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 function saveDraft() { if (!dirty || !doc) return; if (isSealed()) { forgetDraft(); return; } try { localStorage.setItem(LS + 'draft:' + doc.id, JSON.stringify({ t: Date.now(), json: JSON.stringify(doc) })); } catch (_) {} }

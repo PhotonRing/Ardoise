@@ -138,6 +138,16 @@ function officeBloc(b, d, opts) {
         out.push({ t: 'cadre', fond: OFFICE_CLAIR.surface, barre: null, contenu: ct });
       });
       break;
+    case 'group':
+      // groupe : toujours ouvert (comme à l'impression), titre en gras puis ses blocs
+      if (!officeVide(S(b.title))) out.push(para(gras(S(b.title))));
+      (b.blocks || []).forEach(function (c) { out = out.concat(officeBloc(c, d, opts)); });
+      break;
+    case 'diamond':
+      // modèle diamant : tableau à deux colonnes, titre puis les sommets dans l'ordre de l'écran (DIA_SOMMETS : 07-rendu.js)
+      var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
+      out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s[1], b[s[0]]); })) });
+      break;
     case 'divider': out.push({ t: 'ligne' }); break;
     case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
     case 'map':
@@ -160,6 +170,8 @@ function officeBloc(b, d, opts) {
   }
   return out;
 }
+// blocs d'une page (ou un seul bloc) → éléments neutres, dans l'ordre ; les enfants d'un groupe suivent par le groupe
+function officeBlocs(blocs, d, opts) { return (blocs || []).reduce(function (a, b) { return a.concat(officeBloc(b, d, opts)); }, []); }
 // cartes d'une colonne de kanban : titre en gras, puis échéance, responsable et priorité
 function officeCartesKanban(cards, S, txt, para) {
   var out = [];

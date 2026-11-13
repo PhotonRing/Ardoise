@@ -138,3 +138,34 @@ test('office : requête figée comme affichée (tableau, liste, nombre « texte 
   egal(office('q', page({ view: 'list' })).texte, 'Hôtes\n- Accueil · Hôte srv1 #OK · Risque haut\n- Accueil · Hôte srv2');
   egal(office('q', page({ view: 'count', cards: [{ label: 'Avec OK', tags: ['ok'], match: 'any', state: 'all', total: 'all' }] })).texte, 'Hôtes\nAvec OK : 1 / 2');
 });
+
+// groupe et modèle diamant (lot 6) : le groupe arrive ouvert, titre en gras puis ses blocs ; le diamant en tableau
+const DOC6 = { v: 6, title: 'Doc', tags: { apt: { c: 1 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
+  { id: 'g1', type: 'group', title: 'Détails <i>repliés</i>', folded: true, blocks: [
+    { id: 'gp', type: 'p', html: 'dans le groupe' },
+    { id: 'gd', type: 'diamond', title: '', adversaire: 'Groupe ' + P('APT'), capacite: 'Hameçonnage', infrastructure: '', victime: 'Mairie' },
+  ] },
+  { id: 'd1', type: 'diamond', title: 'Campagne X', adversaire: 'A', capacite: 'C', infrastructure: 'I', victime: 'V' },
+] }] };
+
+test('office : groupe ouvert (même plié), titre en gras puis ses blocs', () => {
+  const { e, texte, html } = office('g1', DOC6);
+  egal(e.map((x) => x.t), ['para', 'para', 'tableau'], 'titre, paragraphe, diamant');
+  egal(pur(e[0].segs), [{ texte: 'Détails ', gras: true }, { texte: 'repliés', italique: true, gras: true }]);
+  vrai(texte.startsWith('Détails repliés\ndans le groupe\n'), texte);
+  vrai(/<p style="[^"]*"><b>Détails <\/b><i><b>repliés<\/b><\/i><\/p><p style="[^"]*">dans le groupe<\/p><table/.test(html), html);
+  const vide = office('g1', { ...DOC6, pages: [{ id: 'p1', blocks: [{ id: 'g1', type: 'group', title: '', blocks: [{ id: 'x', type: 'p', html: 'seul' }] }] }] });
+  egal(vide.texte, 'seul', 'titre vide : omis');
+});
+
+test('office : modèle diamant en tableau, titre puis les quatre sommets nommés dans l\'ordre de l\'écran', () => {
+  const { e, texte, html } = office('d1', DOC6);
+  egal(e.length, 1); egal(e[0].t, 'tableau'); egal(e[0].entete, false);
+  egal(texte, 'Titre\tCampagne X\nAdversaire\tA\nCapacité\tC\nInfrastructure\tI\nVictime\tV');
+  vrai(html.includes('<b>Adversaire</b>') && html.includes('<b>Titre</b>'), html);
+  // titre vide : ligne omise ; sommet vide : « — » en gris ; pastille d'un sommet en sa couleur
+  const g = office('g1', DOC6).e[2];
+  egal(office('g1', DOC6).ctx.officeTexte([g]), 'Adversaire\tGroupe #APT\nCapacité\tHameçonnage\nInfrastructure\t—\nVictime\tMairie');
+  egal(pur(g.lignes[2][1][0].segs), [{ texte: '—', couleur: '#566573' }]);
+  egal(pur(g.lignes[0][1][0].segs[1]), { texte: 'APT', pastille: { fond: '#fdecea', texte: '#b42318' } });
+});
