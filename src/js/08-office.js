@@ -258,13 +258,18 @@ function officeHtml(elts, d) {
   var TITRES = [['h1', '24pt'], ['h1', '16pt'], ['h2', '13pt'], ['h3', '11pt']];
   var cellule = 'border:1px solid ' + C.line + ';padding:4pt 6pt;vertical-align:top;text-align:left;';
   var liste = function (e) {
-    var tg = e.ordonnee ? 'ol' : 'ul', cur = -1, h = '', st = e.items.some(function (it) { return it.coche != null; }) ? ' style="list-style:none;padding-left:0;margin:0 0 6pt"' : ' style="margin:0 0 6pt"';
+    // cases à cocher : des paragraphes en retrait (Writer reprend une liste sans puce comme une liste à puces)
+    if (e.items.some(function (it) { return it.coche != null; })) return e.items.map(function (it, i) {
+      var lv = Math.max(0, +it.niveau || 0);
+      return '<p style="margin:0 0 ' + (i === e.items.length - 1 ? '6pt' : '2pt') + (lv ? ';margin-left:' + 18 * lv + 'pt' : '') + '">' + (it.coche ? '☑ ' : '☐ ') + segs(it.segs) + '</p>';
+    }).join('');
+    var tg = e.ordonnee ? 'ol' : 'ul', cur = -1, h = '', st = ' style="margin:0 0 6pt"';
     e.items.forEach(function (it) {
       var lv = Math.max(0, Math.min(it.niveau, cur + 1));
       if (cur < 0) { h += '<' + tg + st + '>'; cur = 0; }
-      else if (lv > cur) { h += '<' + tg + st.replace(';padding-left:0', ';padding-left:18pt').replace('margin:0 0 6pt', 'margin:0') + '>'; cur = lv; }
+      else if (lv > cur) { h += '<' + tg + ' style="margin:0">'; cur = lv; }
       else { h += '</li>'; while (cur > lv) { h += '</' + tg + '></li>'; cur--; } }
-      h += '<li>' + (it.coche != null ? (it.coche ? '☑ ' : '☐ ') : '') + segs(it.segs);
+      h += '<li>' + segs(it.segs);
     });
     if (cur < 0) return '';
     h += '</li>'; while (cur > 0) { h += '</' + tg + '></li>'; cur--; }
@@ -286,7 +291,9 @@ function officeHtml(elts, d) {
           (e.barre ? 'border-left:4px solid ' + e.barre : 'border:1px solid ' + C.line) + '">' + tous(e.contenu) + '</td></tr></table>';
       case 'code':
         return (e.nom ? '<p style="' + P + 'font-family:' + OFFICE_MONO + ';font-size:8pt;color:' + C.muted + '">' + esc(e.nom) + '</p>' : '') +
-          '<pre style="font-family:' + OFFICE_MONO + ';font-size:9.5pt;background:' + C['code-soft'] + ';color:' + C.fg + ';padding:6pt 8pt;margin:0 0 6pt;white-space:pre-wrap">' + esc(e.texte) + '</pre>';
+          // fond sur une cellule pleine largeur : Google Docs ne teinte un <pre> que sous le texte
+          '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
+          '<pre style="font-family:' + OFFICE_MONO + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
       case 'image':
         var l = e.l, h = e.h; if (l > 680) { h = Math.round(h * 680 / l); l = 680; }
         return '<p style="' + P + '"><img src="' + esc(e.src) + '" alt="' + esc(e.alt) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + '></p>' +

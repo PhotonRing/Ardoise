@@ -80,7 +80,12 @@ test('office : listes à niveaux et liste à cocher', () => {
   vrai(/^<div[^>]*><ol style="[^"]*"><li>un<ol style="[^"]*"><li>sous<\/li><\/ol><\/li><li>deux<\/li><\/ol><\/div>$/.test(office('l1').html), office('l1').html);
   const c = office('c1');
   egal(c.texte, '☑ fait\n☐ à faire');
-  vrai(c.html.includes('list-style:none') && c.html.includes('<li>☑ fait</li><li>☐ à faire</li>'), c.html);
+  // Writer reprend une liste <ul> sans puce comme une liste à puces après la première ligne : des paragraphes, sans liste
+  vrai(!/<[ou]l|<li/.test(c.html) && /<p style="[^"]*">☑ fait<\/p><p style="[^"]*">☐ à faire<\/p>/.test(c.html), c.html);
+  const n = office('c2', { v: 6, title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'c2', type: 'check', items: [{ html: 'haut' }, { html: 'dessous', lv: 1 }, { html: 'plus bas', lv: 2 }] }] }] });
+  const retraits = [...n.html.matchAll(/<p style="([^"]*)">☐ /g)].map((m) => (m[1].match(/margin-left:([\d.]+pt)/) || [])[1] || '0');
+  egal(retraits, ['0', '18pt', '36pt'], 'retrait par niveau : ' + n.html);
+  egal(n.texte, '☐ haut\n  ☐ dessous\n    ☐ plus bas');
 });
 
 test('office : tableau à en-tête gras et bordures fines ; fiche de faits à deux colonnes, alerte en rouge', () => {
@@ -98,7 +103,8 @@ test('office : encadré teinté avec sa barre, code à chasse fixe sans colorati
   vrai(/<td style="background:#fdecea;[^"]*border-left:4px solid #b42318">/.test(n.html), n.html);
   const k = office('k1');
   egal(k.texte, 'a.sh\necho "<a>"\nls');
-  vrai(/<pre style="font-family:Consolas[^"]*background:#eef2f4[^"]*white-space:pre-wrap">echo &quot;&lt;a&gt;&quot;\nls<\/pre>/.test(k.html), k.html);
+  // fond sur une cellule pleine largeur : Google Docs ne teinte un <pre> que sous le texte
+  vrai(/<table style="[^"]*width:100%[^"]*"><tr><td style="background:#eef2f4;[^"]*"><pre style="font-family:Consolas[^"]*margin:0[^"]*white-space:pre-wrap">echo &quot;&lt;a&gt;&quot;\nls<\/pre><\/td><\/tr><\/table>/.test(k.html), k.html);
 });
 
 test('office : kanban en colonnes, cartes en paragraphes (titre gras, échéance, responsable, priorité)', () => {
