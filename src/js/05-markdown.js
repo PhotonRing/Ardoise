@@ -11,19 +11,85 @@ var ENCADRES_MD = { warning: 'warn', caution: 'warn', attention: 'warn', danger:
 var MD_CLOTURE = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/, MD_TITRE = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/, MD_SEPARATEUR = /^ {0,3}([-*_])([ \t]*\1){2,}[ \t]*$/;
 var MD_CITATION = /^ {0,3}>/, MD_ELEMENT = /^([ \t]*)([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/, MD_DELIMITEURS = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
+// #tag d'Obsidian : en début de mot, lettres (latines, grecques, cyrilliques), chiffres, _ - / ; au moins une lettre
+var MD_LETTRE = 'A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0370-\u03FF\u0400-\u04FF';
+var MD_PASTILLE = new RegExp('(^|[\\s(*_~])#([' + MD_LETTRE + '0-9_\\/-]*[' + MD_LETTRE + '][' + MD_LETTRE + '0-9_\\/-]*)', 'g');
 // { entete: { title } | null, blocs: blocs sans identifiant, imagesManquantes } ; pages : pages du document, pour les liens [[…]]
-function blocsDuMarkdown(texte, pages) {
+function blocsDuMarkdown(texte, pages, cur) {
   var lignes = String(texte == null ? '' : texte).replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
-  var r = { entete: null, blocs: [], imagesManquantes: 0 };
+  liensMd = { pages: pages || [], cur: cur };
+  try { return blocsDuMarkdownLu(lignes); } finally { liensMd = null; }
+}
+var liensMd = null;   // pages du document pendant une conversion (liens [[…]]) ; cur : page remplacée, dont les sections ne comptent pas
+function blocsDuMarkdownLu(lignes) {
+  var r = { entete: null, blocs: [], imagesManquantes: 0, images: [] }, fin = finYamlMd(lignes);
+  if (fin > 0) { var fiche = ficheYamlMd(lignes.slice(1, fin)); if (fiche.items.length) r.blocs.push(fiche); lignes = lignes.slice(fin + 1); }
   decouperMarkdown(lignes).forEach(function (g) {
     if (g.sorte === 'titre') {
       var html = enLigneMd(g.texte);
       if (g.niveau === 1 && !r.entete) r.entete = { title: html };
       else r.blocs.push({ type: g.niveau <= 2 ? 'h2' : g.niveau === 3 ? 'h3' : 'subtitle', html: html });
+    } else if (g.sorte === 'paragraphe') {
+      // une image sort du paragraphe en bloc Image juste après lui ; distante : à télécharger (images), sinon à remettre
+      var x = imagesDuParagrapheMd(g.lignes.join('\n'));
+      if (x.texte) r.blocs.push({ type: 'p', html: enLigneMd(x.texte) });
+      x.images.forEach(function (im) {
+        if (im.distante) r.images.push({ bloc: r.blocs.length, url: im.url, nom: im.nom }); else r.imagesManquantes++;
+        r.blocs.push({ type: 'image', src: '', caption: esc(im.distante ? im.alt : im.nom), alt: im.alt });
+      });
     } else r.blocs.push(blocDuGroupe(g));
   });
   return r;
 }
+// images d'un paragraphe (hors code en ligne) : ![texte](adresse) et ![[fichier.png|…]] ; { texte sans les images, images }
+var MD_IMAGE = /(`+)[\s\S]*?[^`]\1(?!`)|!\[([^\]\n]*)\]\(\s*<?([^\s()<>]+)>?(?:\s+"[^"]*")?\s*\)|!\[\[([^\[\]\n|]+?\.(?:png|jpe?g|gif|webp|svg|bmp|avif))(?:\|[^\]\n]*)?\]\]/gi;
+function imagesDuParagrapheMd(texte) {
+  var images = [];
+  var t = texte.replace(MD_IMAGE, function (m, code, alt, url, fichier) {
+    if (code) return m;
+    var adresse = url || fichier, nom = adresse.replace(/[?#].*$/, '').split('/').pop();
+    try { nom = decodeURIComponent(nom); } catch (_) {}
+    if (/^data:/i.test(adresse)) nom = 'image';
+    images.push({ alt: alt || '', url: adresse, nom: nom || 'image', distante: !!url && /^(https?:|data:image\/)/i.test(url) });
+    return '\u0005';
+  });
+  t = t.replace(/[ \t]*\u0005[ \t]*/g, ' ').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).join('\n');
+  return { texte: t, images: images };
+}
+// en-tête YAML d'Obsidian : « --- » en toute première ligne, fermé par « --- » ou « ... » ; indice de la ligne qui le ferme, sinon -1
+function finYamlMd(lignes) {
+  if (!/^---[ \t]*$/.test(lignes[0])) return -1;
+  for (var i = 1; i < lignes.length; i++) if (/^(---|\.\.\.)[ \t]*$/.test(lignes[i])) return i;
+  return -1;
+}
+// propriétés YAML → Fiche de faits : une ligne par clé (texte simple), valeurs d'une liste jointes par des virgules ;
+// tags (ou tag) → pastilles. Lecture simple : scalaire, liste [a, b], liste à tirets, texte sur plusieurs lignes (| ou >)
+function ficheYamlMd(lignes) {
+  var props = [], p = null;
+  lignes.forEach(function (l) {
+    var m;
+    if (!l.trim() || /^\s*#/.test(l)) return;
+    if (!/^[ \t]/.test(l) && (m = l.match(/^([^:]+?)[ \t]*:(?:[ \t]+(.*?))?[ \t]*$/))) {
+      var v = m[2] || '';
+      p = { k: m[1].replace(/^(["'])(.*)\1$/, '$2'), valeurs: [], bloc: /^[|>][-+]?$/.test(v) };
+      props.push(p);
+      if (/^\[.*\]$/.test(v)) p.valeurs = v.slice(1, -1).split(',').map(scalaireYamlMd).filter(function (x) { return x !== ''; });
+      else if (v && !p.bloc) p.valeurs = [scalaireYamlMd(v)];
+      return;
+    }
+    if (!p) return;
+    if (!p.bloc && (m = l.match(/^[ \t]*-[ \t]*(.*)$/))) { var x = scalaireYamlMd(m[1]); if (x !== '') p.valeurs.push(x); return; }
+    if (p.bloc && p.valeurs.length) p.valeurs[0] += ' ' + l.trim(); else p.valeurs.push(l.trim());   // texte sur plusieurs lignes, sous-objet gardé en texte
+  });
+  return { type: 'facts', items: props.map(function (p) {
+    if (/^tags?$/i.test(p.k)) {
+      var noms = []; p.valeurs.forEach(function (v) { v.split(/[,\s]+/).forEach(function (n) { n = n.replace(/^#/, ''); if (n) noms.push(n); }); });
+      return { k: p.k, v: noms.map(function (n) { return '<span class="pill">' + esc(n) + '</span>'; }).join(' ') };
+    }
+    return { k: p.k, v: esc(p.valeurs.join(', ')) };
+  }) };
+}
+function scalaireYamlMd(v) { v = v.trim(); var m = v.match(/^(["'])(.*)\1$/); return m ? m[2] : v.replace(/[ \t]+#.*$/, ''); }
 // lignes groupées en blocs bruts ; le code clôturé passe avant tout le reste et son contenu n'est jamais interprété
 function decouperMarkdown(lignes) {
   var out = [], i = 0, n = lignes.length, l, m;
@@ -126,11 +192,18 @@ function enLigneMd(texte) {
   function garder(h) { gardes.push(h); return '\u0001' + (gardes.length - 1) + '\u0002'; }
   var s = String(texte).replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, function (m, f, c) { return garder('<code>' + esc(c.replace(/^ ([\s\S]*) $/, '$1')) + '</code>'); });
   s = s.replace(/\\([\\`*_{}\[\]()#+\-.!|~<>])/g, function (m, c) { return garder(esc(c)); });
+  s = s.replace(/!?\[\[([^\[\]\n]+)\]\]/g, function (m, cible) { var l = lienWikiMd(cible); return garder(l.href ? '<a href="' + l.href + '">' + esc(l.texte) + '</a>' : esc(l.texte)); });
   s = s.replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?\/?>/g, garder);   // balise HTML : laissée à l'assainisseur
   s = s.replace(/&(?!#\d+;|#x[0-9a-fA-F]+;|[A-Za-z][A-Za-z0-9]*;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   // [texte](adresse) : adresse web, courriel ou ancre ; une autre adresse (fichier local) ne garde que le texte
   s = s.replace(/(^|[^!])\[([^\]\n]+)\]\(\s*(?:&lt;)?([^\s()]*?)(?:&gt;)?(?:\s+"[^"]*")?\s*\)/g, function (m, av, t, u) {
     return av + (/^(https?:|mailto:|#)/i.test(u) ? garder('<a href="' + u.replace(/"/g, '&quot;') + '">') + t + garder('</a>') : t);
+  });
+  // #tag → pastille (règle de la pastille au clavier, saisieDiese) : en début de mot, au moins une lettre ; pas dans un lien
+  s = s.replace(MD_PASTILLE, function (m, av, nom, i, tout) {
+    nom = nom.replace(/[\/-]+$/, '');
+    var ouverts = 0; tout.slice(0, i + av.length).replace(/\u0001(\d+)\u0002/g, function (x, k) { if (/^<a\s/.test(gardes[+k])) ouverts++; else if (gardes[+k] === '</a>') ouverts--; return x; });
+    return ouverts > 0 ? m : av + garder('<span class="pill">' + nom + '</span>') + m.slice(av.length + 1 + nom.length);
   });
   s = s.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<s>$1</s>');
   s = s.replace(/\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/g, '<b><i>$1</i></b>');
@@ -139,6 +212,22 @@ function enLigneMd(texte) {
   s = s.split('\n').map(function (l) { return l.replace(/^[ \t]+/, '').replace(/(\\|[ \t]+)$/, ''); }).join('<br>');   // chaque retour à la ligne est gardé, comme dans Obsidian
   while (/\u0001\d+\u0002/.test(s)) s = s.replace(/\u0001(\d+)\u0002/g, function (m, k) { return gardes[+k]; });
   return s.trim();
+}
+// [[Page]], [[Page|texte]], [[Page#Section]] (^bloc : la page) → { href, texte } ; page cherchée sans casse ni accents par son
+// nom (pageTitle), avec ou sans dossier et .md ; section absente : la page ; sans page : href vide. Texte : l'alias, sinon « Page › Section »
+function lienWikiMd(cible) {
+  var bar = cible.indexOf('|'), alias = bar >= 0 ? cible.slice(bar + 1).trim() : '', c = bar >= 0 ? cible.slice(0, bar) : cible;
+  var di = c.indexOf('#'), nom = (di >= 0 ? c.slice(0, di) : c).trim(), sec = di >= 0 ? c.slice(di + 1).trim() : '';
+  if (sec.charAt(0) === '^') sec = '';
+  var texte = alias || (nom && sec ? nom + ' › ' + sec : nom || sec);
+  if (!nom || !liensMd) return { href: '', texte: texte };
+  var cles = [sansAccents(nom), sansAccents(nom.replace(/\.md$/i, '').split('/').pop())], pages = liensMd.pages;
+  for (var i = 0; i < pages.length; i++) {
+    if (cles.indexOf(sansAccents(pageTitle(pages[i], i))) < 0) continue;
+    var x = sec && i !== liensMd.cur ? sectionsOf(pages[i]).filter(function (y) { return sansAccents(y.t) === sansAccents(sec); })[0] : null;
+    return { href: '#pg-' + pages[i].id + (x ? '/' + x.id : ''), texte: texte };
+  }
+  return { href: '', texte: texte };
 }
 // vrai si la page a un bloc non vide autre que l'en-tête et le pied de page, que l'import garde
 function pageAContenu(blocs) {

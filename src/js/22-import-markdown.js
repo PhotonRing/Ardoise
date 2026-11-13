@@ -4,17 +4,30 @@
 function importMarkdown() {
   if (mode !== 'edit') return;
   var m = modal('Importer du Markdown', '<p class="muted">Collez une note Markdown (Obsidian…) ou choisissez un fichier .md. Le contenu de la page courante sera remplacé ; Ctrl+Z permet de revenir en arrière.</p>' +
-    '<textarea placeholder="# Titre&#10;&#10;Texte, listes, tableaux…" spellcheck="false"></textarea><p class="muted" id="mderr" style="color:var(--bad)"></p>' +
+    '<textarea placeholder="# Titre&#10;&#10;Texte, listes, tableaux…" spellcheck="false"></textarea><p class="muted" id="mderr" style="color:var(--bad)"></p><p class="muted" id="mdetat"></p>' +
     '<input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>', [
     { label: 'Annuler' },
     { label: 'Choisir un fichier…', fn: function (bg) { $('input[type=file]', bg).click(); return false; } },
     { label: 'Importer', primary: true, fn: function (bg) {
+      if (bg.dataset.attente) return false;   // images en cours de téléchargement
       var texte = $('textarea', bg).value, err = $('#mderr', bg);
       if (!texte.trim()) { err.textContent = 'Rien à importer : collez du Markdown ou choisissez un fichier.'; return false; }
-      var r = blocsDuMarkdown(texte, doc.pages);
+      var r = blocsDuMarkdown(texte, doc.pages, doc.cur);
       if (pageAContenu(doc.blocks) && !confirm('Le contenu de la page « ' + pageTitle(doc.pages[doc.cur], doc.cur) + ' » sera remplacé par la note importée. Continuer ?')) return false;
-      // ticket des images (Obsidian) : les images distantes se téléchargent ici, avant l'étape, puis importerMarkdown(r)
-      importerMarkdown(r);
+      if (!r.images.length) { importerMarkdown(r); return; }
+      // images distantes : téléchargées avant l'étape, fenêtre ouverte, pour que l'import reste une seule étape (un Ctrl+Z)
+      var n = r.images.length, k = 0, etat = $('#mdetat', bg);
+      bg.dataset.attente = '1'; err.textContent = '';
+      etat.textContent = 'Téléchargement des images (0/' + n + ')…';
+      Promise.all(r.images.map(function (im) {
+        function fini() { etat.textContent = 'Téléchargement des images (' + (++k) + '/' + n + ')…'; }
+        return telechargerImage(im.url, 15000).then(function (src) { r.blocs[im.bloc].src = src; fini(); },
+          function () { r.blocs[im.bloc].caption = esc(im.nom); r.imagesManquantes++; fini(); });
+      })).then(function () {
+        if (!bg.isConnected) return;   // fenêtre fermée pendant le téléchargement (Échap, clic à côté) : import abandonné
+        bg.remove(); importerMarkdown(r);
+      });
+      return false;
     } }]);
   var ta = $('textarea', m);
   $('input[type=file]', m).addEventListener('change', function (e) {
@@ -37,15 +50,18 @@ function importerMarkdown(r) {
     doc.blocks = haut.concat(r.blocs.map(function (b) { return mk(b.type, blocAssaini(b)); }), bas);
   }, null, { etape: ETAPE_MARKDOWN });
   scrollTo(0, 0);
-  toast(nb + (nb > 1 ? ' blocs importés' : ' bloc importé'));
+  var ni = r.imagesManquantes;
+  toast(nb + (nb > 1 ? ' blocs importés' : ' bloc importé') + (ni ? ' · ' + ni + (ni > 1 ? ' images à remettre' : ' image à remettre') : ''), ni ? 6000 : 2600);
 }
 function assainirMd(h) { return paintPills(sanitize(h), doc); }
 function blocAssaini(b) {
   var o = {};
   for (var k in b) if (k !== 'type') o[k] = b[k];
   if (o.html != null) o.html = assainirMd(o.html);
+  if (o.caption) o.caption = assainirMd(o.caption);
   if (b.type === 'details') o.title = assainirMd(o.title);
-  if (o.items) o.items = o.items.map(function (it) { var c = {}; for (var j in it) c[j] = it[j]; c.html = assainirMd(it.html); return c; });
+  if (b.type === 'facts') o.items = o.items.map(function (it) { return { k: it.k, v: assainirMd(it.v) }; });   // clé en texte simple
+  else if (o.items) o.items = o.items.map(function (it) { var c = {}; for (var j in it) c[j] = it[j]; c.html = assainirMd(it.html); return c; });
   if (o.rows) o.rows = o.rows.map(function (l) { return l.map(assainirMd); });
   return o;
 }

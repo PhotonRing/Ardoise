@@ -164,7 +164,8 @@ function renderBlock(b, d, ctx, num) {
     case 'image':
       if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
         '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
-        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div></div>' : '';
+        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div>' +
+        (isBlank(b.caption) ? '' : f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 })) + '</div>' : '';   // légende : l'image à remettre (import Markdown)
       return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
         ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
     case 'map':

@@ -18,7 +18,7 @@ test('markdown : le premier # donne le titre de l\'en-tête, les suivants et ## 
 test('markdown : sans titre #, pas d\'en-tête ; #mot en début de ligne n\'est pas un titre', () => {
   const r = md('## Section\n#tag seul');
   egal(r.entete, null);
-  egal(r.blocs, [{ type: 'h2', html: 'Section' }, { type: 'p', html: '#tag seul' }]);
+  egal(r.blocs, [{ type: 'h2', html: 'Section' }, { type: 'p', html: '<span class="pill">tag</span> seul' }], 'pastille (vocabulaire d\'Obsidian, markdown-obsidian.mjs)');
 });
 
 test('markdown : paragraphes séparés par une ligne vide, chaque retour à la ligne gardé (aussi deux espaces ou \\ en fin de ligne)', () => {
@@ -91,12 +91,12 @@ test('markdown : encadré replié (-) → bloc dépliable fermé, dépliable (+)
 });
 
 test('markdown : fins de ligne Windows et marque d\'ordre des octets lues sans caractère parasite', () => {
-  egal(md('﻿# Titre\r\n\r\nUn\r\ndeux\r\n\r\n- a\r\n'), { entete: { title: 'Titre' }, blocs: [{ type: 'p', html: 'Un<br>deux' }, { type: 'list', ordered: false, items: [{ html: 'a' }] }], imagesManquantes: 0 });
+  egal(md('﻿# Titre\r\n\r\nUn\r\ndeux\r\n\r\n- a\r\n'), { entete: { title: 'Titre' }, blocs: [{ type: 'p', html: 'Un<br>deux' }, { type: 'list', ordered: false, items: [{ html: 'a' }] }], imagesManquantes: 0, images: [] });
   egal(blocs('ligne\rseule'), [{ type: 'p', html: 'ligne<br>seule' }], 'ancien Mac');
 });
 
 test('markdown : texte vide ou fait de blancs → aucun bloc', () => {
-  egal(md('  \n\t\n'), { entete: null, blocs: [], imagesManquantes: 0 });
+  egal(md('  \n\t\n'), { entete: null, blocs: [], imagesManquantes: 0, images: [] });
 });
 
 test('markdown : note de référence (syntaxe documentée d\'Obsidian, fixtures/markdown/note-obsidian.md)', () => {

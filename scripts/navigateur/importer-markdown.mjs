@@ -5,10 +5,14 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const DOC = { v: 5, id: 'doc-md', title: 'Import', pages: [
+const DOC = { v: 5, id: 'doc-md', title: 'Import', tags: { projet: { c: 3 } }, pages: [
   { id: 'p1', title: 'Accueil', blocks: [{ id: 'h1', type: 'header', eyebrow: 'Surtitre', title: 'Accueil', lede: '' }, { id: 'x1', type: 'p', html: 'Texte existant' }, { id: 'f1', type: 'footer', html: 'Pied gardé' }] },
   { id: 'p2', title: 'Vide', blocks: [{ id: 'h2', type: 'header', eyebrow: '', title: 'Vide', lede: '' }, { id: 'v1', type: 'p', html: '' }] },
+  { id: 'p3', title: '', blocks: [{ id: 'h3', type: 'header', eyebrow: '', title: 'Suivi de projet', lede: '' }, { id: 's9', type: 'h2', html: 'Étapes clés' }] },
 ] };
+// vocabulaire d'Obsidian (ticket 05) : propriétés, #tag, [[…]], image locale et image intégrée sans réseau (data:)
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const OBSIDIAN = '---\ntags: [projet, nouveau]\nauteur: Ana\n---\nSuite de #Projet, voir [[suivi de projet#etapes cles]].\n\n![](capture.png)\n\n![Point](' + PNG + ')';
 const NOTE = readFileSync(new URL('../fixtures/markdown/note-obsidian.md', import.meta.url), 'utf8') +
   '\nPiège <b onclick="window.piege=1">gras</b><script>window.piege=2<\/script> <img src=x onerror="window.piege=3">\n';
 
@@ -103,6 +107,32 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure
     if (JSON.stringify(p2) !== JSON.stringify(['Vide', ['Section'], 2])) echec('page vide : ' + JSON.stringify(p2));
     await touche('PageUp', 1, 'PageUp', 33);
     if (!(await evalue('document.querySelector("#app").textContent.includes("Texte existant")'))) echec('l\'import a touché une autre page que la page courante');
+
+    // Obsidian (page 2, qui a maintenant du contenu) : fiche juste après l'en-tête, pastilles à la couleur connue, lien suivi,
+    // image locale à remettre (légende), image intégrée, message qui compte les images à remettre, un seul Ctrl+Z
+    mesure();
+    await touche('PageDown', 1, 'PageDown', 34);
+    await ouvrir();
+    await evalue(`document.querySelector('${fenetre} textarea').value = ${JSON.stringify(OBSIDIAN)}`);
+    await clic(fenetre + ' [data-m="2"]');
+    for (let i = 0; i < 60 && (await evalue(`!!document.querySelector('${fenetre}')`)); i++) await attendre(50);
+    if (await evalue(`!!document.querySelector('${fenetre}')`)) echec('Obsidian : la fenêtre reste ouverte : ' + (await texte('#mdetat')) + ' ' + (await texte('#mderr')));
+    const ob = await evalue(`(() => { const a = document.querySelector('#app'), bl = window.ardoise.doc.pages[1].blocks; return {
+      types: bl.map((b) => b.type), faits: [...a.querySelectorAll('dl.facts dt')].map((e) => e.textContent),
+      fiche: [...a.querySelectorAll('dl.facts dd .pill')].map((e) => e.textContent + ':' + /\\bpa-3\\b/.test(e.className)),
+      pastille: [...a.querySelectorAll('p .pill')].map((e) => e.textContent + ':' + /\\bpa-3\\b/.test(e.className)),
+      lien: (a.querySelector('a[href="#pg-p3/s9"]') || {}).textContent, legende: (a.querySelector('.img-new figcaption') || {}).textContent,
+      integree: /^data:image\\//.test(bl[4].src), message: (document.querySelector('#ui .toast') || {}).textContent }; })()`);
+    const vuOb = { types: ['header', 'facts', 'p', 'image', 'image'], faits: ['tags', 'auteur'], fiche: ['projet:true', 'nouveau:false'], pastille: ['Projet:true'],
+      lien: 'suivi de projet › etapes cles', legende: 'capture.png', integree: true, message: '4 blocs importés · 1 image à remettre' };
+    for (const k in vuOb) if (JSON.stringify(ob[k]) !== JSON.stringify(vuOb[k])) echec(`Obsidian : ${k} = ${JSON.stringify(ob[k])} au lieu de ${JSON.stringify(vuOb[k])}`);
+    await evalue(`document.querySelector('#app a[href="#pg-p3/s9"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))`);
+    await attendre(200);
+    if ((await evalue('document.querySelector("#app .b-header [data-k=title]").textContent')) !== 'Suivi de projet') echec('Obsidian : Ctrl+clic sur le lien n\'ouvre pas la page liée');
+    await touche('PageUp', 1, 'PageUp', 33);
+    await touche('z');
+    const avant = await evalue('window.ardoise.doc.pages[1].blocks.map((b) => b.type).join(",")');
+    if (avant !== 'header,h2,list') echec('Obsidian : un Ctrl+Z ne défait pas tout l\'import : ' + avant);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
