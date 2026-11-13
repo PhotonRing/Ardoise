@@ -68,8 +68,10 @@ function queryBlocks(b, d, pi) {
   } else return [];
   for (var i = from; i < to; i++) {
     var sec = null;
-    pages[i].blocks.forEach(function (x, j) {
-      if (foldLevel(x) > 0) sec = x; else if (foldLevel(x) === 0) sec = null;
+    // blocs d'un groupe compris : ils appartiennent à la section du groupe (j : position du bloc ou de son groupe)
+    blocsDe(pages[i].blocks, function (x, liste, k, parent) {
+      var j = parent ? pages[i].blocks.indexOf(parent) : k;
+      if (!parent) { if (foldLevel(x) > 0) sec = x; else if (foldLevel(x) === 0) sec = null; }
       if (region && (j < region[0] || j >= region[1])) return;
       if (x !== b) list.push({ blk: x, pi: i, sec: sec });
     });

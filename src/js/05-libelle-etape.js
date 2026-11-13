@@ -63,6 +63,7 @@ function libelleGrille(ra, rb) {
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
+  if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
   if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
     // une seule colonne bascule par étape : réduite si l'une l'est devenue
     var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
@@ -79,13 +80,22 @@ function libelleNature(ba, b) {
   return 'bloc modifié';
 }
 // modifications des blocs d'une page présente avant et après ; nature : celle du geste, donnée par l'appelant (collage, vidage d'une plage)
-function libellesBlocs(pa, pg, out, nature) {
-  var o = libelleOrdre(pa.blocks, pg.blocks);
-  pa.blocks.forEach(function (b) { if (!o.enB['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
-  pg.blocks.forEach(function (b) {
+function libellesBlocs(pa, pg, out, nature) { libellesListe(pa, pg, pa.blocks, pg.blocks, out, nature); }
+// une liste de blocs (la page, ou les blocs d'un groupe présent avant et après) : un groupe ajouté ou supprimé donne un
+// seul libellé ; sinon le groupe est comparé sans ses blocs, et ses blocs ont leurs propres libellés
+function libellesListe(pa, pg, la, lb, out, nature) {
+  var o = libelleOrdre(la, lb);
+  la.forEach(function (b) { if (!o.enB['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
+  lb.forEach(function (b) {
     var ba = o.enA['$' + b.id];
     if (!ba) { out.push(libelleBloc(pg, b) + ' : bloc ajouté'); return; }
     if (!o.garde['$' + b.id]) out.push(libelleBloc(pg, b) + ' : bloc déplacé');
+    if (ba.type === 'group' && b.type === 'group') {
+      var sa = libelleSans(ba, 'blocks'), sb = libelleSans(b, 'blocks');
+      if (sa !== sb) out.push(libelleBloc(pg, b) + ' : ' + (nature || libelleNature(JSON.parse(sa), JSON.parse(sb))));
+      libellesListe(pa, pg, ba.blocks || [], b.blocks || [], out, nature);
+      return;
+    }
     if (JSON.stringify(ba) !== JSON.stringify(b)) out.push(libelleBloc(pg, b) + ' : ' + (nature || libelleNature(ba, b)));
   });
 }

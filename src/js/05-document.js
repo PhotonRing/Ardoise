@@ -23,6 +23,13 @@ function normBlocks(arr, newer) {
     if (nb.type === 'kanban') kbCleanDeps(nb);
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
+    if (nb.type === 'group') {
+      // groupe : ses blocs, un seul niveau ; un bloc refusé dans un groupe est remis dans la page juste après lui
+      var dedans = [], dehors = [];
+      (Array.isArray(b.blocks) ? b.blocks : []).forEach(function (c) { (c && HORS_GROUPE[c.type] ? dehors : dedans).push(c); });
+      nb.blocks = normBlocks(dedans, newer); nb.folded = !!nb.folded; nb.title = String(nb.title || '');
+      Array.prototype.push.apply(out, normBlocks(dehors, newer));
+    }
   });
   return out;
 }
@@ -85,8 +92,34 @@ function loadInitial() {
   if (!d) { d = normalize(template('tour')); d.id = uid() + uid(); freshDoc = true; }
   return d;
 }
-function byId(id) { for (var i = 0; i < doc.blocks.length; i++) if (doc.blocks[i].id === id) return doc.blocks[i]; return null; }
-function idx(b) { return doc.blocks.indexOf(b); }
+/* Parcours des blocs d'une page, enfants des groupes compris (un seul niveau) : fn(bloc, liste qui le contient, position
+   dans cette liste, groupe parent ou null), les enfants d'un groupe juste après lui. Pur : sert aussi aux bancs. */
+function blocsDe(blocks, fn) {
+  (blocks || []).forEach(function (b, i) {
+    fn(b, blocks, i, null);
+    if (b && b.type === 'group' && Array.isArray(b.blocks)) b.blocks.forEach(function (c, j) { fn(c, b.blocks, j, b); });
+  });
+}
+// liste plate des blocs d'une page, enfants compris
+function tousBlocs(blocks) { var out = []; blocsDe(blocks, function (b) { out.push(b); }); return out; }
+// où est le bloc id parmi les blocs d'une page : { b, liste, i, parent } (parent : le groupe qui le contient, sinon null), ou null
+function ouEst(blocks, id) {
+  var r = null;
+  blocsDe(blocks, function (b, liste, i, parent) { if (!r && b && b.id === id) r = { b: b, liste: liste, i: i, parent: parent }; });
+  return r;
+}
+// page qui contient un bloc, enfants des groupes compris (-1 sinon)
+function pageDuBloc(pages, bid) { for (var i = 0; i < pages.length; i++) if (ouEst(pages[i].blocks, bid)) return i; return -1; }
+// copie profonde d'un bloc, identifiant neuf pour lui et pour chaque bloc qu'il contient
+function copieBloc(b) {
+  var c = JSON.parse(JSON.stringify(b)); c.id = uid();
+  if (c.type === 'group' && Array.isArray(c.blocks)) c.blocks.forEach(function (x) { x.id = uid(); });
+  return c;
+}
+function byId(id) { var o = ouEst(doc.blocks, id); return o ? o.b : null; }
+// position d'un bloc de la page affichée : { liste, i, parent } (liste : la page ou le groupe qui le contient), ou null
+function position(b) { var o = b ? ouEst(doc.blocks, b.id) : null; return o && o.b === b ? o : null; }
+function idx(b) { return doc.blocks.indexOf(b); }   // position au premier niveau seulement (-1 pour un bloc d'un groupe)
 function getPath(o, k) { var p = k.split('.'); for (var i = 0; i < p.length; i++) { if (o == null) return undefined; o = o[p[i]]; } return o; }
 function ligneVide(l) { return l.every(function (v) { return !v; }); }   // ligne (ou colonne) de tableau sans texte
 function setPath(o, k, v) { var p = k.split('.'); for (var i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v; }

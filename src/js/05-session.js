@@ -76,7 +76,7 @@ function creerSession(adaptateur) {
     if (r.neuf) { nd.id = uid() + uid(); nd.savedAt = null; delete nd.lock; delete nd.mapKey; delete nd.sync; }
     (r.garde || []).forEach(function (k) { if (ancien[k] !== undefined && ancien[k] !== null) nd[k] = ancien[k]; else delete nd[k]; });
     if (r.garde && !ancien.savedAt) nd.savedAt = null;   // normalize écrit toujours savedAt
-    if (r.renumeroter) { var vus = {}; nd.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (vus[b.id]) b.id = uid(); vus[b.id] = 1; }); }); }
+    if (r.renumeroter) { var vus = {}; nd.pages.forEach(function (pg) { blocsDe(pg.blocks, function (b) { if (vus[b.id]) b.id = uid(); vus[b.id] = 1; }); }); }   // blocs des groupes compris
     if (r.historique === 'etape') { delete nd.sync; sy.reprendre(ancien, nd); }   // la synchronisation reste celle du document courant
     var p = r.page === 'lien' && options && +options.page >= 0 ? Math.floor(+options.page) : 0;
     if (r.page === 'gardee') p = ancien.cur < nd.pages.length ? ancien.cur : 0;

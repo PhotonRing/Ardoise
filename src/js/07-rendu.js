@@ -158,6 +158,19 @@ function renderBlock(b, d, ctx, num) {
         }).join('') + '</tbody></table></div>';
     case 'note':
       return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
+    case 'group':
+      // groupe repliable : son pli d'édition est enregistré (folded) ; en lecture, un <details> que chacun plie pour soi
+      var gk = b.blocks || [], gn = gk.length, gplie = e ? !!b.folded : ((ctx.folds || {})[b.id] != null ? !!ctx.folds[b.id] : !!b.folded);
+      if (e) return '<div class="grp grp-edit' + (gplie ? ' grp-plie' : '') + '"><div class="grp-head"><button type="button" class="grp-v" data-act="fold" aria-expanded="' + !gplie + '" title="' + (gplie ? 'Déplier' : 'Plier') + ' le groupe">›</button>' +
+        f('span', 'grp-t', 'title', b.title, { ph: 'Titre du groupe', nl: 1 }) +
+        (gplie ? '<button type="button" class="grp-n" data-act="fold" title="Déplier le groupe">' + (gn ? gn + ' bloc' + (gn > 1 ? 's' : '') : 'vide') + '</button>' : '') + '</div>' +
+        (gplie ? '' : '<div class="grp-body">' + gk.map(function (c) { return wrapEdit(c, renderBlock(c, d, ctx, null), 0, editorUi, d.pages.length, true); }).join('') +
+          (gn ? '' : '<div class="grp-vide">Glissez des blocs ici ou ajoutez-en un</div>') +
+          '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
+      return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
+        var ci = renderBlock(c, d, ctx, null);
+        return ci && !ctx.static ? ci.replace(/^<(\w+)/, '<$1 data-bid="' + c.id + '"') : ci;   // ancrage de la bascule (19-mode-lecture-edition.js)
+      }).join('') + '</div></details>';
     case 'details':
       if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
       return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
@@ -372,18 +385,24 @@ function foldInfo(blocks, isFolded) {
   r.forEach(function (h, i) { if (h < 0) return; var hid = blocks[h].id; hidden[blocks[i].id] = hid; count[hid] = (count[hid] || 0) + 1; });
   return { hidden: hidden, count: count };
 }
+// bloc caché en édition : par une section pliée (lui ou son groupe), ou par son groupe plié
+function cacheEnEdition(blocks, id) {
+  var o = ouEst(blocks, id); if (!o) return false;
+  return !!foldInfo(blocks).hidden[(o.parent || o.b).id] || !!(o.parent && o.parent.folded);
+}
 function revealBlock(id, blocks) {
-  // déplie les sections qui masquent ce bloc, parmi blocks (par défaut, la page affichée)
+  // déplie le groupe qui contient ce bloc et les sections qui le masquent, parmi blocks (par défaut, la page affichée)
   blocks = blocks || doc.blocks;
+  var o = ouEst(blocks, id); if (o && o.parent) { o.parent.folded = false; id = o.parent.id; }
   for (var n = 0; n < 20; n++) { var h = foldInfo(blocks).hidden[id], hb = h && blocks.filter(function (b) { return b.id === h; })[0]; if (!hb) return; delete hb.folded; }
 }
-function wrapEdit(b, inner, nHidden, editorUi, nPages) {
+function wrapEdit(b, inner, nHidden, editorUi, nPages, enfant) {
   var s = settings(b), fl = foldLevel(b) > 0;
   return '<div class="blk' + (editorUi && editorUi.bar != null && b.id === editorUi.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="collant"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
-    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && b.type !== 'footer' && nPages > 1 ? act('deplacer-page', '⇥', 'Déplacer vers la page…') : '') +
+    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && b.type !== 'footer' && nPages > 1 && !enfant ? act('deplacer-page', '⇥', 'Déplacer vers la page…') : '') +
     '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
@@ -411,7 +430,7 @@ function pageLv(pages, i) { return +pages[i].lv || 0; }
 function pageEnd(pages, i) { var lv = pageLv(pages, i), j = i + 1; while (j < pages.length && pageLv(pages, j) > lv) j++; return j; }   // fin de la page et de ses sous-pages (exclue)
 // déplacement d'un bloc vers une autre page : page qui contient un bloc (-1 sinon) ; blocs emportés à partir de l'indice i
 // (un titre de section emporte ce qu'il masquerait s'il était seul plié, plié ou non ; un autre bloc part seul)
-function pageDuBloc(pages, bid) { for (var i = 0; i < pages.length; i++) for (var j = 0; j < pages[i].blocks.length; j++) if (pages[i].blocks[j].id === bid) return i; return -1; }
+// pageDuBloc : 05-document.js (enfants des groupes compris)
 function uniteDuBloc(blocks, i) {
   var levels = blocks.map(foldLevel); if (levels[i] <= 0) return 1;
   return 1 + Reader.foldHidden(levels, levels.map(function (_, j) { return j === i; })).filter(function (h) { return h === i; }).length;

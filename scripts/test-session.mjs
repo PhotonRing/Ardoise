@@ -1056,6 +1056,51 @@ test('libellé, deux copies : une modification reçue n\'apparaît jamais, ni po
   egal(lib(b), ['Accueil · Paragraphe « c-B » : bloc ajouté', ''], 'chez B, rien de A');
 });
 
+// Groupe repliable : les blocs d'un groupe ont leurs propres libellés ; le groupe entier part et revient en une étape
+const AVEC_GROUPE = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+  { id: 'b1', type: 'p', html: 'a' },
+  { id: 'g1', type: 'group', title: 'Détails', blocks: [{ id: 'c1', type: 'p', html: 'un' }, { id: 'c2', type: 'p', html: 'deux' }] },
+] }] });
+const groupe = (m) => m.doc.pages[0].blocks[1];
+
+test('groupe : supprimer un groupe est une étape, un seul Ctrl+Z le rend entier ; un seul libellé', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  const avant = JSON.stringify(m.doc.pages);
+  m.s.modifier(() => { m.doc.pages[0].blocks.splice(1, 1); });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : bloc supprimé');
+  m.s.annuler();
+  egal(JSON.stringify(m.doc.pages), avant, 'groupe rendu avec son contenu');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+
+test('groupe : un bloc d\'un groupe est libellé pour lui-même (texte modifié, ajouté, supprimé)', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  m.s.modifier(() => { groupe(m).blocks[0].html = 'un bis'; });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « un bis » : texte modifié');
+  m.s.modifier(() => { groupe(m).blocks.push({ id: 'c3', type: 'p', html: 'trois' }); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « trois » : bloc ajouté');
+  m.s.modifier(() => { groupe(m).blocks.splice(1, 1); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « deux » : bloc supprimé');
+});
+
+test('groupe : plier et déplier le groupe en édition sont des étapes nommées', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  m.s.modifier(() => { groupe(m).folded = true; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : groupe plié');
+  m.s.modifier(() => { groupe(m).folded = false; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : groupe déplié');
+  m.s.modifier(() => { groupe(m).title = 'Plus'; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Plus un deux » : texte modifié');
+});
+
+test('groupe : un import renumérote les identifiants en double, blocs des groupes compris', () => {
+  const m = monter();
+  const d = AVEC_GROUPE(); d.pages[0].blocks[1].blocks[1].id = 'b1';
+  m.s.remplacer(d, 'import');
+  const vus = [m.doc.pages[0].blocks[0].id, ...groupe(m).blocks.map((b) => b.id), groupe(m).id];
+  egal(new Set(vus).size, 4, 'identifiants uniques');
+});
+
 for (const [nom, fn] of tests) {
   try { fn(); n++; } catch (e) { console.error(`ÉCHEC : ${nom}\n${e.stack || e.message}`); process.exit(1); }
 }
