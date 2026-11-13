@@ -62,6 +62,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     if (bl.nom !== 'Evenement.docx') echec('nom tiré du titre du groupe : ' + bl.nom);
     if (!/Campagne X/.test(bl.doc) || /Texte/.test(bl.doc)) echec('le bloc seul attendu');
   }
+  // ticket 02 en même temps : le menu ⋯ d'un groupe garde ses entrées de rangement à côté des deux exports
+  mesure();
+  const entrees = await evalue(`(() => { document.querySelector('.blk[data-id="g1"] [data-act="menu-bloc"]').click(); const t = [...document.querySelectorAll('.menu-bloc .mi')].map((m) => m.textContent); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return t; })()`);
+  if (!['Copier pour Office', 'Exporter en Word (.docx)', 'Dégrouper'].every((l) => entrees.some((t) => t.includes(l)))) echec('menu ⋯ du groupe : ' + JSON.stringify(entrees));
   mesure();
   if ((await evalue('JSON.stringify(window.ardoise.doc)')) !== avant) echec('le document a changé');
   if ((await evalue(`document.querySelector('[data-ui=undo]').title`)) !== annuler) echec('une étape d\'annulation est apparue');
