@@ -798,6 +798,35 @@ test('libellé : un geste peut donner le libellé complet de son étape ({ etape
   egal(libelles(m)[1], 'Accueil : page importée du Markdown', 'rétablir reprend le même libellé');
 });
 
+// déplacement vers une autre page : section et paragraphe de la page Accueil vers la page Suite (comme deplacerVersPage)
+const DEUX_PAGES = () => ({ title: 'Doc', pages: [
+  { id: 'p1', title: 'Accueil', blocks: [{ id: 's1', type: 'h2', html: 'Courses' }, { id: 'x1', type: 'p', html: 'du pain' }, { id: 'x2', type: 'p', html: 'reste' }] },
+  { id: 'p2', title: 'Suite', blocks: [{ id: 'y1', type: 'p', html: 'déjà là' }] }] });
+const versSuite = (d) => () => { const seg = d.pages[0].blocks.splice(0, 2); d.pages[1].blocks.push(...seg); };
+const idsPages = (d) => d.pages.map((p) => p.blocks.map((x) => x.id).join(','));
+
+test('libellé : bloc déplacé vers une autre page, une seule étape, annulée d\'un seul Ctrl+Z', () => {
+  const m = monter(); m.s.remplacer(DEUX_PAGES(), 'demarrage'); m.vider();
+  const titre = m.ctx.libelleDeplacement('Accueil', m.doc.pages[0].blocks[0], 'Suite');
+  egal(titre, 'Accueil · Titre de section « Courses » : bloc déplacé vers « Suite »');
+  m.s.modifier(versSuite(m.doc), null, { etape: titre });
+  egal(idsPages(m.doc), ['x2', 'y1,s1,x1']);
+  egal(libelles(m), [titre, '']);
+  m.s.annuler();
+  egal(idsPages(m.doc), ['s1,x1,x2', 'y1'], 'une seule annulation remet la section et son contenu');
+  egal(libelles(m), ['', titre]);
+  m.s.retablir();
+  egal(idsPages(m.doc), ['x2', 'y1,s1,x1']);
+});
+
+test('deux copies : un bloc déplacé vers une autre page arrive chez l\'autre copie, une seule fois, sur la page cible', () => {
+  const { a, b } = relier(DEUX_PAGES);
+  a.s.modifier(versSuite(a.ctx.doc), null, { etape: 'déplacé' });
+  echanger(a, b);
+  egal(idsPages(b.ctx.doc), ['x2', 'y1,s1,x1']);
+  egal(JSON.stringify(b.ctx.doc.pages[1].blocks[2]), JSON.stringify(a.ctx.doc.pages[1].blocks[2]), 'contenu transmis');
+});
+
 test('libellé : l\'import Markdown remplace la page en une étape « page importée du Markdown », défaite d\'un seul Ctrl+Z', () => {
   const m = monter();
   const r = m.ctx.blocsDuMarkdown('# Note\n\nUn\n\n- a', []);

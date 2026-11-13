@@ -229,7 +229,8 @@ function ardoiseReader() {
       if (!e.target.closest) return;
       var a = e.target.closest('a[href^="#pg-"]');
       if (a) {
-        // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>), cherchée dans toutes les pages
+        // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>) ; la section est cherchée dans toutes les
+        // pages : déplacée, elle s'ouvre sur sa page réelle (cible)
         e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), c = cible(h[0], h[1]);
         if (c) aller(c.page, c.bloc);
         return;

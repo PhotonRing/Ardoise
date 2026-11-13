@@ -8,7 +8,7 @@ import { join } from 'node:path';
 const long = (p) => Array.from({ length: 40 }, (_, k) => ({ id: p + 'x' + k, type: 'p', html: 'Ligne ' + k + ' de la page ' + p + ', assez longue pour remplir la largeur de la colonne de lecture.' }));
 const DOC = {
   title: 'Carnet', pages: [
-    { id: 'p1', blocks: [{ id: 'h1', type: 'header', title: 'Accueil' }, { id: 'a1', type: 'p', html: 'Début' }].concat(long('p1')) },
+    { id: 'p1', blocks: [{ id: 'h1', type: 'header', title: 'Accueil' }, { id: 'a1', type: 'p', html: 'Début, <a href="#pg-p1/s3">ancienne adresse de la section</a>' }].concat(long('p1')) },
     { id: 'p2', blocks: [{ id: 'h2', type: 'header', title: 'Suite' }, { id: 'l2', type: 'p', html: 'Aller à <a href="#pg-p3/s3">la section</a>' }].concat(long('p2')) },
     { id: 'p3', blocks: [{ id: 'h3', type: 'header', title: 'Fin' }, { id: 'l3', type: 'p', html: 'Plus bas : <a href="#pg-p3/s3">la section</a>' }].concat(long('p3'),
       [{ id: 's3', type: 'h2', html: 'Section visée' }, { id: 'y3', type: 'p', html: 'Sous la section' }], long('p3b')) }] };
@@ -82,6 +82,15 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     attendu('section de la barre latérale sur une autre page : page 3, section en haut, une entrée', b1.pg === 'p3' && b1.h === '#pg-p3/s3' && b1.n === b0.n + 1 && Math.abs(sb) < 120, { b0, b1, sb });
     const b2 = await retour('back');
     attendu('Précédent : retour en page 1', b2.pg === 'p1' && b2.h === '#pg-p1', b2);
+
+    // avec le ticket 03 : lien vers une section déplacée (adresse de son ancienne page) ; sa page réelle s'ouvre, et
+    // Précédent ramène à la page du lien (l'entrée remplace la suite de l'historique : sa longueur ne change pas)
+    await evalue('scrollTo(0, 0); true'); await attendre(250);
+    await evalue(cliquer('.pg:not([hidden]) a[href="#pg-p1/s3"]')); await attendre(150);
+    const d1 = await etat(), sd = await evalue(HAUT_SECTION);
+    attendu('section déplacée : page réelle, adresse corrigée', d1.pg === 'p3' && d1.h === '#pg-p3/s3' && Math.abs(sd) < 120, { b2, d1, sd });
+    const d2 = await retour('back');
+    attendu('Précédent après la section déplacée : page 1', d2.pg === 'p1', d2);
 
     // ouverture sur une adresse : ancienne forme #p2, section, page supprimée
     const o1 = await ouvrir('#p2');
