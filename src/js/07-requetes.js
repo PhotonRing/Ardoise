@@ -211,19 +211,26 @@ function qCardLabel(b, c, names) {
   var t = (c.tags || []).map(function (k) { return names[k] || k; });
   return base + (t.length ? ' · ' + t.join(c.match === 'all' ? ' + ' : ' ou ') : '');
 }
+// compteurs de la vue nombre : { num, tot (null sans total), def (texte par défaut), label (texte affiché) } par carte (partagé avec l'export Office)
+function qCompteurs(b, d, pi, recs) {
+  var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
+  if (b.src === 'kanban') kbColumns(b, d, pi).forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
+  return (b.cards && b.cards.length ? b.cards : [qDefCard(b)]).map(function (c) {
+    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate, c.tcol).length : null, def = qCardLabel(b, c, names);
+    return { num: filterRecs(recs, c.tags, c.match, c.state, c.col).length, tot: tot, def: def, label: String(c.label || '').trim() || def };
+  });
+}
 function qCards(b, d, ctx, recs) {
   var pi = ctx.page, e = ctx.edit;
   // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui ont ses
   // propres pastilles (et, pour les cases, leur état), éventuellement rapportés à un total
-  var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
   var avail = e ? scopeTags(b, d, pi, recs) : null, cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], chk = b.src === 'check', kbc = b.src === 'kanban' ? kbColumns(b, d, pi) : [];
-  kbc.forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
+  var compteurs = qCompteurs(b, d, pi, recs);
   var o = function (v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
   var stSel = function (p, cur) { if (kbc.length || b.src === 'kanban') return qColSel(b, p.replace(/state$/, 'col'), (function () { var m = p.match(/^cards\.(\d+)\.(t?)state$/); return m ? cards[+m[1]][m[2] + 'col'] : ''; })(), kbc); return chk ? '<select data-act="set" data-prop="' + p + '">' + o('all', cur || 'all', 'toutes') + o('done', cur, 'cochées') + o('todo', cur, 'non cochées') + '</select>' : ''; };
   return '<div class="q-cards">' + cards.map(function (c, i) {
-    var num = filterRecs(recs, c.tags, c.match, c.state, c.col).length;
-    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate, c.tcol).length : null;
-    var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0, def = qCardLabel(b, c, names);
+    var cpt = compteurs[i], num = cpt.num, tot = cpt.tot, def = cpt.def;
+    var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0;
     var lab = e ? '<span class="fld q-lab" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="cards.' + i + '.label" data-nl data-ph="' + esc(def) + '">' + esc(c.label || '') + '</span>'
       : '<span class="q-lab">' + esc(String(c.label || '').trim() || def) + '</span>';
     var form = !e ? '' : '<div class="q-cform">' +
@@ -310,9 +317,8 @@ function qTh(b, ctx, key, label) {
   if (ctx.static) return '<th>' + esc(label) + '</th>';
   return '<th><button type="button" class="q-th" data-qsort="' + esc(key) + '" title="Trier">' + esc(label) + (on ? '<span class="q-dir">' + (sp.dir === 'desc' ? ' ↓' : ' ↑') + '</span>' : '') + '</button></th>';
 }
-function qKanban(b, d, ctx, recs) {
-  var pi = ctx.page;
-  // résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie
+// résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie (gb) ; partagé avec l'export Office
+function qGroupes(b, d, pi, recs) {
   var src = b.src || 'facts', groups = [], gi = {};
   var add = function (key, name, r) { if (!(key in gi)) { gi[key] = groups.length; groups.push({ name: name, recs: [] }); } if (r) groups[gi[key]].recs.push(r); };
   var gb = src === 'check' || src === 'kanban' ? '' : (b.groupBy || (qSortOptions(b, recs)[0] || [''])[0]);
@@ -324,6 +330,10 @@ function qKanban(b, d, ctx, recs) {
     var c = null; for (var i = 0; i < r.cells.length; i++) if ('c:' + r.cells[i].k.toLowerCase() === gb) c = r.cells[i];
     var t = c ? htmlText(c.v).replace(/\s+/g, ' ').trim() : ''; add(t.toLowerCase(), t || '(vide)', r);
   });
+  return { groups: groups, gb: gb };
+}
+function qKanban(b, d, ctx, recs) {
+  var src = b.src || 'facts', qg = qGroupes(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
   var card = function (r) {
     if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
       (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(d, r.x) + '</article>'; }
@@ -333,6 +343,12 @@ function qKanban(b, d, ctx, recs) {
   return '<div class="kb kb-q"><div class="kb-cols">' + groups.map(function (g) {
     return '<section class="kb-col"><div class="kb-head"><span class="kb-title">' + esc(g.name) + '</span><span class="kb-n">' + g.recs.length + '</span></div><div class="kb-list">' + (g.recs.map(card).join('') || '<p class="kb-empty">—</p>') + '</div></section>';
   }).join('') + '</div></div>';
+}
+// colonnes réunies par nom, dans l'ordre d'apparition, et cellules d'un résultat rangées par colonne (partagé avec l'export Office)
+function qColonnes(recs) {
+  var cols = [], ck = {};
+  recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
+  return { cols: cols, cellsOf: function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; } };
 }
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
@@ -353,9 +369,7 @@ function queryResult(b, d, ctx) {
       recs.map(function (r) { return '<tr' + (r.done ? ' class="done"' : '') + '><td class="q-boxc">' + qBox(d, ctx, r) + '</td><td>' + item(r) + '</td><td>' + qSource(d, r.x) + '</td></tr>'; }).join('') + '</tbody></table></div>' + more;
   }
   // fiches de faits et lignes de tableaux : colonnes réunies par nom, dans l'ordre d'apparition
-  var cols = [], ck = {};
-  recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
-  var cellsOf = function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; };
+  var cc = qColonnes(recs), cols = cc.cols, cellsOf = cc.cellsOf;
   if (view === 'list') {
     return '<ul class="q-list">' + recs.map(function (r) {
       var parts = cellsOf(r).map(function (c, j) { return c && !isBlank(c.v) ? '<span class="q-kv"><span class="q-k">' + esc(cols[j]) + '</span> ' + val(c) + '</span>' : ''; }).filter(Boolean);

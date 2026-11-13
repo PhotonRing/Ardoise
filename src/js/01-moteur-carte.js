@@ -340,7 +340,7 @@ function ardoiseMapKit() {
     }
 
     function size() {
-      W = el.clientWidth; H = el.clientHeight; dpr = printing ? 2 : Math.min(2, window.devicePixelRatio || 1);
+      W = el.clientWidth; H = el.clientHeight; dpr = printing ? 2 : o.dpr || Math.min(2, window.devicePixelRatio || 1);   // o.dpr : image d'export (22-copier-office.js)
       cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
       cv.style.width = W + 'px'; cv.style.height = H + 'px';
     }

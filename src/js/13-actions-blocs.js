@@ -37,6 +37,7 @@ app.addEventListener('click', function (e) {
     case 'down': moveBlock(b, 1); break;
     case 'dup': dupBlock(b); break;
     case 'deplacer-page': ouvrirDeplacerBloc(a, b); break;
+    case 'menu-bloc': ouvrirMenuBloc(a, b); break;
     case 'del': deleteBlock(b, false); break;
     case 'toggle': keepView(b); session.modifier(function () { var pr = a.dataset.prop; b[pr] = pr === 'cities' || pr === 'countries' || pr === 'deep' ? b[pr] === false : !b[pr]; }); break;
     case 'tl-add': session.modifier(function () { b.items.push({ date: '', title: '', text: '', color: 'accent' }); }, { b: b.id, k: 'items.' + b.items.length + '.date' }); break;
