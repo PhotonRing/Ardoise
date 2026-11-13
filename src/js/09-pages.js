@@ -1,15 +1,19 @@
 /* ---------- Pages ---------- */
-function pageHash(i) { try { history.replaceState(null, '', '#p' + (i + 1)); } catch (_) {} }
-function goPage(i, keepScroll) {
+// adresse de la page affichée, sans entrée d'historique (opérations de page, import)
+function pageHash(i) { remplacerAdresse(adressePage(doc.pages, i)); }
+// sansEntree : retour par Précédent / Suivant, ou lien qui crée lui-même son entrée (goLink)
+function goPage(i, keepScroll, sansEntree) {
   i = Math.max(0, Math.min(doc.pages.length - 1, i));
   session.valider();
   if (i === doc.cur) return;
+  if (!sansEntree) noterDefilement();
   maps.forEach(function (m) { var b = byId(m.blockId); if (b && mode === 'edit') b.view = m.getView(); });
   mapUi = { draw: null, kind: null, editOf: null, edit: null, add: null }; cheatBlock = null;
   closePop(); itb.style.display = 'none';
   if (mode === 'edit') viewCol = {};   // colonne rouverte par un saut vers une carte : refermée en quittant la page
   pageAncestors(doc.pages, i).forEach(function (a) { if (navFold[doc.pages[a].id] === false) delete navFold[doc.pages[a].id]; });
-  doc.cur = i; render(); if (!keepScroll) scrollTo(0, 0); pageHash(i);
+  doc.cur = i; render(); if (!keepScroll) scrollTo(0, 0);
+  if (!sansEntree) naviguer(adressePage(doc.pages, i));
 }
 function insertPage(at, lv) {
   var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('p', {})] }; if (lv) pg.lv = lv;
@@ -98,6 +102,8 @@ app.addEventListener('click', function (e) {
   var lk = t.closest('a[href^="#pg-"]');
   if (lk && (mode === 'view' || e.ctrlKey || e.metaKey || lk.closest('.toc-blk, .q-res'))) { e.preventDefault(); goLink(lk.getAttribute('href')); return; }
   var sec = t.closest('a[data-sec]');
+  // section du sommaire latéral : une entrée d'historique, avant le défilement fait par Reader.navSpy
+  if (sec && byId(sec.dataset.sec)) { noterDefilement(); naviguer(adressePage(doc.pages, doc.cur, sec.dataset.sec)); }
   if (sec && mode === 'edit' && byId(sec.dataset.sec) && !$('.blk[data-id="' + sec.dataset.sec + '"]', app)) { var sid = sec.dataset.sec; session.modifier(function () { revealBlock(sid); }); }
   var kd = t.closest('[data-kbdep]');
   if (kd) { var dp = kd.dataset.kbdep.split('|'); kbDepMenu(kd, dp[0], dp[1]); return; }

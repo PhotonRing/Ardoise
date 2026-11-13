@@ -317,12 +317,23 @@ function goLink(href) {
   // ouvre la page liée, puis fait défiler jusqu'à la section (dépliée au besoin en édition)
   var L = parseLink(href); if (!L.page) return;
   var i = pageIndex(doc.pages, L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
-  var moved = i !== doc.cur; if (moved) goPage(i);
-  if (!L.bid) return;
-  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });
-  var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
-  if (el && mode === 'view') Reader.foldReveal(el);
-  if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');
+  var moved = i !== doc.cur;
+  if (!moved && !L.bid) return;
+  // une seule entrée d'historique pour la page et la section : la position de départ est notée avant de quitter
+  noterDefilement();
+  if (moved) goPage(i, false, true);
+  if (L.bid && montrerBloc(L.bid, !moved)) { naviguer(adressePage(doc.pages, i, L.bid)); return; }
+  if (moved) naviguer(adressePage(doc.pages, i));
+  if (L.bid) toast('Section introuvable : elle a sans doute été supprimée');
+}
+function montrerBloc(bid, doux) {
+  // section de la page affichée : dépliée au besoin (en édition, étape annulable), puis amenée en haut de l'écran
+  if (mode === 'edit' && byId(bid) && foldInfo(doc.blocks).hidden[bid]) session.modifier(function () { revealBlock(bid); });
+  var el = document.getElementById('b-' + bid) || $('.blk[data-id="' + bid + '"]', app);
+  if (!el) return false;
+  if (mode === 'view') Reader.foldReveal(el);
+  el.scrollIntoView({ block: 'start', behavior: doux ? 'smooth' : 'auto' });
+  return true;
 }
 function openLinkPop(kind, range, fld, a) {
   // kind : 'url' (adresse) ou 'page' (page ou section) ; a : lien existant à modifier, sinon range : texte à lier
