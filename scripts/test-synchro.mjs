@@ -157,6 +157,15 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   expect(r.pages[0].blocks.map((b) => b.id).join() === 'n2,c,n1', 'blocs ajoutés : ' + r.pages[0].blocks.map((b) => b.id));
   expect(r.pages[0].blocks[1].items[0].done === true && r.pages[0].blocks[1].items[0].html === 'lait entier', 'case cochée et modifiée');
 }
+{ // modèle diamant : deux personnes écrivent dans le même sommet, puis dans deux sommets ; frappes fusionnées caractère par caractère
+  const D = { id: 'd', type: 'diamond', title: 'Campagne', adversaire: 'APT28', capacite: '', infrastructure: '', victime: 'Mairie' };
+  const x = pair({ pages: [{ id: 'p', blocks: [D] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].adversaire = 'APT28 (Fancy Bear)'; na.pages[0].blocks[0].capacite = 'Mimikatz';
+  const nb = clone(x.db); nb.pages[0].blocks[0].adversaire = 'Groupe APT28'; nb.pages[0].blocks[0].victime = 'Mairie de X'; nb.pages[0].blocks[0].title = 'Campagne X';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)), d = r.pages[0].blocks[0];
+  expect(d.adversaire === 'Groupe APT28 (Fancy Bear)', 'diamant, même sommet : ' + d.adversaire);
+  expect(d.capacite === 'Mimikatz' && d.victime === 'Mairie de X' && d.title === 'Campagne X', 'diamant, sommets différents : ' + JSON.stringify(d));
+}
 { // un bloc supprimé d'un côté, modifié de l'autre : il reste supprimé
   const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'x' }, { id: 'c', type: 'p', html: 'y' }] }] });
   const na = clone(x.da); na.pages[0].blocks.shift();

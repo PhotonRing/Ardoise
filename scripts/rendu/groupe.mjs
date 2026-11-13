@@ -170,3 +170,13 @@ test('groupe : export et import JSON gardent le groupe et son contenu', () => {
   const { d: d2 } = monter(JSON.parse(JSON.stringify({ title: d.title, pages: d.pages })));
   egal(d2.pages[0].blocks[1], d.pages[0].blocks[1]);
 });
+
+test('groupe et modèle diamant : un diamant reste dans un groupe et la source « Modèles diamant » le trouve, avec la section du groupe', () => {
+  const doc = DOC();
+  doc.pages[0].blocks[1].blocks.push({ id: 'dm', type: 'diamond', title: 'Campagne', adversaire: 'Groupe <span class="pill">apt</span>' });
+  doc.pages[1].blocks.push({ id: 'q', type: 'query', src: 'diamond', scope: 'sec:p1/s1', tags: ['apt'] });
+  const { ctx, d } = monter(doc);
+  egal(ids(d.pages[0].blocks[1].blocks), ['c1', 'c2', 'dm'], 'diamant gardé dans le groupe');
+  egal(ctx.queryRecords(d.pages[1].blocks[1], d, 1).map((r) => r.x.blk.id), ['dm']);
+  vrai(/id="b-dm"/.test(ctx.renderPage(d, { page: 0, view: 'export' })), 'cible du lien de la requête, dans le groupe, export compris');
+});

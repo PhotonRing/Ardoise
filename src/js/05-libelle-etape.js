@@ -7,6 +7,8 @@ var LIBELLE_MOTS = 40;   // longueur des premiers mots d'un bloc, en caractères
 var LIBELLE_REGLAGES = [['title', 'Titre du document'], ['palette', 'Palette'], ['typo', 'Typographie'], ['width', 'Largeur'],
   ['theme', 'Thème'], ['nav', 'Navigation'], ['mapKey', 'Clé de carte']];
 // premiers mots d'un bloc : ses textes dans l'ordre (champs de texte, cellules), sans balise, tronqués
+// texte enrichi sans texte visible (pur : isBlank passe par le DOM)
+function libelleVide(h) { return !htmlText(h || '').trim(); }
 function libelleMots(b) {
   var t = [];
   function lire(x, k) {
@@ -15,7 +17,8 @@ function libelleMots(b) {
     if (Array.isArray(x)) { x.forEach(function (e) { lire(e, k); }); return; }
     if (x && typeof x === 'object') Object.keys(x).forEach(function (c) { if (c !== 'id' && c !== 'type') lire(x[c], k === 'rows' ? k : c); });
   }
-  lire(b, '');
+  // modèle diamant titré : son titre seul le nomme (« Modèle diamant « Campagne X » »), sinon ses sommets
+  if (b.type === 'diamond' && !libelleVide(b.title)) lire(b.title, 'title'); else lire(b, '');
   var m = t.join(' ').replace(/\s+/g, ' ').trim();
   return m.length > LIBELLE_MOTS ? m.slice(0, LIBELLE_MOTS).trim() + '…' : m;
 }

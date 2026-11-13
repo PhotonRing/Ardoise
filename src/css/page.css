@@ -63,6 +63,21 @@ b,strong{font-weight:600}
 .facts dt{font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .facts dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
 .alert{color:var(--bad)}
+/* modèle diamant : sommets dans une grille 3 × 3 (Adversaire en haut, Infrastructure à gauche, Capacité à droite, Victime en bas),
+   traits en SVG derrière ; sous 480 px, pile dans l'ordre du HTML (Adversaire, Capacité, Infrastructure, Victime) */
+.dia{display:flex;flex-direction:column;gap:10px}
+.dia-t{margin:0;font-weight:600;text-align:center}
+.dia-g{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:". a ." "i . c" ". v .";gap:18px 14px;align-items:center}
+.dia-traits{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.dia-traits line{stroke:var(--line);stroke-width:2}
+.dia-traits .dia-cote{stroke:var(--muted);stroke-opacity:.55}
+.dia-traits .dia-axe{stroke-dasharray:6 5}
+.dia-s{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.dia-adversaire{grid-area:a}.dia-capacite{grid-area:c}.dia-infrastructure{grid-area:i}.dia-victime{grid-area:v}
+.dia-n{font:500 11px/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dia-v{min-height:1.4em}
+.dia-vide{color:var(--muted);opacity:.6}
+@media (max-width:480px){.dia-g{grid-template-columns:minmax(0,1fr);grid-template-areas:none;gap:8px}.dia-g>.dia-s{grid-area:auto}.dia-traits{display:none}}
 section.step{display:flex;flex-direction:column;gap:12px;padding-top:20px;border-top:1px solid var(--line)}
 .step-head{display:flex;gap:12px;align-items:baseline}
 .num{font:800 15px/1 var(--f-display);color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:6px 9px;flex:none;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -521,7 +536,7 @@ span.kb-dref{text-decoration:none;cursor:auto}
   h1,h2,h3,.subtitle,.eyebrow,.step-head,header.b-header,.toc-blk-t,.kb-head,figure.fig figcaption{break-after:avoid;page-break-after:avoid}
   h2+*,h3+*,.subtitle+*,.step-head+*{break-before:avoid;page-break-before:avoid}
   /* blocs entiers */
-  .facts,.sub,.note,.fig,.mapblk,.map,.code,.codebox,pre.cmd,.fold,.toc-blk,.q-count,.q-cards,.kb,.kb-card,.tl-h,.tl-v-item,.tl-card,
+  .facts,.dia,.sub,.note,.fig,.mapblk,.map,.code,.codebox,pre.cmd,.fold,.toc-blk,.q-count,.q-cards,.kb,.kb-card,.tl-h,.tl-v-item,.tl-card,
   .q-list li,ul.check li,.list li,tr,dl .fact,footer.b-foot,header.b-header{break-inside:avoid;page-break-inside:avoid}
   .subs{display:grid}
   /* tableaux : en-tête répété sur chaque page, pas de défilement horizontal */
@@ -538,7 +553,7 @@ span.kb-dref{text-decoration:none;cursor:auto}
   .kb-band,.kb-fold{display:none!important}
   .kb-ctl,.q-go,.q-cdel,.q-cadd{display:none!important}
   /* pas d'ombres ni d'effets d'écran */
-  .kb-card,.q-count,.sub,.facts{box-shadow:none}
+  .kb-card,.q-count,.sub,.facts,.dia-s{box-shadow:none}
   a{text-decoration:underline;text-underline-offset:2px}
   .code pre,.codebox pre,pre.cmd{white-space:pre-wrap;overflow:visible;word-break:break-word}
   .map-list{break-inside:avoid}
