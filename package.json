@@ -1,6 +1,6 @@
 {
   "name": "ardoise",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "description": "Éditeur de pages WYSIWYG autonome : un seul fichier HTML qui s'enregistre lui-même.",
   "private": true,
   "license": "Unlicense",
