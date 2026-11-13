@@ -54,17 +54,18 @@ test('requête kanban : colonne « Attend » proposée en tableau, masquée par 
   vrai(li.includes('<span class="q-k">Attend</span> Relire, Valider'), li);
   const tri = rendu({ view: 'table', sortBy: 'att', sortDir: 'asc', colonnes: { mode: 'seulement', noms: ['titre'], ordre: [] } });
   egal(textes(resultat(tri), /<tr><td>([^<]*)<\/td>/g), ['Écrire', 'Publier', 'Relire', 'Valider'], 'tri sur Attend masquée, vides à la fin');
-  vrai(!resultat(rendu({ view: 'table' }, 'edit')).includes('data-qcol="#attend" checked'), 'case Attend décochée par défaut');
+  vrai(fenetre({ view: 'table' }, 'cols').includes('data-qcol="#attend">'), 'case Attend décochée par défaut');
 });
 
-test('requête kanban : réglages en édition seulement (case « bloquées seulement », champs des cartes en vue kanban)', () => {
-  const ed = rendu({ champs: { masques: ['texte'], ordre: ['source'] } }, 'edit');
-  vrai(ed.includes('data-qbloquees') && !ed.includes('data-qbloquees checked'), 'case bloquées');
-  vrai(rendu({ bloquees: true }, 'edit').includes('data-qbloquees checked'), 'case cochée');
+const fenetre = (q, cle) => { const { ctx, d } = monter(doc(q)); return ctx.qFenetre(d.pages[0].blocks[1], d, 0, cle); };
+test('requête kanban : réglages en édition seulement (filtre « Bloquées » par « + Filtre », champs des cartes en vue kanban)', () => {
+  vrai(fenetre({}, 'plus').includes('data-qfiltre="bloquees"'), '« + Filtre » propose Bloquées');
+  vrai(rendu({ bloquees: true }, 'edit').includes('data-qretirer="bloquees"'), 'filtre posé : puce et ×');
+  const ed = fenetre({ champs: { masques: ['texte'], ordre: ['source'] } }, 'cols');
   egal([...ed.matchAll(/data-qchamp="([^"]*)"( checked)?/g)].map((m) => m[1] + (m[2] ? '+' : '-')), ['source+', 'texte-', 'priorite+', 'echeance+', 'responsable+', 'attend+']);
   vrai(!ed.includes('data-qcolmode'), 'pas de choix des colonnes en vue kanban');
-  vrai(rendu({ view: 'table' }, 'edit').includes('data-qbloquees') && !rendu({ view: 'table' }, 'edit').includes('data-qchamp'), 'tableau : filtre, pas de champs');
-  for (const v of ['read', 'export']) vrai(!rendu({}, v).includes('data-qchamp') && !rendu({}, v).includes('data-qbloquees'), v);
+  vrai(!fenetre({ view: 'table' }, 'cols').includes('data-qchamp'), 'tableau : colonnes, pas de champs');
+  for (const v of ['read', 'export']) vrai(!rendu({ bloquees: true }, v).includes('q-puce'), v);
 });
 
 const pur = (x) => JSON.parse(JSON.stringify(x));

@@ -117,7 +117,7 @@ function renderBlock(b, d, ctx, num) {
     case 'kanban': return kanbanHTML(b, ctx, f);
     case 'query':
       return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? queryForm(b, d, ctx) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
+        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +

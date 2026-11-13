@@ -158,17 +158,6 @@ function qKbWhos(b, d, pi) {
   });
   return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
 }
-function qKbForm(b, d, pi) {
-  var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (String(cur || '') === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
-  var whos = qKbWhos(b, d, pi), w = b.kbWho || '';
-  if (w && w !== '-' && !whos.some(function (x) { return x.key === w; })) whos.push({ key: w, name: w });
-  var due = b.kbDue || '', withN = due === 'next' || due === 'soon' || due === 'after';
-  return '<select data-act="set" data-prop="kbWho" title="Responsable des cartes">' + o('', w, 'tous les responsables') + whos.map(function (x) { return o(x.key, w, 'responsable : ' + esc(x.name)); }).join('') + o('-', w, 'sans responsable') + '</select>' +
-    '<select data-act="set" data-prop="kbPrio" title="Priorité des cartes">' + o('', b.kbPrio, 'toutes les priorités') + o('p1', b.kbPrio, 'priorité P1') + o('p2', b.kbPrio, 'priorité P2') + o('p3', b.kbPrio, 'priorité P3') + o('p12', b.kbPrio, 'priorité P1 ou P2') + o('-', b.kbPrio, 'sans priorité') + '</select>' +
-    '<select data-act="set" data-prop="kbDue" title="Échéance des cartes">' + Q_DUE.map(function (x) { return o(x[0], due, x[1]); }).join('') + '</select>' +
-    (withN ? '<input type="number" class="q-num" data-prop="kbDueN" min="1" max="999" value="' + (Math.max(1, Math.round(+b.kbDueN) || 7)) + '" title="Nombre de jours, de semaines ou de mois">' +
-      '<select data-act="set" data-prop="kbDueU" title="Unité">' + o('j', b.kbDueU || 'j', 'jours') + o('s', b.kbDueU, 'semaines') + o('m', b.kbDueU, 'mois') + '</select>' : '');
-}
 function scopeTags(b, d, pi, recs) {
   // pastilles présentes dans les éléments cherchés de la portée (fiches, lignes ou cases), dans l'ordre du document
   var names = {}, out = [];
@@ -572,38 +561,138 @@ function queryResult(b, d, ctx) {
   return '<div class="tablewrap"><table class="q-table"><thead><tr>' + cols.map(function (c) { return qTh(b, ctx, qColTri(c), c.nom); }).join('') + '</tr></thead><tbody>' +
     recs.map(function (r) { var o = cellsOf(r); return '<tr' + (r.done ? ' class="done"' : '') + '>' + cols.map(function (c) { return td(c, r, o); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + more;
 }
-function queryForm(b, d, ctx) {
-  var pi = ctx.page;
-  // formulaire de la requête (édition)
-  var o = function (v, cur, label, extra) { return '<option value="' + esc(v) + '"' + (String(cur) === String(v) ? ' selected' : '') + (extra || '') + '>' + label + '</option>'; };
-  var sc = b.scope || 'doc', scopes = o('doc', sc, 'Tout le document') + o('here', sc, 'Cette page');
-  d.pages.forEach(function (pg, i) {
-    var pad = new Array(pageLv(d.pages, i) + 1).join('   ');
-    scopes += o('pg:' + pg.id, sc, pad + 'Page « ' + esc(pageTitle(pg, i)) + ' »');
-    sectionsOf(pg).forEach(function (x) { scopes += o('sec:' + pg.id + '/' + x.id, sc, pad + '   ' + (x.lv > 1 ? '   ' : '') + '§ ' + esc((x.n ? x.n + ' · ' : '') + x.t)); });
-  });
-  var want = b.tags || [], chips = qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
-  var pageScope = sc === 'here' || /^pg:/.test(sc);
-  var reg = b.view === 'regroupee' && b.src === 'table' ? qRegReglage(b, queryRecords(b, d, pi)) : null;   // vue regroupée : réglages et tri des groupes
-  return '<div class="q-form">' +
-    '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + o('diamond', b.src, 'les modèles diamant') + '</select></label>' +
-    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) +
-      '<label class="q-tog" title="Cartes dont une carte attendue n’est pas dans la dernière colonne de son kanban"><input type="checkbox" data-qbloquees' + (b.bloquees ? ' checked' : '') + '> bloquées seulement</label>' : '') +
-    (b.src === 'check' ? '<select data-act="set" data-prop="state" title="État des cases">' + o('all', b.state || 'all', 'toutes') + o('done', b.state, 'cochées') + o('todo', b.state, 'non cochées') + '</select>' : '') +
-    '<label>dans <select data-act="set" data-prop="scope" class="q-scope">' + scopes + '</select></label>' +
-    (pageScope ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') +
-    '<div class="q-tags"><span class="q-lbl">' + (b.view === 'count' ? 'Parmi ceux qui ont les pastilles' : 'Avec les pastilles') + '</span>' + chips +
-    (want.length > 1 ? '<select data-act="set" data-prop="match" title="Combinaison des pastilles">' + o('any', b.match || 'any', 'au moins une') + o('all', b.match, 'toutes') + '</select>' : '') +
-    (want.length ? '' : '<span class="muted q-hint">(aucune choisie : tout est retenu)</span>') + '</div>' +
-    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + (b.src === 'table' ? o('regroupee', b.view, 'regroupé') : '') + '</select></label>' +
-    (reg ? qRegForm(b, reg) : '') +
-    (b.view === 'kanban' && b.src !== 'check' && b.src !== 'kanban' ? '<label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, d, pi)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label>' : '') +
-    (b.view !== 'count' ? '<label>trier par <select data-act="set" data-prop="sortBy">' + o('', b.sortBy || '', 'ordre du document') +
-      (reg ? [['c:' + reg.nom(reg.x).toLowerCase(), reg.nom(reg.x)], ['#n', 'nombre de lignes']] : qSortOptions(b, queryRecords(b, d, pi))).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
-      (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
-      (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
-    (b.view === 'count' || reg ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
-    '</div>';
+// Ligne de puces (édition) : le réglage se lit comme une phrase, chaque puce ouvre sa fenêtre (16-puces-requete.js).
+// Un filtre posé est un champ présent ; ne pas le poser veut dire « tous ».
+var Q_VUES = { table: 'Tableau', list: 'Liste', kanban: 'En colonnes', count: 'Nombre', regroupee: 'Regroupée', chaleur: 'Carte de chaleur' };
+var Q_PRIO = { p1: 'P1', p2: 'P2', p3: 'P3', p12: 'P1 ou P2', '-': 'Sans priorité' };
+var Q_UNITE = { j: ['jour', 'jours'], s: ['semaine', 'semaines'], m: ['mois', 'mois'] };
+// filtres de chaque source, dans l'ordre de la ligne : [champ, nom dans « + Filtre »]
+var Q_FILTRE_TAGS = [['tags', 'Pastilles']];
+var Q_FILTRES = { facts: Q_FILTRE_TAGS, table: Q_FILTRE_TAGS, diamond: Q_FILTRE_TAGS, check: Q_FILTRE_TAGS.concat([['state', 'État des cases']]),
+  kanban: Q_FILTRE_TAGS.concat([['col', 'Colonne du kanban'], ['kbWho', 'Responsable'], ['kbPrio', 'Priorité'], ['kbDue', 'Échéance'], ['bloquees', 'Bloquées']]) };
+// vue rendue : les vues propres aux lignes de tableaux retombent sur le tableau (queryResult)
+function qVue(b) { var v = b.view || 'table'; return !Q_VUES[v] || ((v === 'regroupee' || v === 'chaleur') && b.src !== 'table') ? 'table' : v; }
+function qFiltrePose(b, prop) {
+  var v = b[prop];
+  return prop === 'tags' ? Array.isArray(v) && v.length > 0 : prop === 'state' ? v === 'done' || v === 'todo' : !!v;
+}
+function qFiltresProposes(b) { return (Q_FILTRES[b.src || 'facts'] || Q_FILTRE_TAGS).map(function (f) { return { prop: f[0], nom: f[1], pose: qFiltrePose(b, f[0]) }; }); }
+function qDueN(b) { return Math.max(1, Math.min(999, Math.round(+b.kbDueN) || 7)); }
+function qDueLibelle(b) {
+  var n = qDueN(b), u = Q_UNITE[b.kbDueU] || Q_UNITE.j, dans = n > 1 ? 'dans les ' + n + ' ' + u[1] : 'dans 1 ' + u[0];
+  return { late: 'Échéance dépassée', today: 'Échéance aujourd’hui', next: 'Échéance ' + dans, soon: 'Échéance dépassée ou ' + dans,
+    after: 'Échéance au-delà de ' + n + ' ' + u[n > 1 ? 1 : 0], set: 'Avec une échéance', none: 'Sans échéance' }[b.kbDue] || String(b.kbDue);
+}
+function qNomsTags(d) { var noms = {}; docTags(d).forEach(function (t) { noms[t.key] = t.name; }); return noms; }
+function qFiltreLibelle(b, d, pi, prop) {
+  var nom = function (liste, k) { var x = liste.filter(function (y) { return y.key === k; })[0]; return x ? x.name : k; };
+  if (prop === 'tags') { var noms = qNomsTags(d); return b.tags.map(function (k) { return noms[k] || k; }).join(b.match === 'all' ? ' et ' : ' ou '); }
+  if (prop === 'state') return b.state === 'done' ? 'Cochées' : 'Non cochées';
+  if (prop === 'col') return 'Colonne : ' + nom(kbColumns(b, d, pi), b.col);
+  if (prop === 'kbWho') return b.kbWho === '-' ? 'Sans responsable' : 'Responsable : ' + nom(qKbWhos(b, d, pi), b.kbWho);
+  if (prop === 'kbPrio') return Q_PRIO[b.kbPrio] || String(b.kbPrio);
+  if (prop === 'kbDue') return qDueLibelle(b);
+  return 'Bloquées';
+}
+function qPorteeLibelle(b, d) {
+  var sc = b.scope || 'doc', m = String(sc).match(/^(?:pg:(.+)|sec:([^/]+)\/(.+))$/), sub = b.sub && (sc === 'here' || /^pg:/.test(sc)) ? ' et ses sous-pages' : '';
+  if (sc === 'here') return 'Cette page' + sub;
+  if (!m) return 'Tout le document';
+  var pi = -1; d.pages.forEach(function (pg, i) { if (pg.id === (m[1] || m[2])) pi = i; });
+  if (pi < 0) return m[1] ? 'Page introuvable' : 'Section introuvable';
+  if (m[1]) return 'Page ' + pageTitle(d.pages[pi], pi) + sub;
+  var s = sectionsOf(d.pages[pi]).filter(function (x) { return x.id === m[3]; })[0];
+  return s ? 'Section ' + (s.n ? s.n + ' · ' : '') + s.t : 'Section introuvable';
+}
+function qColsLibelle(b, d, pi, v) {
+  if (v === 'kanban' && b.src === 'kanban') { var n = qChampsAffiches(b).length; return n ? 'Cartes : ' + n + (n > 1 ? ' champs' : ' champ') : 'Cartes : titre seul'; }
+  var recs = queryRecords(b, d, pi), tous = qColonnesDispo(b, recs).dispo.length, vus = qColonnesAffichees(b, recs).cols.length;
+  return vus === tous ? 'Toutes les colonnes' : vus + (vus > 1 ? ' colonnes' : ' colonne') + ' sur ' + tous;
+}
+function qTriLibelle(b, d, pi) {
+  var by = b.sortBy || ''; if (!by) return 'Sans tri';
+  var nom = by === '#n' ? 'Nombre de lignes' : by === 'att' ? 'Attend' : '';
+  if (!nom) qSortOptions(b, queryRecords(b, d, pi)).forEach(function (x) { if (x[0] === by) nom = x[1]; });
+  return 'Tri : ' + (nom || by.replace(/^c:/, '')) + (b.sortDir === 'desc' ? ' ↓' : ' ↑');
+}
+// puces de la ligne : [{ cle, quoi, libelle, prop? }] ; cle : src, scope, f:<champ du filtre>, plus, view, cols, sort
+function qPuces(b, d, pi) {
+  var v = qVue(b), out = [];
+  var p = function (cle, quoi, libelle, prop) { var o = { cle: cle, quoi: quoi, libelle: libelle }; if (prop) o.prop = prop; out.push(o); };
+  p('src', 'src', (Q_SRC[b.src || 'facts'] || Q_SRC.facts)[0]);
+  p('scope', 'scope', qPorteeLibelle(b, d));
+  qFiltresProposes(b).forEach(function (f) { if (f.pose) p('f:' + f.prop, 'filtre', qFiltreLibelle(b, d, pi, f.prop), f.prop); });
+  p('plus', 'plus', '+ Filtre');
+  p('view', 'view', Q_VUES[v]);
+  if (v !== 'count' && v !== 'regroupee' && v !== 'chaleur') p('cols', 'cols', qColsLibelle(b, d, pi, v));
+  if (v !== 'count' && v !== 'chaleur') p('sort', 'sort', qTriLibelle(b, d, pi));
+  return out;
+}
+var Q_PUCE_TITRES = { src: 'Changer ce que la requête cherche', scope: 'Changer où chercher', filtre: 'Modifier ce filtre', plus: 'Ajouter un filtre', view: 'Changer la vue et ses réglages', cols: 'Choisir les colonnes', sort: 'Changer le tri' };
+function qLignePuces(b, d, pi) {
+  var pre = { src: 'Chercher', scope: 'dans' }, coul = function (k) { return knownTagColor(d, k); };
+  // filtre de pastilles : les pastilles elles-mêmes, dans leur couleur
+  var pastilles = function () { var noms = qNomsTags(d); return b.tags.map(function (k) { var c = coul(k); return '<span class="pill' + (c == null ? '' : ' pa-' + c) + '">' + esc(noms[k] || k) + '</span>'; }).join(b.match === 'all' ? ' <small>et</small> ' : ' <small>ou</small> '); };
+  return '<div class="q-puces" role="toolbar" aria-label="Réglage de la requête">' + qPuces(b, d, pi).map(function (p) {
+    var titre = p.cle === 'cols' && /^Cartes/.test(p.libelle) ? 'Choisir les champs des cartes' : Q_PUCE_TITRES[p.quoi];
+    var btn = '<button type="button" class="q-puce' + (p.cle === 'plus' ? ' q-puce-plus' : '') + '" data-qpuce="' + p.cle + '" aria-haspopup="dialog" aria-expanded="false" title="' + titre + '">' +
+      (pre[p.cle] ? '<small>' + pre[p.cle] + '</small> ' : '') + (p.prop === 'tags' ? pastilles() : esc(p.libelle)) + '</button>';
+    if (p.quoi !== 'filtre') return (p.cle === 'view' ? '<span class="q-puce-sep" aria-hidden="true"></span>' : '') + btn;
+    return '<span class="q-puce-f">' + btn + '<button type="button" class="q-puce-x" data-qretirer="' + p.prop + '" title="Retirer ce filtre" aria-label="Retirer le filtre « ' + esc(p.libelle) + ' »">×</button></span>';
+  }).join('') + '</div>';
+}
+// contenu de la fenêtre d'une puce (cle de qPuces) ; gestes : data-qset (choix d'une valeur), data-qfiltre (« + Filtre »),
+// select[data-act=set], input.q-num, q-tag, data-qsub et les gestes des colonnes (14-colonnes-requete.js)
+function qFenetre(b, d, pi, cle) {
+  var src = b.src || 'facts', v = qVue(b), h = function (t) { return '<h4>' + t + '</h4>'; };
+  var choix = function (prop, val, cur, label, ic) { return '<button type="button" class="mi" data-qset="' + prop + '" data-v="' + esc(val) + '" aria-pressed="' + (String(cur == null ? '' : cur) === String(val)) + '">' + (ic ? '<span class="ic">' + ic + '</span>' : '') + '<span>' + label + '</span></button>'; };
+  var seg = function (prop, cur, opts) { return '<div class="seg">' + opts.map(function (x) { return '<button type="button" data-qset="' + prop + '" data-v="' + x[0] + '" aria-pressed="' + (cur === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>'; };
+  var o = function (val, cur, label) { return '<option value="' + esc(val) + '"' + (String(cur) === String(val) ? ' selected' : '') + '>' + label + '</option>'; };
+  if (cle === 'src') return h('Chercher') + Object.keys(Q_SRC).map(function (k) { return choix('src', k, src, Q_SRC[k][0]); }).join('');
+  if (cle === 'scope') {
+    var sc = b.scope || 'doc', scopes = o('doc', sc, 'Tout le document') + o('here', sc, 'Cette page');
+    d.pages.forEach(function (pg, i) {
+      var pad = new Array(pageLv(d.pages, i) + 1).join('   ');
+      scopes += o('pg:' + pg.id, sc, pad + 'Page « ' + esc(pageTitle(pg, i)) + ' »');
+      sectionsOf(pg).forEach(function (x) { scopes += o('sec:' + pg.id + '/' + x.id, sc, pad + '   ' + (x.lv > 1 ? '   ' : '') + '§ ' + esc((x.n ? x.n + ' · ' : '') + x.t)); });
+    });
+    return h('Chercher dans') + '<div class="q-fen-b"><select data-act="set" data-prop="scope" class="q-scope" aria-label="Portée">' + scopes + '</select>' +
+      (sc === 'here' || /^pg:/.test(sc) ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') + '</div>';
+  }
+  if (cle === 'plus') return h('Ajouter un filtre') + qFiltresProposes(b).map(function (f) {
+    return '<button type="button" class="mi" data-qfiltre="' + f.prop + '"><span>' + f.nom + (f.pose ? '<small>déjà là</small>' : f.prop === 'bloquees' ? '<small>Attendent une carte pas finie</small>' : '') + '</span></button>';
+  }).join('');
+  if (cle === 'f:tags') {
+    var want = b.tags || [];
+    return h('Pastilles') + '<div class="q-fen-b"><input type="search" class="q-fen-q" placeholder="Rechercher une pastille…" aria-label="Rechercher une pastille">' +
+      '<div class="q-fen-pills">' + qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'ce filtre') + '</div>' +
+      (want.length > 1 ? seg('match', b.match === 'all' ? 'all' : 'any', [['any', 'au moins une'], ['all', 'toutes']]) : '') + '</div>';
+  }
+  if (cle === 'f:state') return h('État des cases') + choix('state', 'done', b.state, 'Cochées') + choix('state', 'todo', b.state, 'Non cochées');
+  if (cle === 'f:col') return h('Colonne du kanban') + kbColumns(b, d, pi).map(function (x) { return choix('col', x.key, b.col, 'En « ' + esc(x.name) + ' »'); }).join('');
+  if (cle === 'f:kbWho') return h('Responsable') + qKbWhos(b, d, pi).map(function (x) { return choix('kbWho', x.key, b.kbWho, esc(x.name)); }).join('') + choix('kbWho', '-', b.kbWho, 'Sans responsable');
+  if (cle === 'f:kbPrio') return h('Priorité') + ['p1', 'p2', 'p3', 'p12', '-'].map(function (k) { return choix('kbPrio', k, b.kbPrio, Q_PRIO[k]); }).join('');
+  if (cle === 'f:kbDue') {
+    var due = b.kbDue || '', withN = due === 'next' || due === 'soon' || due === 'after';
+    return h('Échéance') + Q_DUE.slice(1).map(function (x) { return choix('kbDue', x[0], due, x[1].charAt(0).toUpperCase() + x[1].slice(1)); }).join('') +
+      (withN ? '<div class="q-fen-b"><input type="number" class="q-num" data-prop="kbDueN" min="1" max="999" value="' + qDueN(b) + '" aria-label="Nombre de jours, de semaines ou de mois">' +
+        seg('kbDueU', b.kbDueU || 'j', [['j', 'jours'], ['s', 'semaines'], ['m', 'mois']]) + '</div>' : '');
+  }
+  if (cle === 'view') {
+    var vues = [['table', '▦'], ['list', '≡'], ['kanban', '▥'], ['count', '#']].concat(src === 'table' ? [['regroupee', '⊞']] : []);
+    var reg = v === 'regroupee' ? qRegReglage(b, queryRecords(b, d, pi)) : null, regl = '';
+    if (reg) regl += h('Regrouper') + '<div class="q-fen-b">' + qRegForm(b, reg) + '</div>';
+    if (v === 'kanban' && src !== 'check' && src !== 'kanban') regl += '<div class="q-fen-b"><label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, d, pi)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label></div>';
+    if (v !== 'kanban' && v !== 'count' && v !== 'chaleur') regl += '<div class="q-fen-b"><label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + (reg ? ' groupes' : ' résultats') : 'tous'); }).join('') + '</select></label></div>';
+    return h('Vue') + vues.map(function (x) { return choix('view', x[0], v, Q_VUES[x[0]], x[1]); }).join('') + regl;
+  }
+  if (cle === 'cols') return v === 'kanban' && src === 'kanban' ? h('Champs des cartes') + qChampsForm(b) : h('Colonnes affichées') + qColForm(b, queryRecords(b, d, pi));
+  if (cle === 'sort') {
+    var opts = v === 'regroupee' ? (function (rg) { return [['c:' + rg.nom(rg.x).toLowerCase(), rg.nom(rg.x)], ['#n', 'Nombre de lignes']]; })(qRegReglage(b, queryRecords(b, d, pi))) : qSortOptions(b, queryRecords(b, d, pi));
+    return h('Trier') + '<div class="q-fen-b"><select data-act="set" data-prop="sortBy" aria-label="Trier par">' + o('', b.sortBy || '', 'Sans tri (ordre du document)') + opts.map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select>' +
+      (b.sortBy ? seg('sortDir', b.sortDir === 'desc' ? 'desc' : 'asc', [['asc', 'croissant ↑'], ['desc', 'décroissant ↓']]) : '') + '</div>';
+  }
+  return '';
 }
 function qChampsForm(b) {
   // champs des cartes en vue kanban : le titre est fixe, puis une ligne par champ (poignée, case) ; gestes : 14-colonnes-requete.js
