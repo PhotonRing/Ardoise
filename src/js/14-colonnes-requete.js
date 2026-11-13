@@ -1,10 +1,10 @@
-/* ---------- Choix des colonnes et des champs des cartes d'une requête (formulaire d'édition) ----------
+/* ---------- Choix des colonnes et des champs des cartes d'une requête (formulaire d'édition), colonnes Y de la vue regroupée ----------
    Mode, cases, poignée et Alt+↑ / Alt+↓ sur une case ; le nouveau champ colonnes (ou champs, liste data-qliste="champs") vient des
    fonctions pures de 07-requetes.js (qColMode, qColBasculer, qColDeplacer, qChampBasculer, qChampDeplacer). Chaque geste est une
    étape « colonnes modifiées » ou « champs des cartes modifiés » ; la case « bloquées seulement », « filtres modifiés » (05-libelle-etape.js). */
 function colonnesBloc(el) { var x = el.closest('.blk'); return x ? byId(x.dataset.id) : null; }
 function ecrireColonnes(b, calcul, focus) {
-  var neuf = calcul(qColonnesDispo(b, queryRecords(b, doc, doc.cur)).dispo);
+  var neuf = calcul(qColonnesDispo(b, queryRecords(b, doc, doc.cur), b.view === 'list').dispo);   // dans l'ordre du réglage affiché
   holdBar(b.id); session.modifier(function () { b.colonnes = neuf; });
   // la case touchée garde le focus après le rendu
   caseFocus(b, focus);
@@ -25,6 +25,13 @@ app.addEventListener('change', function (e) {
   else if (el.matches('input[data-qcol]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColBasculer(b, dp, el.dataset.qcol); }, el.dataset.qcol);
   else if (el.matches('input[data-qchamp]') && (b = colonnesBloc(el))) ecrireChamps(b, qChampBasculer(b, el.dataset.qchamp), el.dataset.qchamp);
   else if (el.matches('input[data-qbloquees]') && (b = colonnesBloc(el))) { holdBar(b.id); session.modifier(function () { if (el.checked) b.bloquees = true; else delete b.bloquees; }); }
+  else if (el.matches('input[data-qregy]') && (b = colonnesBloc(el))) {
+    // vue regroupée : colonnes Y dont on veut les valeurs uniques (qRegBasculerY, 07-requetes.js)
+    var cle = el.dataset.qregy, ys = qRegBasculerY(b, queryRecords(b, doc, doc.cur), cle);
+    holdBar(b.id); session.modifier(function () { b.regY = ys; }, { b: b.id }, 'vue modifiée');
+    var c = $$('.blk[data-id="' + b.id + '"] input[data-qregy]', app).filter(function (x) { return x.dataset.qregy === cle; })[0];
+    if (c) c.focus({ preventScroll: true });
+  }
 });
 app.addEventListener('keydown', function (e) {
   var el = e.target;

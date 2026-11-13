@@ -397,6 +397,7 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-form .q-num{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:28px;padding:0 6px;width:64px}
 .q-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
 .q-lbl{margin-right:2px}
+.q-regy{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;flex-basis:100%}
 .q-colonnes{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 10px;flex-basis:100%}
 .q-cols{display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none;min-width:0}
 .q-col{display:inline-flex;align-items:center;gap:2px;padding:2px 8px 2px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);max-width:100%}

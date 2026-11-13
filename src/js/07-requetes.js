@@ -422,13 +422,18 @@ function qColonnesDispo(b, recs, liste) {
   var src = { cle: Q_SOURCE, nom: 'Source', source: true };
   if ((b.src || 'facts') === 'check') return { dispo: [{ cle: '✓', nom: '✓', coche: true }, { cle: 'élément', nom: 'Élément', element: true }, src], cellsOf: function () { return []; } };
   var cc = qColonnes(recs), dispo = cc.cols.map(function (n, j) { return { cle: qCleCol(n), nom: n, j: j }; });
-  var ch = qColReglage(b), bouge = Array.isArray(ch.ordre) && ch.ordre.indexOf(Q_SOURCE) >= 0;
   if (b.src === 'kanban') dispo.push({ cle: Q_ATTEND, nom: 'Attend', attend: true });
-  return { dispo: dispo.concat([src]), tete: liste && !bouge ? src : null, cellsOf: cc.cellsOf };
+  return { dispo: liste && !qColSourceBougee(b) ? [src].concat(dispo) : dispo.concat([src]), cellsOf: cc.cellsOf };
+}
+// Source n'entre dans ordre que si l'auteur l'a déplacée elle-même ; sinon, en tête de dispo (vue liste), elle y reste
+function qColSourceBougee(b) { var ch = qColReglage(b); return Array.isArray(ch.ordre) && ch.ordre.indexOf(Q_SOURCE) >= 0; }
+function qColPlacees(b, dispo) {
+  var tete = dispo[0] && dispo[0].cle === Q_SOURCE && !qColSourceBougee(b) ? dispo[0] : null, r = qColonnesRangees(b, tete ? dispo.slice(1) : dispo);
+  return tete ? [tete].concat(r) : r;
 }
 function qColonnesAffichees(b, recs, liste) {
-  var x = qColonnesDispo(b, recs, liste), cols = qColonnesChoisies(b, x.dispo.filter(function (c) { return c !== x.tete; }));
-  return { cols: x.tete && qColonneVisible(b, Q_SOURCE) ? [x.tete].concat(cols) : cols, cellsOf: x.cellsOf };
+  var x = qColonnesDispo(b, recs, liste);
+  return { cols: qColPlacees(b, x.dispo).filter(function (c) { return qColonneVisible(b, c.cle); }), cellsOf: x.cellsOf };
 }
 // gestes du choix des colonnes : nouveau champ colonnes d'après les colonnes disponibles (dispo de qColonnesDispo, hors liste) ;
 // les clés qui n'y sont plus sont purgées ; le premier choix part de « Toutes sauf… »
@@ -450,18 +455,97 @@ function qColMode(b, dispo, mode) {
   return qColNeuf(dispo, mode, noms, ch.ordre);
 }
 function qColDeplacer(b, dispo, cle, vers) {
-  var ch = qColActuel(b), cles = qColonnesRangees(b, dispo).map(function (c) { return c.cle; }), at = cles.indexOf(cle);
+  // dispo dans l'ordre du réglage (vers : position dans ce réglage) ; Source reste hors de ordre si l'on déplace une autre colonne
+  var ch = qColActuel(b), cles = qColPlacees(b, dispo).map(function (c) { return c.cle; }), at = cles.indexOf(cle);
   if (at < 0) return qColNeuf(dispo, ch.mode, ch.noms, ch.ordre);
   cles.splice(at, 1); cles.splice(Math.max(0, Math.min(cles.length, vers)), 0, cle);
+  if (cle !== Q_SOURCE && !qColSourceBougee(b)) cles = cles.filter(function (k) { return k !== Q_SOURCE; });
   return qColNeuf(dispo, ch.mode, ch.noms, cles);
 }
+function qRegBasculerY(b, recs, cle) {
+  // nouvelle liste regY : la colonne cochée ou décochée, dans l'ordre des colonnes disponibles, clés inconnues purgées
+  var rg = qRegReglage(b, recs), ys = rg.ys.slice(), at = ys.indexOf(cle);
+  if (at >= 0) ys.splice(at, 1); else ys.push(cle);
+  return rg.dispo.map(function (c) { return c.cle; }).filter(function (k) { return ys.indexOf(k) >= 0 && k !== rg.x; });
+}
 function qColTri(c) { return c.source ? 'src' : c.coche ? 'done' : c.element ? 'txt' : c.attend ? 'att' : 'c:' + c.nom.toLowerCase(); }   // clé de tri d'une colonne
+// Regroupement (vue « Regroupée », réutilisé par la carte de chaleur) : un groupe par valeur unique de la colonne X, valeurs uniques des colonnes Y.
+// Valeurs comparées sans casse ni espaces superflus ; une cellule faite seulement de pastilles donne une valeur par pastille (comparée par son nom)
+function qValeursCellule(html) {
+  var h = String(html || ''), out = [], vu = {};
+  var ajout = function (cle, v) { if (cle && !vu[cle]) { vu[cle] = 1; out.push({ cle: cle, html: v }); } };
+  if (!htmlText(h.replace(PILL_RE, '')).replace(/[\s ​,;]+/g, '') && PILL_RE.test(h)) {
+    PILL_RE.lastIndex = 0;
+    h.replace(PILL_RE, function (m, cls, attrs, inner) { ajout(tagKey(htmlText(inner)), m); return m; });
+    return out;
+  }
+  PILL_RE.lastIndex = 0;
+  ajout(tagKey(htmlText(h)), h.trim());
+  return out;
+}
+function qRegrouper(recs, cleX, clesY) {
+  // → [{ cle, valeur (HTML de la première apparition), vide, n, lignes, uniques: { cléY: [HTML] } }] dans l'ordre de première apparition
+  var groupes = [], gi = {};
+  var cellule = function (r, cle) { for (var i = 0; i < r.cells.length; i++) if (qCleCol(r.cells[i].k) === cle) return r.cells[i].v; return ''; };
+  recs.forEach(function (r) {
+    var vx = cellule(r, cleX), cle = tagKey(htmlText(vx)), g;
+    if (!(('$' + cle) in gi)) {
+      gi['$' + cle] = groupes.length;
+      g = { cle: cle, valeur: cle ? String(vx).trim() : '(vide)', vide: !cle, n: 0, lignes: [], uniques: {}, vus: {} };
+      clesY.forEach(function (y) { g.uniques[y] = []; g.vus[y] = {}; });
+      groupes.push(g);
+    }
+    g = groupes[gi['$' + cle]]; g.n++; g.lignes.push(r);
+    clesY.forEach(function (y) { qValeursCellule(cellule(r, y)).forEach(function (v) { if (!g.vus[y][v.cle]) { g.vus[y][v.cle] = 1; g.uniques[y].push(v.html); } }); });
+  });
+  groupes.forEach(function (g) { delete g.vus; });
+  return groupes;
+}
+function qGroupesTries(groupes, by, dir) {
+  // by : '' (première apparition), 'c:<colonne X>' (valeur, les vides à la fin) ou '#n' (nombre de lignes)
+  if (!by) return groupes;
+  var k = function (g) { return by === '#n' ? { n: g.n } : g.vide ? null : qSortKey(g.valeur); };
+  return groupes.map(function (g, i) { return { g: g, k: k(g), i: i }; }).sort(function (x, y) {
+    var c = qCompare(x.k, y.k); if (!x.k || !y.k) return c || x.i - y.i;
+    return (dir === 'desc' ? -c : c) || x.i - y.i;
+  }).map(function (x) { return x.g; });
+}
+function qRegReglage(b, recs) {
+  // colonnes X et Y retenues (clés connues seulement) ; X absent : première colonne disponible
+  var dispo = qColonnesDispo(b, recs).dispo.filter(function (c) { return !c.source; }), la = function (k) { return dispo.some(function (c) { return c.cle === k; }); };
+  var x = la(b.regX) ? b.regX : (dispo[0] ? dispo[0].cle : ''), nom = function (k) { for (var i = 0; i < dispo.length; i++) if (dispo[i].cle === k) return dispo[i].nom; return k; };
+  var ys = (Array.isArray(b.regY) ? b.regY : []).filter(function (k, i, a) { return la(k) && k !== x && a.indexOf(k) === i; });
+  return { x: x, ys: ys, nom: nom, dispo: dispo };
+}
+function qRegTri(b, ctx, rg) { var sp = qSortSpec(b, ctx); return sp.by === '#n' || (sp.by.slice(0, 2) === 'c:' && qCleCol(sp.by.slice(2)) === rg.x) ? sp : { by: '', dir: 'asc' }; }
+function qRegSources(d, g) {
+  // liens vers les lignes réunies : une entrée par source distincte, avec le nombre de lignes qui en viennent
+  var vu = [], n = {};
+  g.lignes.forEach(function (r) { var h = qSource(d, r.x); if (!(h in n)) { n[h] = 0; vu.push(h); } n[h]++; });
+  return '<details class="q-reg-src"><summary>' + g.n + (g.n > 1 ? ' lignes' : ' ligne') + '</summary><ul>' + vu.map(function (h) { return '<li>' + h + (n[h] > 1 ? ' <span class="muted">× ' + n[h] + '</span>' : '') + '</li>'; }).join('') + '</ul></details>';
+}
+function qRegroupee(b, d, ctx, recs) {
+  var rg = qRegReglage(b, recs), sp = qRegTri(b, ctx, rg), groupes = qGroupesTries(qRegrouper(recs, rg.x, rg.ys), sp.by, sp.dir);
+  var total = groupes.length, lim = Math.max(0, +b.limit || 0);
+  if (lim && groupes.length > lim) groupes = groupes.slice(0, lim);
+  var more = groupes.length < total ? '<p class="muted q-more">' + groupes.length + ' premiers groupes sur ' + total + '</p>' : '';
+  var titre = function (g) { return g.vide ? '<span class="muted">(vide)</span>' : R(g.valeur); };
+  var uniques = function (g, y) { return g.uniques[y].map(R).join(', '); };
+  if (b.regForme === 'tableau') return '<div class="tablewrap"><table class="q-reg-table"><thead><tr>' + qTh(b, ctx, 'c:' + rg.x, rg.nom(rg.x)) +
+    rg.ys.map(function (y) { return '<th>' + esc(rg.nom(y)) + '</th>'; }).join('') + qTh(b, ctx, '#n', 'Lignes') + '</tr></thead><tbody>' +
+    groupes.map(function (g) { return '<tr><td>' + titre(g) + '</td>' + rg.ys.map(function (y) { return '<td>' + uniques(g, y) + '</td>'; }).join('') + '<td class="q-reg-n">' + qRegSources(d, g) + '</td></tr>'; }).join('') + '</tbody></table></div>' + more;
+  return '<div class="q-reg">' + groupes.map(function (g) {
+    return '<section class="q-reg-f"><h4 class="q-reg-t">' + titre(g) + '<span class="kb-n">' + g.n + '</span></h4>' +
+      (rg.ys.length ? '<dl class="facts">' + rg.ys.map(function (y) { return '<div class="fact"><dt>' + esc(rg.nom(y)) + '</dt><dd>' + uniques(g, y) + '</dd></div>'; }).join('') + '</dl>' : '') + qRegSources(d, g) + '</section>';
+  }).join('') + '</div>' + more;
+}
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
   ctx = renderCtx(d, ctx);
   var recs = queryRecords(b, d, ctx.page), src = b.src || 'facts', view = b.view || 'table';
   if (view === 'count') return qCards(b, d, ctx, recs);
   if (!recs.length) return '<p class="muted q-empty">Aucun résultat.</p>';
+  if (view === 'regroupee' && src === 'table') return qRegroupee(b, d, ctx, recs);   // le tri vise les groupes ; une autre source retombe sur le tableau
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') return qKanban(b, d, ctx, recs);
   var total = recs.length, lim = Math.max(0, +b.limit || 0);
@@ -500,6 +584,7 @@ function queryForm(b, d, ctx) {
   });
   var want = b.tags || [], chips = qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
   var pageScope = sc === 'here' || /^pg:/.test(sc);
+  var reg = b.view === 'regroupee' && b.src === 'table' ? qRegReglage(b, queryRecords(b, d, pi)) : null;   // vue regroupée : réglages et tri des groupes
   return '<div class="q-form">' +
     '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + o('diamond', b.src, 'les modèles diamant') + '</select></label>' +
     (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) +
@@ -510,13 +595,14 @@ function queryForm(b, d, ctx) {
     '<div class="q-tags"><span class="q-lbl">' + (b.view === 'count' ? 'Parmi ceux qui ont les pastilles' : 'Avec les pastilles') + '</span>' + chips +
     (want.length > 1 ? '<select data-act="set" data-prop="match" title="Combinaison des pastilles">' + o('any', b.match || 'any', 'au moins une') + o('all', b.match, 'toutes') + '</select>' : '') +
     (want.length ? '' : '<span class="muted q-hint">(aucune choisie : tout est retenu)</span>') + '</div>' +
-    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + '</select></label>' +
+    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + (b.src === 'table' ? o('regroupee', b.view, 'regroupé') : '') + '</select></label>' +
+    (reg ? qRegForm(b, reg) : '') +
     (b.view === 'kanban' && b.src !== 'check' && b.src !== 'kanban' ? '<label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, d, pi)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label>' : '') +
     (b.view !== 'count' ? '<label>trier par <select data-act="set" data-prop="sortBy">' + o('', b.sortBy || '', 'ordre du document') +
-      qSortOptions(b, queryRecords(b, d, pi)).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
+      (reg ? [['c:' + reg.nom(reg.x).toLowerCase(), reg.nom(reg.x)], ['#n', 'nombre de lignes']] : qSortOptions(b, queryRecords(b, d, pi))).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
       (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
       (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
-    (b.view === 'count' ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
+    (b.view === 'count' || reg ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
     '</div>';
 }
 function qChampsForm(b) {
@@ -527,11 +613,20 @@ function qChampsForm(b) {
         '<label><input type="checkbox" data-qchamp="' + esc(c.cle) + '"' + (qChampVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
     }).join('') + '</ol></div>';
 }
+function qRegForm(b, rg) {
+  // vue regroupée : colonne X (select), colonnes Y (cases, gestes : 14-colonnes-requete.js), forme
+  var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + label + '</option>'; };
+  return '<label>par <select data-act="set" data-prop="regX" title="Colonne qui regroupe">' + rg.dispo.map(function (c) { return o(c.cle, rg.x, esc(c.nom)); }).join('') + '</select></label>' +
+    '<div class="q-regy"><span class="q-lbl">Valeurs de</span>' + rg.dispo.filter(function (c) { return c.cle !== rg.x; }).map(function (c) {
+      return '<label class="q-tog"><input type="checkbox" data-qregy="' + esc(c.cle) + '"' + (rg.ys.indexOf(c.cle) >= 0 ? ' checked' : '') + '> ' + esc(c.nom) + '</label>';
+    }).join('') + '</div>' +
+    '<select data-act="set" data-prop="regForme" title="Forme des groupes">' + o('fiches', b.regForme === 'tableau' ? '' : 'fiches', 'en fiches') + o('tableau', b.regForme, 'en tableau') + '</select>';
+}
 function qColForm(b, recs) {
   // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js
   var mode = qColReglage(b).mode || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
   return '<div class="q-colonnes"><label><span class="q-lbl">Colonnes</span> <select data-qcolmode title="Colonnes affichées">' + o('toutes', 'toutes') + o('sauf', 'toutes sauf…') + o('seulement', 'seulement…') + '</select></label>' +
-    '<ol class="q-cols">' + qColonnesRangees(b, qColonnesDispo(b, recs).dispo).map(function (c) {
+    '<ol class="q-cols">' + qColPlacees(b, qColonnesDispo(b, recs, b.view === 'list').dispo).map(function (c) {
       return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +
         '<label><input type="checkbox" data-qcol="' + esc(c.cle) + '"' + (qColonneVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
     }).join('') + '</ol></div>';
