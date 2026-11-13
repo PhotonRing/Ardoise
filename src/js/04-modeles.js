@@ -69,7 +69,7 @@ var TEMPLATES = {
       mk('footer', { html: 'Ce fichier est autonome : il s’ouvre dans n’importe quel navigateur, sans installation ni connexion.' })
       ] },
       { id: 'suivi', title: '', lv: 1, blocks: [
-        mk('header', { eyebrow: 'Visite guidée · sous-page', title: 'Suivi de projet', lede: 'Un kanban, et des blocs requête qui se tiennent à jour tout seuls à partir du contenu du document.' }),
+        mk('header', { eyebrow: 'Visite guidée · sous-page', title: 'Suivi de projet', lede: 'Un kanban, un tableau d’incidents, et des blocs requête qui se tiennent à jour tout seuls à partir du contenu du document.' }),
         mk('h2', { html: 'Kanban' }),
         mk('p', { html: 'Glissez une carte d’une colonne à l’autre, ou utilisez <b>⇄</b> : en lecture aussi. L’échéance, la personne responsable et la priorité (P1 à P3, avec un cadre de couleur) sont facultatives ; une échéance dépassée s’affiche en rouge. En édition, l’échéance se tape en jj/mm/aaaa ou se choisit dans le calendrier 📅, et <b>Dépend de…</b> désigne les cartes à finir avant : « Attend » et « Bloque » les affichent. <b>⇤</b> réduit une colonne en bande verticale, comme « Fait » ci-dessous ; un clic sur la bande la rouvre.' }),
         mk('kanban', { cols: [
@@ -77,13 +77,23 @@ var TEMPLATES = {
           { id: uid(), title: 'En cours', cards: [{ id: uid(), title: 'Supervision ' + P('Prod'), html: '', due: '2024-01-15', who: 'Bob', prio: 'p1' }, { id: cours, title: 'Tests de charge ' + P('Recette'), html: '', due: '2030-02-01', who: '', prio: 'p2' }] },
           { id: uid(), title: 'Fait', collapsed: true, cards: [{ id: uid(), title: 'Sauvegardes ' + P('Prod'), html: '', due: '2024-06-01', who: 'Chloé' }] }] }),
         mk('h2', { html: 'Tableau de bord' }),
-        mk('p', { html: 'Ces blocs requête comptent et listent les cartes ci-dessus : changez une carte de colonne, ils suivent. En édition, leur formulaire règle ce qu’ils cherchent, où, avec quelles pastilles, et comment l’afficher.' }),
+        mk('p', { html: 'Ces blocs requête comptent et listent les cartes ci-dessus : changez une carte de colonne, ils suivent. En édition, une ligne de puces au-dessus du résultat résume ce qu’ils cherchent, où, avec quels filtres, et comment l’afficher : un clic sur une puce ouvre sa fenêtre pour la régler, <b>+ Filtre</b> en ajoute un.' }),
         mk('query', { src: 'kanban', scope: 'here', view: 'count', cards: [
           { label: 'Cartes terminées', tags: [], match: 'any', state: 'all', col: 'fait', total: 'all' },
           { label: 'Cartes Prod terminées', tags: ['prod'], match: 'any', state: 'all', col: 'fait', total: 'filter', ttags: ['prod'], tmatch: 'any' }] }),
-        mk('query', { title: 'Échéances', src: 'kanban', scope: 'here', view: 'table', sortBy: 'c:échéance', sortDir: 'asc', limit: 5, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('p', { html: 'La puce des colonnes choisit celles à montrer : toutes, « Toutes sauf… » ou « Seulement… », dans l’ordre voulu (glissez les lignes de sa fenêtre). Ici, toutes sauf la priorité :' }),
+        mk('query', { title: 'Échéances', src: 'kanban', scope: 'here', view: 'table', sortBy: 'c:échéance', sortDir: 'asc', limit: 5, colonnes: { mode: 'sauf', noms: ['priorité'], ordre: [] }, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
         mk('p', { html: 'Une requête sur les cartes peut aussi filtrer par responsable, par priorité et par échéance (dépassée, aujourd’hui, dans les prochains jours, semaines ou mois…). Celle-ci montre les cartes P1 ou P2 en retard ou à rendre dans les 3 mois :' }),
         mk('query', { title: 'Urgences', src: 'kanban', scope: 'here', view: 'list', kbPrio: 'p12', kbDue: 'soon', kbDueN: 3, kbDueU: 'm', sortBy: 'c:échéance', sortDir: 'asc', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('p', { html: 'Le filtre <b>Bloquées</b> garde les cartes qui attendent une carte pas encore finie, et la colonne <b>Attend</b> (masquée par défaut, cochée ici) dit laquelle :' }),
+        mk('query', { title: 'Cartes bloquées', src: 'kanban', scope: 'here', view: 'table', bloquees: true, colonnes: { mode: 'toutes', noms: [], ordre: [] }, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('h2', { html: 'Incidents' }),
+        mk('p', { html: 'Une requête sur les lignes de tableaux peut les regrouper ou les croiser. Le tableau ci-dessous sert d’exemple : ajoutez une ligne, les deux vues suivent.' }),
+        mk('table', { rows: [['Service', 'Gravité', 'Équipe', 'Durée (h)'], ['Messagerie', 'Majeure', 'Système', '4'], ['Messagerie', 'Mineure', 'Système', '1'], ['Intranet', 'Mineure', 'Web', '2'], ['Intranet', 'Critique', 'Web', '6'], ['VPN', 'Majeure', 'Réseau', '3'], ['VPN', 'Mineure', 'Réseau', '0,5'], ['Messagerie', 'Critique', 'Système', '8'], ['Intranet', 'Mineure', 'Web', '1']] }),
+        mk('p', { html: 'La vue <b>regroupée</b> ⊞ réunit les lignes qui partagent une valeur (ici le service) et liste les autres valeurs de chaque groupe ; le nombre de lignes ouvre leurs sources.' }),
+        mk('query', { title: 'Par service', src: 'table', scope: 'here', view: 'regroupee', regX: 'service', regY: ['équipe'], cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('p', { html: 'La <b>carte de chaleur</b> ▩ croise deux colonnes : chaque case est teintée selon le nombre de lignes, ou selon la somme d’une colonne de nombres (ici la durée). En lecture, survolez une case pour voir les lignes qu’elle réunit.' }),
+        mk('query', { title: 'Durée des incidents', src: 'table', scope: 'here', view: 'chaleur', chX: 'gravité', chY: 'service', chN: 'durée (h)', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
         mk('h2', { html: 'Contrôles' }),
         mk('check', { items: [{ html: 'Sauvegardes ' + P('Prod'), done: true }, { html: 'Restauration testée', lv: 1, done: true }, { html: 'Supervision ' + P('Prod'), done: false }, { html: 'Alertes reçues', lv: 1, done: false }, { html: 'Recette validée ' + P('Recette'), done: false }] }),
         mk('query', { src: 'check', scope: 'here', view: 'list', tags: ['prod'], cards: [{ label: '', tags: [], match: 'any', state: 'done', total: 'all' }] })
