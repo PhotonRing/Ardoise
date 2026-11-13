@@ -539,6 +539,67 @@ function qRegroupee(b, d, ctx, recs) {
       (rg.ys.length ? '<dl class="facts">' + rg.ys.map(function (y) { return '<div class="fact"><dt>' + esc(rg.nom(y)) + '</dt><dd>' + uniques(g, y) + '</dd></div>'; }).join('') + '</dl>' : '') + qRegSources(d, g) + '</section>';
   }).join('') + '</div>' + more;
 }
+// Carte de chaleur (vue « Carte de chaleur ») : une colonne par valeur de X, une case par valeur de Y, des sous-cases par valeur de Z ;
+// X, Y et Z comparés sur la cellule entière (qRegrouper), total = somme de la colonne N (nombre de lignes sans N) ; une seule échelle pour cases et sous-cases
+var Q_CH_PALIERS = [6, 16, 28, 42, 100];   // part de la couleur d'accent de chaque palier, en % (page.css : .q-ch-p0 à .q-ch-p4)
+function qNombre(html) {
+  // nombre d'une cellule : virgule ou point décimal, espaces de milliers ignorés ; une valeur non numérique compte 0
+  var t = htmlText(String(html || '')).replace(/[\s  ]+/g, '').replace(',', '.');
+  return /^[-+]?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : 0;
+}
+function qNombreFr(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
+function qChReglage(b, recs) {
+  // colonnes X, Y, Z (facultative) et N (facultative) retenues, clés connues seulement ; X absent : première colonne, Y absent : la suivante
+  var dispo = qColonnesDispo(b, recs).dispo.filter(function (c) { return !c.source; }), la = function (k) { return dispo.some(function (c) { return c.cle === k; }); };
+  var nom = function (k) { for (var i = 0; i < dispo.length; i++) if (dispo[i].cle === k) return dispo[i].nom; return k; };
+  var x = la(b.chX) ? b.chX : (dispo[0] ? dispo[0].cle : '');
+  var autre = dispo.filter(function (c) { return c.cle !== x; })[0];
+  var y = la(b.chY) && b.chY !== x ? b.chY : (autre ? autre.cle : '');
+  var z = la(b.chZ) && b.chZ !== x && b.chZ !== y ? b.chZ : '';
+  var n = la(b.chN) ? b.chN : '';
+  return { x: x, y: y, z: z, n: n, nom: nom, dispo: dispo };
+}
+function qChaleur(recs, x, y, z, n) {
+  // → { colonnes: [{ cle, valeur, vide, total, lignes, cases: [{ cle, valeur, vide, total, lignes, sous: [mêmes champs] }] }], min, max }
+  var vals = [];
+  var total = function (lignes) {
+    if (!n) return lignes.length;
+    return lignes.reduce(function (s, r) { for (var i = 0; i < r.cells.length; i++) if (qCleCol(r.cells[i].k) === n) return s + qNombre(r.cells[i].v); return s; }, 0);
+  };
+  var noeud = function (g) { return { cle: g.cle, valeur: g.valeur, vide: g.vide, total: total(g.lignes), lignes: g.lignes }; };
+  var colonnes = qRegrouper(recs, x, []).map(function (g) {
+    var col = noeud(g);
+    col.cases = qRegrouper(g.lignes, y, []).map(function (gc) {
+      var c = noeud(gc); vals.push(c.total);
+      c.sous = z ? qRegrouper(gc.lignes, z, []).filter(function (gs) { return !gs.vide; }).map(function (gs) { var s = noeud(gs); vals.push(s.total); return s; }) : [];
+      return c;
+    });
+    return col;
+  });
+  return { colonnes: colonnes, min: vals.length ? Math.min.apply(null, vals) : 0, max: vals.length ? Math.max.apply(null, vals) : 0 };
+}
+function qChPalier(total, min, max) { return max > min ? Math.min(4, Math.floor((total - min) / (max - min) * 5)) : 4; }
+function qChaleurVue(b, d, ctx, recs) {
+  var ch = qChReglage(b, recs), m = qChaleur(recs, ch.x, ch.y, ch.z, ch.n);
+  var nomV = function (g) { return g.vide ? '<span class="muted">(vide)</span>' : R(g.valeur); };
+  var bulle = function (g) {
+    // lignes de la case : cellules non vides, puis la source ; 20 au plus
+    var max = 20, l = g.lignes.slice(0, max).map(function (r) {
+      return '<li>' + r.cells.filter(function (c) { return !isBlank(c.v); }).map(function (c) { return '<span class="q-kv"><span class="q-k">' + esc(c.k) + '</span> ' + R(c.v) + '</span>'; }).join(' ') + ' ' + qSource(d, r.x) + '</li>';
+    }).join('');
+    return '<div class="q-ch-tip" hidden><ul class="q-ch-l">' + l + '</ul>' + (g.lignes.length > max ? '<p class="muted">et ' + (g.lignes.length - max) + ' autres</p>' : '') + '</div>';
+  };
+  var boite = function (g, cls) {
+    return '<div class="' + cls + ' q-ch-p' + qChPalier(g.total, m.min, m.max) + '" tabindex="0"><span class="q-ch-n">' + nomV(g) + '</span> <span class="q-ch-v">' + qNombreFr(g.total) + '</span>' + bulle(g);
+  };
+  var leg = '<div class="q-ch-leg"><span class="q-ch-lv">' + qNombreFr(m.min) + '</span>' + Q_CH_PALIERS.map(function (p, i) { return '<span class="q-ch-sw q-ch-p' + i + '"></span>'; }).join('') +
+    '<span class="q-ch-lv">' + qNombreFr(m.max) + '</span><span class="muted">' + (ch.n ? 'somme de ' + esc(ch.nom(ch.n)) : 'nombre de lignes') + '</span></div>';
+  return '<div class="q-ch-wrap"><div class="q-ch">' + m.colonnes.map(function (col) {
+    return '<section class="q-ch-col"><h4 class="q-ch-t">' + nomV(col) + '<span class="kb-n">' + qNombreFr(col.total) + '</span></h4>' + col.cases.map(function (c) {
+      return boite(c, 'q-ch-c') + (c.sous.length ? '<div class="q-ch-sous">' + c.sous.map(function (s) { return boite(s, 'q-ch-s') + '</div>'; }).join('') + '</div>' : '') + '</div>';
+    }).join('') + '</section>';
+  }).join('') + '</div></div>' + leg;
+}
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
   ctx = renderCtx(d, ctx);
@@ -546,6 +607,7 @@ function queryResult(b, d, ctx) {
   if (view === 'count') return qCards(b, d, ctx, recs);
   if (!recs.length) return '<p class="muted q-empty">Aucun résultat.</p>';
   if (view === 'regroupee' && src === 'table') return qRegroupee(b, d, ctx, recs);   // le tri vise les groupes ; une autre source retombe sur le tableau
+  if (view === 'chaleur' && src === 'table') return qChaleurVue(b, d, ctx, recs);   // ordre de première apparition, ni tri ni limite
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') return qKanban(b, d, ctx, recs);
   var total = recs.length, lim = Math.max(0, +b.limit || 0);
@@ -585,6 +647,7 @@ function queryForm(b, d, ctx) {
   var want = b.tags || [], chips = qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   var reg = b.view === 'regroupee' && b.src === 'table' ? qRegReglage(b, queryRecords(b, d, pi)) : null;   // vue regroupée : réglages et tri des groupes
+  var ch = b.view === 'chaleur' && b.src === 'table' ? qChReglage(b, queryRecords(b, d, pi)) : null;   // carte de chaleur : ni tri, ni limite, ni choix des colonnes
   return '<div class="q-form">' +
     '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + o('diamond', b.src, 'les modèles diamant') + '</select></label>' +
     (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) +
@@ -595,14 +658,14 @@ function queryForm(b, d, ctx) {
     '<div class="q-tags"><span class="q-lbl">' + (b.view === 'count' ? 'Parmi ceux qui ont les pastilles' : 'Avec les pastilles') + '</span>' + chips +
     (want.length > 1 ? '<select data-act="set" data-prop="match" title="Combinaison des pastilles">' + o('any', b.match || 'any', 'au moins une') + o('all', b.match, 'toutes') + '</select>' : '') +
     (want.length ? '' : '<span class="muted q-hint">(aucune choisie : tout est retenu)</span>') + '</div>' +
-    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + (b.src === 'table' ? o('regroupee', b.view, 'regroupé') : '') + '</select></label>' +
-    (reg ? qRegForm(b, reg) : '') +
+    '<label>Afficher <select data-act="set" data-prop="view">' + o('table', b.view, 'en tableau') + o('list', b.view, 'en liste') + o('kanban', b.view, 'en colonnes') + o('count', b.view, 'le nombre') + (b.src === 'table' ? o('regroupee', b.view, 'regroupé') + o('chaleur', b.view, 'en carte de chaleur') : '') + '</select></label>' +
+    (reg ? qRegForm(b, reg) : '') + (ch ? qChForm(b, ch) : '') +
     (b.view === 'kanban' && b.src !== 'check' && b.src !== 'kanban' ? '<label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, d, pi)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label>' : '') +
-    (b.view !== 'count' ? '<label>trier par <select data-act="set" data-prop="sortBy">' + o('', b.sortBy || '', 'ordre du document') +
+    (b.view !== 'count' && !ch ? '<label>trier par <select data-act="set" data-prop="sortBy">' + o('', b.sortBy || '', 'ordre du document') +
       (reg ? [['c:' + reg.nom(reg.x).toLowerCase(), reg.nom(reg.x)], ['#n', 'nombre de lignes']] : qSortOptions(b, queryRecords(b, d, pi))).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
       (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
       (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
-    (b.view === 'count' || reg ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
+    (b.view === 'count' || reg || ch ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
     '</div>';
 }
 function qChampsForm(b) {
@@ -621,6 +684,18 @@ function qRegForm(b, rg) {
       return '<label class="q-tog"><input type="checkbox" data-qregy="' + esc(c.cle) + '"' + (rg.ys.indexOf(c.cle) >= 0 ? ' checked' : '') + '> ' + esc(c.nom) + '</label>';
     }).join('') + '</div>' +
     '<select data-act="set" data-prop="regForme" title="Forme des groupes">' + o('fiches', b.regForme === 'tableau' ? '' : 'fiches', 'en fiches') + o('tableau', b.regForme, 'en tableau') + '</select>';
+}
+function qChForm(b, ch) {
+  // carte de chaleur : colonne X des colonnes de la matrice, Y des cases, Z facultative des sous-cases, N facultative de la somme
+  var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + label + '</option>'; };
+  var sel = function (prop, titre, cur, vide, sauf) {
+    return '<select data-act="set" data-prop="' + prop + '" title="' + titre + '">' + (vide ? o('', cur, vide) : '') +
+      ch.dispo.filter(function (c) { return sauf.indexOf(c.cle) < 0; }).map(function (c) { return o(c.cle, cur, esc(c.nom)); }).join('') + '</select>';
+  };
+  return '<label>colonnes <select data-act="set" data-prop="chX" title="Colonnes de la matrice">' + ch.dispo.map(function (c) { return o(c.cle, ch.x, esc(c.nom)); }).join('') + '</select></label>' +
+    '<label>cases ' + sel('chY', 'Cases de chaque colonne', ch.y, '', [ch.x]) + '</label>' +
+    '<label>sous-cases ' + sel('chZ', 'Sous-niveau de chaque case', ch.z, 'aucun sous-niveau', [ch.x, ch.y]) + '</label>' +
+    '<label>couleur selon ' + sel('chN', 'Couleur des cases', ch.n, 'nombre de lignes', []) + '</label>';
 }
 function qColForm(b, recs) {
   // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js

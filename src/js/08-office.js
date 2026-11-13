@@ -79,6 +79,11 @@ function memeForme(a, b) { return OFFICE_FORMES.every(function (k) { return (a[k
 function officeTexteDe(segs) { return segs.map(function (g) { return g.saut ? '\n' : g.texte; }).join(''); }
 function officeVide(segs) { return !officeTexteDe(segs).trim(); }
 // forme k (gras, couleur) posée sur les segments de texte, ni saut ni pastille ; rend les segments
+// teinte d'un palier de la carte de chaleur en thème clair : accent du document mêlé au blanc selon Q_CH_PALIERS (comme color-mix de page.css)
+function officeChaleurTeinte(d, palier) {
+  var a = officeAccent(d)[0], p = Q_CH_PALIERS[palier] / 100;
+  return '#' + [1, 3, 5].map(function (i) { var v = Math.round(parseInt(a.slice(i, i + 2), 16) * p + 255 * (1 - p)); return (v < 16 ? '0' : '') + v.toString(16); }).join('');
+}
 function officeMettreForme(segs, k, v) { segs.forEach(function (g) { if (!g.saut && !g.pastille) g[k] = v; }); return segs; }
 
 /* Bloc → éléments neutres. opts : { page, images: { idBloc: { src, mime, l, h } } } (images préparées par l'appelant) */
@@ -240,6 +245,24 @@ function officeRequete(b, d, pi, S, txt, para) {
     if (gr.length < gtot) out.push(para([txt(gr.length + ' premiers groupes sur ' + gtot, { couleur: OFFICE_CLAIR.muted })]));
     return out;
   }
+  if (view === 'chaleur' && src === 'table') {
+    // carte de chaleur (07-requetes.js) : une colonne par X, ses cases puis leurs sous-cases (« › ») alignées par rang ; cases teintées
+    var ch = qChReglage(b, recs), m = qChaleur(recs, ch.x, ch.y, ch.z, ch.n);
+    var nomC = function (g) { return g.vide ? [txt('(vide)')] : S(g.valeur); };
+    var pile = m.colonnes.map(function (col) { return col.cases.reduce(function (a, c) { return a.concat([{ g: c }], c.sous.map(function (x) { return { g: x, sous: true }; })); }, []); });
+    var rangs = pile.reduce(function (n, p) { return Math.max(n, p.length); }, 0), lignes = [m.colonnes.map(function (col) { return [para([txt(htmlText(col.vide ? '(vide)' : col.valeur).replace(/\s+/g, ' ').trim() + ' (' + qNombreFr(col.total) + ')')])]; })], fonds = [m.colonnes.map(function () { return null; })];
+    for (var ri = 0; ri < rangs; ri++) {
+      lignes.push(pile.map(function (p) {
+        var x = p[ri]; if (!x) return [];
+        var pal = qChPalier(x.g.total, m.min, m.max), segs = (x.sous ? [txt('› ')] : []).concat(nomC(x.g), [txt('  ' + qNombreFr(x.g.total))]);
+        return [para(officeMettreForme(segs, 'couleur', pal === 4 ? '#ffffff' : OFFICE_CLAIR.fg))];
+      }));
+      fonds.push(pile.map(function (p) { return p[ri] ? officeChaleurTeinte(d, qChPalier(p[ri].g.total, m.min, m.max)) : null; }));
+    }
+    out.push({ t: 'tableau', entete: true, lignes: lignes, fonds: fonds });
+    out.push(para([txt('Échelle : de ' + qNombreFr(m.min) + ' (clair) à ' + qNombreFr(m.max) + ' (foncé), ' + (ch.n ? 'somme de ' + ch.nom(ch.n) : 'nombre de lignes'), { couleur: OFFICE_CLAIR.muted })]));
+    return out;
+  }
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') {
     var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
@@ -334,7 +357,8 @@ function officeHtml(elts, d) {
         if (!e.lignes.length) return '';   // pas de tableau vide (fiche de faits ou tableau sans ligne)
         return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt">' + e.lignes.map(function (l, i) {
           var th = e.entete && i === 0;
-          return '<tr>' + l.map(function (c) { return th ? '<th style="' + cellule + 'font-weight:bold;background:' + C.bg + '">' + tous(c) + '</th>' : '<td style="' + cellule + '">' + tous(c) + '</td>'; }).join('') + '</tr>';
+          var fd = e.fonds && e.fonds[i] || [];   // fonds : teinte facultative de chaque cellule (carte de chaleur)
+          return '<tr>' + l.map(function (c, j) { return th ? '<th style="' + cellule + 'font-weight:bold;background:' + C.bg + '">' + tous(c) + '</th>' : '<td style="' + cellule + (fd[j] ? 'background:' + fd[j] + ';' : '') + '">' + tous(c) + '</td>'; }).join('') + '</tr>';
         }).join('') + '</table>';
       case 'cadre':
         return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + e.fond + ';padding:6pt 9pt;' +

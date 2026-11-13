@@ -31,21 +31,24 @@ function ardoiseReader() {
     window.addEventListener('resize', refit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
     if (document.readyState !== 'loading') refit(); else document.addEventListener('DOMContentLoaded', refit);
-    // bulle façon BD sous la pastille d'une chronologie horizontale : immédiate, au survol, au clavier ou au toucher
-    var tip = null, cur = null;
+    // bulle façon BD sous la pastille d'une chronologie horizontale : immédiate, au survol, au clavier ou au toucher ;
+    // la même sous une case de carte de chaleur (07-requetes.js : ses lignes, en lecture comme en édition), qui reste ouverte sous le pointeur pour ses liens
+    var tip = null, cur = null, CIBLE = '.tl-h-item,.q-ch-s,.q-ch-c';
+    function cible(t) { return t && t.closest ? t.closest(CIBLE) : null; }
     function hide() { if (tip) { tip.remove(); tip = null; } cur = null; }
     function show(it) {
       if (cur === it) return;
       hide();
-      if (document.documentElement.classList.contains('is-edit') || !it.closest('.tl-tips')) return;
+      var chaleur = !it.classList.contains('tl-h-item');
+      if (!chaleur && (document.documentElement.classList.contains('is-edit') || !it.closest('.tl-tips'))) return;
       cur = it;
-      var dot = it.querySelector('.tl-dot'), date = it.querySelector('.tl-h-date'), src = it.querySelector('.tl-h-tip');
+      var dot = chaleur ? it : it.querySelector('.tl-dot'), date = chaleur ? null : it.querySelector('.tl-h-date'), src = chaleur ? it.querySelector(':scope > .q-ch-tip') : it.querySelector('.tl-h-tip');
       if (!dot || !src) return;
       tip = document.createElement('div'); tip.className = 'tl-bubble'; tip.setAttribute('role', 'tooltip');
       tip.innerHTML = src.innerHTML;
-      tip.style.setProperty('--bc', getComputedStyle(dot).backgroundColor);
+      if (chaleur) tip.classList.add('q-ch-bulle'); else tip.style.setProperty('--bc', getComputedStyle(dot).backgroundColor);
       document.body.appendChild(tip);
-      var d = dot.getBoundingClientRect(), r = date && date.textContent ? date.getBoundingClientRect() : d, w = tip.offsetWidth, h = tip.offsetHeight;
+      var d = chaleur ? it.querySelector('.q-ch-n').getBoundingClientRect() : dot.getBoundingClientRect(), r = date && date.textContent ? date.getBoundingClientRect() : d, w = tip.offsetWidth, h = tip.offsetHeight;
       var cx = d.left + d.width / 2, left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2)), top = r.bottom + 12;
       if (top + h > innerHeight - 8 && d.top - h - 14 > 8) { top = d.top - h - 14; tip.classList.add('up'); }
       tip.style.left = left + 'px'; tip.style.top = top + 'px';
@@ -53,13 +56,13 @@ function ardoiseReader() {
       requestAnimationFrame(function () { if (tip) tip.classList.add('on'); });
     }
     document.addEventListener('pointerover', function (e) {
-      var it = e.target && e.target.closest ? e.target.closest('.tl-h-item') : null;
-      if (it) show(it); else if (cur && document.activeElement !== cur) hide();
+      var it = cible(e.target);
+      if (it) show(it); else if (cur && document.activeElement !== cur && !(tip && tip.contains(e.target) && !cur.classList.contains('tl-h-item'))) hide();
     });
-    document.addEventListener('focusin', function (e) { var it = e.target && e.target.closest ? e.target.closest('.tl-h-item') : null; if (it) show(it); });
+    document.addEventListener('focusin', function (e) { var it = cible(e.target); if (it) show(it); });
     document.addEventListener('focusout', function (e) { if (cur && e.target === cur) hide(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
-    window.addEventListener('scroll', hide, true);
+    window.addEventListener('scroll', function (e) { if (!(tip && e.target && tip.contains && tip.contains(e.target))) hide(); }, true);
     window.addEventListener('resize', hide);
   }
   // bloc affiché d'une section (page exportée : #b-<id> ; éditeur : .blk[data-id]), null sans identifiant

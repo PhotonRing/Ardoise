@@ -208,3 +208,18 @@ test('office : vue regroupée en fiches (titre gras avec le nombre, tableau à d
   vrai(/<b[^>]*>APT28 \(2\)<\/b>|font-weight:bold[^>]*>APT28 \(2\)/.test(f.html), 'titre en gras');
   egal(office('q', page({ regForme: 'tableau', sortBy: '#n', sortDir: 'asc' })).texte, 'Synthèse\nAdversaire\tTechnique\tLignes\n(vide)\tT1566\t1\nAPT28\t#T1059, T1071\t2');
 });
+
+test('office : carte de chaleur en tableau aux cases teintées (couleurs du thème clair), sous-cases sous leur case, légende', () => {
+  const page = (q, palette) => ({ title: 'Doc', palette, pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 't1', type: 'table', rows: [['Tactique', 'Technique', 'Sous', 'Score'], ['Exécution', 'T1059', '.001', '3,5'], ['Persistance', 'T1053', '', '1'], ['exécution', 'T1204', '', '1']] },
+    { id: 'q', type: 'query', title: 'Matrice', src: 'table', scope: 'doc', view: 'chaleur', chX: 'tactique', chY: 'technique', chZ: 'sous', chN: 'score', ...q },
+  ] }] });
+  const f = office('q', page({}));
+  egal(f.texte, 'Matrice\nExécution (4,5)\tPersistance (1)\nT1059  3,5\tT1053  1\n› .001  3,5\t\nT1204  1\t\nÉchelle : de 1 (clair) à 3,5 (foncé), somme de Score');
+  const t = f.e.find((x) => x.t === 'tableau');
+  // T1059 et .001 au palier le plus foncé (accent pur), T1053 et T1204 au plus clair (6 % d'accent sur blanc)
+  egal(t.fonds, [[null, null], ['#b4540a', '#fbf5f0'], ['#b4540a', null], ['#fbf5f0', null]]);
+  vrai(/background:#b4540a[^>]*>[\s\S]*?color:#ffffff[^>]*>T1059/.test(f.html), 'palier foncé : texte blanc');
+  vrai(/background:#fbf5f0/.test(f.html), 'palier clair');
+  egal(office('q', page({}, 'indigo')).e.find((x) => x.t === 'tableau').fonds[1][0], '#4848c0', 'accent de la palette du document');
+});

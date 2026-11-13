@@ -111,7 +111,7 @@ function docxDepuisElements(elts, d) {
     return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>' + bordures('w:tblBorders', C.line) + '<w:tblCellMar><w:top w:w="57" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="57" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>' + grille + '</w:tblGrid>' +
       lignes.map(function (l, i) {
         var th = entete && i === 0, cs = l.slice(); while (cs.length < n) cs.push([]);
-        return '<w:tr>' + (th ? '<w:trPr><w:tblHeader/></w:trPr>' : '') + cs.map(function (c) { return cellule(c, th, w); }).join('') + '</w:tr>';
+        return '<w:tr>' + (th ? '<w:trPr><w:tblHeader/></w:trPr>' : '') + cs.map(function (c, j) { return cellule(c, th, w, i, j); }).join('') + '</w:tr>';
       }).join('') + '</w:tbl>';
   };
   // contenu d'une cellule : jamais vide, et un paragraphe après un tableau imbriqué
@@ -149,7 +149,10 @@ function docxDepuisElements(elts, d) {
       case 'liste': return liste(e);
       case 'tableau':
         if (!e.lignes.length) return '';   // Word refuse un tableau sans ligne
-        return tableau(e.lignes, e.entete, function (c, th, w) { return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + (th ? '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C.bg) + '"/>' : '') + '</w:tcPr>' + dansCellule(c, th ? { gras: true } : null) + '</w:tc>'; });
+        return tableau(e.lignes, e.entete, function (c, th, w, i, j) {
+          var fd = th ? C.bg : e.fonds && e.fonds[i] && e.fonds[i][j];   // fonds : teinte facultative de chaque cellule (carte de chaleur)
+          return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + (fd ? '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(fd) + '"/>' : '') + '</w:tcPr>' + dansCellule(c, th ? { gras: true } : null) + '</w:tc>';
+        });
       case 'cadre':
         var bd = e.barre ? '<w:tcBorders><w:top w:val="nil"/><w:left w:val="single" w:sz="24" w:space="0" w:color="' + docxCouleur(e.barre) + '"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>' : bordures('w:tcBorders', C.line);
         return tableau([[e.contenu]], false, function (c, th, w) { return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + bd + '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(e.fond) + '"/></w:tcPr>' + dansCellule(c) + '</w:tc>'; }).replace(bordures('w:tblBorders', C.line), '<w:tblBorders/>');
