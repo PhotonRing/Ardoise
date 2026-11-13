@@ -79,7 +79,7 @@ function fieldValue(el) {
   return el.textContent.replace(/\s*\n\s*/g, ' ');
 }
 function nextField(el, dir) {
-  var all = $$('.fld, textarea.code-ta', app).filter(function (x) { return x === el || !x.closest('tr[hidden]'); }), i = all.indexOf(el);   // lignes filtrées sautées
+  var all = $$('.fld, textarea.code-ta', app).filter(function (x) { return x === el || !ligneMasquee(x); }), i = all.indexOf(el);   // lignes filtrées sautées (14-filtre-lignes.js)
   var n = all[i + (dir || 1)]; if (n) { n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0); }
 }
 

@@ -92,12 +92,13 @@ function filtrerBloc(id) {
 // une cellule prise pendant un filtre reste visible jusqu'au prochain changement du terme
 app.addEventListener('focusin', function (e) {
   var el = e.target; if (!el.hasAttribute || !el.hasAttribute('data-cell')) return;
-  var s = filtreSuivi[el.dataset.b], r = +el.dataset.k.split('.')[1], b = byId(el.dataset.b);
+  var s = filtreSuivi[el.dataset.b], r = posCellule(el).r, b = byId(el.dataset.b);   // posCellule : 13-menu-cellules.js
   if (s && b && s.bloc === b && r > 0 && s.gardees.indexOf(b.rows[r]) < 0) s.gardees.push(b.rows[r]);
 });
+function ligneMasquee(el) { return !!(el && el.closest('tr[hidden]')); }   // champ dans une ligne masquée par le filtre
 // ligne voisine visible (dir = ±1) d'un tableau, ou -1 ; l'en-tête n'est jamais masqué
 function ligneVoisine(b, r, dir) {
-  for (var i = r + dir; i >= 0 && i < b.rows.length; i += dir) { var c = cellAt(b, i, 0); if (c && !c.closest('tr[hidden]')) return i; }
+  for (var i = r + dir; i >= 0 && i < b.rows.length; i += dir) { var c = cellAt(b, i, 0); if (c && !ligneMasquee(c)) return i; }
   return -1;
 }
 // impression : toutes les lignes, comme l'export (afterprint refait le rendu, qui réapplique le filtre)

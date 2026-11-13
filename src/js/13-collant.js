@@ -1,10 +1,9 @@
 /* ---------- Barres collantes (menu de bloc, et toute barre posée dans une ancre .collant) ---------- */
-// Le haut d'écran est le bas de la barre du haut, ou des onglets de pages, collés sous elle en édition. Sa hauteur
-// change avec les paliers de largeur et la seconde rangée d'onglets : elle est mesurée ici et posée dans --haut-ecran,
-// que lit l'ancre .collant (editor.css). Les deux éléments sont recréés au rendu : l'observateur est rebranché à chaque fois.
+// Haut d'écran : bas de la barre du haut ou des onglets de pages ; sa hauteur varie (largeur, onglets), d'où sa mesure dans --haut-ecran (editor.css).
+function barresDuHaut() { return [$('#ui .tb'), $('.pnav-tabs', app)]; }   // recréées au rendu : l'observateur est rebranché à chaque fois
 function mesurerHautEcran() {
   var haut = 0;
-  [$('#ui .tb'), $('.pnav-tabs', app)].forEach(function (el) {
+  barresDuHaut().forEach(function (el) {
     if (!el) return;
     var cs = getComputedStyle(el), r = el.getBoundingClientRect();
     if (cs.display === 'none' || !r.height) return;
@@ -14,9 +13,9 @@ function mesurerHautEcran() {
   });
   document.documentElement.style.setProperty('--haut-ecran', haut + 'px');
 }
-var hautObs = window.ResizeObserver ? new ResizeObserver(function () { mesurerHautEcran(); }) : null;
+var observateurHaut = window.ResizeObserver ? new ResizeObserver(function () { mesurerHautEcran(); }) : null;
 function suivreHautEcran() {
-  if (hautObs) { hautObs.disconnect(); [$('#ui .tb'), $('.pnav-tabs', app)].forEach(function (el) { if (el) hautObs.observe(el); }); }
+  if (observateurHaut) { observateurHaut.disconnect(); barresDuHaut().forEach(function (el) { if (el) observateurHaut.observe(el); }); }
   mesurerHautEcran();
 }
 window.addEventListener('resize', mesurerHautEcran);
@@ -29,18 +28,17 @@ function decalageCurseur(curseur, barres, marge) {
   });
   return d;
 }
-// La ligne du curseur ne reste pas cachée sous la barre collante de son bloc : vérifié quand le curseur bouge ou
-// qu'on tape (selectionchange), jamais pendant un simple défilement.
-var collantTick = 0;
+// ligne du curseur sortie de sous la barre collante de son bloc quand le curseur bouge (selectionchange), jamais au simple défilement
+var collantAttente = 0;   // image d'animation demandée
 document.addEventListener('selectionchange', function () {
-  if (mode !== 'edit' || collantTick) return;
-  collantTick = requestAnimationFrame(function () {
-    collantTick = 0;
+  if (mode !== 'edit' || collantAttente) return;
+  collantAttente = requestAnimationFrame(function () {
+    collantAttente = 0;
     var s = getSelection(); if (!s.rangeCount) return;
     var f = fieldOf(s.focusNode), blk = f && f.closest('.blk'); if (!blk) return;
     var rg = document.createRange(); rg.setStart(s.focusNode, s.focusOffset);
     var c = rg.getBoundingClientRect(); if (!c.height) c = f.getBoundingClientRect();
-    var barres = $$('.collant', blk).filter(function (a) { return a.parentNode === blk; }).map(function (a) {
+    var barres = $$('.collant', blk).map(function (a) {
       var b = a.firstElementChild; return b && getComputedStyle(b).visibility === 'visible' ? b.getBoundingClientRect() : null;
     }).filter(Boolean);
     var d = decalageCurseur(c, barres, 4); if (d) scrollBy(0, -d);

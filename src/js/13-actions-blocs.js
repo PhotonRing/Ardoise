@@ -138,11 +138,11 @@ app.addEventListener('mouseout', function (e) {
 document.addEventListener('mousedown', function (e) { if (barHold && !(e.target.closest && e.target.closest('.blk.bar-on'))) releaseBar(); }, true);
 // opération sur la grille d'un tableau (opTableau, 05-tableau.js) à la cellule (r, c) ; sans cellule, celle qui a eu le
 // focus en dernier (boutons +L, −L, +C, −C), à défaut la dernière ; le curseur va dans la ligne ou la colonne qui en résulte
-var TABLE_BOUTONS = { 'row-add': 'ligne-apres', 'col-add': 'col-apres', 'row-del': 'ligne-suppr', 'col-del': 'col-suppr' };
+var BOUTONS_TABLEAU = { 'row-add': 'ligne-apres', 'col-add': 'col-apres', 'row-del': 'ligne-suppr', 'col-del': 'col-suppr' };
 function tableOp(b, op, r, c) {
   var rows = b.rows;
   if (r == null) { var cur = lastCell && lastCell.b === b.id ? lastCell : { r: rows.length - 1, c: rows[0].length - 1 }; r = cur.r; c = cur.c; }
-  var x = opTableau(rows, TABLE_BOUTONS[op] || op, r, c); if (!x) return;
+  var x = opTableau(rows, BOUTONS_TABLEAU[op] || op, r, c); if (!x) return;
   session.modifier(function () { b.rows = reprendreLignes(rows, x.rows, x.origine); }, { b: b.id, k: 'rows.' + x.r + '.' + x.c, end: false });
   lastCell = { b: b.id, r: x.r, c: x.c };
 }

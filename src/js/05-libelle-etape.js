@@ -47,14 +47,13 @@ function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return
 // tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; sinon null (collage et vidage d'une plage donnent leur nature)
 function libelleGrille(ra, rb) {
   var J = JSON.stringify, i;
-  var vide = function (l) { return l.every(function (v) { return !v; }); };
   var sansLigne = function (g, k) { return J(g.slice(0, k).concat(g.slice(k + 1))); };
   var sansCol = function (g, k) { return J(g.map(function (l) { return l.slice(0, k).concat(l.slice(k + 1)); })); };
   var colonne = function (g, k) { return g.map(function (l) { return l[k]; }); };
   var la = ra.length, lb = rb.length, ca = ra[0].length, cb = rb[0].length;
-  if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (vide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
+  if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (ligneVide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
   if (ca === cb && la === lb + 1) for (i = 1; i < la; i++) if (sansLigne(ra, i) === J(rb)) return 'ligne supprimée';
-  if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (vide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
+  if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (ligneVide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
   if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
   return null;
 }
@@ -76,7 +75,7 @@ function libelleNature(ba, b) {
   if (f.every(function (x) { return SYN_TEXT[x.k]; })) return 'texte modifié';   // SYN_TEXT : champs de texte (05-synchro-moteur.js)
   return 'bloc modifié';
 }
-// modifications des blocs d'une page présente avant et après ; nature : celle du geste, si l'appelant la donne
+// modifications des blocs d'une page présente avant et après ; nature : celle du geste, donnée par l'appelant (collage, vidage d'une plage)
 function libellesBlocs(pa, pg, out, nature) {
   var o = libelleOrdre(pa.blocks, pg.blocks);
   pa.blocks.forEach(function (b) { if (!o.enB['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
@@ -116,8 +115,7 @@ function libellesDifferences(avant, apres, nature) {
   return out;
 }
 // libellé d'une étape : la première modification, puis le nombre des autres ; un champ qu'aucune nature ne décrit
-// (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu ; nature : celle
-// du geste (collage, vidage d'une plage), qui remplace celle déduite des blocs modifiés
+// (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu
 function libelleEtape(avant, apres, nature) {
   var l = libellesDifferences(avant, apres, nature);
   if (!l.length) return JSON.stringify(avant) === JSON.stringify(apres) ? '' : 'document modifié';

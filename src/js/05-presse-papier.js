@@ -59,17 +59,17 @@ function grilleDuPressePapier(html, texte) {
   });
   else if (/\t/.test(texte || '')) g = cellulesTsv(String(texte)).map(function (l) { return l.map(function (v) { return esc(compacterTexte(v)); }); });
   if (!g) return null;
-  var vide = function (l) { return l.every(function (v) { return !v; }); };
-  while (g.length && vide(g[g.length - 1])) g.pop();
+  while (g.length && ligneVide(g[g.length - 1])) g.pop();
   var n = 0; g.forEach(function (l) { n = Math.max(n, l.length); });
   if (!g.length || (g.length < 2 && n < 2)) return null;
   return g.map(function (l) { while (l.length < n) l.push(''); return l; });
 }
 /* ---------- Copie d'une plage de cellules ----------
    plage { r1, c1, r2, c2 } : coins inclus, dans n'importe quel ordre ; sauf : lignes masquées par un filtre, exclues. */
+function bornesPlage(p) { return { haut: Math.min(p.r1, p.r2), bas: Math.max(p.r1, p.r2), gauche: Math.min(p.c1, p.c2), droite: Math.max(p.c1, p.c2) }; }
 function cellulesDePlage(rows, plage) {
-  var r0 = Math.min(plage.r1, plage.r2), r1 = Math.max(plage.r1, plage.r2), c0 = Math.min(plage.c1, plage.c2), c1 = Math.max(plage.c1, plage.c2), out = [];
-  for (var r = r0; r <= r1; r++) if (!plage.sauf || plage.sauf.indexOf(r) < 0) out.push(rows[r].slice(c0, c1 + 1));
+  var z = bornesPlage(plage), out = [];
+  for (var r = z.haut; r <= z.bas; r++) if (!plage.sauf || plage.sauf.indexOf(r) < 0) out.push(rows[r].slice(z.gauche, z.droite + 1));
   return out;
 }
 // texte à tabulations pour un tableur : une valeur par cellule, pastilles en #nom, sans tabulation ni retour à la ligne

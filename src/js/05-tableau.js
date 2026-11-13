@@ -1,13 +1,9 @@
-/* ---------- Opérations sur la grille d'un tableau ----------
-   Fonction pure, partagée par le menu contextuel des cellules et les boutons +L, −L, +C, −C de la barre du bloc.
-   Au chargement, ce fichier ne touche ni au DOM ni au stockage. */
+/* ---------- Opérations sur la grille d'un tableau (menu des cellules, +L −L +C −C, collage ; sans DOM) ---------- */
 // opérations du menu, dans son ordre, avec leur libellé
 var OPS_TABLEAU = [['ligne-avant', 'Insérer une ligne au-dessus'], ['ligne-apres', 'Insérer une ligne en dessous'],
   ['col-avant', 'Insérer une colonne à gauche'], ['col-apres', 'Insérer une colonne à droite'],
   ['ligne-suppr', 'Supprimer la ligne'], ['col-suppr', 'Supprimer la colonne']];
-// grille rows (ligne 0 : en-tête) et cellule (r, c) → { rows : nouvelle grille, r, c : place du curseur, origine : indice
-// d'origine de chaque ligne, -1 pour l'ajoutée }, ou null si l'opération est impossible : l'en-tête n'est jamais supprimé
-// ni précédé, il reste une ligne sous l'en-tête et une colonne
+// → { rows : nouvelle grille, r, c : curseur, origine : indice d'avant de chaque ligne, -1 si ajoutée }, ou null si impossible (en-tête, dernière ligne ou colonne)
 function opTableau(rows, op, r, c) {
   var g = rows.map(function (x) { return x.slice(); }), o = rows.map(function (x, i) { return i; }), nc = g[0].length;
   var vide = function () { return g[0].map(function () { return ''; }); };
@@ -24,9 +20,7 @@ function opTableau(rows, op, r, c) {
   }
   return null;
 }
-// plage collée (grille de cellules) à partir de la cellule (r, c), vers la droite et le bas → nouvelle grille, agrandie
-// au besoin (nouvel en-tête « Colonne », nouvelles cellules vides, comme +C et +L), toujours rectangulaire ; les lignes
-// de sauf (masquées par un filtre) sont sautées, comme à la copie
+// plage collée depuis (r, c) → nouvelle grille rectangulaire, agrandie comme par +L et +C ; les lignes de sauf (filtrées) sont sautées, comme à la copie
 function collerGrille(rows, r, c, grille, sauf) {
   var cibles = [];
   for (var i = r; cibles.length < grille.length; i++) if (!sauf || sauf.indexOf(i) < 0) cibles.push(i);
@@ -38,8 +32,7 @@ function collerGrille(rows, r, c, grille, sauf) {
   grille.forEach(function (x, k) { x.forEach(function (v, j) { g[cibles[k]][c + j] = v; }); });
   return g;
 }
-// nouvelle grille g de rows → g, dont chaque ligne venue de rows (origine, par défaut le même indice) reprend son tableau,
-// rempli du nouveau contenu : le filtre des lignes (14-filtre-lignes.js) reconnaît une ligne à son tableau
+// lignes de g venues de rows (origine, sinon même indice) remises dans leur tableau d'avant : le filtre (14-filtre-lignes.js) reconnaît une ligne à son tableau
 function reprendreLignes(rows, g, origine) {
   return g.map(function (l, i) {
     var o = origine ? origine[i] : i < rows.length ? i : -1, x = o >= 0 && rows[o];

@@ -92,8 +92,7 @@ function creerSession(adaptateur) {
     return { ok: true };
   }
   return {
-    // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés ; nature : celle du
-    // geste, quand l'appelant la connaît (« cellules collées »), à la place de celle déduite des blocs modifiés
+    // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés ; nature : celle du geste (« cellules collées »), sinon déduite
     modifier: function (fn, focus, nature) { fn(); etape(nature); prevenir('rendu', focus, {}); prevenir('modifie'); prevenir('historique', etat()); },
     // modification de frappe (déjà écrite dans le champ) : pas de rendu, étape validée après SESSION_DELAI sans frappe
     saisir: function (fn) { if (fn) fn(); clearTimeout(minuteur); minuteur = setTimeout(function () { minuteur = null; etape(); prevenir('historique', etat()); }, SESSION_DELAI); prevenir('modifie'); },
