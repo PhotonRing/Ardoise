@@ -306,7 +306,8 @@ function parseLink(href) {
 }
 function linkLabel(href) {
   var L = parseLink(href); if (!L.page) return L.url.replace(/^mailto:/i, '');
-  var i = pageIndex(doc.pages, L.pid); if (i < 0) return 'Page introuvable';
+  var i = L.bid ? pageDuBloc(doc.pages, L.bid) : -1; if (i < 0) i = pageIndex(doc.pages, L.pid);   // une section déplacée est suivie sur sa page
+  if (i < 0) return 'Page introuvable';
   var t = pageTitle(doc.pages[i], i);
   if (L.bid) { var x = sectionsOf(doc.pages[i]).filter(function (y) { return y.id === L.bid; })[0]; t += ' › ' + (x ? x.t : 'section introuvable'); }
   return t;
@@ -314,7 +315,9 @@ function linkLabel(href) {
 function goLink(href) {
   // ouvre la page liée, puis fait défiler jusqu'à la section (dépliée au besoin en édition)
   var L = parseLink(href); if (!L.page) return;
-  var i = pageIndex(doc.pages, L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
+  // la section est cherchée dans tout le document : déplacée vers une autre page, le lien la retrouve
+  var i = L.bid ? pageDuBloc(doc.pages, L.bid) : -1; if (i < 0) i = pageIndex(doc.pages, L.pid);
+  if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
   var moved = i !== doc.cur; if (moved) goPage(i);
   if (!L.bid) return;
   if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });

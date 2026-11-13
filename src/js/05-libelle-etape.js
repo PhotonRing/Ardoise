@@ -23,6 +23,8 @@ function libelleBloc(pg, b) {
   var mots = libelleMots(b), ty = T[b.type] ? T[b.type].label : 'Bloc';
   return (pg.title || 'Sans titre') + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
 }
+// libellé complet de l'étape d'un bloc déplacé vers une autre page (page source, bloc, puis la page cible)
+function libelleDeplacement(pg, b, titre) { return libelleBloc(pg, b) + ' : bloc déplacé vers « ' + titre + ' »'; }
 // identifiants communs à deux listes d'objets à identifiant, et ceux qui restent dans l'ordre (plus longue sous-suite commune)
 function libelleOrdre(la, lb) {
   var enA = {}, enB = {}; la.forEach(function (x) { enA['$' + x.id] = x; }); lb.forEach(function (x) { enB['$' + x.id] = x; });

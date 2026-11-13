@@ -44,7 +44,7 @@ function renderPage(d, ctx) {
       inner = inner.replace(/^<(\w+)/, '<$1' + at);
       if (fold) inner = inner.replace(/^(<\w+[^>]*>)/, '$1<button type="button" class="fold-v" data-vfold aria-expanded="' + !folded + '" title="Plier / déplier la section"></button>');
     }
-    out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0, ctx.editor) : inner);
+    out.push(edit ? wrapEdit(b, inner, fi.count[b.id] || 0, ctx.editor, d.pages.length) : inner);
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
@@ -375,13 +375,13 @@ function revealBlock(id) {
   // déplie les sections qui masquent ce bloc
   for (var n = 0; n < 20; n++) { var h = foldInfo(doc.blocks).hidden[id], hb = h && byId(h); if (!hb) return; delete hb.folded; }
 }
-function wrapEdit(b, inner, nHidden, editorUi) {
+function wrapEdit(b, inner, nHidden, editorUi, nPages) {
   var s = settings(b), fl = foldLevel(b) > 0;
   return '<div class="blk' + (editorUi && editorUi.bar != null && b.id === editorUi.bar ? ' bar-on' : '') + (fl && b.folded ? ' folded' : '') + '" data-id="' + b.id + '" data-type="' + b.type + '"' + (fl ? ' data-fold' : '') + '>' +
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="collant"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
-    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') +
+    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && nPages > 1 ? act('move-page', '⇥', 'Déplacer vers la page…') : '') +
     '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
@@ -407,6 +407,25 @@ function sectionsOf(pg) {
 function pageIndex(pages, pid) { for (var i = 0; i < pages.length; i++) if (pages[i].id === pid) return i; return -1; }
 function pageLv(pages, i) { return +pages[i].lv || 0; }
 function pageEnd(pages, i) { var lv = pageLv(pages, i), j = i + 1; while (j < pages.length && pageLv(pages, j) > lv) j++; return j; }   // fin de la page et de ses sous-pages (exclue)
+// déplacement d'un bloc vers une autre page : page qui contient un bloc (-1 sinon) ; blocs emportés à partir de l'indice i
+// (un titre de section emporte ce qu'il masquerait s'il était seul plié, plié ou non ; un autre bloc part seul)
+function pageDuBloc(pages, bid) { for (var i = 0; i < pages.length; i++) for (var j = 0; j < pages[i].blocks.length; j++) if (pages[i].blocks[j].id === bid) return i; return -1; }
+function uniteDuBloc(blocks, i) {
+  var levels = blocks.map(foldLevel); if (levels[i] <= 0) return 1;
+  return 1 + Reader.foldHidden(levels, levels.map(function (_, j) { return j === i; })).filter(function (h) { return h === i; }).length;
+}
+// retire l'unité du bloc bid de la page de et l'ajoute à la fin de la page vers, avant son pied de page final ; la section
+// pliée qui la recevrait est dépliée. Rend le nombre de blocs déplacés, ou false (en-tête, même page, bloc ou page absents)
+function deplacerVersPage(pages, de, bid, vers) {
+  var src = pages[de], dst = pages[vers]; if (!src || !dst || de === vers) return false;
+  var i = -1; src.blocks.forEach(function (b, k) { if (b.id === bid) i = k; });
+  if (i < 0 || src.blocks[i].type === 'header') return false;
+  var seg = src.blocks.splice(i, uniteDuBloc(src.blocks, i)), at = dst.blocks.length;
+  while (at > 0 && dst.blocks[at - 1].type === 'footer') at--;
+  Array.prototype.splice.apply(dst.blocks, [at, 0].concat(seg));
+  for (var n = 0; n < 20; n++) { var h = foldInfo(dst.blocks).hidden[bid], hb = h && dst.blocks.filter(function (b) { return b.id === h; })[0]; if (!hb) break; delete hb.folded; }
+  return seg.length;
+}
 function pageParent(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) if (pageLv(pages, j) < lv) return j; return -1; }
 function pageRoot(pages, i) { var p; while ((p = pageParent(pages, i)) >= 0) i = p; return i; }
 function pageAncestors(pages, i) { var out = []; while ((i = pageParent(pages, i)) >= 0) out.push(i); return out; }
