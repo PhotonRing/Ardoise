@@ -91,7 +91,7 @@ test('office : listes à niveaux et liste à cocher', () => {
 test('office : tableau à en-tête gras et bordures fines ; fiche de faits à deux colonnes, alerte en rouge', () => {
   const t = office('t1');
   egal(t.texte, 'Nom\tÉtat\nServeur\t#KO');
-  vrai(/<table style="border-collapse:collapse[^"]*"><tr><th style="border:1px solid #d9e0e5;[^"]*font-weight:bold[^"]*">/.test(t.html), t.html);
+  vrai(/<table width="100%" style="border-collapse:collapse[^"]*"><tr><th style="border:1px solid #d9e0e5;[^"]*font-weight:bold[^"]*">/.test(t.html), t.html);
   vrai(t.html.includes('background:#fdecea;color:#b42318'), 'pastille rouge du registre');
   const f = office('f1');
   egal(f.texte, 'Hôte\tsrv1\nRisque\télevé');
@@ -100,11 +100,12 @@ test('office : tableau à en-tête gras et bordures fines ; fiche de faits à de
 
 test('office : encadré teinté avec sa barre, code à chasse fixe sans coloration', () => {
   const n = office('n1');
-  vrai(/<td style="background:#fdecea;[^"]*border-left:4px solid #b42318">/.test(n.html), n.html);
+  vrai(/<table width="100%" [^>]*><tr><td width="100%" style="background:#fdecea;[^"]*border-left:4px solid #b42318">/.test(n.html), n.html);
   const k = office('k1');
   egal(k.texte, 'a.sh\necho "<a>"\nls');
   // fond sur une cellule pleine largeur : Google Docs ne teinte un <pre> que sous le texte
-  vrai(/<table style="[^"]*width:100%[^"]*"><tr><td style="background:#eef2f4;[^"]*"><pre style="font-family:Consolas[^"]*margin:0[^"]*white-space:pre-wrap">echo &quot;&lt;a&gt;&quot;\nls<\/pre><\/td><\/tr><\/table>/.test(k.html), k.html);
+  // LibreOffice Writer ignore la largeur en style : l'attribut width la donne
+  vrai(/<table width="100%" style="[^"]*width:100%[^"]*"><tr><td width="100%" style="background:#eef2f4;[^"]*"><pre style="font-family:Consolas[^"]*margin:0[^"]*white-space:pre-wrap">echo &quot;&lt;a&gt;&quot;\nls<\/pre><\/td><\/tr><\/table>/.test(k.html), k.html);
 });
 
 test('office : kanban en colonnes, cartes en paragraphes (titre gras, échéance, responsable, priorité)', () => {
@@ -120,7 +121,7 @@ test('office : dépliable ouvert, image avec légende, cartes en cadres, sépara
   egal(pur(im.e[0]), { t: 'image', src: 'data:image/png;base64,AAAA', mime: 'image/png', l: 1360, h: 400, alt: 'Légende', legende: [{ texte: 'Légende' }] });
   vrai(im.html.includes('width="680" height="200"') && /font-style:italic[^"]*">Légende<\/p>/.test(im.html), im.html);
   egal(office('cd').texte, 'Carte A\ntexte\n☑ case');
-  vrai(/<td style="background:#ffffff;[^"]*border:1px solid #d9e0e5">/.test(office('cd').html), 'carte en cadre');
+  vrai(/<td width="100%" style="background:#ffffff;[^"]*border:1px solid #d9e0e5">/.test(office('cd').html), 'carte en cadre');
   vrai(office('dv').html.includes('<hr style='), 'séparateur');
   egal(office('ft').e[0].style, 'pied');
 });

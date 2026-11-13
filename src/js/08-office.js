@@ -292,17 +292,17 @@ function officeHtml(elts, d) {
       case 'liste': return liste(e);
       case 'tableau':
         if (!e.lignes.length) return '';   // pas de tableau vide (fiche de faits ou tableau sans ligne)
-        return '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt">' + e.lignes.map(function (l, i) {
+        return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt">' + e.lignes.map(function (l, i) {
           var th = e.entete && i === 0;
           return '<tr>' + l.map(function (c) { return th ? '<th style="' + cellule + 'font-weight:bold;background:' + C.bg + '">' + tous(c) + '</th>' : '<td style="' + cellule + '">' + tous(c) + '</td>'; }).join('') + '</tr>';
         }).join('') + '</table>';
       case 'cadre':
-        return '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td style="background:' + e.fond + ';padding:6pt 9pt;' +
+        return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + e.fond + ';padding:6pt 9pt;' +
           (e.barre ? 'border-left:4px solid ' + e.barre : 'border:1px solid ' + C.line) + '">' + tous(e.contenu) + '</td></tr></table>';
       case 'code':
         return (e.nom ? '<p style="' + P + 'font-family:' + OFFICE_MONO + ';font-size:8pt;color:' + C.muted + '">' + esc(e.nom) + '</p>' : '') +
-          // fond sur une cellule pleine largeur : Google Docs ne teinte un <pre> que sous le texte
-          '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
+          // fond sur une cellule pleine largeur (attribut width pour Writer) : Google Docs ne teinte un <pre> que sous le texte
+          '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
           '<pre style="font-family:' + OFFICE_MONO + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
       case 'image':
         var l = e.l, h = e.h; if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
