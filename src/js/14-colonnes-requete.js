@@ -3,7 +3,7 @@
    (qColMode, qColBasculer, qColDeplacer). Chaque geste est une étape « colonnes modifiées » (05-libelle-etape.js). */
 function colonnesBloc(el) { var x = el.closest('.blk'); return x ? byId(x.dataset.id) : null; }
 function ecrireColonnes(b, calcul, focus) {
-  var neuf = calcul(qColonnesDispo(b, queryRecords(b, doc, doc.cur)).dispo);
+  var neuf = calcul(qColonnesDispo(b, queryRecords(b, doc, doc.cur), b.view === 'list').dispo);   // dans l'ordre du réglage affiché
   holdBar(b.id); session.modifier(function () { b.colonnes = neuf; });
   // la case touchée garde le focus après le rendu
   var c = focus && $$('.blk[data-id="' + b.id + '"] input[data-qcol]', app).filter(function (x) { return x.dataset.qcol === focus; })[0];

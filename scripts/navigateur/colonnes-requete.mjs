@@ -5,7 +5,14 @@
 const DOC = { title: 'Colonnes', pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 't1', type: 'table', rows: [['Hôte', 'État', 'Risque'], ['srv1', 'ok', 'bas'], ['srv2', 'ko', 'haut'], ['web3', 'ok', 'moyen']] },
   { id: 'q1', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' },
+  { id: 'q2', type: 'query', title: 'En liste', src: 'table', scope: 'doc', view: 'list' },
 ] }] };
+// vue liste de q2 : ordre de la première ligne (Source ou nom de colonne), cases du réglage, focus
+const LISTE = `(() => {
+  const q = document.querySelector('.blk[data-id="q2"]'), li = q.querySelector('.q-res li'), a = document.activeElement;
+  return { ligne: [...li.querySelectorAll('.q-src, .q-k')].map((x) => x.classList.contains('q-src') ? 'Source' : x.textContent),
+    cases: [...q.querySelectorAll('input[data-qcol]')].map((c) => c.dataset.qcol), focus: a && a.dataset ? a.dataset.qcol || null : null };
+})()`;
 const MODE = `document.documentElement.classList.contains('is-edit')`;
 const basculer = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))`;
 // état : en-têtes du résultat, cases du formulaire (clé + cochée), focus, champ colonnes du document, libellé d'Annuler
@@ -60,6 +67,14 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   attendu('Alt+↑ : focus gardé sur la case déplacée', e.focus === 'risque', e.focus);
   await touche('ArrowDown', 'ArrowDown', 1);
   e = await etat(); attendu('Alt+↓ : Risque après Hôte', e.cases.join() === 'hôte+,risque+,état-,#source+' && e.focus === 'risque', e);
+
+  // vue liste : Source en tête du réglage et de la ligne ; Alt+↑ sur Risque ne la déplace pas
+  let l = await evalue(LISTE);
+  attendu('liste : Source en tête du réglage et des lignes', l.cases.join() === '#source,hôte,état,risque' && l.ligne.join() === 'Source,Hôte,État,Risque', l);
+  await evalue(`[...document.querySelectorAll('.blk[data-id="q2"] input[data-qcol]')].find((c) => c.dataset.qcol === 'risque').focus()`);
+  await touche('ArrowUp', 'ArrowUp', 1); await touche('ArrowUp', 'ArrowUp', 1);
+  l = await evalue(LISTE);
+  attendu('liste, Alt+↑ deux fois sur Risque : Source reste en tête', l.cases.join() === '#source,risque,hôte,état' && l.ligne.join() === 'Source,Risque,Hôte,État' && l.focus === 'risque', l);
 
   // poignée : Source glissée avant Hôte
   await evalue(GLISSER('#source', 'hôte')); await attendre(80);
