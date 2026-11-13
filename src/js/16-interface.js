@@ -93,13 +93,14 @@ function closePop() { if (pop) { pop.remove(); pop = null; var c = popClose; pop
 // point { x, y } facultatif : le menu s'ouvre à ce point (clic droit) plutôt que sous l'ancre
 function placePop(p, anchor, point) {
   var r = anchor.getBoundingClientRect(); if (point) r = { left: point.x, top: point.y, bottom: point.y };
-  ui.appendChild(p); p.ancre = anchor;   // ancre : un clic dans un popup ouvert depuis une carte reste sur la carte
+  if (p.parentNode !== ui) ui.appendChild(p);   // déjà là (fenêtre d'une puce replacée) : pas déplacé, son défilement reste
+  p.ancre = anchor;   // ancre : un clic dans un popup ouvert depuis une carte reste sur la carte
   var w = p.offsetWidth, h = p.offsetHeight;
   var left = Math.min(Math.max(8, r.left), innerWidth - w - 8);
   var top = r.bottom + 6; if (top + h > innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
   p.style.left = left + 'px'; p.style.top = Math.max(8, top) + 'px';
 }
-document.addEventListener('mousedown', function (e) { if (pop && !pop.contains(e.target) && !e.target.closest('[data-ui],[data-act=add-after],[data-act=add-end]')) closePop(); });
+document.addEventListener('mousedown', function (e) { if (pop && !pop.contains(e.target) && !e.target.closest('[data-ui],[data-act=add-after],[data-act=add-end],[data-qpuce]')) closePop(); });   // puce : son clic ouvre ou ferme sa fenêtre
 var norm = function (s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
 // bloc d'un groupe de la page affichée : son menu d'insertion ne propose pas les types refusés dans un groupe
 function dansUnGroupe(b) { var o = position(b); return !!(o && o.parent); }

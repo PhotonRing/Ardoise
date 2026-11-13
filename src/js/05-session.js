@@ -30,6 +30,9 @@ function creerSession(adaptateur) {
   // libelles : ce que chaque étape a changé, calculé à sa validation entre deux états qui ont reçu les mêmes
   // modifications des autres copies (recevoir réécrit l'état courant) : seule l'étape locale y figure
   var libelles = [];
+  // étape ouverte (fenêtre d'une puce de requête) : ses modifications se fondent dans une seule étape, à sa nature ;
+  // pos : position de cette étape dans la pile (-1 tant qu'aucune modification, ou après annuler, rétablir, remplacer)
+  var groupe = null;
   var abonnes = { rendu: [], modifie: [], historique: [], nouveauFichier: [] };
   function prevenir(ev) { var a = Array.prototype.slice.call(arguments, 1); abonnes[ev].forEach(function (fn) { fn.apply(null, a); }); }
   function etat() {
@@ -48,9 +51,20 @@ function creerSession(adaptateur) {
     sy.envoyer();   // synchronisation : la modification part vers les autres copies
     return true;
   }
+  // modification dans l'étape ouverte, déjà au sommet de la pile : l'état remplace celui de l'étape (même libellé) ;
+  // revenu à l'état d'avant l'étape, l'étape disparaît
+  function fondre() {
+    clearTimeout(minuteur); minuteur = null;
+    var s = JSON.stringify(doc);
+    if (pile[pos] === s) return;
+    if (pos > 0 && pile[pos - 1] === s) { pile.pop(); marques.pop(); libelles.pop(); pos--; groupe.pos = -1; }
+    else { pile[pos] = s; marques[pos] = sy.marque(); }
+    sy.envoyer();
+  }
   function valider() { if (minuteur) { etape(); prevenir('historique', etat()); } }
   function aller(d, focus) {
     valider();
+    if (groupe) groupe.pos = -1;
     var vers = pos + d;
     if (vers >= 0 && vers < pile.length) {
       pos = vers;
@@ -73,6 +87,7 @@ function creerSession(adaptateur) {
     if (nd.newer && r.plusRecent) return { refus: 'plus-recent', format: nd.newer };
     if (r.verrou && doc && doc.lock && !(options && options.deverrouille)) return { refus: 'verrouille' };
     var ancien = doc;
+    if (groupe) groupe.pos = -1;
     if (r.neuf) { nd.id = uid() + uid(); nd.savedAt = null; delete nd.lock; delete nd.mapKey; delete nd.sync; }
     (r.garde || []).forEach(function (k) { if (ancien[k] !== undefined && ancien[k] !== null) nd[k] = ancien[k]; else delete nd[k]; });
     if (r.garde && !ancien.savedAt) nd.savedAt = null;   // normalize écrit toujours savedAt
@@ -93,7 +108,16 @@ function creerSession(adaptateur) {
   }
   return {
     // applique fn au document, valide une étape si l'état a changé, puis prévient les abonnés ; nature : celle du geste (« cellules collées »), sinon déduite
-    modifier: function (fn, focus, nature) { fn(); etape(nature); prevenir('rendu', focus, {}); prevenir('modifie'); prevenir('historique', etat()); },
+    modifier: function (fn, focus, nature) {
+      fn();
+      if (groupe && groupe.pos >= 0 && groupe.pos === pos && pos === pile.length - 1) fondre();
+      else if (groupe) { if (etape(groupe.nature)) groupe.pos = pos; }
+      else etape(nature);
+      prevenir('rendu', focus, {}); prevenir('modifie'); prevenir('historique', etat());
+    },
+    // étape ouverte : les modifications suivantes forment une seule étape, nommée par nature ({ etape }), jusqu'à fermerEtape
+    ouvrirEtape: function (nature) { valider(); groupe = { nature: nature, pos: -1 }; },
+    fermerEtape: function () { if (groupe) { groupe = null; prevenir('historique', etat()); } },
     // modification de frappe (déjà écrite dans le champ) : pas de rendu, étape validée après SESSION_DELAI sans frappe
     saisir: function (fn) { if (fn) fn(); clearTimeout(minuteur); minuteur = setTimeout(function () { minuteur = null; etape(); prevenir('historique', etat()); }, SESSION_DELAI); prevenir('modifie'); },
     // valide tout de suite la frappe en attente, s'il y en a

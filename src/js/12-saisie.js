@@ -57,12 +57,32 @@ app.addEventListener('beforeinput', function (e) {
   if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
+// réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
+// requête : un filtre ramené à « tous » et « Sans tri » suppriment leur champ (un filtre posé est un champ présent) ;
+// dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
+var Q_EFFACABLES = { col: 1, kbWho: 1, kbPrio: 1, kbDue: 1, state: 1, sortBy: 1 };
+function reglerBloc(blk, prop, v, dansFenetre) {
+  holdBar(blk.id); keepView(blk); session.modifier(function () {
+    if (blk.type === 'query' && Q_EFFACABLES[prop] && (v === '' || (prop === 'state' && v === 'all'))) {
+      delete blk[prop];
+      if (prop === 'kbDue') { delete blk.kbDueN; delete blk.kbDueU; }
+      if (prop === 'sortBy') delete blk.sortDir;
+      return;
+    }
+    if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
+    // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
+    if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
+    if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
+  }, dansFenetre ? null : { b: blk.id });
+}
+// nombre d'un filtre de requête (échéance dans les N jours…)
+function reglerNombre(blk, prop, v) { var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id); session.modifier(function () { blk[prop] = n; }); }
+function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
   var el = e.target;
   if (el.matches('input.q-num[data-prop]')) {
     // nombre d'un filtre de requête (échéance dans les N jours…)
-    var bq2 = byId(el.closest('.blk').dataset.id), nv2 = Math.max(1, Math.min(999, Math.round(+el.value) || 1));
-    holdBar(bq2.id); session.modifier(function () { bq2[el.dataset.prop] = nv2; }); return;
+    reglerNombre(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value); return;
   }
   if (el.matches('select.kb-prio-in')) { var bp = byId(el.dataset.b); if (bp) { var pv = el.value || ''; session.modifier(function () { if (pv) setPath(bp, el.dataset.k, pv); else { var o = getPath(bp, el.dataset.k.replace(/\.prio$/, '')); if (o) delete o.prio; } }); } return; }
   if (el.matches('input.kb-due-in, input.kb-due-pick')) {
@@ -73,7 +93,7 @@ app.addEventListener('change', function (e) {
     if (newDue === oldDue) { el.value = kbDate(oldDue); return; }
     session.modifier(function () { if (newDue) setPath(bk, el.dataset.k, newDue); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
   }
-  if (el.matches('input[data-qsub]')) { var bq = byId(el.closest('.blk').dataset.id); holdBar(bq.id); session.modifier(function () { if (el.checked) bq.sub = true; else delete bq.sub; }); return; }
+  if (el.matches('input[data-qsub]')) { reglerSousPages(byId(el.closest('.blk').dataset.id), el.checked); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
@@ -124,15 +144,7 @@ app.addEventListener('change', function (e) {
     if (!cc) { toast('Coordonnées non reconnues. Format : latitude, longitude (ex. 48.38, -4.47)'); el.value = bl2.markers[i2].lat + ', ' + bl2.markers[i2].lon; return; }
     keepView(bl2); session.modifier(function () { bl2.markers[i2].lat = cc.lat; bl2.markers[i2].lon = cc.lon; }); return;
   }
-  if (el.matches('select[data-act=set]')) {
-    var blk = byId(el.closest('.blk').dataset.id), prop = el.dataset.prop, v = el.value;
-    holdBar(blk.id); keepView(blk); session.modifier(function () {
-      if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
-      // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
-      if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
-      if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
-    }, { b: blk.id });
-  }
+  if (el.matches('select[data-act=set]')) reglerBloc(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value);
 });
 app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
 app.addEventListener('focusout', function (e) {

@@ -1,5 +1,5 @@
 // Sujet : vue « Carte de chaleur » d'une requête (spec requetes-avancees, ticket 05).
-// Matrice en lecture ; sous-niveau choisi dans le formulaire (une étape, un Ctrl+Z) ; bulle des lignes au survol, qui ne filtre rien ;
+// Matrice en lecture ; sous-niveau choisi dans la fenêtre de la puce « vue » (une étape, un Ctrl+Z) ; bulle des lignes au survol, qui ne filtre rien ;
 // à 360 px la matrice défile dans le bloc, jamais la page ; texte des cases lisible (contraste ≥ 4,5) en clair et en sombre, pour chaque palette.
 
 const LIGNES = [['Tactique', 'Technique', 'Sous-technique', 'Score'],
@@ -15,9 +15,11 @@ const basculer = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e'
 const ETAT = `(() => {
   const q = document.querySelector('[data-qid="q1"]'), b = window.ardoise.doc.pages[0].blocks[1];
   return { colonnes: q.querySelectorAll('.q-ch-col').length, cases: q.querySelectorAll('.q-ch-c').length, sous: q.querySelectorAll('.q-ch-s').length,
-    vues: [...q.querySelectorAll('select[data-prop=view] option')].map((o) => o.value), chZ: b.chZ || '', view: b.view };
+    vues: [...document.querySelectorAll('.q-fen [data-qset=view]')].map((o) => o.dataset.v), chZ: b.chZ || '', view: b.view,
+    puce: ((document.querySelector('.blk[data-id="q1"] [data-qpuce="view"]') || {}).textContent || '').trim() };
 })()`;
-const choisir = (prop, v) => `(() => { const s = document.querySelector('[data-qid="q1"] select[data-prop=${prop}]'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
+const ouvrir = (cle) => `document.querySelector('.blk[data-id="q1"] [data-qpuce="${cle}"]').click()`;
+const choisir = (prop, v) => `(() => { const s = document.querySelector('.q-fen[data-id="q1"] select[data-prop=${prop}]'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
 // contraste WCAG du texte de chaque palier sur son fond, couleurs calculées par le navigateur (color-mix compris)
 const CONTRASTES = `(() => {
   const rgb = (s) => { const m = s.match(/color\\(srgb ([\\d.]+) ([\\d.]+) ([\\d.]+)/); if (m) return [m[1], m[2], m[3]].map((x) => +x * 255); return s.match(/[\\d.]+/g).slice(0, 3).map(Number); };
@@ -59,10 +61,11 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   const faibles = (await evalue(CONTRASTES)).filter((x) => x.r < 4.5);
   attendu('contraste ≥ 4,5 pour chaque palier, thème et palette', !faibles.length, faibles);
 
-  // édition : « carte de chaleur » proposée, sous-niveau choisi (une étape, un Ctrl+Z)
+  // édition : puce « Carte de chaleur », vue proposée dans sa fenêtre, sous-niveau choisi (une étape, un Ctrl+Z)
   await evalue(basculer); await attendre(80);
+  await evalue(ouvrir('view')); await attendre(80);
   e = await etat();
-  attendu('édition : vue proposée pour les lignes de tableaux', e.vues.includes('chaleur'), e.vues);
+  attendu('édition : puce « Carte de chaleur », vue proposée pour les lignes de tableaux', e.puce === 'Carte de chaleur' && e.vues.includes('chaleur'), e);
   await evalue(choisir('chZ', 'sous-technique')); await attendre(80);
   e = await etat();
   attendu('sous-niveau choisi : sous-cases', e.chZ === 'sous-technique' && e.sous === 6, e);
@@ -78,7 +81,9 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   await ecran(1000, false); await evalue(basculer); await attendre(80);
 
   // autre source : la vue retombe sur « Tableau »
-  await evalue(choisir('src', 'facts')); await attendre(80);
+  await evalue(ouvrir('src')); await attendre(80);
+  await evalue(`document.querySelector('.q-fen [data-qset="src"][data-v="facts"]').click()`); await attendre(80);
+  await evalue(ouvrir('view')); await attendre(80);
   e = await etat();
   attendu('fiches de faits : vue Tableau', e.view === 'table' && !e.vues.includes('chaleur'), e);
 }

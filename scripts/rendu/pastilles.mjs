@@ -39,7 +39,8 @@ test('une requête qui filtre par responsable, colonne ou pastille absente n\'in
     { id: 'q2', type: 'query', src: 'facts', scope: 'doc', view: 'count', cards: [{ label: '', tags: ['autre'], match: 'any', state: 'all', total: 'filter', ttags: ['encore'] }] },
   ] }] });
   const avant = JSON.stringify(d.tags);
-  const h = ctx.renderPage(d, { page: 2, view: 'edit' });
+  const q1 = d.pages[2].blocks[0];
+  const h = ctx.renderPage(d, { page: 2, view: 'edit' }) + ctx.qFenetre(q1, d, 2, 'f:tags') + ctx.qFenetre(q1, d, 2, 'f:kbWho') + ctx.qFenetre(q1, d, 2, 'f:col');
   egal(JSON.stringify(d.tags), avant, 'registre inchangé');
   for (const nom of ['inconnue', 'autre', 'encore']) {
     const p = puces(h)[nom];
@@ -68,9 +69,9 @@ test('nom d\'une pastille retirée de tous les textes : celui vu au rendu pendan
   egal(nomDe(recharge.ctx, recharge.d, 'ko'), 'ko', 'nouvelle session');
 });
 
-test('une puce de requête prend la couleur du registre ; absente de la portée mais au registre, elle garde sa couleur', () => {
+test('une pastille de la fenêtre du filtre prend la couleur du registre ; absente de la portée mais au registre, elle garde sa couleur', () => {
   const { ctx, d } = monter(DOC);
-  const p = puces(ctx.renderPage(d, { page: 1, view: 'edit' }));
+  const p = puces(ctx.qFenetre(d.pages[1].blocks.find((x) => x.id === 'b3'), d, 1, 'f:tags'));
   vrai(/\bpa-0\b/.test(p.OK.cls) && !/q-gone/.test(p.OK.cls), 'OK : couleur 0 : ' + p.OK.cls);
   vrai(/\bpa-2\b/.test(p.ancienne.cls) && /q-gone/.test(p.ancienne.cls) && p.ancienne.title.startsWith('Absente de la portée'), 'ancienne : ' + JSON.stringify(p.ancienne));
 });

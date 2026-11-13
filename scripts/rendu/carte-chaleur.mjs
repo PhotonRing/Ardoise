@@ -89,16 +89,20 @@ test('carte de chaleur : paliers de page.css égaux à Q_CH_PALIERS', () => {
   });
 });
 
-test('carte de chaleur : formulaire (option seulement pour les lignes de tableaux ; X, Y, Z, N ; ni tri, ni limite, ni colonnes)', () => {
-  const form = (q) => { const { ctx, d } = monter(doc(q)); return ctx.queryForm(d.pages[0].blocks[1], d, { page: 0 }); };
-  const f = form({ chZ: 'sous-technique' });
-  vrai(/<option value="chaleur" selected>en carte de chaleur<\/option>/.test(f), 'option choisie');
+test('carte de chaleur : puce « vue » et sa fenêtre (proposée seulement pour les lignes de tableaux ; X, Y, Z, N ; ni tri, ni limite, ni colonnes)', () => {
+  const monte = (q) => { const { ctx, d } = monter(doc(q)); return { ctx, d, b: d.pages[0].blocks[1] }; };
+  const { ctx, d, b } = monte({ chZ: 'sous-technique' });
+  const f = ctx.qFenetre(b, d, 0, 'view');
+  vrai(/data-qset="view" data-v="chaleur" aria-pressed="true">[\s\S]*?<span>Carte de chaleur<\/span>/.test(f), 'vue choisie');
+  egal(ctx.qPuces(b, d, 0).map((p) => p.cle).filter((k) => k === 'view' || k === 'cols' || k === 'sort'), ['view'], 'ni puce colonnes ni puce tri');
+  egal(ctx.qPuces(b, d, 0).find((p) => p.cle === 'view').libelle, 'Carte de chaleur');
   const sel = (p) => { const m = f.match(new RegExp('<select data-act="set" data-prop="' + p + '"[^>]*>([\\s\\S]*?)</select>')); return m && textes(m[1], /<option[^>]*>([\s\S]*?)<\/option>/g); };
   egal(sel('chX'), ['Tactique', 'Technique', 'Sous-technique', 'Score']);
   egal(sel('chY'), ['Technique', 'Sous-technique', 'Score'], 'Y : colonnes autres que X');
   egal(sel('chZ'), ['aucun sous-niveau', 'Sous-technique', 'Score'], 'Z : colonnes autres que X et Y');
   egal(sel('chN'), ['nombre de lignes', 'Tactique', 'Technique', 'Sous-technique', 'Score']);
   vrai(/data-prop="chZ"[^>]*>[\s\S]*?<option value="sous-technique" selected>/.test(f), 'Z choisi');
-  vrai(!/data-prop="sortBy"|data-prop="limit"|data-qcolmode/.test(f), 'ni tri, ni limite, ni choix des colonnes');
-  vrai(!/value="chaleur"/.test(form({ src: 'facts' })), 'pas proposée pour les fiches de faits');
+  vrai(!/data-prop="limit"/.test(f), 'pas de limite');
+  const m = monte({ src: 'facts' });
+  vrai(!/data-v="chaleur"/.test(m.ctx.qFenetre(m.b, m.d, 0, 'view')), 'pas proposée pour les fiches de faits');
 });

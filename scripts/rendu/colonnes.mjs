@@ -70,8 +70,9 @@ test('colonnes : cases à cocher (✓, Élément, Source) et modèles diamant', 
   egal(entetes(rendu({ src: 'diamond', colonnes: { mode: 'seulement', noms: ['adversaire', 'titre'], ordre: ['adversaire'] } }, [dia])), ['Adversaire', 'Titre']);
 });
 
-test('colonnes : réglage dans le formulaire en édition seulement', () => {
-  const ed = rendu({ colonnes: { mode: 'sauf', noms: ['état'], ordre: ['risque'] } }, null, 'edit');
+test('colonnes : réglage dans la fenêtre de la puce « colonnes », rien en lecture ni à l\'export', () => {
+  const m = monter(doc({ colonnes: { mode: 'sauf', noms: ['état'], ordre: ['risque'] } })), bq = m.d.pages[0].blocks.find((x) => x.id === 'q');
+  const ed = m.ctx.qFenetre(bq, m.d, 0, 'cols');
   vrai(ed.includes('data-qcolmode'), 'mode des colonnes');
   egal([...ed.matchAll(/data-qcol="([^"]*)"( checked)?/g)].map((m) => m[1] + (m[2] ? '+' : '-')), ['risque+', 'hôte+', 'état-', '#source+'], 'cases dans l\'ordre choisi');
   vrai(!rendu({}).includes('data-qcol') && !rendu({}, null, 'export').includes('data-qcol'), 'lecture et export : aucun réglage');
@@ -110,7 +111,7 @@ test('colonnes, vue liste : Source reste en tête après le déplacement d\'une 
   egal(ch, { mode: 'toutes', noms: [], ordre: ['risque', 'hôte', 'état'] }, 'Risque juste après Source');
   const liste = resultat(rendu({ view: 'list', colonnes: ch })).match(/<li>([\s\S]*?)<\/li>/)[1];
   egal([...liste.matchAll(/class="q-src"|<span class="q-k">([^<]*)/g)].map((m) => m[1] || 'Source'), ['Source', 'Risque', 'Hôte', 'État']);
-  const ed = rendu({ view: 'list', colonnes: ch }, null, 'edit');
+  const m = monter(doc({ view: 'list', colonnes: ch })), ed = m.ctx.qFenetre(m.d.pages[0].blocks.find((x) => x.id === 'q'), m.d, 0, 'cols');
   egal([...ed.matchAll(/data-qcol="([^"]*)"/g)].map((m) => m[1]), ['#source', 'risque', 'hôte', 'état'], 'réglage dans l\'ordre de la liste');
   egal(entetes(rendu({ colonnes: ch })), ['Risque', 'Hôte', 'État', 'Source'], 'vue tableau : Source en fin');
 });
