@@ -210,8 +210,9 @@ function officeRequete(b, d, pi, S, txt, para) {
     var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
       if (src === 'kanban') return officeCartesKanban([r.kb], S, txt, para);
       if (src === 'check') return [para([txt(r.done ? '☑ ' : '☐ ')].concat(element(r)))];
-      return [para(r.cells.filter(function (c) { return !officeVide(S(c.v)); }).reduce(function (a, c) { return a.concat(a.length ? [txt(' · ')] : [], [txt(c.k + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(c)); }, []))];
-    };
+      var o = kc.cellsOf(r);   // colonnes choisies dans leur ordre ; la carte n'a pas de source, comme avant le choix des colonnes
+      return [para(kc.cols.filter(function (c) { return !c.source && o[c.j] && !officeVide(S(o[c.j].v)); }).reduce(function (a, c) { return a.concat(a.length ? [txt(' · ')] : [], [txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(o[c.j])); }, []))];
+    }, kc = src === 'kanban' || src === 'check' ? null : qColonnesAffichees(b, recs);
     out.push({ t: 'tableau', entete: true, lignes: [groupes.map(function (g) { return [para([txt(g.name + ' (' + g.recs.length + ')')])]; }),
       groupes.map(function (g) { return g.recs.reduce(function (a, r) { return a.concat(carte(r)); }, []); })] });
     return out;
@@ -219,24 +220,27 @@ function officeRequete(b, d, pi, S, txt, para) {
   var total = recs.length, lim = Math.max(0, +b.limit || 0);
   if (lim && recs.length > lim) recs = recs.slice(0, lim);
   var plus = recs.length < total ? [para([txt(recs.length + ' premiers résultats sur ' + total, { couleur: OFFICE_CLAIR.muted })])] : [];
-  if (src === 'check') {
-    if (view === 'list') out.push({ t: 'liste', ordonnee: false, items: recs.map(function (r) { return { niveau: 0, coche: r.done, segs: element(r).concat([txt(' — ')], [source(r)]) }; }) });
-    else out.push({ t: 'tableau', entete: true, lignes: [[[para([txt('✓')])], [para([txt('Élément')])], [para([txt('Source')])]]].concat(recs.map(function (r) {
-      return [[para([txt(r.done ? '☑' : '☐')])], [para(element(r))], [para([source(r)])]];
-    })) });
-    return out.concat(plus);
-  }
-  var cc = qColonnes(recs);
+  // colonnes choisies, dans l'ordre choisi (07-requetes.js) ; Source et, pour les cases, ✓ et Élément en sont
+  var cc = qColonnesAffichees(b, recs, view === 'list');
+  var cellule = function (c, r, o) { return c.source ? [source(r)] : c.coche ? [txt(r.done ? '☑' : '☐')] : c.element ? element(r) : o[c.j] ? valeur(o[c.j]) : []; };
   if (view === 'list') {
     out.push({ t: 'liste', ordonnee: false, items: recs.map(function (r) {
-      var segs = [source(r)];
-      cc.cellsOf(r).forEach(function (c, j) { if (c && !officeVide(S(c.v))) segs = segs.concat([txt(' · ' + cc.cols[j] + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(c)); });
+      var o = cc.cellsOf(r), segs = [];
+      if (src === 'check') {
+        // case : cochée par la liste ; élément et source à la suite, séparés par un tiret
+        cc.cols.forEach(function (c) { if (!c.coche) segs = segs.concat(segs.length ? [txt(' — ')] : [], cellule(c, r, o)); });
+        return { niveau: 0, coche: cc.cols.some(function (c) { return c.coche; }) ? r.done : undefined, segs: segs };
+      }
+      cc.cols.forEach(function (c) {
+        if (c.source) segs = segs.concat(segs.length ? [txt(' · ')] : [], [source(r)]);
+        else if (o[c.j] && !officeVide(S(o[c.j].v))) segs = segs.concat(segs.length ? [txt(' · ')] : [], [txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(o[c.j]));
+      });
       return { niveau: 0, segs: segs };
     }) });
   } else {
-    out.push({ t: 'tableau', entete: true, lignes: [cc.cols.concat(['Source']).map(function (c) { return [para([txt(c)])]; })].concat(recs.map(function (r) {
+    out.push({ t: 'tableau', entete: true, lignes: [cc.cols.map(function (c) { return [para([txt(c.nom)])]; })].concat(recs.map(function (r) {
       var o = cc.cellsOf(r);
-      return cc.cols.map(function (c, j) { return [para(o[j] ? valeur(o[j]) : [])]; }).concat([[para([source(r)])]]);
+      return cc.cols.map(function (c) { return [para(cellule(c, r, o))]; });
     })) });
   }
   return out.concat(plus);

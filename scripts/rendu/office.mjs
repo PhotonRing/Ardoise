@@ -146,6 +146,22 @@ test('office : requête figée comme affichée (tableau, liste, nombre « texte 
   egal(office('q', page({ view: 'count', cards: [{ label: 'Avec OK', tags: ['ok'], match: 'any', state: 'all', total: 'all' }] })).texte, 'Hôtes\nAvec OK : 1 / 2');
 });
 
+test('office : requête aux colonnes choisies (tableau, liste, en colonnes, cases)', () => {
+  const page = (q, plus) => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'f1', type: 'facts', items: [{ k: 'Hôte', v: 'srv1' }, { k: 'Risque', v: 'haut' }, { k: 'Note', v: 'n' }] },
+    ...(plus || []),
+    { id: 'q', type: 'query', title: 'Hôtes', src: 'facts', scope: 'doc', tags: [], match: 'any', ...q },
+  ] }] });
+  const ch = { mode: 'sauf', noms: ['note'], ordre: ['#source', 'risque'] };
+  egal(office('q', page({ view: 'table', colonnes: ch })).texte, 'Hôtes\nSource\tRisque\tHôte\nAccueil\thaut\tsrv1');
+  egal(office('q', page({ view: 'table', colonnes: { mode: 'seulement', noms: ['hôte'], ordre: [] } })).texte, 'Hôtes\nHôte\nsrv1', 'Source masquée');
+  egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['note'], ordre: ['risque'] } })).texte, 'Hôtes\n- Accueil · Risque haut · Hôte srv1', 'liste : Source en tête');
+  egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['#source'], ordre: [] } })).texte, 'Hôtes\n- Hôte srv1 · Risque haut · Note n', 'liste sans Source');
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nHôte srv1 · Risque haut', 'en colonnes : Note masquée');
+  const cases = [{ id: 'c1', type: 'check', items: [{ html: 'fait', done: true }] }];
+  egal(office('q', page({ src: 'check', view: 'table', colonnes: { mode: 'sauf', noms: ['#source'], ordre: ['élément'] } }, cases)).texte, 'Hôtes\nÉlément\t✓\nfait\t☑');
+});
+
 // groupe et modèle diamant (lot 6) : le groupe arrive ouvert, titre en gras puis ses blocs ; le diamant en tableau
 const DOC6 = { v: 6, title: 'Doc', tags: { apt: { c: 1 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 'g1', type: 'group', title: 'Détails <i>repliés</i>', folded: true, blocks: [

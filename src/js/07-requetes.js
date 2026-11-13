@@ -334,11 +334,22 @@ function qRegroupements(b, d, pi, recs) {
 }
 function qKanban(b, d, ctx, recs) {
   var src = b.src || 'facts', qg = qRegroupements(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
+  var cc = src === 'kanban' ? null : qColonnesAffichees(b, recs), cols = cc ? cc.cols : [];
   var card = function (r) {
     if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
       (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(d, r.x) + '</article>'; }
-    if (src === 'check') return '<article class="kb-card' + (r.done ? ' done' : '') + '"><div class="q-it">' + qBox(d, ctx, r) + ' ' + (r.par ? '<span class="q-par">' + esc(r.par) + ' › </span>' : '') + R(r.html) + '</div>' + qSource(d, r.x) + '</article>';
-    return '<article class="kb-card"><div class="q-kvs">' + r.cells.filter(function (c) { return 'c:' + c.k.toLowerCase() !== gb && !isBlank(c.v); }).map(function (c) { return '<span class="q-kv"><span class="q-k">' + esc(c.k) + '</span> ' + R(c.v) + '</span>'; }).join('') + '</div>' + qSource(d, r.x) + '</article>';
+    // carte des autres sources : colonnes choisies dans leur ordre (Source à sa place), sans la colonne de regroupement
+    // les valeurs voisines (case et élément, ou paires clé valeur) vont dans un même conteneur ; Source le coupe là où elle est rangée
+    var o = cc.cellsOf(r), kvs = [], parts = [], boite = src === 'check' ? 'q-it' : 'q-kvs';
+    var fin = function () { if (kvs.length) parts.push('<div class="' + boite + '">' + kvs.join(src === 'check' ? ' ' : '') + '</div>'); kvs = []; };
+    cols.forEach(function (c) {
+      if (c.source) { fin(); parts.push(qSource(d, r.x)); }
+      else if (c.coche) kvs.push(qBox(d, ctx, r));
+      else if (c.element) kvs.push((r.par ? '<span class="q-par">' + esc(r.par) + ' › </span>' : '') + R(r.html));
+      else if (o[c.j] && 'c:' + c.nom.toLowerCase() !== gb && !isBlank(o[c.j].v)) kvs.push('<span class="q-kv"><span class="q-k">' + esc(c.nom) + '</span> ' + R(o[c.j].v) + '</span>');
+    });
+    fin();
+    return '<article class="kb-card' + (r.done ? ' done' : '') + '">' + parts.join('') + '</article>';
   };
   return '<div class="kb kb-q"><div class="kb-cols">' + groups.map(function (g) {
     return '<section class="kb-col"><div class="kb-head"><span class="kb-title">' + esc(g.name) + '</span><span class="kb-n">' + g.recs.length + '</span></div><div class="kb-list">' + (g.recs.map(card).join('') || '<p class="kb-empty">—</p>') + '</div></section>';
@@ -350,6 +361,60 @@ function qColonnes(recs) {
   recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
   return { cols: cols, cellsOf: function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; } };
 }
+// Choix des colonnes (champ colonnes : { mode : 'toutes' | 'sauf' | 'seulement', noms, ordre }) ; absent = toutes. Clé d'une colonne :
+// son nom sans casse ni espaces superflus, « Source » a la clé réservée '#source' ; une clé inconnue est ignorée (colonne disparue ou renommée)
+var Q_SOURCE = '#source';
+function qCleCol(nom) { return tagKey(nom); }
+function qColonneVisible(b, cle) {
+  var ch = b.colonnes || {}, noms = Array.isArray(ch.noms) ? ch.noms : [];
+  return ch.mode === 'sauf' ? noms.indexOf(cle) < 0 : ch.mode === 'seulement' ? noms.indexOf(cle) >= 0 : true;
+}
+function qColonnesRangees(b, dispo) {
+  // dispo : [{ cle, nom… }] dans l'ordre d'apparition → les mêmes, celles de ordre d'abord, puis les autres dans leur ordre
+  var ordre = b.colonnes && Array.isArray(b.colonnes.ordre) ? b.colonnes.ordre : [], out = [];
+  ordre.forEach(function (k) { dispo.forEach(function (c) { if (c.cle === k && out.indexOf(c) < 0) out.push(c); }); });
+  return out.concat(dispo.filter(function (c) { return out.indexOf(c) < 0; }));
+}
+function qColonnesChoisies(b, dispo) { return qColonnesRangees(b, dispo).filter(function (c) { return qColonneVisible(b, c.cle); }); }
+// colonnes disponibles d'une requête (cases à cocher : ✓, Élément, Source ; sinon colonnes réunies puis Source) et cellules d'un résultat ;
+// en vue liste (hors cases), Source reste en tête tant qu'elle n'a pas été déplacée (partagé avec le formulaire et l'export Office)
+function qColonnesDispo(b, recs, liste) {
+  var src = { cle: Q_SOURCE, nom: 'Source', source: true };
+  if ((b.src || 'facts') === 'check') return { dispo: [{ cle: '✓', nom: '✓', coche: true }, { cle: 'élément', nom: 'Élément', element: true }, src], cellsOf: function () { return []; } };
+  var cc = qColonnes(recs), dispo = cc.cols.map(function (n, j) { return { cle: qCleCol(n), nom: n, j: j }; });
+  var bouge = b.colonnes && Array.isArray(b.colonnes.ordre) && b.colonnes.ordre.indexOf(Q_SOURCE) >= 0;
+  return { dispo: dispo.concat([src]), tete: liste && !bouge ? src : null, cellsOf: cc.cellsOf };
+}
+function qColonnesAffichees(b, recs, liste) {
+  var x = qColonnesDispo(b, recs, liste), cols = qColonnesChoisies(b, x.dispo.filter(function (c) { return c !== x.tete; }));
+  return { cols: x.tete && qColonneVisible(b, Q_SOURCE) ? [x.tete].concat(cols) : cols, cellsOf: x.cellsOf };
+}
+// gestes du choix des colonnes : nouveau champ colonnes d'après les colonnes disponibles (dispo de qColonnesDispo, hors liste) ;
+// les clés qui n'y sont plus sont purgées ; le premier choix part de « Toutes sauf… »
+function qColNeuf(dispo, mode, noms, ordre) {
+  var la = function (k) { return dispo.some(function (c) { return c.cle === k; }); };
+  return { mode: mode, noms: noms.filter(la), ordre: ordre.filter(la) };
+}
+function qColActuel(b) { var ch = b.colonnes || {}; return { mode: ch.mode === 'sauf' || ch.mode === 'seulement' ? ch.mode : 'toutes', noms: (ch.noms || []).slice(), ordre: (ch.ordre || []).slice() }; }
+function qColBasculer(b, dispo, cle) {
+  var ch = qColActuel(b), at = ch.noms.indexOf(cle);
+  if (ch.mode === 'toutes') return qColNeuf(dispo, 'sauf', [cle], ch.ordre);
+  if (at >= 0) ch.noms.splice(at, 1); else ch.noms.push(cle);
+  return qColNeuf(dispo, ch.mode, ch.noms, ch.ordre);
+}
+function qColMode(b, dispo, mode) {
+  // « Seulement… » garde les colonnes visibles, « Toutes sauf… » masque les cachées : le résultat ne change pas au changement de mode
+  var ch = qColActuel(b), rangees = qColonnesRangees(b, dispo);
+  var noms = mode === 'toutes' ? [] : rangees.filter(function (c) { return qColonneVisible(b, c.cle) === (mode === 'seulement'); }).map(function (c) { return c.cle; });
+  return qColNeuf(dispo, mode, noms, ch.ordre);
+}
+function qColDeplacer(b, dispo, cle, vers) {
+  var ch = qColActuel(b), cles = qColonnesRangees(b, dispo).map(function (c) { return c.cle; }), at = cles.indexOf(cle);
+  if (at < 0) return qColNeuf(dispo, ch.mode, ch.noms, ch.ordre);
+  cles.splice(at, 1); cles.splice(Math.max(0, Math.min(cles.length, vers)), 0, cle);
+  return qColNeuf(dispo, ch.mode, ch.noms, cles);
+}
+function qColTri(c) { return c.source ? 'src' : c.coche ? 'done' : c.element ? 'txt' : 'c:' + c.nom.toLowerCase(); }   // clé de tri d'une colonne
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
   ctx = renderCtx(d, ctx);
@@ -363,21 +428,24 @@ function queryResult(b, d, ctx) {
   var more = recs.length < total ? '<p class="muted q-more">' + recs.length + ' premiers résultats sur ' + total + '</p>' : '';
   var val = function (c) { var h = R(c.v); return c.alert ? '<span class="alert">' + h + '</span>' : h; };
   var item = function (r) { return (r.par ? '<span class="q-par">' + esc(r.par) + ' › </span>' : '') + R(r.html); };
-  if (src === 'check') {
-    if (view === 'list') return '<ul class="q-list q-checks">' + recs.map(function (r) { return '<li' + (r.done ? ' class="done"' : '') + '>' + qBox(d, ctx, r) + '<span class="q-it">' + item(r) + '</span>' + qSource(d, r.x) + '</li>'; }).join('') + '</ul>' + more;
-    return '<div class="tablewrap"><table class="q-table"><thead><tr>' + qTh(b, ctx, 'done', '✓') + qTh(b, ctx, 'txt', 'Élément') + qTh(b, ctx, 'src', 'Source') + '</tr></thead><tbody>' +
-      recs.map(function (r) { return '<tr' + (r.done ? ' class="done"' : '') + '><td class="q-boxc">' + qBox(d, ctx, r) + '</td><td>' + item(r) + '</td><td>' + qSource(d, r.x) + '</td></tr>'; }).join('') + '</tbody></table></div>' + more;
-  }
-  // fiches de faits et lignes de tableaux : colonnes réunies par nom, dans l'ordre d'apparition
-  var cc = qColonnes(recs), cols = cc.cols, cellsOf = cc.cellsOf;
+  // colonnes choisies, dans l'ordre choisi ; fiches et lignes : colonnes réunies par nom, dans l'ordre d'apparition
+  var cc = qColonnesAffichees(b, recs, view === 'list'), cols = cc.cols, cellsOf = cc.cellsOf;
   if (view === 'list') {
+    if (src === 'check') return '<ul class="q-list q-checks">' + recs.map(function (r) {
+      return '<li' + (r.done ? ' class="done"' : '') + '>' + cols.map(function (c) { return c.coche ? qBox(d, ctx, r) : c.element ? '<span class="q-it">' + item(r) + '</span>' : qSource(d, r.x); }).join('') + '</li>';
+    }).join('') + '</ul>' + more;
     return '<ul class="q-list">' + recs.map(function (r) {
-      var parts = cellsOf(r).map(function (c, j) { return c && !isBlank(c.v) ? '<span class="q-kv"><span class="q-k">' + esc(cols[j]) + '</span> ' + val(c) + '</span>' : ''; }).filter(Boolean);
-      return '<li>' + qSource(d, r.x) + '<span class="q-kvs">' + (parts.join('') || '<span class="muted">—</span>') + '</span></li>';
+      var o = cellsOf(r), parts = [], kvs = [], vu = false;
+      // les valeurs voisines vont dans une même suite ; Source les coupe là où elle est rangée
+      var fin = function () { if (kvs.length) parts.push('<span class="q-kvs">' + kvs.join('') + '</span>'); kvs = []; };
+      cols.forEach(function (c) { if (c.source) { fin(); parts.push(qSource(d, r.x)); } else if (o[c.j] && !isBlank(o[c.j].v)) { vu = true; kvs.push('<span class="q-kv"><span class="q-k">' + esc(c.nom) + '</span> ' + val(o[c.j]) + '</span>'); } });
+      fin(); if (!vu) parts.push('<span class="q-kvs"><span class="muted">—</span></span>');
+      return '<li>' + parts.join('') + '</li>';
     }).join('') + '</ul>' + more;
   }
-  return '<div class="tablewrap"><table class="q-table"><thead><tr>' + cols.map(function (c) { return qTh(b, ctx, 'c:' + c.toLowerCase(), c); }).join('') + qTh(b, ctx, 'src', 'Source') + '</tr></thead><tbody>' +
-    recs.map(function (r) { var o = cellsOf(r); return '<tr>' + cols.map(function (c, j) { return '<td>' + (o[j] ? val(o[j]) : '') + '</td>'; }).join('') + '<td>' + qSource(d, r.x) + '</td></tr>'; }).join('') + '</tbody></table></div>' + more;
+  var td = function (c, r, o) { return c.source ? '<td>' + qSource(d, r.x) + '</td>' : c.coche ? '<td class="q-boxc">' + qBox(d, ctx, r) + '</td>' : c.element ? '<td>' + item(r) + '</td>' : '<td>' + (o[c.j] ? val(o[c.j]) : '') + '</td>'; };
+  return '<div class="tablewrap"><table class="q-table"><thead><tr>' + cols.map(function (c) { return qTh(b, ctx, qColTri(c), c.nom); }).join('') + '</tr></thead><tbody>' +
+    recs.map(function (r) { var o = cellsOf(r); return '<tr' + (r.done ? ' class="done"' : '') + '>' + cols.map(function (c) { return td(c, r, o); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + more;
 }
 function queryForm(b, d, ctx) {
   var pi = ctx.page;
@@ -406,5 +474,15 @@ function queryForm(b, d, ctx) {
       qSortOptions(b, queryRecords(b, d, pi)).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
       (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
       (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
+    (b.view === 'count' || (b.src === 'kanban' && b.view === 'kanban') ? '' : qColForm(b, queryRecords(b, d, pi))) +
     '</div>';
+}
+function qColForm(b, recs) {
+  // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js
+  var mode = (b.colonnes && b.colonnes.mode) || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
+  return '<div class="q-colonnes"><label><span class="q-lbl">Colonnes</span> <select data-qcolmode title="Colonnes affichées">' + o('toutes', 'toutes') + o('sauf', 'toutes sauf…') + o('seulement', 'seulement…') + '</select></label>' +
+    '<ol class="q-cols">' + qColonnesRangees(b, qColonnesDispo(b, recs).dispo).map(function (c) {
+      return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +
+        '<label><input type="checkbox" data-qcol="' + esc(c.cle) + '"' + (qColonneVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
+    }).join('') + '</ol></div>';
 }

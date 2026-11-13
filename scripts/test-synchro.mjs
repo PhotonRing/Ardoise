@@ -192,6 +192,19 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   expect(g.blocks[0].html === 'Bonjour tout le <b>vaste</b> monde !', 'frappe dans un bloc d\'un groupe : ' + g.blocks[0].html);
   expect(g.title === 'Détails A' && g.blocks.map((b) => b.id).join() === 'c,c2', 'titre et bloc ajouté au groupe');
 }
+{ // requête : l'un règle les colonnes, l'autre un filtre et l'ordre des colonnes ; tout converge, sans texte mélangé
+  const Q = { id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', tags: [], match: 'any', view: 'table' };
+  const x = pair({ pages: [{ id: 'p', blocks: [Q] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].colonnes = { mode: 'sauf', noms: ['état'], ordre: [] };
+  const nb = clone(x.db); nb.pages[0].blocks[0].tags = ['urgent'];
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)), q = r.pages[0].blocks[0];
+  expect(JSON.stringify(q.colonnes) === '{"mode":"sauf","noms":["état"],"ordre":[]}' && q.tags.join() === 'urgent', 'colonnes et filtre : ' + JSON.stringify(q));
+  x.da = clone(r); x.db = clone(r);
+  const ma = clone(x.da); ma.pages[0].blocks[0].colonnes.ordre = ['#source', 'risque'];
+  const mb = clone(x.db); mb.pages[0].blocks[0].colonnes.noms = ['état', 'hôte'];
+  const r2 = swap(x, synDiff(x.a, x.da, ma), synDiff(x.b, x.db, mb)), c = r2.pages[0].blocks[0].colonnes;
+  expect(c.ordre.join() === '#source,risque' && c.noms.join() === 'état,hôte' && c.mode === 'sauf', 'ordre et noms réglés à deux : ' + JSON.stringify(c));
+}
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));
 if (games >= 50 && (!snaps || !reloads)) throw new Error('instantanés non exercés');

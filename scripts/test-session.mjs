@@ -880,6 +880,20 @@ test('libellé : dépendance entre cartes de kanban ajoutée puis retirée', () 
   egal(libelles(m), ['Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée']);
 });
 
+test('libellé : colonnes d\'une requête modifiées, un Ctrl+Z rend la requête sans choix', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' }); });
+  const q = () => blocsDe(m)[1];
+  m.s.modifier(() => { q().colonnes = { mode: 'sauf', noms: ['état'], ordre: [] }; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : colonnes modifiées');
+  m.s.modifier(() => { q().colonnes.ordre = ['#source']; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : colonnes modifiées', 'ordre');
+  m.s.annuler(); m.s.annuler();
+  egal('colonnes' in q(), false, 'annuler : plus de choix');
+  m.s.modifier(() => { q().view = 'list'; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : bloc modifié', 'autre réglage : libellé inchangé');
+});
+
 test('libellé : colonne de kanban réduite puis affichée, annulée puis rétablie', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'kb', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [] }, { id: 'c2', title: 'Fait', cards: [{ id: 'k1', title: 'Écrire' }] }] }); });

@@ -78,6 +78,7 @@ function libelleNature(ba, b) {
     return reduite ? 'colonne réduite' : 'colonne affichée';
   }
   if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
+  if (b.type === 'query' && libelleSans(ba, 'colonnes') === libelleSans(b, 'colonnes')) return 'colonnes modifiées';   // choix des colonnes (07-requetes.js)
   if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
     var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
   }

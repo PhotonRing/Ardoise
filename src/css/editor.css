@@ -397,6 +397,14 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-form .q-num{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:28px;padding:0 6px;width:64px}
 .q-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex-basis:100%}
 .q-lbl{margin-right:2px}
+.q-colonnes{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 10px;flex-basis:100%}
+.q-cols{display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none;min-width:0}
+.q-col{display:inline-flex;align-items:center;gap:2px;padding:2px 8px 2px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);max-width:100%}
+.q-col label{gap:4px;min-width:0;overflow-wrap:anywhere}
+.q-col.dragging{opacity:.4}
+.q-col.q-drop-avant{box-shadow:-3px 0 0 var(--accent)}
+.q-col.q-drop-apres{box-shadow:3px 0 0 var(--accent)}
+.q-grip{cursor:grab;color:var(--muted);padding:0 4px;user-select:none;letter-spacing:-2px}
 .q-chip{border:0;cursor:pointer;opacity:.45}
 .q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
 .q-chip:hover{opacity:.85}
