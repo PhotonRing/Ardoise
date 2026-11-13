@@ -36,7 +36,9 @@ app.addEventListener('dragover', function (e) {
   e.preventDefault();
   var src = dragId && byId(dragId), cs = ciblesDepot(!src || !HORS_GROUPE[src.type]), best = null;
   for (var i = 0; i < cs.length; i++) if (e.clientY < cs[i].y) { best = cs[i]; break; }
-  if (!best && cs.length) { var der = cs[cs.length - 1]; best = der.t.dans ? der : { t: { id: der.t.id, before: false }, el: der.el }; }
+  // plus bas que toutes les cibles : après le dernier bloc du premier niveau (après un groupe final, pas dedans)
+  var hauts = $$('.blk', app).filter(function (x) { return !x.parentNode.closest('.blk'); }), der = hauts[hauts.length - 1];
+  if (!best && der) best = { t: { id: der.dataset.id, before: false }, el: der };
   dropTarget = best ? best.t : null;
   if (!dropLine) { dropLine = document.createElement('div'); dropLine.className = 'drop-line'; ui.appendChild(dropLine); }
   if (best) {
@@ -70,6 +72,10 @@ app.addEventListener('drop', function (e) {
   if (!dragId || !t) { endDrag(); return; }
   e.preventDefault();
   var b = byId(dragId), target = byId(t.dans || t.id), ob = position(b), ot = position(target);
+  // après un titre plié de la page, on dépose après sa section : la cible devient le dernier bloc qu'elle masque
+  if (ot && !ot.parent && !t.dans && !t.before) blockUnits().forEach(function (u) {
+    if (u.id === target.id && u.n > 1) { target = doc.blocks[u.i + u.n - 1]; t = { id: target.id, before: false }; ot = position(target); }
+  });
   if (b && target && b !== target && (t.dans || ob.parent || ot.parent)) session.modifier(function () {
     // dans, hors ou à l'intérieur d'un groupe : le bloc part seul (rangerBloc refuse un type interdit dans un groupe)
     rangerBloc(doc.blocks, b.id, t); revealBlock(b.id);

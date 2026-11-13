@@ -10,7 +10,21 @@ const PAGE = [
   { id: 'g1', type: 'group', title: 'Détails', folded: false, blocks: [{ id: 'c1', type: 'p', html: 'premier' }, { id: 'c2', type: 'p', html: 'second' }] },
   { id: 'x1', type: 'p', html: 'après' },
 ];
-const CHARGER = `(() => { const d = JSON.parse(JSON.stringify(window.ardoise.doc)); d.pages = [{ id: 'p1', title: 'Accueil', blocks: ${JSON.stringify(PAGE)} }]; return window.ardoise.load(d); })()`;
+const CHARGER_PAGE = (blocs) => `(() => { const d = JSON.parse(JSON.stringify(window.ardoise.doc)); d.pages = [{ id: 'p1', title: 'Accueil', blocks: ${JSON.stringify(blocs)} }]; return window.ardoise.load(d); })()`;
+const CHARGER = CHARGER_PAGE(PAGE);
+// page qui finit par un groupe ouvert, sans pied de page ; puis un groupe suivi d'un titre plié, dernier bloc visible
+const FIN_GROUPE = [
+  { id: 'hd', type: 'header', title: 'Accueil' },
+  { id: 'a1', type: 'p', html: 'haut' },
+  { id: 'g1', type: 'group', title: 'Détails', folded: false, blocks: [{ id: 'c1', type: 'p', html: 'premier' }, { id: 'c2', type: 'p', html: 'second' }] },
+];
+const FIN_PLIEE = [
+  { id: 'hd', type: 'header', title: 'Accueil' },
+  { id: 'g1', type: 'group', title: 'Détails', folded: false, blocks: [{ id: 'c1', type: 'p', html: 'premier' }, { id: 'c2', type: 'p', html: 'second' }] },
+  { id: 's1', type: 'h2', html: 'Section', folded: true },
+  { id: 'a1', type: 'p', html: 'masqué' },
+  { id: 'x1', type: 'p', html: 'masqué aussi' },
+];
 const IDS = `window.ardoise.doc.pages[0].blocks.map((b) => b.id + (b.type === 'group' ? '[' + b.blocks.map((c) => c.id).join(',') + ']' : '')).join(' ')`;
 const ANNULER = `document.querySelector('#ui [data-ui=undo]').title`;
 const TOUCHE = (key, opts = {}) => `(() => { const t = document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }, ${JSON.stringify(opts)}))); return true; })()`;
@@ -98,4 +112,18 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   if (!menuGroupe.includes('Dégrouper') || menuGroupe.includes('Mettre dans un groupe')) echec('menu du groupe : ' + menuGroupe);
   await evalue(CHOISIR('Dégrouper'));
   await geste('Dégrouper', 'hd s1 a1 c1 c2 x1', 'Groupe repliable « Détails » : groupe défait');
+
+  // sous « + Ajouter dans le groupe » d'un groupe ouvert placé en dernier : on dépose après le groupe
+  const BAS = `document.querySelector('#app').getBoundingClientRect().bottom - 2`;
+  await evalue(CHARGER_PAGE(FIN_GROUPE)); await attendre(100);
+  await evalue(GLISSER('a1', BAS)); await attendre(60); mesure();
+  if (await evalue(IDS) !== 'hd g1[c1,c2] a1') echec('glisser tout en bas, après un groupe final : ' + await evalue(IDS));
+  await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(60);
+  await evalue(GLISSER('c2', BAS)); await attendre(60); mesure();
+  if (await evalue(IDS) !== 'hd a1 g1[c1] c2') echec('glisser un bloc du groupe final tout en bas : ' + await evalue(IDS));
+
+  // un bloc sorti du groupe et déposé après un titre plié arrive après sa section, comme un bloc de la page
+  await evalue(CHARGER_PAGE(FIN_PLIEE)); await attendre(100);
+  await evalue(GLISSER('c1', BAS)); await attendre(60); mesure();
+  if (await evalue(IDS) !== 'hd g1[c2] s1 a1 x1 c1') echec('bloc du groupe déposé après un titre plié : ' + await evalue(IDS));
 }
