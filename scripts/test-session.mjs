@@ -848,11 +848,11 @@ test('libellé : ligne ou colonne ajoutée ou supprimée dans un tableau, à l\'
   egal(libelles(m), ['Accueil · Tableau « Ville Colonne Pays » : colonne ajoutée', 'Accueil · Tableau « Colonne Pays » : colonne supprimée']);
 });
 
-test('libellé : une plage collée dans un tableau est « cellules collées », qu\'elle l\'agrandisse ou non', () => {
+test('libellé : une plage collée dans un tableau est « cellules collées », qu\'elle l\'agrandisse, ne change qu\'une cellule ou en vide', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France']] }); });
   const t = () => blocsDe(m)[1];
-  const coller = (r, c, g) => m.s.modifier(() => { t().rows = m.ctx.collerGrille(t().rows, r, c, g); });
+  const coller = (r, c, g) => m.s.modifier(() => { t().rows = m.ctx.collerGrille(t().rows, r, c, g); }, null, 'cellules collées');
   coller(1, 0, [['Lille', 'France'], ['Gand', 'Belgique']]);
   egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Lille France Gand Belgique » : cellules collées', 'une ligne de plus');
   coller(1, 1, [['FR', 'Nord'], ['BE', 'Flandre']]);
@@ -863,23 +863,29 @@ test('libellé : une plage collée dans un tableau est « cellules collées », 
   egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Colonne Paris FR Nord » : cellules collées', 'ligne et colonne de plus');
   m.s.annuler();
   egal(t().rows, [['Ville', 'Pays', 'Colonne'], ['Paris', 'FR', 'Nord'], ['Liège', 'BE', 'Flandre']], 'annuler retire la plage d\'un coup');
+  coller(1, 0, [['Paris', 'BE']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Paris BE Nord Liège B… » : cellules collées', 'une seule cellule changée');
+  coller(1, 0, [['', ''], ['', '']]);
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Colonne Nord Flandre » : cellules collées', 'cellules vidées par la plage');
 });
 
-test('libellé : une plage coupée (Ctrl+X) ou effacée est « cellules vidées », pas « cellules collées »', () => {
+test('libellé : une plage coupée (Ctrl+X) ou effacée est « cellules vidées », même si une seule cellule était pleine', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });
   const t = () => blocsDe(m)[1];
-  m.s.modifier(() => { t().rows[1][0] = ''; t().rows[2][0] = ''; });
+  m.s.modifier(() => { t().rows[1][0] = ''; t().rows[2][0] = ''; }, null, 'cellules vidées');
   egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées');
   m.s.annuler();
   egal(t().rows, [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']], 'annuler rend les cellules');
   m.s.retablir();
   egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays France Belgique » : cellules vidées', 'rétablir');
-  m.s.modifier(() => { t().rows[1][1] = ''; });
-  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Belgique » : cellule modifiée', 'une seule cellule vidée');
+  m.s.modifier(() => { t().rows[1][1] = ''; t().rows[2][1] = t().rows[2][1]; }, null, 'cellules vidées');
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Belgique » : cellules vidées', 'une seule cellule pleine dans la plage');
+  m.s.modifier(() => { t().rows[2][1] = ''; });
+  egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays » : cellule modifiée', 'une cellule vidée par la frappe');
 });
 
-test('libellé : une ligne ou une colonne déplacée, ou une seule cellule changée, ne sont pas des cellules collées', () => {
+test('libellé : une ligne ou une colonne déplacée n\'est pas un collage', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 't', type: 'table', rows: [['Ville', 'Pays'], ['Lyon', 'France'], ['Gand', 'Belgique']] }); });
   const t = () => blocsDe(m)[1];
@@ -887,8 +893,6 @@ test('libellé : une ligne ou une colonne déplacée, ou une seule cellule chang
   egal(libelles(m)[0], 'Accueil · Tableau « Ville Pays Gand Belgique Lyon France » : cellule modifiée', 'ligne déplacée');
   m.s.modifier(() => { t().rows.forEach((r) => r.reverse()); });
   egal(libelles(m)[0], 'Accueil · Tableau « Pays Ville Belgique Gand France Lyon » : cellule modifiée', 'colonne déplacée');
-  m.s.modifier(() => { t().rows = m.ctx.collerGrille(t().rows, 1, 0, [['Belgique', 'Bruges']]); });
-  egal(libelles(m)[0], 'Accueil · Tableau « Pays Ville Belgique Bruges France Lyon » : cellule modifiée', 'plage qui ne change qu\'une cellule');
 });
 
 test('libellé : cellule modifiée, case cochée ou décochée, autre changement d\'un bloc', () => {

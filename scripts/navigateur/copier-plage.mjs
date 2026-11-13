@@ -101,6 +101,12 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     const vide = await textes('t1');
     if (!egal(vide, [T1[0], T1[1], ['', '', ''], ['', '', '']])) echec('Suppr : cellules ' + JSON.stringify(vide));
     if (!/cellules vidées/.test(await annuler())) echec('Suppr : libellé « ' + (await annuler()) + ' »');
+    // une plage dont une seule cellule était pleine : toujours « cellules vidées »
+    await clic(sel('t1', 1, 2));
+    await clic(sel('t1', 2, 2), 8);
+    await touche('Delete');
+    if (!/cellules vidées/.test(await annuler())) echec('Suppr d\'une seule cellule pleine : libellé « ' + (await annuler()) + ' »');
+    await touche('z', 2);
     await touche('z', 2);
 
     // glisser d'une cellule à une autre : plage, sans texte sélectionné

@@ -67,6 +67,14 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     const avant = await grille('t1');
     if (JSON.stringify(avant) !== JSON.stringify(DOC.pages[0].blocks[0].rows)) echec('Ctrl+Z ne retire pas la plage d\'un coup : ' + JSON.stringify(avant));
 
+    // une plage qui ne change qu'une cellule, ou qui ne fait que vider des cellules, est toujours « cellules collées »
+    mesure();
+    for (const [cas, k, texte] of [['une seule cellule changée', 'rows.1.0', 'Lyon\tBelgique'], ['cellules vidées par la plage', 'rows.0.0', '\t\nLyon\tFrance']]) {
+      await coller(`.fld[data-b="t1"][data-k="${k}"]`, '', texte);
+      if (!/cellules collées/.test(await annuler())) echec(cas + ' : libellé d\'annulation « ' + (await annuler()) + ' »');
+      await touche('z');
+    }
+
     // cellule : un texte de plusieurs lignes sans tabulation reste dans la cellule
     mesure();
     await coller('.fld[data-b="t1"][data-k="rows.1.0"]', '', 'un\ndeux');

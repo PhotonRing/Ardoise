@@ -44,30 +44,19 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
-// tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; tout autre changement de taille, ou
-// plusieurs cellules changées sans simple déplacement d'une ligne ou d'une colonne, est un collage de plage (ou une plage
-// vidée si toutes sont vides après) ; sinon null
+// tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; sinon null (collage et vidage d'une plage donnent leur nature)
 function libelleGrille(ra, rb) {
   var J = JSON.stringify, i;
   var vide = function (l) { return l.every(function (v) { return !v; }); };
   var sansLigne = function (g, k) { return J(g.slice(0, k).concat(g.slice(k + 1))); };
   var sansCol = function (g, k) { return J(g.map(function (l) { return l.slice(0, k).concat(l.slice(k + 1)); })); };
   var colonne = function (g, k) { return g.map(function (l) { return l[k]; }); };
-  var tri = function (ls) { return J(ls.map(J).sort()); };
   var la = ra.length, lb = rb.length, ca = ra[0].length, cb = rb[0].length;
-  if (la !== lb || ca !== cb) {
-    if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (vide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
-    if (ca === cb && la === lb + 1) for (i = 1; i < la; i++) if (sansLigne(ra, i) === J(rb)) return 'ligne supprimée';
-    if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (vide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
-    if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
-    return 'cellules collées';
-  }
-  var n = 0, vides = 0; ra.forEach(function (l, r) { l.forEach(function (v, c) { if (v !== rb[r][c]) { n++; if (!rb[r][c]) vides++; } }); });
-  if (n < 2) return null;
-  if (vides === n) return 'cellules vidées';   // plage coupée (Ctrl+X) ou effacée (Suppr)
-  var cols = function (g) { return g[0].map(function (x, k) { return colonne(g, k); }); };
-  if (tri(ra) === tri(rb) || tri(cols(ra)) === tri(cols(rb))) return null;   // ligne ou colonne déplacée (glisser)
-  return 'cellules collées';
+  if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (vide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
+  if (ca === cb && la === lb + 1) for (i = 1; i < la; i++) if (sansLigne(ra, i) === J(rb)) return 'ligne supprimée';
+  if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (vide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
+  if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
+  return null;
 }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
@@ -87,20 +76,20 @@ function libelleNature(ba, b) {
   if (f.every(function (x) { return SYN_TEXT[x.k]; })) return 'texte modifié';   // SYN_TEXT : champs de texte (05-synchro-moteur.js)
   return 'bloc modifié';
 }
-// modifications des blocs d'une page présente avant et après
-function libellesBlocs(pa, pg, out) {
+// modifications des blocs d'une page présente avant et après ; nature : celle du geste, si l'appelant la donne
+function libellesBlocs(pa, pg, out, nature) {
   var o = libelleOrdre(pa.blocks, pg.blocks);
   pa.blocks.forEach(function (b) { if (!o.enB['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
   pg.blocks.forEach(function (b) {
     var ba = o.enA['$' + b.id];
     if (!ba) { out.push(libelleBloc(pg, b) + ' : bloc ajouté'); return; }
     if (!o.garde['$' + b.id]) out.push(libelleBloc(pg, b) + ' : bloc déplacé');
-    if (JSON.stringify(ba) !== JSON.stringify(b)) out.push(libelleBloc(pg, b) + ' : ' + libelleNature(ba, b));
+    if (JSON.stringify(ba) !== JSON.stringify(b)) out.push(libelleBloc(pg, b) + ' : ' + (nature || libelleNature(ba, b)));
   });
 }
 function libellePage(pg) { return pg.title ? 'page « ' + pg.title + ' »' : 'page sans titre'; }
 // libellés des modifications entre deux documents JSON, dans l'ordre du document : pages, réglages, pastilles
-function libellesDifferences(avant, apres) {
+function libellesDifferences(avant, apres, nature) {
   var out = [], o = libelleOrdre(avant.pages, apres.pages);
   avant.pages.forEach(function (pg) { if (!o.enB['$' + pg.id]) out.push(libellePage(pg) + ' supprimée'); });
   apres.pages.forEach(function (pg) {
@@ -109,7 +98,7 @@ function libellesDifferences(avant, apres) {
     if (!o.garde['$' + pg.id]) out.push(libellePage(pg) + ' déplacée');
     if ((pa.title || '') !== (pg.title || '')) out.push(libellePage(pa) + (pg.title ? ' renommée en « ' + pg.title + ' »' : ' renommée sans titre'));
     if ((+pa.lv || 0) !== (+pg.lv || 0)) out.push(libellePage(pg) + ' : niveau modifié');
-    if (JSON.stringify(pa.blocks) !== JSON.stringify(pg.blocks)) libellesBlocs(pa, pg, out);
+    if (JSON.stringify(pa.blocks) !== JSON.stringify(pg.blocks)) libellesBlocs(pa, pg, out, nature);
   });
   LIBELLE_REGLAGES.forEach(function (r) { if (JSON.stringify(avant[r[0]]) !== JSON.stringify(apres[r[0]])) out.push(r[1] + ' : réglage modifié'); });
   // pastilles : une nouvelle s'inscrit avec le texte qui la cite, déjà compté
@@ -127,9 +116,10 @@ function libellesDifferences(avant, apres) {
   return out;
 }
 // libellé d'une étape : la première modification, puis le nombre des autres ; un champ qu'aucune nature ne décrit
-// (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu
-function libelleEtape(avant, apres) {
-  var l = libellesDifferences(avant, apres);
+// (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu ; nature : celle
+// du geste (collage, vidage d'une plage), qui remplace celle déduite des blocs modifiés
+function libelleEtape(avant, apres, nature) {
+  var l = libellesDifferences(avant, apres, nature);
   if (!l.length) return JSON.stringify(avant) === JSON.stringify(apres) ? '' : 'document modifié';
   if (l.length < 2) return l[0];
   return l[0] + ' et ' + (l.length - 1) + (l.length === 2 ? ' autre modification' : ' autres modifications');

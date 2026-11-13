@@ -32,7 +32,7 @@ function viderPlage() {
     for (var r = Math.min(pl.r1, pl.r2); r <= Math.max(pl.r1, pl.r2); r++) {
       if (pl.sauf.indexOf(r) < 0) for (var c = Math.min(pl.c1, pl.c2); c <= Math.max(pl.c1, pl.c2); c++) b.rows[r][c] = '';
     }
-  }, { b: b.id, k: 'rows.' + pl.r1 + '.' + pl.c1, end: false });
+  }, { b: b.id, k: 'rows.' + pl.r1 + '.' + pl.c1, end: false }, 'cellules vidées');
   lastCell = { b: b.id, r: pl.r1, c: pl.c1 };
 }
 // copie : document.execCommand('copy') déclenche l'événement même quand le curseur n'a rien sélectionné

@@ -460,7 +460,7 @@ function collerPlage(el, g) {
   var b = byId(el.dataset.b); if (!b) return;
   if (el.hasAttribute('data-cell') && b.type === 'table') {
     var m = el.dataset.k.split('.'), r = +m[1], c = +m[2], rows = collerGrille(b.rows, r, c, g);
-    session.modifier(function () { b.rows = rows; }, { b: b.id, k: el.dataset.k, end: false });
+    session.modifier(function () { b.rows = rows; }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
     lastCell = { b: b.id, r: r, c: c }; return;
   }
   if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
