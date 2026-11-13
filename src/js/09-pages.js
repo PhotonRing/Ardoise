@@ -28,7 +28,7 @@ function addSubPage(i) { navFold[doc.pages[i].id] = true; saveNavFold(); insertP
 function dupPage(i) {
   // copie de la page seule (sans ses sous-pages), placée après elle et ses sous-pages
   var c = JSON.parse(JSON.stringify(doc.pages[i])), at = pageEnd(doc.pages, i); c.id = uid();
-  c.blocks.forEach(function (b) { b.id = uid(); });
+  c.blocks = c.blocks.map(copieBloc);   // identifiants neufs, blocs des groupes compris
   var ch = pageHeader(c), nm = pageTitle(doc.pages[i], i) + ' (copie)';
   if (ch && textOf(ch.title)) ch.title = esc(nm); else c.title = nm;
   session.modifier(function () { doc.pages.splice(at, 0, c); doc.cur = at; }); scrollTo(0, 0); pageHash(at);
@@ -116,7 +116,7 @@ app.addEventListener('click', function (e) {
   var qc = t.closest('[data-qchk]');
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
-    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qb = qpi >= 0 && doc.pages[qpi].blocks.filter(function (x) { return x.id === qp[1]; })[0];
+    var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qo = qpi >= 0 && ouEst(doc.pages[qpi].blocks, qp[1]), qb = qo && qo.b;   // liste d'un groupe comprise
     if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
     return;
   }
@@ -169,3 +169,8 @@ app.addEventListener('drop', function (e) {
 });
 function pgDragEnd() { pgDropClear(); $$('.toc-pr.dragging', app).forEach(function (r) { r.classList.remove('dragging'); }); pgDrag = null; pgDrop = null; }
 app.addEventListener('dragend', function () { if (pgDrag != null) pgDragEnd(); });
+// lecture : le pli d'un groupe repliable (<details>) est gardé pour la session, jamais enregistré, pour survivre à un nouveau rendu
+document.addEventListener('toggle', function (e) {
+  var g = e.target; if (mode !== 'view' || !g.matches || !g.matches('details.grp[data-bid]')) return;
+  viewFold[g.dataset.bid] = !g.open;
+}, true);

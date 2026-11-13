@@ -9,6 +9,7 @@ app.addEventListener('mousedown', function (e) {
 });
 app.addEventListener('dragstart', function (e) {
   var blk = e.target.closest && e.target.closest('.blk[draggable=true]'); if (!blk) return;
+  if (blk.parentNode.closest('.blk')) { e.preventDefault(); blk.removeAttribute('draggable'); return; }   // bloc d'un groupe : pas encore déplaçable à la souris
   dragId = blk.dataset.id; blk.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', 'bloc'); } catch (_) {}
 });
@@ -17,7 +18,8 @@ app.addEventListener('dragover', function (e) {
   var hasFile = e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0;
   if (!dragId && !hasFile) return;
   e.preventDefault();
-  var blks = $$('.blk', app), best = null, before = true;
+  // blocs du premier niveau : un groupe est une seule cible (le dépôt dans un groupe n'existe pas encore)
+  var blks = $$('.blk', app).filter(function (x) { return !x.parentNode.closest('.blk'); }), best = null, before = true;
   for (var i = 0; i < blks.length; i++) {
     var r = blks[i].getBoundingClientRect();
     if (e.clientY < r.top + r.height / 2) { best = blks[i]; before = true; break; }

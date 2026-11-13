@@ -45,7 +45,7 @@ ui.addEventListener('click', function (e) {
   else if (k === 'add') {
     var f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.blk');
     var b = f ? byId(f.dataset.id) : null;
-    openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); });
+    openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }, null, dansUnGroupe(b));
   }
   else if (k === 'print') printPage();
   else if (k === 'vmenu') openViewMenu(a);
@@ -81,7 +81,7 @@ function openSheet() {
     closeSheet();
     if (k === 'save') save(false);
     else if (k === 'mode') toggleMode();
-    else if (k === 'add') { var f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.blk'); var b = f ? byId(f.dataset.id) : null; openBlockMenu(anchor, function (ty) { var nb = insertAfter(b, ty); if (ty === 'image') pickImage(nb); }); }
+    else if (k === 'add') { var f = document.activeElement && document.activeElement.closest && document.activeElement.closest('.blk'); var b = f ? byId(f.dataset.id) : null; openBlockMenu(anchor, function (ty) { var nb = insertAfter(b, ty); if (ty === 'image') pickImage(nb); }, null, dansUnGroupe(b)); }
     else if (k === 'style') openStyle(anchor);
   });
   var x = $('.sh-x', sheet); if (x) x.focus({ preventScroll: true });
@@ -101,7 +101,9 @@ function placePop(p, anchor, point) {
 }
 document.addEventListener('mousedown', function (e) { if (pop && !pop.contains(e.target) && !e.target.closest('[data-ui],[data-act=add-after],[data-act=add-end]')) closePop(); });
 var norm = function (s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
-function openBlockMenu(anchor, onPick, onCancel) {
+// bloc d'un groupe de la page affichée : son menu d'insertion ne propose pas les types refusés dans un groupe
+function dansUnGroupe(b) { var o = position(b); return !!(o && o.parent); }
+function openBlockMenu(anchor, onPick, onCancel, dansGroupe) {
   closePop();
   var p = document.createElement('div'); p.className = 'pop'; pop = p; popClose = null;
   p.innerHTML = '<input class="menu-q" placeholder="Rechercher un bloc…" aria-label="Rechercher un bloc"><div class="menu-list"></div>';
@@ -109,7 +111,7 @@ function openBlockMenu(anchor, onPick, onCancel) {
   function draw() {
     var s = norm(q.value.trim());
     var rank = function (t) { var l = norm(T[t].label); return l === s ? -1 : l.indexOf(s) === 0 ? 0 : l.indexOf(s) > 0 ? 1 : 2; };
-    shown = ORDER.filter(function (t) { return !s || norm(T[t].label + ' ' + T[t].kw + ' ' + T[t].desc).indexOf(s) >= 0; });
+    shown = ORDER.filter(function (t) { return !(dansGroupe && HORS_GROUPE[t]) && (!s || norm(T[t].label + ' ' + T[t].kw + ' ' + T[t].desc).indexOf(s) >= 0); });
     if (s) shown = shown.map(function (t, i) { return { t: t, r: rank(t), i: i }; }).sort(function (a, b) { return a.r - b.r || a.i - b.i; }).map(function (x) { return x.t; });
     cur = Math.min(cur, Math.max(0, shown.length - 1));
     list.innerHTML = shown.length ? shown.map(function (t, i) {
@@ -331,8 +333,9 @@ function goLink(href) {
 }
 function montrerBloc(bid, doux) {
   // section de la page affichée : dépliée au besoin (en édition, étape annulable), puis amenée en haut de l'écran
-  if (mode === 'edit' && byId(bid) && foldInfo(doc.blocks).hidden[bid]) session.modifier(function () { revealBlock(bid); });
-  var el = document.getElementById('b-' + bid) || $('.blk[data-id="' + bid + '"]', app);
+  if (mode === 'edit' && byId(bid) && cacheEnEdition(doc.blocks, bid)) session.modifier(function () { revealBlock(bid); });   // section ou groupe
+  // lecture : un bloc qui n'est pas un titre (adresse #pg-<page>/<bloc>, bloc d'un groupe) est retrouvé par son ancrage
+  var el = document.getElementById('b-' + bid) || $('.blk[data-id="' + bid + '"]', app) || (mode === 'view' && $('[data-bid="' + bid + '"]', app));
   if (!el) return false;
   if (mode === 'view') Reader.foldReveal(el);
   el.scrollIntoView({ block: 'start', behavior: doux ? 'smooth' : 'auto' });

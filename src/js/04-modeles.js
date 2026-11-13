@@ -87,7 +87,10 @@ var TEMPLATES = {
         mk('h2', { html: 'Liens' }),
         mk('p', { html: 'Le bouton <b>Lien</b> de la barre de mise en forme pointe vers une adresse, le bouton <b>Page</b> vers une page ou une section du document : par exemple <a href="#pg-suivi">Suivi de projet</a>, ou la section <a href="#pg-visite/ecrire">Écrire</a> de la visite. Le curseur dans un lien affiche une bulle pour l’ouvrir, le modifier ou le retirer.' }),
         mk('h2', { html: 'Lire et imprimer' }),
-        mk('p', { html: 'En lecture, la barre en bas à droite imprime ou enregistre en PDF (les blocs qui doivent rester entiers ne sont pas coupés entre deux pages), exporte une page statique, plie ou déplie toutes les sections, et choisit un thème clair ou sombre pour soi seulement.' })
+        mk('p', { html: 'En lecture, la barre en bas à droite imprime ou enregistre en PDF (les blocs qui doivent rester entiers ne sont pas coupés entre deux pages), exporte une page statique, plie ou déplie toutes les sections, et choisit un thème clair ou sombre pour soi seulement.' }),
+        mk('group', { title: 'Un groupe repliable', blocks: [
+          mk('p', { html: 'Un groupe plie quelques blocs sans ouvrir de section : il n’entre pas dans le sommaire. Insérez-le avec <b>+</b> ou <code>/</code> ; dans un de ses blocs, <b>+</b>, <code>/</code> et <b>Entrée</b> ajoutent au groupe.' }),
+          mk('check', { items: chk(['En édition, le chevron plie le groupe et cet état est enregistré.', 'En lecture, chacun l’ouvre et le ferme pour soi ; à l’impression, il est ouvert.']) })] })
       ] },
       { id: 'niveau2', title: '', lv: 2, blocks: [
         mk('header', { eyebrow: 'Visite guidée · deuxième niveau', title: 'Une sous-page de sous-page', lede: '' }),

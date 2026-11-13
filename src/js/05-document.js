@@ -81,7 +81,7 @@ function normalize(d) {
   }
   return out;
 }
-var TEMPLATES_V = 5;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
+var TEMPLATES_V = 6;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
 function template(kind) { var t = TEMPLATES[kind](); t.v = TEMPLATES_V; return t; }
 var sealed = null, origStored = '';   // fichier chiffré en attente du mot de passe
 function loadInitial() {

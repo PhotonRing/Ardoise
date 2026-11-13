@@ -8,7 +8,8 @@ app.addEventListener('click', function (e) {
   var blkEl = a.closest('.blk'), b = blkEl ? byId(blkEl.dataset.id) : null, i = +a.dataset.i;
   if (b && a.closest('.blk-bar') && ['del', 'add-after'].indexOf(a.dataset.act) < 0) holdBar(b.id);
   switch (a.dataset.act) {
-    case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }); break;
+    case 'add-after': openBlockMenu(a, function (t) { var nb = insertAfter(b, t); if (t === 'image') pickImage(nb); }, null, dansUnGroupe(b)); break;
+    case 'grp-add': openBlockMenu(a, function (t) { var nb = insertInGroup(b, t); if (t === 'image') pickImage(nb); }, null, true); break;
     case 'add-end': openBlockMenu(a, function (t) { var nb = insertAt(doc.blocks.length, t); if (t === 'image') pickImage(nb); }); break;
     case 'kb-card-add': var n0 = (b.cols[i].cards || []).length; session.modifier(function () { (b.cols[i].cards = b.cols[i].cards || []).push(kbNewCard()); }, { b: b.id, k: 'cols.' + i + '.cards.' + n0 + '.title' }); break;
     case 'kb-due-cal':
@@ -31,7 +32,7 @@ app.addEventListener('click', function (e) {
       var ct = a.dataset.tag, cp = a.dataset.act === 'q-ctag' ? 'tags' : 'ttags';
       session.modifier(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; var c = b.cards[i], w = c[cp] || (c[cp] = []), at = w.indexOf(ct); if (at >= 0) w.splice(at, 1); else w.push(ct); }); break;
     case 'q-tag': var tk = a.dataset.tag; session.modifier(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); }); break;
-    case 'fold': delete viewFold[b.id]; session.modifier(function () { if (b.folded) delete b.folded; else b.folded = true; }); break;
+    case 'fold': delete viewFold[b.id]; session.modifier(function () { if (b.type === 'group') b.folded = !b.folded; else if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;
     case 'down': moveBlock(b, 1); break;
     case 'dup': dupBlock(b); break;

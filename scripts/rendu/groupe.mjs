@@ -155,3 +155,18 @@ test('groupe : sommaire, numéros d\'étape et sections ignorent le groupe', () 
   const { ctx, d } = monter(DOC());
   egal(ctx.sectionsOf(d.pages[0]).map((x) => x.id), ['s1', 's2']);
 });
+
+test('groupe : à la bascule, un bloc d\'un groupe ouvert s\'ancre sur lui-même, d\'un groupe plié sur le groupe', () => {
+  const doc = DOC(); doc.pages[0].blocks[1].folded = true;
+  const { ctx, d } = monter(doc);
+  egal(ctx.anchorBlock(d, { page: 0, view: 'edit' }, 'c1'), 'g1', 'édition : groupe plié');
+  egal(ctx.anchorBlock(d, { page: 0, view: 'read', folds: { g1: false } }, 'c1'), 'c1', 'lecture : déplié pour soi');
+  d.pages[0].blocks[0].folded = true;
+  egal(ctx.anchorBlock(d, { page: 0, view: 'read', folds: { g1: false } }, 'c1'), 's1', 'section pliée : son titre');
+});
+
+test('groupe : export et import JSON gardent le groupe et son contenu', () => {
+  const { ctx, d } = monter(DOC());
+  const { d: d2 } = monter(JSON.parse(JSON.stringify({ title: d.title, pages: d.pages })));
+  egal(d2.pages[0].blocks[1], d.pages[0].blocks[1]);
+});

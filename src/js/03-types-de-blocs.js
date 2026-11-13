@@ -30,6 +30,11 @@ var T = {
 var ORDER = ['p', 'h2', 'h3', 'subtitle', 'step', 'summary', 'query', 'kanban', 'header', 'facts', 'cards', 'check', 'list', 'code', 'table', 'timeline', 'note', 'details', 'image', 'map', 'divider', 'footer', 'group'];
 // types refusés dans un groupe repliable (un seul niveau ; le sommaire, les sections et les étapes restent au premier niveau)
 var HORS_GROUPE = { header: 1, footer: 1, h2: 1, h3: 1, step: 1, group: 1 };
-function mk(type, props) { var b = T[type].make(); b.id = uid(); b.type = type; for (var k in props) b[k] = props[k]; return b; }
+function mk(type, props) {
+  var b = T[type].make(); b.id = uid(); b.type = type;
+  if (type === 'group') b.blocks = [mk('p', {})];   // un groupe neuf contient un paragraphe vide
+  for (var k in props) b[k] = props[k];
+  return b;
+}
 function chk(arr) { return arr.map(function (h) { return { html: h, done: false }; }); }
 

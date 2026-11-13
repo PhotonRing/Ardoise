@@ -55,6 +55,13 @@ function anchorBlock(d, ctx, id) {
   ctx = renderCtx(d, ctx);
   var blocks = d.pages[ctx.page].blocks, edit = ctx.edit, fi = foldInfo(blocks, edit ? null : foldedIn(ctx));
   var shown = function (b) { return !fi.hidden[b.id] && (edit || !!renderBlock(b, d, ctx, null)); };
+  // bloc d'un groupe : lui-même si son groupe est affiché et ouvert, sinon l'ancrage de son groupe
+  var go = ouEst(blocks, id);
+  if (go && go.parent) {
+    var gp = go.parent, gplie = !edit && ctx.folds[gp.id] != null ? !!ctx.folds[gp.id] : !!gp.folded;
+    if (!gplie && !fi.hidden[gp.id]) return id;
+    id = gp.id;
+  }
   var a = fi.hidden[id] || id, i = -1, j;
   blocks.forEach(function (b, k) { if (b.id === a) i = k; });
   if (i < 0 || shown(blocks[i])) return a;
@@ -544,7 +551,7 @@ function refreshDerived() {
   }
   // blocs requête de la page : résultats et formulaire recalculés après la saisie (une pastille ajoutée ou retirée
   // d'un texte change les puces du filtre, un titre change la liste des portées)
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'query') return;
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
@@ -558,7 +565,7 @@ function refreshDerived() {
     }
   });
   // blocs sommaire de la page : la liste suit les titres saisis
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'summary') return;
     var box = $('.blk[data-id="' + b.id + '"] .toc-blk-l', app); if (!box) return;
     var h = summaryList(b, doc, vc.page) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
@@ -621,7 +628,7 @@ function chRaw(v) {
 // Source « tableau » : les valeurs sont lues dans un bloc tableau du document (colonne des pays, colonne des valeurs)
 function chTables(d) {
   var out = [];
-  d.pages.forEach(function (pg, pi) { pg.blocks.forEach(function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
+  d.pages.forEach(function (pg, pi) { blocsDe(pg.blocks, function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
   return out;
 }
 function chTableLabel(d, t) {
@@ -641,7 +648,7 @@ function chView(b, d) {
   var ch = b.choro; if (!ch || !ch.src) return ch;
   var out = {}; for (var k in ch) out[k] = ch[k];
   var info = { n: 0, bad: [], dup: [], missing: false }, data = {}, t = null;
-  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
+  d.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
   if (!t) info.missing = true;
   else {
     if (!MapKit) MapKit = ardoiseMapKit();
@@ -710,10 +717,10 @@ function chRefresh(b) {
   $$('.ch-row[data-b="' + b.id + '"]', app).forEach(function (r) { var col = S.color(vw.data[r.dataset.id]); r.querySelector('.ch-sw').style.background = col || ''; });
   if (m) m.setChoro(vw);
 }
-function chLinked(tableId) { return doc.blocks.some(function (x) { return x.type === 'map' && x.choro && x.choro.src && x.choro.src.b === tableId; }); }
+function chLinked(tableId) { return tousBlocs(doc.blocks).some(function (x) { return x.type === 'map' && x.choro && x.choro.src && x.choro.src.b === tableId; }); }
 function chRefreshLinked() {
   // tableau source modifié : cartes et listes des données mises à jour (sauf pendant une saisie dans la liste)
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'map' || !b.choro || !b.choro.src) return;
     var m = mapOf(b.id); if (m) m.setChoro(chView(b, doc));
     var w = $('.ch-wrap[data-b="' + b.id + '"]', app); if (w && !w.contains(document.activeElement)) { var h = choroPanel(b, doc, viewCtx().editor); if (w.outerHTML !== h) w.outerHTML = h; }
@@ -782,7 +789,7 @@ function routeNear(d, lat, lon, except) {
   if (!MapKit) MapKit = ardoiseMapKit();
   var best = '', bd = 50;
   var see = function (n, la, lo) { if (!n) return; var m = MapKit.gcDist([lat, lon], [la, lo]); if (m < bd) { bd = m; best = n; } };
-  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) {
+  d.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) {
     if (x.type !== 'map') return;
     (x.markers || []).forEach(function (mk) { see(String(mk.label || '').trim(), +mk.lat, +mk.lon); });
     (x.routes || []).forEach(function (r, i) {

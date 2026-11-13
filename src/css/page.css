@@ -167,6 +167,14 @@ table.filtrable thead th:last-child{padding-right:40px}
 .fold>summary::before,.fold .sum::before{content:"▸";color:var(--accent);transition:transform .15s;display:inline-block}
 .fold[open]>summary::before,.fold .sum::before{transform:rotate(90deg)}
 .fold .fold-body{padding:0 16px 14px 36px;max-width:none}
+/* groupe repliable : titre cliquable qui plie quelques blocs ; largeur de la page, titre facile à toucher */
+.grp{border-left:2px solid var(--line);padding:0 0 0 14px;margin:0}
+.grp>summary{cursor:pointer;list-style:none;display:flex;gap:10px;align-items:center;min-height:44px;font-weight:600;color:var(--fg)}
+.grp>summary::-webkit-details-marker{display:none}
+.grp>summary::before{content:"›";color:var(--accent);font-size:18px;line-height:1;transition:transform .15s;display:inline-block;width:14px;flex:none}
+.grp[open]>summary::before{transform:rotate(90deg)}
+.grp>summary:empty::after{content:"Groupe";color:var(--muted)}
+.grp>.grp-body{display:flex;flex-direction:column;gap:22px;min-width:0;padding:6px 0 4px}
 .fig{margin:0;display:flex;flex-direction:column;gap:8px}
 .fig img{display:block;border-radius:10px;border:1px solid var(--line);margin-inline:auto}
 .fig figcaption,.img-new figcaption{color:var(--muted);font-size:13px;text-align:center}
@@ -539,6 +547,7 @@ span.kb-dref{text-decoration:none;cursor:auto}
   .wrap,section.step,header.b-header,.keep-print{display:block}
   .wrap>*+*,.keep-print>*+*{margin-top:14px}
   section.step>*+*{margin-top:12px}
+  .grp{border-left:0;padding-left:0}.grp>.grp-body{display:block}.grp>.grp-body>*+*{margin-top:12px}
   header.b-header>*+*{margin-top:6px}
   /* titre et ce qui le suit (groupés juste avant l'impression) : jamais coupés */
   .keep-print{break-inside:avoid;page-break-inside:avoid}

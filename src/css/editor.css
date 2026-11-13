@@ -159,6 +159,22 @@ html.sheet-on{overflow:hidden}
 .blk-gut .g-drag{cursor:grab;letter-spacing:-2px;font-size:12px}
 @media (min-width:980px){.blk-gut{display:flex}.blk:hover>.blk-gut,.blk-gut:hover{opacity:1;visibility:visible;transition-delay:0s}}
 .blk.dragging{opacity:.35}
+/* groupe repliable en édition : en-tête (chevron, titre, compteur), blocs du groupe, invite d'un groupe vide */
+.grp-edit{border-left:2px solid var(--line);padding-left:14px}
+.grp-head{display:flex;align-items:center;gap:8px;min-height:36px}
+.grp-t{flex:1;min-width:0;font-weight:600}
+.grp-v{flex:none;width:24px;height:24px;padding:0;border:0;border-radius:5px;background:none;color:var(--accent);cursor:pointer;font:600 18px/1 var(--f-body);transform:rotate(90deg);transition:transform .15s}
+.grp-plie .grp-v{transform:none}
+.grp-v:hover{background:var(--accent-soft)}
+.grp-n{flex:none;padding:3px 9px;border:1px dashed var(--line);border-radius:6px;background:none;color:var(--muted);font:500 12px var(--f-body);cursor:pointer}
+.grp-n:hover{border-color:var(--accent);color:var(--accent)}
+.grp-body{display:flex;flex-direction:column;gap:22px;padding:12px 0 4px}
+.grp-vide{padding:14px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:13px;text-align:center}
+.grp-add{align-self:flex-start;padding:3px 10px;border:0;border-radius:6px;background:none;color:var(--muted);font:500 12px var(--f-body);cursor:pointer}
+.grp-add:hover{background:var(--accent-soft);color:var(--accent)}
+/* un bloc du groupe survolé ou en saisie : seule sa barre s'affiche, pas celle du groupe */
+.blk[data-type=group]:has(.blk:hover,.blk:focus-within):not(.bar-on)>.collant>.blk-bar{opacity:0;visibility:hidden}
+@media (min-width:980px){.blk[data-type=group]:has(.blk:hover)>.blk-gut{opacity:0;visibility:hidden}}
 .drop-line{position:fixed;height:3px;background:var(--accent);border-radius:2px;z-index:40;pointer-events:none}
 .fld{outline:none;border-radius:3px;min-width:2ch;cursor:text}
 .fld:hover{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}

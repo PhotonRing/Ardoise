@@ -70,7 +70,7 @@ function kbCollapsed(c, ctx) { var v = (ctx.kbCols || {})[c.id], f = !!c.collaps
 // retire les états pour soi dont la colonne a changé dans le fichier (synchronisation, annulation) ou a disparu
 function kbColsPerimes(vc, d) {
   var ids = Object.keys(vc), cols = {}; if (!ids.length) return;
-  d.pages.forEach(function (pg) { pg.blocks.forEach(function (b) { if (b.type === 'kanban') (b.cols || []).forEach(function (c) { cols[c.id] = !!c.collapsed; }); }); });
+  d.pages.forEach(function (pg) { blocsDe(pg.blocks, function (b) { if (b.type === 'kanban') (b.cols || []).forEach(function (c) { cols[c.id] = !!c.collapsed; }); }); });
   ids.forEach(function (id) { if (cols[id] !== vc[id].base) delete vc[id]; });
 }
 function kanbanHTML(b, ctx, f) {

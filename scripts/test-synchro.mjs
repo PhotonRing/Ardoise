@@ -170,6 +170,19 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
   expect(r.palette === 'bleu' || r.palette === 'vert', 'réglage');
 }
+{ // groupe repliable : l'autre copie le reçoit avec son contenu et son pli ; deux frappes dans un bloc du groupe fusionnées
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'avant' }] }] });
+  const na = clone(x.da); na.pages[0].blocks.push({ id: 'g', type: 'group', title: 'Détails', folded: true, blocks: [{ id: 'c', type: 'p', html: 'Bonjour le monde' }] });
+  const r0 = swap(x, synDiff(x.a, x.da, na), []);
+  expect(r0.pages[0].blocks[1].type === 'group' && r0.pages[0].blocks[1].folded === true && r0.pages[0].blocks[1].blocks[0].html === 'Bonjour le monde', 'groupe reçu');
+  x.da = clone(r0); x.db = clone(r0);
+  const ma = clone(x.da); ma.pages[0].blocks[1].blocks[0].html = 'Bonjour le <b>vaste</b> monde'; ma.pages[0].blocks[1].title = 'Détails A';
+  const mb = clone(x.db); mb.pages[0].blocks[1].blocks[0].html = 'Bonjour tout le monde !'; mb.pages[0].blocks[1].blocks.push({ id: 'c2', type: 'p', html: 'ajout B' });
+  const r = swap(x, synDiff(x.a, x.da, ma), synDiff(x.b, x.db, mb));
+  const g = r.pages[0].blocks[1];
+  expect(g.blocks[0].html === 'Bonjour tout le <b>vaste</b> monde !', 'frappe dans un bloc d\'un groupe : ' + g.blocks[0].html);
+  expect(g.title === 'Détails A' && g.blocks.map((b) => b.id).join() === 'c,c2', 'titre et bloc ajouté au groupe');
+}
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));
 if (games >= 50 && (!snaps || !reloads)) throw new Error('instantanés non exercés');
