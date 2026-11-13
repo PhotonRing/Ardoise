@@ -11,6 +11,8 @@ const DOC = { v: 5, id: 'doc-plage', title: 'Plage', pages: [{ id: 'p1', title: 
   { id: 'v1', type: 'p', html: '' },
   { id: 'x1', type: 'p', html: 'Texte' },
 ] }] };
+// image réelle que Calc joint à une plage copiée (capture du presse-papier sous Linux)
+const IMAGE_CALC = [...readFileSync(new URL('../fixtures/presse-papier/calc/presse.png', import.meta.url))];
 const fixture = (n) => readFileSync(new URL('../fixtures/presse-papier/' + n + '.html', import.meta.url), 'utf8');
 const TSV = 'Nom\tÂge\tSite\r\nAlice\t31\tExemple\r\nBob & Co\t\t"deux\nlignes"\r\n';
 
@@ -39,7 +41,7 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     const coller = async (sel, html, texte, avecImage) => {
       const ok = await evalue(`(() => { const f = document.querySelector(${JSON.stringify(sel)}); if (!f) return false; f.focus();
         const dt = new DataTransfer(); if (${JSON.stringify(html)}) dt.setData('text/html', ${JSON.stringify(html)}); dt.setData('text/plain', ${JSON.stringify(texte)});
-        if (${!!avecImage}) dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'plage.png', { type: 'image/png' }));
+        if (${!!avecImage}) dt.items.add(new File([new Uint8Array(${JSON.stringify(IMAGE_CALC)})], 'plage.png', { type: 'image/png' }));
         f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
       if (!ok) echec('champ introuvable : ' + sel);
       await attendre(150);
