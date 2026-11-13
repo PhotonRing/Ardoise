@@ -64,6 +64,8 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const toast = await evalue(`(() => { const t = document.querySelector('.toast'); return t && getComputedStyle(t).display !== 'none' ? { txt: t.textContent, btn: !!t.querySelector('button') } : null; })()`);
   if (!toast || !/Déplacé vers « Suite »/.test(toast.txt) || !toast.btn) echec('message après le déplacement : ' + JSON.stringify(toast));
   if (await evalue(`document.querySelector('.blk[data-id="s1"]') !== null`)) echec('on n\'est pas resté sur la page source');
+  const annuler = await evalue(`document.querySelector('#ui [data-ui=undo]').title`);
+  if (annuler !== 'Annuler : Accueil · Titre de section « Courses » : bloc déplacé vers « Suite » (Ctrl+Z)') echec('libellé d\'annulation : ' + annuler);
 
   // Ctrl+Z en une fois, puis rétablir
   await evalue(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })), true`); await attendre(50);

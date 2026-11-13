@@ -807,7 +807,7 @@ const idsPages = (d) => d.pages.map((p) => p.blocks.map((x) => x.id).join(','));
 
 test('libellé : bloc déplacé vers une autre page, une seule étape, annulée d\'un seul Ctrl+Z', () => {
   const m = monter(); m.s.remplacer(DEUX_PAGES(), 'demarrage'); m.vider();
-  const pg = m.doc.pages[0], titre = m.ctx.libelleDeplacement(pg, pg.blocks[0], 'Suite');
+  const titre = m.ctx.libelleDeplacement('Accueil', m.doc.pages[0].blocks[0], 'Suite');
   egal(titre, 'Accueil · Titre de section « Courses » : bloc déplacé vers « Suite »');
   m.s.modifier(versSuite(m.doc), null, { etape: titre });
   egal(idsPages(m.doc), ['x2', 'y1,s1,x1']);

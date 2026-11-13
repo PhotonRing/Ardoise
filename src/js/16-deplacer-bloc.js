@@ -37,7 +37,7 @@ function openMovePagePop(anchor, b) {
 }
 function deplacerBloc(b, vers) {
   var de = doc.cur, cible = doc.pages[vers], titre = pageTitle(cible, vers), pid = cible.id, bid = b.id;
-  var etape = libelleDeplacement(doc.pages[de], b, titre);
+  var etape = libelleDeplacement(pageTitle(doc.pages[de], de), b, titre);
   session.modifier(function () { deplacerVersPage(doc.pages, de, bid, vers); }, null, { etape: etape });
   toast('Déplacé vers « ' + titre + ' »', 8000, { label: 'Ouvrir', fn: function () { goLink('#pg-' + pid + '/' + bid); } });
 }
