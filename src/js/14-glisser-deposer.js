@@ -9,25 +9,41 @@ app.addEventListener('mousedown', function (e) {
 });
 app.addEventListener('dragstart', function (e) {
   var blk = e.target.closest && e.target.closest('.blk[draggable=true]'); if (!blk) return;
-  if (blk.parentNode.closest('.blk')) { e.preventDefault(); blk.removeAttribute('draggable'); return; }   // bloc d'un groupe : pas encore déplaçable à la souris
   dragId = blk.dataset.id; blk.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', 'bloc'); } catch (_) {}
 });
+/* Cibles d'un dépôt, de haut en bas : chacune vaut pour un pointeur au-dessus de son seuil y. Un groupe ouvert offre son
+   titre, ses blocs (ou sa zone vide), puis le milieu de « + Ajouter dans le groupe » : plus bas, on dépose après le groupe.
+   Un bloc refusé dans un groupe (HORS_GROUPE) ne voit que les blocs du premier niveau. */
+function ciblesDepot(dansGroupe) {
+  var out = [];
+  function mi(el) { var r = el.getBoundingClientRect(); return r.top + r.height / 2; }
+  $$('.blk', app).filter(function (x) { return !x.parentNode.closest('.blk'); }).forEach(function (x) {
+    var corps = dansGroupe && $('.grp-body', x);
+    if (!corps) { out.push({ y: mi(x), t: { id: x.dataset.id, before: true }, el: x }); return; }
+    var kids = $$('.blk', corps), vide = $('.grp-vide', corps), dern = kids[kids.length - 1];
+    out.push({ y: mi($('.grp-head', x)), t: { id: x.dataset.id, before: true }, el: x });
+    kids.forEach(function (c) { out.push({ y: mi(c), t: { id: c.dataset.id, before: true }, el: c }); });
+    if (vide) out.push({ y: mi(vide), t: { dans: x.dataset.id }, el: vide });
+    out.push({ y: mi($('.grp-add', corps)), t: dern ? { id: dern.dataset.id, before: false } : { dans: x.dataset.id }, el: dern || vide });
+  });
+  return out;
+}
 app.addEventListener('dragover', function (e) {
   if (mode !== 'edit') return;
   var hasFile = e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0;
   if (!dragId && !hasFile) return;
   e.preventDefault();
-  // blocs du premier niveau : un groupe est une seule cible (le dépôt dans un groupe n'existe pas encore)
-  var blks = $$('.blk', app).filter(function (x) { return !x.parentNode.closest('.blk'); }), best = null, before = true;
-  for (var i = 0; i < blks.length; i++) {
-    var r = blks[i].getBoundingClientRect();
-    if (e.clientY < r.top + r.height / 2) { best = blks[i]; before = true; break; }
-    best = blks[i]; before = false;
-  }
-  dropTarget = best ? { id: best.dataset.id, before: before } : null;
+  var src = dragId && byId(dragId), cs = ciblesDepot(!src || !HORS_GROUPE[src.type]), best = null;
+  for (var i = 0; i < cs.length; i++) if (e.clientY < cs[i].y) { best = cs[i]; break; }
+  if (!best && cs.length) { var der = cs[cs.length - 1]; best = der.t.dans ? der : { t: { id: der.t.id, before: false }, el: der.el }; }
+  dropTarget = best ? best.t : null;
   if (!dropLine) { dropLine = document.createElement('div'); dropLine.className = 'drop-line'; ui.appendChild(dropLine); }
-  if (best) { var rr = best.getBoundingClientRect(); dropLine.style.left = rr.left + 'px'; dropLine.style.width = rr.width + 'px'; dropLine.style.top = ((before ? rr.top - 14 : rr.bottom + 12)) + 'px'; dropLine.style.display = 'block'; }
+  if (best) {
+    // ligne : au milieu de la zone d'un groupe vide, sinon au-dessus ou au-dessous du bloc visé
+    var rr = best.el.getBoundingClientRect(), y = best.t.dans ? rr.top + rr.height / 2 : best.t.before ? rr.top - 14 : rr.bottom + 12;
+    dropLine.style.left = rr.left + 'px'; dropLine.style.width = rr.width + 'px'; dropLine.style.top = y + 'px'; dropLine.style.display = 'block';
+  }
 });
 function endDrag() {
   if (dropLine) dropLine.style.display = 'none';
@@ -43,15 +59,22 @@ app.addEventListener('drop', function (e) {
     var imgHost = e.target.closest && e.target.closest('.img-drop');
     readImage(files[0], function (src) {
       if (imgHost) { var ib = byId(imgHost.dataset.b); session.modifier(function () { ib.src = src; }); return; }
-      var at = t ? idx(byId(t.id)) + (t.before ? 0 : 1) : doc.blocks.length;
-      insertAt(at, 'image', { src: src }, false);
+      // image déposée dans un groupe : dans sa liste ; sinon à sa place dans la page
+      var g = t && t.dans && byId(t.dans), o = t && t.id && position(byId(t.id));
+      if (g) insertAt(g.blocks.length, 'image', { src: src }, false, g.blocks);
+      else if (o) insertAt(o.i + (t.before ? 0 : 1), 'image', { src: src }, false, o.liste);
+      else insertAt(doc.blocks.length, 'image', { src: src }, false);
     });
     endDrag(); return;
   }
   if (!dragId || !t) { endDrag(); return; }
   e.preventDefault();
-  var b = byId(dragId), target = byId(t.id);
-  if (b && target && b !== target) session.modifier(function () {
+  var b = byId(dragId), target = byId(t.dans || t.id), ob = position(b), ot = position(target);
+  if (b && target && b !== target && (t.dans || ob.parent || ot.parent)) session.modifier(function () {
+    // dans, hors ou à l'intérieur d'un groupe : le bloc part seul (rangerBloc refuse un type interdit dans un groupe)
+    rangerBloc(doc.blocks, b.id, t); revealBlock(b.id);
+  });
+  else if (b && target && b !== target) session.modifier(function () {
     // un titre plié emmène les blocs de sa section ; déposé après un titre plié, on passe après sa section
     var us = blockUnits(), ub = null, ut = null;
     us.forEach(function (u) { if (u.id === b.id) ub = u; if (u.id === target.id) ut = u; });

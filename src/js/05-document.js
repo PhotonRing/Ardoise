@@ -116,6 +116,36 @@ function copieBloc(b) {
   if (c.type === 'group' && Array.isArray(c.blocks)) c.blocks.forEach(function (x) { x.id = uid(); });
   return c;
 }
+/* Ranger les blocs d'une page dans ses groupes : chaque geste rend false (ou null) sans rien changer s'il est refusé.
+   Un groupe vidé reste en place ; les types de HORS_GROUPE n'entrent jamais dans un groupe. */
+// déplace le bloc bid avant ou après le bloc cible.id (de la page ou d'un groupe), ou à la fin du groupe cible.dans
+function rangerBloc(blocks, bid, cible) {
+  var o = ouEst(blocks, bid), t = ouEst(blocks, cible.dans || cible.id); if (!o || !t || t.b === o.b) return false;
+  if (cible.dans && (t.b.type !== 'group' || t.parent)) return false;
+  var dest = cible.dans ? t.b.blocks : t.liste;
+  if (dest !== blocks && HORS_GROUPE[o.b.type]) return false;
+  o.liste.splice(o.i, 1);
+  dest.splice(cible.dans ? dest.length : dest.indexOf(t.b) + (cible.before ? 0 : 1), 0, o.b);
+  return true;
+}
+// sort un bloc de son groupe : juste après le groupe, ou juste avant
+function sortirDuGroupe(blocks, bid, avant) {
+  var o = ouEst(blocks, bid); if (!o || !o.parent) return false;
+  o.liste.splice(o.i, 1); blocks.splice(blocks.indexOf(o.parent) + (avant ? 0 : 1), 0, o.b);
+  return true;
+}
+// enveloppe un bloc de la page dans un groupe neuf, sans titre, placé à sa place ; rend le groupe
+function mettreDansGroupe(blocks, bid) {
+  var o = ouEst(blocks, bid); if (!o || o.parent || HORS_GROUPE[o.b.type]) return null;
+  var g = mk('group', {}); g.blocks = [o.b]; blocks.splice(o.i, 1, g);
+  return g;
+}
+// remet les blocs d'un groupe à sa place, dans l'ordre, et retire le groupe
+function degrouper(blocks, gid) {
+  var o = ouEst(blocks, gid); if (!o || o.parent || o.b.type !== 'group') return false;
+  Array.prototype.splice.apply(blocks, [o.i, 1].concat(o.b.blocks));
+  return true;
+}
 function byId(id) { var o = ouEst(doc.blocks, id); return o ? o.b : null; }
 // position d'un bloc de la page affichée : { liste, i, parent } (liste : la page ou le groupe qui le contient), ou null
 function position(b) { var o = b ? ouEst(doc.blocks, b.id) : null; return o && o.b === b ? o : null; }

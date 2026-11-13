@@ -1079,7 +1079,7 @@ test('groupe : supprimer un groupe est une étape, un seul Ctrl+Z le rend entier
   const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
   const avant = JSON.stringify(m.doc.pages);
   m.s.modifier(() => { m.doc.pages[0].blocks.splice(1, 1); });
-  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : bloc supprimé');
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : bloc supprimé');
   m.s.annuler();
   egal(JSON.stringify(m.doc.pages), avant, 'groupe rendu avec son contenu');
   egal(possible(m.s.historique()), { annuler: false, retablir: true });
@@ -1098,11 +1098,11 @@ test('groupe : un bloc d\'un groupe est libellé pour lui-même (texte modifié,
 test('groupe : plier et déplier le groupe en édition sont des étapes nommées', () => {
   const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
   m.s.modifier(() => { groupe(m).folded = true; });
-  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : groupe plié');
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : groupe plié');
   m.s.modifier(() => { groupe(m).folded = false; });
-  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails un deux » : groupe déplié');
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : groupe déplié');
   m.s.modifier(() => { groupe(m).title = 'Plus'; });
-  egal(libelles(m)[0], 'Accueil · Groupe repliable « Plus un deux » : texte modifié');
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Plus » : texte modifié');
 });
 
 test('groupe : un import renumérote les identifiants en double, blocs des groupes compris', () => {
@@ -1111,6 +1111,26 @@ test('groupe : un import renumérote les identifiants en double, blocs des group
   m.s.remplacer(d, 'import');
   const vus = [m.doc.pages[0].blocks[0].id, ...groupe(m).blocks.map((b) => b.id), groupe(m).id];
   egal(new Set(vus).size, 4, 'identifiants uniques');
+});
+
+// Ranger les blocs : chaque geste est une étape, un seul Ctrl+Z rend la page d'avant, et un seul libellé le nomme
+const GESTES = [
+  ['dépôt dans un groupe', (c, bl) => c.rangerBloc(bl, 'b1', { id: 'c1', before: false }), 'Accueil · Groupe repliable « Détails » : bloc ajouté au groupe'],
+  ['glissé hors du groupe', (c, bl) => c.rangerBloc(bl, 'c2', { id: 'b1', before: true }), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Monter qui sort du groupe', (c, bl) => c.sortirDuGroupe(bl, 'c1', true), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Sortir du groupe', (c, bl) => c.sortirDuGroupe(bl, 'c2'), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Mettre dans un groupe', (c, bl) => c.mettreDansGroupe(bl, 'b1'), 'Accueil · Groupe repliable « a » : bloc ajouté au groupe'],
+  ['Dégrouper', (c, bl) => c.degrouper(bl, 'g1'), 'Accueil · Groupe repliable « Détails » : groupe défait'],
+  ['réordonner dans le groupe', (c, bl) => c.rangerBloc(bl, 'c1', { id: 'c2', before: false }), 'Accueil · Paragraphe « un » : bloc déplacé'],
+];
+for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une étape, libellée, qu\'un seul Ctrl+Z défait', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  const avant = JSON.stringify(m.doc.pages);
+  m.s.modifier(() => { geste(m.ctx, m.doc.pages[0].blocks); });
+  egal(libelles(m)[0], libelle);
+  m.s.annuler();
+  egal(JSON.stringify(m.doc.pages), avant, 'page d\'avant');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
 });
 
 for (const [nom, fn] of tests) {

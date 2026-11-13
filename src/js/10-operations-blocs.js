@@ -23,9 +23,14 @@ function blockUnits() {
 function moveBlock(b, d) {
   var o = position(b);
   if (o && o.parent) {
-    // bloc d'un groupe : il change de place dans son groupe (en sortir : ticket « ranger les blocs »)
-    var j0 = o.i + d; if (j0 < 0 || j0 >= o.liste.length) return;
-    session.modifier(function () { o.liste.splice(o.i, 1); o.liste.splice(j0, 0, b); });
+    // bloc d'un groupe : il change de place dans son groupe ; le premier monte juste au-dessus, le dernier descend juste en dessous
+    var j0 = o.i + d;
+    session.modifier(function () {
+      if (j0 < 0 || j0 >= o.liste.length) sortirDuGroupe(doc.blocks, b.id, d < 0);
+      else { o.liste.splice(o.i, 1); o.liste.splice(j0, 0, b); }
+      revealBlock(b.id);
+    });
+    var eg = $('.blk[data-id="' + b.id + '"]'); if (eg) eg.scrollIntoView({ block: 'nearest' });
     return;
   }
   var us = blockUnits(), k = -1;
@@ -59,3 +64,14 @@ function replaceBlock(b, type) {
   if (type === 'image') pickImage(nb); else focusField(nb.id, type === 'group' ? 'title' : null, false);
 }
 
+// menu ⋯ d'un bloc : envelopper dans un groupe neuf (curseur dans son titre), sortir du groupe, dégrouper
+function mettreEnGroupe(b) {
+  var g = null; session.modifier(function () { g = mettreDansGroupe(doc.blocks, b.id); });
+  if (g) focusField(g.id, 'title', false);
+}
+function sortirBloc(b) { session.modifier(function () { sortirDuGroupe(doc.blocks, b.id); }); focusField(b.id, null, false); }
+function degrouperBloc(g) {
+  var premier = g.blocks[0];
+  session.modifier(function () { degrouper(doc.blocks, g.id); });
+  if (premier) focusField(premier.id, null, false);
+}
