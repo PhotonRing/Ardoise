@@ -22,10 +22,10 @@ const PAGES = (n) => {
 };
 const CHARGER = (n) => `(() => { const d = JSON.parse(JSON.stringify(window.ardoise.doc)); d.pages = ${JSON.stringify(PAGES(n))}; return window.ardoise.load(d); })()`;
 const IDS = `window.ardoise.doc.pages.map((p) => p.blocks.map((b) => b.id).filter((id) => !/^long/.test(id)).join(','))`;
-const OUVRIR = (id) => `(() => { const b = document.querySelector('.blk[data-id="${id}"] [data-act="move-page"]'); if (!b) return false; b.click(); return !!document.querySelector('.move-pop'); })()`;
-const LISTE = `[...document.querySelectorAll('.move-pop .menu-list .mi')].map((b) => ({ t: b.querySelector('span:last-child').firstChild.textContent, off: b.getAttribute('aria-disabled') === 'true', act: b.classList.contains('act'), ml: parseFloat(getComputedStyle(b).marginLeft) || 0 }))`;
-const TAPER = (v) => `(() => { const q = document.querySelector('.move-pop [data-q]'); q.value = ${JSON.stringify(v)}; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`;
-const TOUCHE = (key, opts = {}) => `(() => { const t = document.querySelector('.move-pop [data-q]') || document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }, ${JSON.stringify(opts)}))); return true; })()`;
+const OUVRIR = (id) => `(() => { const b = document.querySelector('.blk[data-id="${id}"] [data-act="deplacer-page"]'); if (!b) return false; b.click(); return !!document.querySelector('.deplacer-pop'); })()`;
+const LISTE = `[...document.querySelectorAll('.deplacer-pop .menu-list .mi')].map((b) => ({ t: b.querySelector('span:last-child').firstChild.textContent, off: b.getAttribute('aria-disabled') === 'true', act: b.classList.contains('act'), ml: parseFloat(getComputedStyle(b).marginLeft) || 0 }))`;
+const TAPER = (v) => `(() => { const q = document.querySelector('.deplacer-pop [data-q]'); q.value = ${JSON.stringify(v)}; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`;
+const TOUCHE = (key, opts = {}) => `(() => { const t = document.querySelector('.deplacer-pop [data-q]') || document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }, ${JSON.stringify(opts)}))); return true; })()`;
 const VISIBLE = (id) => `(() => { const e = document.getElementById('b-${id}') || document.querySelector('.blk[data-id="${id}"]'); if (!e || e.offsetParent === null) return false; const r = e.getBoundingClientRect(); return r.top >= -1 && r.top < innerHeight; })()`;
 
 export const nom = 'déplacer un bloc';
@@ -35,7 +35,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
 
   // le bouton : sur chaque bloc sauf l'en-tête
   mesure();
-  if (await evalue(`!!document.querySelector('.blk[data-id="hd1"] [data-act="move-page"]')`)) echec('l\'en-tête propose « Déplacer vers la page… »');
+  if (await evalue(`!!document.querySelector('.blk[data-id="hd1"] [data-act="deplacer-page"]')`)) echec('l\'en-tête propose « Déplacer vers la page… »');
   if (!(await evalue(OUVRIR('s1')))) { echec('pas de fenêtre « Déplacer vers la page… » sur la section'); return; }
 
   // la liste : pages seules, hiérarchie, page affichée inactive et non choisie au départ
@@ -54,7 +54,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await evalue(TOUCHE('ArrowUp')); await evalue(TOUCHE('ArrowUp')); l = await evalue(LISTE); mesure();
   if (!l[1].act) echec('flèche ↑ : la page affichée (inactive) ne doit pas être sélectionnée');
   await evalue(TOUCHE('Escape')); mesure();
-  if (await evalue(`!!document.querySelector('.move-pop')`)) echec('Échap ne ferme pas la liste');
+  if (await evalue(`!!document.querySelector('.deplacer-pop')`)) echec('Échap ne ferme pas la liste');
 
   // déplacement de la section au clavier : filtre, Entrée
   await evalue(OUVRIR('s1')); await evalue(TAPER('suite')); await evalue(TOUCHE('Enter')); await attendre(100);
@@ -114,7 +114,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     await ecran(w, true, 640);
     await charger(); await evalue(CHARGER(14)); await attendre(100);
     if (!(await evalue(OUVRIR('x1')))) { echec(w + ' px : pas de liste'); continue; }
-    const o = await evalue(`(() => { const p = document.querySelector('.move-pop').getBoundingClientRect(), li = document.querySelector('.move-pop .menu-list');
+    const o = await evalue(`(() => { const p = document.querySelector('.deplacer-pop').getBoundingClientRect(), li = document.querySelector('.deplacer-pop .menu-list');
       return { g: p.left, d: p.right, h: p.top, b: p.bottom, iw: innerWidth, ih: innerHeight, defile: li.scrollHeight > li.clientHeight && getComputedStyle(li).overflowY !== 'visible' }; })()`);
     mesure();
     if (o.g < 0 || o.d > o.iw || o.h < 0 || o.b > o.ih) echec(`${w} px : la liste sort de l'écran (${Math.round(o.g)}–${Math.round(o.d)} × ${Math.round(o.h)}–${Math.round(o.b)}, écran ${o.iw} × ${o.ih})`);

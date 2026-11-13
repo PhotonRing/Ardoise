@@ -226,7 +226,7 @@ function fileMenuAct(k) {
   else if (k === 'print') printPage();
   else if (k === 'json-copy') copyJSON();
   else if (k === 'json-import') importJSON();
-  else if (k === 'md-import') importMarkdown();
+  else if (k === 'md-import') ouvrirImportMarkdown();
   else if (k === 'help') showHelp();
   else if (k === 'sync') synDialog();
   else if (k === 'update') openUpdate();

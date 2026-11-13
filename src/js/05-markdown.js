@@ -14,13 +14,13 @@ var MD_CITATION = /^ {0,3}>/, MD_ELEMENT = /^([ \t]*)([-*+]|\d{1,9}[.)])(?:[ \t]
 // #tag d'Obsidian : en début de mot, lettres (latines, grecques, cyrilliques), chiffres, _ - / ; au moins une lettre
 var MD_LETTRE = 'A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0370-\u03FF\u0400-\u04FF';
 var MD_PASTILLE = new RegExp('(^|[\\s(*_~])#([' + MD_LETTRE + '0-9_\\/-]*[' + MD_LETTRE + '][' + MD_LETTRE + '0-9_\\/-]*)', 'g');
+var liensMd = null;   // pages du document pendant une conversion (liens [[…]]) ; cur : page remplacée, dont les sections ne comptent pas
 // { entete: { title } | null, blocs: blocs sans identifiant, imagesManquantes } ; pages : pages du document, pour les liens [[…]]
 function blocsDuMarkdown(texte, pages, cur) {
   var lignes = String(texte == null ? '' : texte).replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
   liensMd = { pages: pages || [], cur: cur };
   try { return blocsDuMarkdownLu(lignes); } finally { liensMd = null; }
 }
-var liensMd = null;   // pages du document pendant une conversion (liens [[…]]) ; cur : page remplacée, dont les sections ne comptent pas
 function blocsDuMarkdownLu(lignes) {
   var r = { entete: null, blocs: [], imagesManquantes: 0, images: [] }, fin = finYamlMd(lignes);
   if (fin > 0) { var fiche = ficheYamlMd(lignes.slice(1, fin)); if (fiche.items.length) r.blocs.push(fiche); lignes = lignes.slice(fin + 1); }

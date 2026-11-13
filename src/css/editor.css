@@ -334,8 +334,8 @@ button.tl-dot:hover{transform:scale(1.2)}
 .link-pop{width:360px}
 .link-pop .menu-q{margin:0 0 6px}
 .link-pop .menu-list{max-height:min(320px,50vh);overflow:auto;overscroll-behavior:contain}
-.move-pop .mi[aria-disabled="true"]{opacity:.45;cursor:default}
-.move-pop .mi[aria-disabled="true"]:hover{background:none}
+.deplacer-pop .mi[aria-disabled="true"]{opacity:.45;cursor:default}
+.deplacer-pop .mi[aria-disabled="true"]:hover{background:none}
 .link-pop .lk-lv1{padding-left:26px} .link-pop .lk-lv2{padding-left:44px}
 .link-pop .lk-lv1 .ic,.link-pop .lk-lv2 .ic{width:22px;height:22px;font-size:11px}
 .link-pop .mi.on .ic{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}

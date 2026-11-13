@@ -1,7 +1,7 @@
 /* ---------- Importer du Markdown ----------
    Fenêtre : texte collé ou fichier .md choisi ; le contenu remplace celui de la page courante (en-tête et pied de page
    gardés) en une étape annulable. Conversion : blocsDuMarkdown (05-markdown.js). */
-function importMarkdown() {
+function ouvrirImportMarkdown() {
   if (mode !== 'edit') return;
   var m = modal('Importer du Markdown', '<p class="muted">Collez une note Markdown (Obsidian…) ou choisissez un fichier .md. Le contenu de la page courante sera remplacé ; Ctrl+Z permet de revenir en arrière.</p>' +
     '<textarea placeholder="# Titre&#10;&#10;Texte, listes, tableaux…" spellcheck="false"></textarea><p class="muted" id="mderr" style="color:var(--bad)"></p><p class="muted" id="mdetat"></p>' +
@@ -14,7 +14,7 @@ function importMarkdown() {
       if (!texte.trim()) { err.textContent = 'Rien à importer : collez du Markdown ou choisissez un fichier.'; return false; }
       var r = blocsDuMarkdown(texte, doc.pages, doc.cur);
       if (pageAContenu(doc.blocks) && !confirm('Le contenu de la page « ' + pageTitle(doc.pages[doc.cur], doc.cur) + ' » sera remplacé par la note importée. Continuer ?')) return false;
-      if (!r.images.length) { importerMarkdown(r); return; }
+      if (!r.images.length) { appliquerImportMarkdown(r); return; }
       // images distantes : téléchargées avant l'étape, fenêtre ouverte, pour que l'import reste une seule étape (un Ctrl+Z)
       var n = r.images.length, k = 0, etat = $('#mdetat', bg);
       bg.dataset.attente = '1'; err.textContent = '';
@@ -25,7 +25,7 @@ function importMarkdown() {
           function () { r.blocs[im.bloc].caption = esc(im.nom); r.imagesManquantes++; fini(); });
       })).then(function () {
         if (!bg.isConnected) return;   // fenêtre fermée pendant le téléchargement (Échap, clic à côté) : import abandonné
-        bg.remove(); importerMarkdown(r);
+        bg.remove(); appliquerImportMarkdown(r);
       });
       return false;
     } }]);
@@ -41,8 +41,9 @@ function importMarkdown() {
   ta.focus();
 }
 // blocs convertis → page courante, en une étape « page importée du Markdown » ; champs HTML assainis comme un collage
-function importerMarkdown(r) {
+function appliquerImportMarkdown(r) {
   var haut = [], bas = [];
+  // une page n'a qu'un en-tête : un second bloc En-tête de la page n'est pas gardé
   doc.blocks.forEach(function (b) { if (b.type === 'header' && !haut.length) haut.push(b); else if (b.type === 'footer') bas.push(b); });
   var nb = r.blocs.length;
   session.modifier(function () {

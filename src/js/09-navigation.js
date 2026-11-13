@@ -1,8 +1,6 @@
 /* ---------- Précédent et Suivant ---------- */
-// Un changement de page voulu (barre latérale, onglets, Alt+Page, lien) et un saut vers une section créent une entrée
-// d'historique (naviguer) ; les autres changements de page (annulation, modification reçue, opérations de page, import)
-// remplacent l'adresse sans entrée. Chaque entrée garde sa position de défilement (history.state.y), rétablie par Précédent.
-// Dans une iframe (plugin Obsidian) : aucune entrée, Précédent n'est pas écouté.
+// Changement de page voulu (sommaire, onglets, Alt+Page, lien) ou saut vers une section : une entrée (naviguer), qui garde
+// son défilement (history.state.y) ; autre changement (annulation, import…) : adresse remplacée. Iframe : aucune entrée.
 var dansCadre = (function () { try { return window.self !== window.top; } catch (_) { return true; } })();
 if (!dansCadre) try { history.scrollRestoration = 'manual'; } catch (_) {}
 function noterDefilement() {

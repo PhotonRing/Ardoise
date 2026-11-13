@@ -73,11 +73,11 @@ test('pageDuBloc : indice de la page qui contient le bloc, -1 sinon', () => {
 test('barre du bloc : « Déplacer vers la page… » sauf sur l\'en-tête et le pied de page, absente avec une seule page', () => {
   const { ctx, d } = monter(DOC());
   const h = ctx.renderPage(d, { page: 0, view: 'edit' });
-  const avec = [...h.matchAll(/<div class="blk[^"]*" data-id="([^"]+)"[\s\S]*?(?=<div class="blk[ "]|$)/g)].filter((m) => m[0].includes('data-act="move-page"')).map((m) => m[1]);
+  const avec = [...h.matchAll(/<div class="blk[^"]*" data-id="([^"]+)"[\s\S]*?(?=<div class="blk[ "]|$)/g)].filter((m) => m[0].includes('data-act="deplacer-page"')).map((m) => m[1]);
   egal(avec, ['s1', 'x1', 's2', 'x2', 's3', 'x3']);
   const seule = DOC(); seule.pages = [seule.pages[0]];
   const u = monter(seule);
-  vrai(!u.ctx.renderPage(u.d, { page: 0, view: 'edit' }).includes('move-page'), 'une seule page : absente');
+  vrai(!u.ctx.renderPage(u.d, { page: 0, view: 'edit' }).includes('deplacer-page'), 'une seule page : absente');
 });
 
 test('après le déplacement, sommaire et résultat de requête lient la section à sa nouvelle page', () => {
