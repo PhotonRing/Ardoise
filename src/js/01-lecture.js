@@ -161,11 +161,25 @@ function ardoiseReader() {
       c.addEventListener('change', function () { try { localStorage.setItem(K + c.id, c.checked ? '1' : '0'); } catch (_) {} });
     });
   }
+  function lireAdresse(hash, pages) {
+    // copie autonome de lireAdresse (09-adresse.js), mêmes résultats (banc de rendu) : #pg-<page>[/<bloc>], ancienne forme #p<N>, #edit
+    var h = String(hash || ''), r = { page: 0, bloc: '', mode: '', introuvable: false }, n = pages.length, m;
+    if (h === '#edit') r.mode = 'edit';
+    else if ((m = h.match(/^#pg-([^/]+)(?:\/(.+))?$/))) {
+      var i = -1; for (var k = 0; k < n; k++) if (pages[k].id === m[1]) { i = k; break; }
+      if (i < 0) r.introuvable = true; else { r.page = i; r.bloc = m[2] || ''; }
+    } else if ((m = h.match(/^#p(\d+)$/))) r.page = Math.max(0, Math.min(n - 1, +m[1] - 1));
+    return r;
+  }
   function exportPages() {
-    // export statique : bascule entre les pages (adresse #p2, #p3…), sommaire et onglets
-    var pages = Array.prototype.slice.call(document.querySelectorAll('.pg')), spy = navSpy();
+    // export statique : bascule entre les pages, sommaire et onglets. Adresse #pg-<page>[/<bloc>] (#p<N> encore lu) ;
+    // un changement de page et un saut vers une section créent une entrée d'historique, dont la position de défilement
+    // (state.y) est rétablie par Précédent / Suivant. Dans une iframe : adresse remplacée, aucune entrée, Précédent non écouté
+    var pages = Array.prototype.slice.call(document.querySelectorAll('.pg')), spy = navSpy(sauter), cur = -1;
+    var ids = pages.map(function (p) { return { id: p.getAttribute('data-pgid') }; }), defilT = null;
+    var cadre = (function () { try { return window.self !== window.top; } catch (_) { return true; } })();
     function show(i, noScroll) {
-      i = Math.max(0, Math.min(pages.length - 1, i || 0));
+      i = Math.max(0, Math.min(pages.length - 1, i || 0)); cur = i;
       pages.forEach(function (p, k) { p.hidden = k !== i; });
       Array.prototype.forEach.call(document.querySelectorAll('[data-pg]'), function (b) {
         var on = +b.getAttribute('data-pg') === i, w = b.closest('.ptab-w,.toc-p');
@@ -182,25 +196,65 @@ function ardoiseReader() {
       if (!noScroll) scrollTo(0, 0);
       spy();
     }
+    function section(bloc) { return bloc ? document.getElementById('b-' + bloc) || document.querySelector('.blk[data-id="' + bloc + '"]') : null; }
+    function cible(pid, bloc) {
+      // page d'une adresse : celle qui contient la section si elle existe (section déplacée), sinon la page nommée
+      var s = section(bloc), t = (s && s.closest('.pg')) || document.querySelector('.pg[data-pgid="' + pid + '"]');
+      return t ? { page: pages.indexOf(t), bloc: s ? bloc : '' } : null;
+    }
+    function montrer(bloc, doux) {
+      var s = section(bloc); if (!s) return false;
+      foldReveal(s); s.scrollIntoView({ block: 'start', behavior: doux ? 'smooth' : 'auto' }); return true;
+    }
+    function adresse(i, bloc) { return '#pg-' + ids[i].id + (bloc ? '/' + bloc : ''); }
+    function noter() { if (!cadre) try { history.replaceState({ y: scrollY }, '', location.href); } catch (_) {} }
+    function aller(i, bloc) {
+      // navigation voulue : la position de départ est notée, puis une seule entrée pour la page et la section
+      var moved = i !== cur; if (!moved && !bloc) return;
+      noter();
+      if (moved) show(i);
+      var adr = adresse(i, bloc && montrer(bloc, !moved) ? bloc : '');
+      if (!moved && adr === adresse(i)) return;
+      try { if (cadre) history.replaceState(history.state, '', adr); else history.pushState({ y: 0 }, '', adr); } catch (_) {}
+    }
+    function sauter(id) {
+      // section du sommaire latéral, sur la page affichée ou une autre
+      var t = section(id), pg = t && t.closest('.pg'); if (pg) aller(pages.indexOf(pg), id);
+    }
+    function ouvrir(hash) {
+      var a = lireAdresse(hash, ids), c = a.introuvable || !ids.length ? null : cible(ids[a.page].id, a.bloc);
+      return c || { page: a.page, bloc: '' };
+    }
     document.addEventListener('click', function (e) {
       if (!e.target.closest) return;
       var a = e.target.closest('a[href^="#pg-"]');
       if (a) {
-        // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>)
-        e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), t = document.querySelector('.pg[data-pgid="' + h[0] + '"]');
-        if (t) {
-          show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {}
-          var sec = h[1] && document.getElementById('b-' + h[1]); if (sec) { foldReveal(sec); sec.scrollIntoView({ block: 'start' }); }
-        }
+        // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>), cherchée dans toutes les pages
+        e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), c = cible(h[0], h[1]);
+        if (c) aller(c.page, c.bloc);
         return;
       }
       var f = e.target.closest('[data-pgfold]'); if (f) { tocFold(f); return; }
       var b = e.target.closest('[data-pg]'); if (!b) return;
-      e.preventDefault(); var i = +b.getAttribute('data-pg'); show(i);
-      try { history.replaceState(null, '', '#p' + (i + 1)); } catch (_) {}
+      e.preventDefault(); aller(+b.getAttribute('data-pg'), '');
     });
-    var m = location.hash.match(/^#p(\d+)$/);
-    navLayout(); show(m ? +m[1] - 1 : 0, true);
+    if (!cadre) {
+      try { history.scrollRestoration = 'manual'; } catch (_) {}
+      // la position de l'entrée courante suit le défilement : Précédent la retrouve
+      window.addEventListener('scroll', function () { clearTimeout(defilT); defilT = setTimeout(noter, 150); }, { passive: true });
+      window.addEventListener('popstate', function (e) {
+        clearTimeout(defilT);
+        var c = ouvrir(location.hash), y = e.state && typeof e.state.y === 'number' ? e.state.y : null;
+        show(c.page, true);   // sans remonter en haut : la position de l'entrée est posée aussitôt
+        if (y !== null) {
+          scrollTo(0, y);
+          requestAnimationFrame(function () { if (Math.abs(scrollY - y) > 1) scrollTo(0, y); });
+        } else if (!montrer(c.bloc, false)) scrollTo(0, 0);
+      });
+    }
+    var o = ouvrir(location.hash);
+    navLayout(); show(o.page, true); montrer(o.bloc, false);
+    noter();   // première entrée : sa position, pour y revenir par Précédent
   }
   function tocFold(btn, open) {
     // déplie / replie un groupe de sous-pages du sommaire
@@ -217,8 +271,9 @@ function ardoiseReader() {
     h.classList.toggle('nav-none', none); h.classList.toggle('nav-side', !none && side); h.classList.toggle('nav-tabs', !none && !side); h.classList.toggle('nav-push', push);
     h.style.setProperty('--navw', (push ? 220 : Math.max(190, Math.min(260, room - 40))) + 'px');
   }
-  function navSpy() {
-    // section en cours surlignée dans le sommaire ; clic sur une section : défilement sans changer l'adresse
+  function navSpy(sauter) {
+    // section en cours surlignée dans le sommaire ; clic sur une section : défilement sans changer l'adresse, ou confié à
+    // sauter(id) (export statique : entrée d'historique, page de la section ouverte au besoin)
     function target(id) { return document.getElementById('b-' + id) || document.querySelector('.blk[data-id="' + id + '"]'); }
     var tick = 0;
     function spy() {
@@ -232,7 +287,8 @@ function ardoiseReader() {
     document.addEventListener('click', function (e) {
       var a = e.target.closest && e.target.closest('a[data-sec]'); if (!a) return;
       var t = target(a.getAttribute('data-sec')); if (!t) return;
-      e.preventDefault(); foldReveal(t); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      e.preventDefault(); if (sauter) { sauter(a.getAttribute('data-sec')); return; }
+      foldReveal(t); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
     window.addEventListener('resize', navLayout);
     return spy;
@@ -246,7 +302,7 @@ function ardoiseReader() {
     exportPages();
   }
   return { tlFit: tlFit, tlTips: tlTips, foldHidden: foldHidden, foldToggle: foldToggle, foldReveal: foldReveal, printKeep: printKeep, printPrep: printPrep,
-    viewScript: viewScript, exportPages: exportPages, tocFold: tocFold, navLayout: navLayout, navSpy: navSpy, startExport: startExport };
+    viewScript: viewScript, lireAdresse: lireAdresse, exportPages: exportPages, tocFold: tocFold, navLayout: navLayout, navSpy: navSpy, startExport: startExport };
 }
 var Reader = ardoiseReader();
 // le script de lecture de la page exportée : la fabrique, recopiée telle quelle, puis son démarrage
