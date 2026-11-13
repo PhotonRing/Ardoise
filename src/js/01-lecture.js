@@ -187,10 +187,12 @@ function ardoiseReader() {
       var a = e.target.closest('a[href^="#pg-"]');
       if (a) {
         // lien vers une page (#pg-<page>) ou une section (#pg-<page>/<bloc>)
-        e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), t = document.querySelector('.pg[data-pgid="' + h[0] + '"]');
+        // la section est cherchée dans toutes les pages : déplacée, elle s'ouvre sur sa page réelle
+        e.preventDefault(); var h = a.getAttribute('href').slice(4).split('/'), sec = h[1] && document.getElementById('b-' + h[1]);
+        var t = (sec && sec.closest('.pg')) || document.querySelector('.pg[data-pgid="' + h[0] + '"]');
         if (t) {
           show(pages.indexOf(t)); try { history.replaceState(null, '', '#p' + (pages.indexOf(t) + 1)); } catch (_) {}
-          var sec = h[1] && document.getElementById('b-' + h[1]); if (sec) { foldReveal(sec); sec.scrollIntoView({ block: 'start' }); }
+          if (sec) { foldReveal(sec); sec.scrollIntoView({ block: 'start' }); }
         }
         return;
       }
