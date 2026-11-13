@@ -63,7 +63,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await cliquer(`document.querySelector('.q-fen [data-qfiltre="tags"]')`);
   await cliquer(`document.querySelector('.q-fen .q-fen-q')`);
   await cdp('Input.insertText', { text: 'urg' }); await attendre(80);
-  attendu('recherche : seule « urgent » reste', (await evalue(`[...document.querySelectorAll('.q-fen .q-chip')].filter((c) => !c.hidden).map((c) => c.textContent).join()`)) === 'urgent', 'recherche');
+  attendu('recherche : seule « urgent » reste', (await evalue(`[...document.querySelectorAll('.q-fen .q-chip')].filter((c) => c.getClientRects().length > 0).map((c) => c.textContent).join()`)) === 'urgent', 'recherche');
   await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="urgent"]')`);
   e = await etat();
   attendu('pastille posée : puce du filtre, résultat filtré, fenêtre ouverte sous la nouvelle puce', e.puces[2] === 'urgent' && e.lignes.join() === '1,3' && e.fen === 'q1:Pastilles' && e.ouverte === 'urgent', e);

@@ -437,6 +437,7 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-col.q-drop-apres{box-shadow:3px 0 0 var(--accent)}
 .q-grip{cursor:grab;color:var(--muted);padding:0 4px;user-select:none;letter-spacing:-2px}
 .q-chip{border:0;cursor:pointer;opacity:.45}
+.q-chip[hidden]{display:none}
 .q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
 .q-chip:hover{opacity:.85}
 .q-hint{font-size:12px}
