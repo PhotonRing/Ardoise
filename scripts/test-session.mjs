@@ -790,6 +790,14 @@ test('libellé : plusieurs modifications dans une étape, la première puis le n
   egal(libelles(m)[0], 'Accueil · Paragraphe « Un ter » : texte modifié et 1 autre modification');
 });
 
+test('libellé : un geste peut donner le libellé complet de son étape ({ etape }), affiché tel quel', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Section' }); blocsDe(m).splice(0, 1); }, null, { etape: 'Accueil : page importée du Markdown' });
+  egal(libelles(m)[0], 'Accueil : page importée du Markdown');
+  m.s.annuler();
+  egal(libelles(m)[1], 'Accueil : page importée du Markdown', 'rétablir reprend le même libellé');
+});
+
 test('libellé : bloc ajouté, supprimé, déplacé', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Section' }); });

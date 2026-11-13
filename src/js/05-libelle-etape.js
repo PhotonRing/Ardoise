@@ -116,7 +116,9 @@ function libellesDifferences(avant, apres, nature) {
 }
 // libellé d'une étape : la première modification, puis le nombre des autres ; un champ qu'aucune nature ne décrit
 // (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu
+// nature : la nature des blocs modifiés (texte), ou { etape } quand le geste nomme toute son étape (import, déplacement entre pages)
 function libelleEtape(avant, apres, nature) {
+  if (nature && typeof nature === 'object') return nature.etape;
   var l = libellesDifferences(avant, apres, nature);
   if (!l.length) return JSON.stringify(avant) === JSON.stringify(apres) ? '' : 'document modifié';
   if (l.length < 2) return l[0];
