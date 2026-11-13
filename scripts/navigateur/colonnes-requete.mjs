@@ -10,7 +10,9 @@ const DOC = { title: 'Colonnes', pages: [{ id: 'p1', title: 'Accueil', blocks: [
 // vue liste de q2 : ordre de la première ligne (Source ou nom de colonne), cases du réglage, focus
 const LISTE = `(() => {
   const q = document.querySelector('.blk[data-id="q2"]'), li = q.querySelector('.q-res li'), a = document.activeElement;
-  return { ligne: [...li.querySelectorAll('.q-src, .q-k')].map((x) => x.classList.contains('q-src') ? 'Source' : x.textContent),
+  // ordre à l'écran (le CSS peut réordonner) : ligne par ligne (8 px de tolérance), puis de gauche à droite
+  const pos = (x) => { const r = x.getBoundingClientRect(); return [Math.round(r.top), r.left]; };
+  return { ligne: [...li.querySelectorAll('.q-src, .q-k')].sort((a, b) => { const p = pos(a), q = pos(b); return Math.abs(p[0] - q[0]) > 8 ? p[0] - q[0] : p[1] - q[1]; }).map((x) => x.classList.contains('q-src') ? 'Source' : x.textContent),
     cases: [...q.querySelectorAll('input[data-qcol]')].map((c) => c.dataset.qcol), focus: a && a.dataset ? a.dataset.qcol || null : null };
 })()`;
 const MODE = `document.documentElement.classList.contains('is-edit')`;
