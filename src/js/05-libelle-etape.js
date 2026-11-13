@@ -23,6 +23,9 @@ function libelleBloc(pg, b) {
   var mots = libelleMots(b), ty = T[b.type] ? T[b.type].label : 'Bloc';
   return (pg.title || 'Sans titre') + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
 }
+// libellé complet de l'étape d'un bloc déplacé vers une autre page : noms affichés des pages source et cible (pageTitle,
+// grand titre de l'en-tête), qui valent mieux ici que pg.title, vide pour une page nommée par son en-tête
+function libelleDeplacement(source, b, cible) { return libelleBloc({ title: source }, b) + ' : bloc déplacé vers « ' + cible + ' »'; }
 // identifiants communs à deux listes d'objets à identifiant, et ceux qui restent dans l'ordre (plus longue sous-suite commune)
 function libelleOrdre(la, lb) {
   var enA = {}, enB = {}; la.forEach(function (x) { enA['$' + x.id] = x; }); lb.forEach(function (x) { enB['$' + x.id] = x; });
@@ -116,7 +119,9 @@ function libellesDifferences(avant, apres, nature) {
 }
 // libellé d'une étape : la première modification, puis le nombre des autres ; un champ qu'aucune nature ne décrit
 // (mot de passe, champ d'une version future) donne un libellé de repli, jamais un bouton au libellé nu
+// nature : la nature des blocs modifiés (texte), ou { etape } quand le geste nomme toute son étape (import, déplacement entre pages)
 function libelleEtape(avant, apres, nature) {
+  if (nature && typeof nature === 'object') return nature.etape;
   var l = libellesDifferences(avant, apres, nature);
   if (!l.length) return JSON.stringify(avant) === JSON.stringify(apres) ? '' : 'document modifié';
   if (l.length < 2) return l[0];

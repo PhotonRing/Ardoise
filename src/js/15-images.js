@@ -6,13 +6,24 @@ function pickImage(b) {
   filePick.click();
 }
 function imageFromUrl(url, cb) {
-  // le navigateur télécharge l'image si le site l'autorise (CORS) ; dans Obsidian, le plugin peut s'en charger
+  // « Adresse de l'image » : messages d'attente et d'échec ; le téléchargement est celui de telechargerImage
   url = String(url || '').trim(); if (!url) return;
-  if (!/^(https?:|data:image\/)/i.test(url)) url = 'https://' + url;
   toast('Téléchargement de l’image…', 20000);
-  var host = window.ardoiseHost && typeof window.ardoiseHost.fetchImage === 'function';
+  telechargerImage(url).then(function (src) { toast('Image intégrée au document'); cb(src); }, function (e) {
+    toast(e && e.message === 'not-image' ? 'Cette adresse ne renvoie pas une image.'
+      : 'Image inaccessible : le site n’autorise pas sa copie depuis une page' + (hoteImages() ? ' (ou le téléchargement a été refusé)' : '') + '. Enregistrez-la, puis déposez-la ici.', 7000);
+  });
+}
+// hôte qui sait télécharger une image refusée au navigateur (plugin Obsidian)
+function hoteImages() { return !!(window.ardoiseHost && typeof window.ardoiseHost.fetchImage === 'function'); }
+function telechargerImage(url, delai) {
+  // promesse de l'image intégrée (data:) ; le navigateur la télécharge si le site l'autorise (CORS), dans Obsidian le plugin
+  // peut s'en charger ; échec (Error 'not-image', HTTP, délai dépassé) : promesse rejetée, sans message
+  url = String(url || '').trim();
+  if (!/^(https?:|data:image\/)/i.test(url)) url = 'https://' + url;
+  var host = hoteImages();
   function blobOf(u) { return fetch(u, { credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); }); }
-  blobOf(url).catch(function (e) {
+  var p = blobOf(url).catch(function (e) {
     if (!host || /^data:/i.test(url)) throw e;
     return Promise.resolve(window.ardoiseHost.fetchImage(url)).then(blobOf);
   }).then(function (blob) {
@@ -23,12 +34,9 @@ function imageFromUrl(url, cb) {
       var ext = (url.match(/\.(png|jpe?g|gif|webp|avif|bmp)(?:[?#]|$)/i) || [])[1] || 'png';
       return new Blob([blob], { type: 'image/' + ext.toLowerCase().replace('jpg', 'jpeg') });
     }, function () { throw new Error('not-image'); });
-  }).then(function (blob) {
-    readImage(blob, function (src) { toast('Image intégrée au document'); cb(src); });
-  }).catch(function (e) {
-    toast(e && e.message === 'not-image' ? 'Cette adresse ne renvoie pas une image.'
-      : 'Image inaccessible : le site n’autorise pas sa copie depuis une page' + (host ? ' (ou le téléchargement a été refusé)' : '') + '. Enregistrez-la, puis déposez-la ici.', 7000);
-  });
+  }).then(function (blob) { return new Promise(function (ok) { readImage(blob, ok); }); });
+  if (!delai) return p;
+  return Promise.race([p, new Promise(function (_, non) { setTimeout(function () { non(new Error('délai')); }, delai); })]);
 }
 function readImage(file, cb) {
   var fr = new FileReader();

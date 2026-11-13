@@ -208,6 +208,7 @@ function fileMenuHTML() {
     mi('sync', '⇄', 'Synchronisation…', doc.sync ? 'Active · ' + doc.sync.relay : 'Garder plusieurs copies à jour, en direct') +
     '<div class="hr"></div>' +
     mi('json-copy', '{ }', 'Copier le JSON', 'Pour le faire modifier par une IA') + mi('json-import', '⇥', 'Importer du JSON…', 'Remplace le contenu de la page') +
+    mi('md-import', '⇥', 'Importer du Markdown…', 'Remplace le contenu de la page courante') +
     '<div class="hr"></div>' +
     (doc.lock ? mi('pw-set', '🔒', 'Changer le mot de passe', isSealed() ? 'Édition protégée · contenu chiffré' : 'L’édition est protégée') +
                 (isSealed() ? mi('pw-unseal', '🔓', 'Ne plus chiffrer le contenu', 'Le document redevient lisible sans mot de passe') : mi('pw-seal', '🔐', 'Chiffrer le contenu…', 'Mot de passe demandé pour ouvrir le document')) +
@@ -225,6 +226,7 @@ function fileMenuAct(k) {
   else if (k === 'print') printPage();
   else if (k === 'json-copy') copyJSON();
   else if (k === 'json-import') importJSON();
+  else if (k === 'md-import') ouvrirImportMarkdown();
   else if (k === 'help') showHelp();
   else if (k === 'sync') synDialog();
   else if (k === 'update') openUpdate();
@@ -306,7 +308,8 @@ function parseLink(href) {
 }
 function linkLabel(href) {
   var L = parseLink(href); if (!L.page) return L.url.replace(/^mailto:/i, '');
-  var i = pageIndex(doc.pages, L.pid); if (i < 0) return 'Page introuvable';
+  var i = pageDuLien(doc.pages, L);   // une section déplacée est suivie sur sa page
+  if (i < 0) return 'Page introuvable';
   var t = pageTitle(doc.pages[i], i);
   if (L.bid) { var x = sectionsOf(doc.pages[i]).filter(function (y) { return y.id === L.bid; })[0]; t += ' › ' + (x ? x.t : 'section introuvable'); }
   return t;
@@ -314,13 +317,26 @@ function linkLabel(href) {
 function goLink(href) {
   // ouvre la page liée, puis fait défiler jusqu'à la section (dépliée au besoin en édition)
   var L = parseLink(href); if (!L.page) return;
-  var i = pageIndex(doc.pages, L.pid); if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
-  var moved = i !== doc.cur; if (moved) goPage(i);
-  if (!L.bid) return;
-  if (mode === 'edit' && byId(L.bid) && foldInfo(doc.blocks).hidden[L.bid]) session.modifier(function () { revealBlock(L.bid); });
-  var el = document.getElementById('b-' + L.bid) || $('.blk[data-id="' + L.bid + '"]', app);
-  if (el && mode === 'view') Reader.foldReveal(el);
-  if (el) el.scrollIntoView({ block: 'start', behavior: moved ? 'auto' : 'smooth' }); else toast('Section introuvable : elle a sans doute été supprimée');
+  // la section est cherchée dans tout le document : déplacée vers une autre page, le lien la retrouve (adresse de sa page réelle)
+  var i = pageDuLien(doc.pages, L);
+  if (i < 0) { toast('Page introuvable : elle a sans doute été supprimée'); return; }
+  var moved = i !== doc.cur;
+  if (!moved && !L.bid) return;
+  // une seule entrée d'historique pour la page et la section : la position de départ est notée avant de quitter
+  noterDefilement();
+  if (moved) goPage(i, false, true);
+  if (L.bid && montrerBloc(L.bid, !moved)) { naviguer(adressePage(doc.pages, i, L.bid)); return; }
+  if (moved) naviguer(adressePage(doc.pages, i));
+  if (L.bid) toast('Section introuvable : elle a sans doute été supprimée');
+}
+function montrerBloc(bid, doux) {
+  // section de la page affichée : dépliée au besoin (en édition, étape annulable), puis amenée en haut de l'écran
+  if (mode === 'edit' && byId(bid) && foldInfo(doc.blocks).hidden[bid]) session.modifier(function () { revealBlock(bid); });
+  var el = document.getElementById('b-' + bid) || $('.blk[data-id="' + bid + '"]', app);
+  if (!el) return false;
+  if (mode === 'view') Reader.foldReveal(el);
+  el.scrollIntoView({ block: 'start', behavior: doux ? 'smooth' : 'auto' });
+  return true;
 }
 function openLinkPop(kind, range, fld, a) {
   // kind : 'url' (adresse) ou 'page' (page ou section) ; a : lien existant à modifier, sinon range : texte à lier

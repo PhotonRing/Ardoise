@@ -16,8 +16,8 @@ function linesHTML(h) { return h; }
 function paintPills(h) { return h; }
 `;
 const SOURCE = entete.slice(OUVERTURE.length) + PURS +
-  ['01-lecture.js', '01-moteur-carte.js', '03-types-de-blocs.js', '05-document.js', '05-migrations.js', '05-presse-papier.js', '05-tableau.js', '06-coloration-syntaxique.js',
-    '07-kanban.js', '07-rendu.js', '07-requetes.js'].map(js).join('\n');
+  ['01-lecture.js', '01-moteur-carte.js', '03-types-de-blocs.js', '05-document.js', '05-markdown.js', '05-migrations.js', '05-presse-papier.js', '05-tableau.js', '06-coloration-syntaxique.js',
+    '07-kanban.js', '07-rendu.js', '07-requetes.js', '09-adresse.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });
 
 // Un contexte neuf, sans DOM : seul `document.querySelector` existe (l'en-tête cherche #app au chargement) ;

@@ -169,7 +169,7 @@ table.filtrable thead th:last-child{padding-right:40px}
 .fold .fold-body{padding:0 16px 14px 36px;max-width:none}
 .fig{margin:0;display:flex;flex-direction:column;gap:8px}
 .fig img{display:block;border-radius:10px;border:1px solid var(--line);margin-inline:auto}
-.fig figcaption{color:var(--muted);font-size:13px;text-align:center}
+.fig figcaption,.img-new figcaption{color:var(--muted);font-size:13px;text-align:center}
 hr.sep{border:0;border-top:1px solid var(--line);margin:0;width:100%}
 .tl{display:flex;flex-direction:column;gap:14px;min-width:0}
 .tl-dot{display:block;width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--bg);box-shadow:0 0 0 1.5px var(--accent);padding:0}

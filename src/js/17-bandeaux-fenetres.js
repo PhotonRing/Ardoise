@@ -1,8 +1,13 @@
 /* ---------- Bandeaux, toasts, fenêtres ---------- */
 var toastT;
-function toast(msg, ms) {
+// action { label, fn } facultative : un bouton après le texte, qui ferme le message puis appelle fn
+function toast(msg, ms, action) {
   var t = $('.toast', ui); if (!t) { t = document.createElement('div'); t.className = 'toast'; ui.appendChild(t); }
   t.textContent = msg; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(function () { t.style.display = 'none'; }, ms || 2600);
+  if (!action) return;
+  var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'toast-b'; bt.textContent = action.label;
+  bt.addEventListener('click', function () { clearTimeout(toastT); t.style.display = 'none'; action.fn(); });
+  t.appendChild(document.createTextNode(' · ')); t.appendChild(bt);
 }
 function modal(title, bodyHTML, buttons) {
   var bg = document.createElement('div'); bg.className = 'modal-bg';
