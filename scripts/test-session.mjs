@@ -793,6 +793,12 @@ test('libellé : un sommet du modèle diamant modifié, nommé par le titre seul
   m.s.modifier(() => { blocsDe(m)[1].victime = 'Mairie de X'; });
   egal(libelles(m)[0], 'Accueil · Modèle diamant « APT28 Mairie de X » : texte modifié', 'sans titre : les sommets');
 });
+test('libellé : une page nommée par son en-tête (sans nom saisi) porte le nom affiché, pas « Sans titre »', () => {
+  const m = monter();
+  m.s.remplacer({ title: 'Doc', pages: [{ id: 'p1', title: '', blocks: [{ id: 'hd', type: 'header', title: 'Visite <i>guidée</i>' }, { id: 'b1', type: 'p', html: 'a' }] }] }, 'demarrage');
+  m.s.modifier(() => { blocsDe(m)[1].html = 'Bonjour'; });
+  egal(libelles(m)[0], 'Visite guidée · Paragraphe « Bonjour » : texte modifié');
+});
 test('libellé : plusieurs modifications dans une étape, la première puis le nombre des autres', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Deux' }, { id: 'b3', type: 'p', html: 'Trois' }); });

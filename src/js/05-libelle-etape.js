@@ -22,9 +22,14 @@ function libelleMots(b) {
   var m = t.join(' ').replace(/\s+/g, ' ').trim();
   return m.length > LIBELLE_MOTS ? m.slice(0, LIBELLE_MOTS).trim() + '…' : m;
 }
+// nom affiché d'une page (comme pageTitle, sans DOM) : grand titre de son en-tête, sinon le nom saisi
+function libelleNomPage(pg) {
+  var h = (pg.blocks || []).filter(function (x) { return x.type === 'header'; })[0], t = h ? htmlText(h.title || '').replace(/\s+/g, ' ').trim() : '';
+  return t || (pg.title || '').trim() || 'Sans titre';
+}
 function libelleBloc(pg, b) {
   var mots = libelleMots(b), ty = T[b.type] ? T[b.type].label : 'Bloc';
-  return (pg.title || 'Sans titre') + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
+  return libelleNomPage(pg) + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
 }
 // libellé complet de l'étape d'un bloc déplacé vers une autre page : noms affichés des pages source et cible (pageTitle,
 // grand titre de l'en-tête), qui valent mieux ici que pg.title, vide pour une page nommée par son en-tête
