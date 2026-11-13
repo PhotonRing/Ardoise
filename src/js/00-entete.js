@@ -5,7 +5,7 @@
    Ardoise — éditeur de page autonome. Le document vit dans le JSON
    #ardoise-doc ci-dessus ; à l'enregistrement le fichier se réécrit lui-même.
    ========================================================================= */
-var VERSION = 5;   // format du document (voir 05-migrations.js)
+var VERSION = 6;   // format du document (voir 05-migrations.js)
 var $ = function (s, r) { return (r || document).querySelector(s); };
 var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 var uid = function () { return Math.random().toString(36).slice(2, 9); };

@@ -117,6 +117,7 @@ Pour faire évoluer le format :
 | 3 | 1.6 | Listes à sous-niveaux (éléments `{ html, lv }`) ; pastilles nommées (registre `tags`, exceptions `pc-N`) ; pages sur plusieurs niveaux (`lv` au lieu de `sub`) |
 | 4 | 1.7 | Bloc « Requête » (nouveau type de bloc, sans conversion) |
 | 5 | 1.10 | Bloc « Kanban » (nouveau type de bloc) ; retrait ligne par ligne des paragraphes (`span.tab`), sans conversion |
+| 6 | 1.22 | Blocs « Groupe repliable » et « Modèle diamant » (nouveaux types de blocs), sans conversion |
 
 ## Assembler localement
 

@@ -37,7 +37,8 @@ var MIGRATIONS = [
     if (Object.keys(tags).length) d.tags = tags;
   } },
   { from: 3, desc: 'Nouveau bloc « Requête » (aucune conversion)', run: function () {} },
-  { from: 4, desc: 'Nouveau bloc « Kanban » ; retrait ligne par ligne des paragraphes (aucune conversion)', run: function () {} }
+  { from: 4, desc: 'Nouveau bloc « Kanban » ; retrait ligne par ligne des paragraphes (aucune conversion)', run: function () {} },
+  { from: 5, desc: 'Nouveaux blocs « Groupe repliable » et « Modèle diamant » (aucune conversion)', run: function () {} }
 ];
 // --- outils des migrations (sans DOM : vérifiés aussi par scripts/check.mjs dans Node) ---
 var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1 };
