@@ -47,7 +47,7 @@ function zipStocke(parties) {
 var DOCX_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 var DOCX_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
 var DOCX_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
-var DOCX_LARGEUR = 680, DOCX_EMU = 9525, DOCX_TEXTE = 11906 - 2 * 850;   // largeur utile en px (comme l'impression) et en twips
+var DOCX_EMU = 9525, DOCX_TEXTE = 11906 - 2 * 850;   // EMU par px ; largeur utile en twips (en px : OFFICE_LARGEUR, 08-office.js)
 // texte XML : caractères interdits retirés, &, < et > échappés (et " dans un attribut)
 function xmlTexte(s) { return String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]|[\ud800-\udbff](?![\udc00-\udfff])|(^|[^\ud800-\udbff])[\udc00-\udfff]/g, '$1').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function xmlAttr(s) { return xmlTexte(s).replace(/"/g, '&quot;'); }
@@ -93,8 +93,7 @@ function docxDepuisElements(elts, d) {
   };
   var t = function (s) { return String(s).split('\t').map(function (x, i) { return (i ? '<w:tab/>' : '') + (x ? '<w:t xml:space="preserve">' + xmlTexte(x) + '</w:t>' : ''); }).join(''); };
   var runs = function (segs, o) {
-    o = o || {}; var h = '', fus = [];
-    segs.forEach(function (g) { var der = fus[fus.length - 1]; if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && memeForme(der, g)) der.texte += g.texte; else fus.push(g.saut ? g : Object.assign({}, g)); });
+    o = o || {}; var h = '', fus = officeFusion(segs);   // 08-office.js, appelé à l'exécution
     for (var i = 0; i < fus.length; i++) {
       var g = fus[i];
       if (g.saut) { h += '<w:r><w:br/></w:r>'; continue; }
@@ -129,8 +128,8 @@ function docxDepuisElements(elts, d) {
   var image = function (e) {
     var img = docxImage(e.src);
     if (!img) return P('', runs([{ texte: officeTexte([e]) }]));
-    var dim = e.l && e.h ? { l: e.l, h: e.h } : docxDimensions(img), l = dim.l || DOCX_LARGEUR, h = dim.h || Math.round(l * 0.6);
-    if (l > DOCX_LARGEUR) { h = Math.round(h * DOCX_LARGEUR / l); l = DOCX_LARGEUR; }
+    var dim = e.l && e.h ? { l: e.l, h: e.h } : docxDimensions(img), l = dim.l || OFFICE_LARGEUR, h = dim.h || Math.round(l * 0.6);
+    if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
     medias.push(img); docPr++;
     var nom = 'image' + medias.length + '.' + img.ext, rid = rel('image', 'media/' + nom), cx = l * DOCX_EMU, cy = h * DOCX_EMU;
     var dessin = '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/>' +
@@ -171,7 +170,7 @@ function docxDepuisElements(elts, d) {
     }, '');
   };
   var corps = tous(elts);
-  var document = DOCX_XML + '<w:document ' + DOCX_NS + '><w:body>' + corps +
+  var documentXml = DOCX_XML + '<w:document ' + DOCX_NS + '><w:body>' + corps +
     '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="907" w:right="850" w:bottom="1020" w:left="850" w:header="454" w:footer="454" w:gutter="0"/></w:sectPr></w:body></w:document>';
   var parties = [
     { nom: '[Content_Types].xml', texte: DOCX_XML + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
@@ -180,8 +179,8 @@ function docxDepuisElements(elts, d) {
       '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
       '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>' },
     { nom: '_rels/.rels', texte: DOCX_XML + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + DOCX_REL + 'officeDocument" Target="word/document.xml"/></Relationships>' },
-    { nom: 'word/document.xml', texte: document },
-    { nom: 'word/styles.xml', texte: docxStyles(acc) },
+    { nom: 'word/document.xml', texte: documentXml },
+    { nom: 'word/styles.xml', texte: docxStyles() },
     { nom: 'word/numbering.xml', texte: docxNumerotation(nums) },
     { nom: 'word/_rels/document.xml.rels', texte: DOCX_XML + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + DOCX_REL + 'styles" Target="styles.xml"/>' +
       '<Relationship Id="rId2" Type="' + DOCX_REL + 'numbering" Target="numbering.xml"/>' + rels.join('') + '</Relationships>' }
@@ -216,10 +215,4 @@ function docxNumerotation(nums) {
   return DOCX_XML + '<w:numbering ' + DOCX_NS + '>' + abs(1, false) + abs(2, true) + nums.map(function (a, i) {
     return '<w:num w:numId="' + (i + 1) + '"><w:abstractNumId w:val="' + a + '"/>' + (a === 2 ? '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride>' : '') + '</w:num>';
   }).join('') + '</w:numbering>';
-}
-// nom du fichier Word : titre du bloc exporté (s'il en a un), sinon celui de la page
-function nomExportWord(b, d, pi) {
-  var t = '';
-  if (b) t = textOf(b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle' ? b.html : b.type === 'header' || b.type === 'step' || b.type === 'group' || b.type === 'diamond' || b.type === 'details' || b.type === 'summary' || b.type === 'query' ? b.title : '');
-  return nomDeFichier(t || pageTitle(d.pages[pi], pi)) + '.docx';
 }

@@ -10,6 +10,7 @@ var OFFICE_CLAIR = {
   t14f: '#937910', t14b: '#fdf7dd', t15f: '#8b2818', t15b: '#fce2de',
   'map-sea': '#d9e5ec', 'map-land': '#f8fafb', 'map-border': '#b4c2cc', 'map-label': '#566573'
 };
+var OFFICE_LARGEUR = 680;   // largeur utile d'une page A4 imprimée en px, comme PRINT_W du moteur de carte (images, .docx)
 var OFFICE_PALETTES = { ambre: ['#b4540a', '#fbeee2'], petrole: ['#0b6e8a', '#e2f0f4'], indigo: ['#4848c0', '#ececfb'], rubis: ['#b4233c', '#fbe8ec'], foret: ['#2f6f3e', '#e6f2e8'], graphite: ['#3d5466', '#e8eef2'] };
 // couleur N d'une pastille (pa-N, pc-N) : { fond, texte }
 function officePastille(n) {
@@ -31,15 +32,11 @@ var OFFICE_BALISE = /<(\/?)([a-z0-9]+)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/gi;
 function officeSegments(html, d) {
   var s = String(html == null ? '' : html), out = [], pile = [], m;
   var etat = function (texte) { var e = { texte: texte }; pile.forEach(function (p) { for (var k in p.f) e[k] = p.f[k]; }); return e; };
-  var pousser = function (seg) {
-    var der = out[out.length - 1];
-    if (der && !der.saut && !seg.saut && !der.pastille && !seg.pastille && memeForme(der, seg)) der.texte += seg.texte; else out.push(seg);
-  };
   OFFICE_BALISE.lastIndex = 0;
   while ((m = OFFICE_BALISE.exec(s))) {
-    if (m[4] != null) { var t = htmlText(m[4]); if (t) pousser(etat(t)); continue; }
+    if (m[4] != null) { var t = htmlText(m[4]); if (t) out.push(etat(t)); continue; }
     var tag = m[2].toLowerCase(), attrs = m[3] || '';
-    if (tag === 'br') { pousser({ saut: true }); continue; }
+    if (tag === 'br') { out.push({ saut: true }); continue; }
     if (m[1]) { for (var i = pile.length - 1; i >= 0; i--) if (pile[i].tag === tag) { pile.splice(i, 1); break; } continue; }
     var cls = (attrs.match(/class="([^"]*)"/) || [])[1] || '';
     if (tag === 'span' && /(^|\s)pill(\s|$)/.test(cls)) {
@@ -48,7 +45,7 @@ function officeSegments(html, d) {
       var nom = htmlText(s.slice(OFFICE_BALISE.lastIndex, fin).replace(/<[^>]*>/g, '')), own = cls.match(/\bpc-(\d+)\b/);
       var c = own ? +own[1] : knownTagColor(d || {}, tagKey(nom)), p = etat(nom);
       p.pastille = c == null ? { fond: OFFICE_CLAIR.line, texte: OFFICE_CLAIR.fg } : officePastille(c);
-      delete p.couleur; if (nom) pousser(p);
+      delete p.couleur; if (nom) out.push(p);
       OFFICE_BALISE.lastIndex = fin + 7; continue;
     }
     var f = {};
@@ -64,12 +61,25 @@ function officeSegments(html, d) {
     pile.push({ tag: tag, f: f });
   }
   while (out.length && out[out.length - 1].saut) out.pop();
+  return officeFusion(out);
+}
+// segments voisins de même forme réunis (ni saut ni pastille), en copies : les segments reçus ne changent pas
+function officeFusion(segs) {
+  var out = [];
+  segs.forEach(function (g) {
+    var der = out[out.length - 1], c = {}, k;
+    if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && memeForme(der, g)) { der.texte += g.texte; return; }
+    for (k in g) c[k] = g[k];
+    out.push(c);
+  });
   return out;
 }
 var OFFICE_FORMES = ['gras', 'italique', 'souligne', 'barre', 'code', 'lien', 'interne', 'couleur'];
 function memeForme(a, b) { return OFFICE_FORMES.every(function (k) { return (a[k] || null) === (b[k] || null); }); }
 function officeTexteDe(segs) { return segs.map(function (g) { return g.saut ? '\n' : g.texte; }).join(''); }
 function officeVide(segs) { return !officeTexteDe(segs).trim(); }
+// forme k (gras, couleur) posée sur les segments de texte, ni saut ni pastille ; rend les segments
+function officeMettreForme(segs, k, v) { segs.forEach(function (g) { if (!g.saut && !g.pastille) g[k] = v; }); return segs; }
 
 /* Bloc → éléments neutres. opts : { page, images: { idBloc: { src, mime, l, h } } } (images préparées par l'appelant) */
 function officeBloc(b, d, opts) {
@@ -78,7 +88,7 @@ function officeBloc(b, d, opts) {
   var S = function (html) { return officeSegments(R(html), d); };
   var txt = function (texte, f) { var g = { texte: String(texte == null ? '' : texte) }; for (var k in f) g[k] = f[k]; return g; };
   var para = function (segs, o) { var e = { t: 'para', segs: segs }; for (var k in o) e[k] = o[k]; return e; };
-  var gras = function (segs) { return segs.map(function (g) { if (!g.saut && !g.pastille) g.gras = true; return g; }); };
+  var gras = function (segs) { return officeMettreForme(segs, 'gras', true); };
   var cases = function (arr, ordre) { return { t: 'liste', ordonnee: false, items: ordre.map(function (i) { var it = arr[i]; return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html), coche: !!it.done }; }) }; };
   var image = function (img, alt, legende) { return { t: 'image', src: img.src, mime: img.mime || '', l: img.l || 0, h: img.h || 0, alt: alt || '', legende: legende || [] }; };
   switch (b.type) {
@@ -109,7 +119,7 @@ function officeBloc(b, d, opts) {
       out.push({ t: 'tableau', entete: true, lignes: b.rows.map(function (r) { return r.map(function (c) { return [para(S(c))]; }); }) }); break;
     case 'facts':
       out.push({ t: 'tableau', entete: false, lignes: b.items.map(function (it) {
-        var v = S(it.v); if (it.alert) v.forEach(function (g) { if (!g.saut && !g.pastille) g.couleur = OFFICE_CLAIR.bad; });
+        var v = S(it.v); if (it.alert) officeMettreForme(v, 'couleur', OFFICE_CLAIR.bad);
         return [[para([txt(it.k, { gras: true })])], [para(v)]];
       }) });
       break;
@@ -144,9 +154,9 @@ function officeBloc(b, d, opts) {
       (b.blocks || []).forEach(function (c) { out = out.concat(officeBloc(c, d, opts)); });
       break;
     case 'diamond':
-      // modèle diamant : tableau à deux colonnes, titre puis les sommets dans l'ordre de l'écran (DIA_SOMMETS : 07-rendu.js)
+      // modèle diamant : tableau à deux colonnes, titre puis les sommets dans l'ordre de l'écran (DIA_SOMMETS : 03-types-de-blocs.js)
       var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
-      out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s[1], b[s[0]]); })) });
+      out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
     case 'divider': out.push({ t: 'ligne' }); break;
     case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
@@ -176,7 +186,7 @@ function officeBlocs(blocs, d, opts) { return (blocs || []).reduce(function (a, 
 function officeCartesKanban(cards, S, txt, para) {
   var out = [];
   cards.forEach(function (k) {
-    out.push(para(S(k.title).map(function (g) { if (!g.saut && !g.pastille) g.gras = true; return g; })));
+    out.push(para(officeMettreForme(S(k.title), 'gras', true)));
     if (!officeVide(S(k.html))) out.push(para(S(k.html)));
     var meta = [k.due ? 'Échéance : ' + kbDate(k.due, true) : '', k.who ? 'Responsable : ' + String(k.who).trim() : '', KB_PRIO[k.prio] ? 'Priorité ' + k.prio.toUpperCase() + ' (' + KB_PRIO[k.prio] + ')' : ''].filter(Boolean);
     if (meta.length) out.push(para([txt(meta.join(' · '), { couleur: OFFICE_CLAIR.muted })]));
@@ -187,7 +197,7 @@ function officeCartesKanban(cards, S, txt, para) {
 function officeRequete(b, d, pi, S, txt, para) {
   var out = [], ctx = renderCtx(d, { page: pi, view: 'export' }), recs = queryRecords(b, d, pi), src = b.src || 'facts', view = b.view || 'table';
   var source = function (r) { var pg = d.pages[r.x.pi], st = r.x.sec ? textOf(r.x.sec.type === 'step' ? r.x.sec.title : r.x.sec.html) : ''; return txt(pageTitle(pg, r.x.pi) + (st ? ' › ' + st : ''), { interne: true, souligne: true }); };
-  var valeur = function (c) { var v = S(c.v); if (c.alert) v.forEach(function (g) { if (!g.saut && !g.pastille) g.couleur = OFFICE_CLAIR.bad; }); return v; };
+  var valeur = function (c) { var v = S(c.v); return c.alert ? officeMettreForme(v, 'couleur', OFFICE_CLAIR.bad) : v; };
   var element = function (r) { return (r.par ? [txt(r.par + ' › ', { couleur: OFFICE_CLAIR.muted })] : []).concat(S(r.html)); };
   if (b.title) out.push(para([txt(b.title, { gras: true })]));
   if (view === 'count') {
@@ -197,7 +207,7 @@ function officeRequete(b, d, pi, S, txt, para) {
   if (!recs.length) { out.push(para([txt('Aucun résultat.', { couleur: OFFICE_CLAIR.muted })])); return out; }
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') {
-    var groupes = qGroupes(b, d, pi, recs).groups, carte = function (r) {
+    var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
       if (src === 'kanban') return officeCartesKanban([r.kb], S, txt, para);
       if (src === 'check') return [para([txt(r.done ? '☑ ' : '☐ ')].concat(element(r)))];
       return [para(r.cells.filter(function (c) { return !officeVide(S(c.v)); }).reduce(function (a, c) { return a.concat(a.length ? [txt(' · ')] : [], [txt(c.k + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(c)); }, []))];
@@ -295,7 +305,7 @@ function officeHtml(elts, d) {
           '<table style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
           '<pre style="font-family:' + OFFICE_MONO + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
       case 'image':
-        var l = e.l, h = e.h; if (l > 680) { h = Math.round(h * 680 / l); l = 680; }
+        var l = e.l, h = e.h; if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
         return '<p style="' + P + '"><img src="' + esc(e.src) + '" alt="' + esc(e.alt) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + '></p>' +
           (officeVide(e.legende) ? '' : '<p style="' + P + PARA.legende + '">' + segs(e.legende) + '</p>');
       case 'ligne': return '<hr style="border:0;border-top:1px solid ' + C.line + ';margin:6pt 0">';

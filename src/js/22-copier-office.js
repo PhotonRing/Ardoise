@@ -1,7 +1,6 @@
 /* ---------- Copier pour Office ----------
    HTML à styles en ligne et texte brut d'un bloc (08-office.js) ; une carte ou une chronologie part en image PNG, dessinée
    hors écran en thème clair à la largeur de la page imprimée, sans bibliothèque. Hors historique : rien n'est modifié. */
-var OFFICE_LARGEUR = 680;   // largeur utile d'une page A4 imprimée, comme PRINT_W du moteur de carte
 function copierPourOffice(b) {
   var refus = function () { toast('Le presse-papier a refusé la copie'); };
   if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem !== 'function') { refus(); return Promise.resolve(false); }

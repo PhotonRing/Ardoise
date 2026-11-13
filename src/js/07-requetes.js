@@ -104,8 +104,8 @@ function queryRecords(b, d, pi, noTags) {
     } else if ((b.src || 'facts') === 'facts' && bl.type === 'facts') {
       recs.push({ x: x, cells: bl.items.map(function (it) { return { k: String(it.k || '').trim() || 'Clé', v: it.v, alert: it.alert }; }), tags: pillKeys(bl.items.map(function (it) { return it.v; }).join(' ')) });
     } else if (b.src === 'diamond' && bl.type === 'diamond') {
-      // un résultat par modèle diamant : titre puis sommets (DIA_SOMMETS : 07-rendu.js) ; pastilles de tous les champs
-      var dc = [{ k: 'Titre', v: bl.title }].concat(DIA_SOMMETS.map(function (s) { return { k: s[1], v: bl[s[0]] }; }));
+      // un résultat par modèle diamant : titre puis sommets (DIA_SOMMETS : 03-types-de-blocs.js) ; pastilles de tous les champs
+      var dc = [{ k: 'Titre', v: bl.title }].concat(DIA_SOMMETS.map(function (s) { return { k: s.nom, v: bl[s.cle] }; }));
       recs.push({ x: x, cells: dc, tags: pillKeys(dc.map(function (c) { return c.v || ''; }).join(' ')) });
     }
   });
@@ -318,7 +318,7 @@ function qTh(b, ctx, key, label) {
   return '<th><button type="button" class="q-th" data-qsort="' + esc(key) + '" title="Trier">' + esc(label) + (on ? '<span class="q-dir">' + (sp.dir === 'desc' ? ' ↓' : ' ↑') + '</span>' : '') + '</button></th>';
 }
 // résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie (gb) ; partagé avec l'export Office
-function qGroupes(b, d, pi, recs) {
+function qRegroupements(b, d, pi, recs) {
   var src = b.src || 'facts', groups = [], gi = {};
   var add = function (key, name, r) { if (!(key in gi)) { gi[key] = groups.length; groups.push({ name: name, recs: [] }); } if (r) groups[gi[key]].recs.push(r); };
   var gb = src === 'check' || src === 'kanban' ? '' : (b.groupBy || (qSortOptions(b, recs)[0] || [''])[0]);
@@ -333,7 +333,7 @@ function qGroupes(b, d, pi, recs) {
   return { groups: groups, gb: gb };
 }
 function qKanban(b, d, ctx, recs) {
-  var src = b.src || 'facts', qg = qGroupes(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
+  var src = b.src || 'facts', qg = qRegroupements(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
   var card = function (r) {
     if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
       (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(d, r.x) + '</article>'; }

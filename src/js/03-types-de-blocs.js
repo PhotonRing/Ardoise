@@ -1,4 +1,6 @@
 /* ---------- Types de blocs ---------- */
+// sommets du modèle diamant : clé du champ et nom, dans l'ordre de la pile (Adversaire, Capacité, Infrastructure, Victime)
+var DIA_SOMMETS = [{ cle: 'adversaire', nom: 'Adversaire' }, { cle: 'capacite', nom: 'Capacité' }, { cle: 'infrastructure', nom: 'Infrastructure' }, { cle: 'victime', nom: 'Victime' }];
 var T = {
   header:  { label: 'En-tête', ic: 'H1', desc: 'Surtitre, grand titre et chapeau', kw: 'titre entete header', make: function () { return { eyebrow: '', title: '', lede: '' }; } },
   h2:      { label: 'Titre de section', ic: 'H2', desc: 'Titre intermédiaire', kw: 'titre heading', make: function () { return { html: '' }; } },
@@ -26,7 +28,7 @@ var T = {
   timeline: { label: 'Chronologie', ic: '⟿', desc: 'Événements datés, verticale ou horizontale', kw: 'timeline chronologie frise evenements dates historique deroule',
     make: function () { return { orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] }; } },
   diamond: { label: 'Modèle diamant', ic: '◇', desc: 'Adversaire, capacité, infrastructure et victime en losange', kw: 'diamant diamond modele intrusion adversaire capacite infrastructure victime cti menace evenement',
-    make: function () { return { title: '', adversaire: '', capacite: '', infrastructure: '', victime: '' }; } },
+    make: function () { var o = { title: '' }; DIA_SOMMETS.forEach(function (s) { o[s.cle] = ''; }); return o; } },
   group:   { label: 'Groupe repliable', ic: '⊟', desc: 'Titre cliquable qui plie quelques blocs, hors du sommaire', kw: 'groupe repliable plier replier accordeon conteneur blocs', make: function () { return { title: '', folded: false, blocks: [] }; } }
 };
 var ORDER = ['p', 'h2', 'h3', 'subtitle', 'step', 'summary', 'query', 'kanban', 'header', 'facts', 'cards', 'check', 'list', 'code', 'table', 'timeline', 'note', 'details', 'image', 'map', 'divider', 'footer', 'diamond', 'group'];

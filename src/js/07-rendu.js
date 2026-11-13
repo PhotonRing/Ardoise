@@ -69,8 +69,6 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
-// sommets du modèle diamant : clé du champ et nom, dans l'ordre de la pile (Adversaire, Capacité, Infrastructure, Victime)
-var DIA_SOMMETS = [['adversaire', 'Adversaire'], ['capacite', 'Capacité'], ['infrastructure', 'Infrastructure'], ['victime', 'Victime']];
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
@@ -300,9 +298,9 @@ function renderBlock(b, d, ctx, num) {
         '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
         dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
         DIA_SOMMETS.map(function (s) {
-          var v = b[s[0]];
-          return '<div class="dia-s dia-' + s[0] + '"><span class="dia-n">' + s[1] + '</span>' +
-            (e || !isBlank(v) ? f('div', 'dia-v', s[0], v, { ph: s[1], ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
+          var v = b[s.cle];
+          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
+            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
         }).join('') + '</div></div>';
     case 'divider': return '<hr class="sep">';
     case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';

@@ -4,6 +4,12 @@
 var DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 function exporterPageWord() { return exporterWord(doc.blocks, nomExportWord(null, doc, doc.cur)); }
 function exporterBlocWord(b) { return exporterWord([b], nomExportWord(b, doc, doc.cur)); }
+// nom du fichier Word : titre du bloc exporté (s'il en a un), sinon celui de la page
+function nomExportWord(b, d, pi) {
+  var t = '';
+  if (b) t = textOf(b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle' ? b.html : b.type === 'header' || b.type === 'step' || b.type === 'group' || b.type === 'diamond' || b.type === 'details' || b.type === 'summary' || b.type === 'query' ? b.title : '');
+  return nomDeFichier(t || pageTitle(d.pages[pi], pi)) + '.docx';
+}
 function exporterWord(blocs, nom) {
   if (isSealed() && !confirm('Le fichier Word n’est pas chiffré : il sera lisible par toute personne qui l’obtient. Continuer ?')) return Promise.resolve(false);
   var pi = doc.cur, attente = setTimeout(function () { toast('Préparation du fichier Word…', 60000); }, 1000);

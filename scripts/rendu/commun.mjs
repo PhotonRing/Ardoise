@@ -34,6 +34,7 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '08-docx.js',
     '08-office.js',
     '09-adresse.js',
+    '22-exporter-word.js',   // nom du fichier Word (nomExportWord) ; rien d'autre n'y tourne au chargement
   ].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });
 
