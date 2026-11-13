@@ -143,7 +143,7 @@ function tableOp(b, op, r, c) {
   var rows = b.rows;
   if (r == null) { var cur = lastCell && lastCell.b === b.id ? lastCell : { r: rows.length - 1, c: rows[0].length - 1 }; r = cur.r; c = cur.c; }
   var x = opTableau(rows, TABLE_BOUTONS[op] || op, r, c); if (!x) return;
-  session.modifier(function () { b.rows = x.rows; }, { b: b.id, k: 'rows.' + x.r + '.' + x.c, end: false });
+  session.modifier(function () { b.rows = reprendreLignes(rows, x.rows, x.origine); }, { b: b.id, k: 'rows.' + x.r + '.' + x.c, end: false });
   lastCell = { b: b.id, r: x.r, c: x.c };
 }
 function copyCode(btn) {

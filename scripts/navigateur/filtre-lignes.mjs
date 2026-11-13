@@ -122,6 +122,24 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const premieres = await evalue(`window.ardoise.doc.pages[0].blocks[1].rows.slice(1, 3).map((r) => r[0])`);
   attendu('glisser-déposer : la vraie ligne est déplacée', premieres[0] === 'Retour en ferry' && premieres[1] === 'Billets de train', premieres);
 
+  // opérations de tableau pendant un filtre : les lignes existantes gardent leur statut, seule la ligne ajoutée reste visible
+  // (+L, menu « Insérer une ligne », collage) ; une plage collée remplit les lignes visibles et saute les masquées
+  await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await attendre(80);
+  await evalue(`document.querySelector('.filtre[data-filtre="t1"] .filtre-q').focus()`); await toutSelectionner(); await taper('priorit');
+  e = await etat('t1'); attendu('opérations : filtre de départ', e.vis.join('|') === 'Billets de train|Assurance|Retour en ferry' && e.total === 12, e);
+  await curseurFin(1, 0);
+  await evalue(`document.querySelector('.blk[data-id="t1"] [data-act="row-add"]').click()`); await attendre(80);
+  e = await etat('t1'); attendu('+L : seule la ligne ajoutée s\'ajoute aux lignes visibles', e.total === 13 && e.vis.join('|') === 'Billets de train||Assurance|Retour en ferry', e);
+  await evalue(`${cellule(5, 0)}.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }))`); await attendre(50);
+  await evalue(`document.querySelector('#ui .pop [data-op="ligne-avant"]').click()`); await attendre(80);
+  e = await etat('t1'); attendu('menu « Insérer une ligne au-dessus » : seule la ligne ajoutée s\'ajoute', e.total === 14 && e.vis.join('|') === 'Billets de train|||Assurance|Retour en ferry', e);
+  const plage = '<table>' + ['a', 'b', 'c', 'd'].map((x) => `<tr><td>Priorité ${x}</td></tr>`).join('') + '</table>';
+  await evalue(`(() => { const f = ${cellule(5, 1)}; f.focus(); const dt = new DataTransfer(); dt.setData('text/html', ${JSON.stringify(plage)}); dt.setData('text/plain', 'x');
+    f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`); await attendre(80);
+  const statuts = await evalue('window.ardoise.doc.pages[0].blocks[1].rows.map((r) => r[1].replace(/<[^>]*>/g, ""))');
+  attendu('collage sous un filtre : lignes visibles remplies, masquées sautées', JSON.stringify(statuts.slice(5)) === JSON.stringify(['Priorité a', 'Priorité b', '', 'à vérifier', '', '', '', '', '', 'Priorité c', 'Priorité d']), statuts);
+  e = await etat('t1'); attendu('collage sous un filtre : seule la ligne ajoutée en bout s\'ajoute aux lignes visibles', e.total === 15 && e.vis.join('|') === 'Billets de train|||Assurance|Retour en ferry|', e);
+
   // écran tactile, 360 px : loupe visible sans survol, page sans débordement
   await evalue(basculer); await attendre(50);
   await ecran(360, true);

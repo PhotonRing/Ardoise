@@ -454,13 +454,13 @@ app.addEventListener('paste', function (e) {
 // cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne
 function celluleCollee(h) { return compacterLigne(sanitize(pastillesDuCollage(h, doc.id)).replace(/<br>/g, ' ')); }
 // plage collée : dans une cellule, elle remplit le tableau à partir de cette cellule (collerGrille, 05-tableau.js) en une
-// étape, le curseur reste dans la cellule de départ ; ailleurs, elle devient un bloc tableau (première ligne en en-tête),
+// étape, lignes filtrées sautées, le curseur reste dans la cellule de départ ; ailleurs, elle devient un bloc tableau (première ligne en en-tête),
 // à la place d'un paragraphe vide, sinon après le bloc
 function collerPlage(el, g) {
   var b = byId(el.dataset.b); if (!b) return;
   if (el.hasAttribute('data-cell') && b.type === 'table') {
-    var m = el.dataset.k.split('.'), r = +m[1], c = +m[2], rows = collerGrille(b.rows, r, c, g);
-    session.modifier(function () { b.rows = rows; }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
+    var m = el.dataset.k.split('.'), r = +m[1], c = +m[2], rows = collerGrille(b.rows, r, c, g, lignesMasquees(b));   // 14-plage-cellules.js
+    session.modifier(function () { b.rows = reprendreLignes(b.rows, rows); }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
     lastCell = { b: b.id, r: r, c: c }; return;
   }
   if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
