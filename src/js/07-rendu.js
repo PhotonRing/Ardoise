@@ -372,9 +372,10 @@ function foldInfo(blocks, isFolded) {
   r.forEach(function (h, i) { if (h < 0) return; var hid = blocks[h].id; hidden[blocks[i].id] = hid; count[hid] = (count[hid] || 0) + 1; });
   return { hidden: hidden, count: count };
 }
-function revealBlock(id) {
-  // déplie les sections qui masquent ce bloc
-  for (var n = 0; n < 20; n++) { var h = foldInfo(doc.blocks).hidden[id], hb = h && byId(h); if (!hb) return; delete hb.folded; }
+function revealBlock(id, blocks) {
+  // déplie les sections qui masquent ce bloc, parmi blocks (par défaut, la page affichée)
+  blocks = blocks || doc.blocks;
+  for (var n = 0; n < 20; n++) { var h = foldInfo(blocks).hidden[id], hb = h && blocks.filter(function (b) { return b.id === h; })[0]; if (!hb) return; delete hb.folded; }
 }
 function wrapEdit(b, inner, nHidden, editorUi, nPages) {
   var s = settings(b), fl = foldLevel(b) > 0;
@@ -424,7 +425,7 @@ function deplacerVersPage(pages, de, bid, vers) {
   var seg = src.blocks.splice(i, uniteDuBloc(src.blocks, i)), at = dst.blocks.length;
   while (at > 0 && dst.blocks[at - 1].type === 'footer') at--;
   Array.prototype.splice.apply(dst.blocks, [at, 0].concat(seg));
-  for (var n = 0; n < 20; n++) { var h = foldInfo(dst.blocks).hidden[bid], hb = h && dst.blocks.filter(function (b) { return b.id === h; })[0]; if (!hb) break; delete hb.folded; }
+  revealBlock(bid, dst.blocks);
   return seg.length;
 }
 function pageParent(pages, i) { var lv = pageLv(pages, i); for (var j = i - 1; j >= 0; j--) if (pageLv(pages, j) < lv) return j; return -1; }

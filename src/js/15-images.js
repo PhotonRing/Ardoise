@@ -9,18 +9,19 @@ function imageFromUrl(url, cb) {
   // « Adresse de l'image » : messages d'attente et d'échec ; le téléchargement est celui de telechargerImage
   url = String(url || '').trim(); if (!url) return;
   toast('Téléchargement de l’image…', 20000);
-  var host = window.ardoiseHost && typeof window.ardoiseHost.fetchImage === 'function';
   telechargerImage(url).then(function (src) { toast('Image intégrée au document'); cb(src); }, function (e) {
     toast(e && e.message === 'not-image' ? 'Cette adresse ne renvoie pas une image.'
-      : 'Image inaccessible : le site n’autorise pas sa copie depuis une page' + (host ? ' (ou le téléchargement a été refusé)' : '') + '. Enregistrez-la, puis déposez-la ici.', 7000);
+      : 'Image inaccessible : le site n’autorise pas sa copie depuis une page' + (hoteImages() ? ' (ou le téléchargement a été refusé)' : '') + '. Enregistrez-la, puis déposez-la ici.', 7000);
   });
 }
+// hôte qui sait télécharger une image refusée au navigateur (plugin Obsidian)
+function hoteImages() { return !!(window.ardoiseHost && typeof window.ardoiseHost.fetchImage === 'function'); }
 function telechargerImage(url, delai) {
   // promesse de l'image intégrée (data:) ; le navigateur la télécharge si le site l'autorise (CORS), dans Obsidian le plugin
   // peut s'en charger ; échec (Error 'not-image', HTTP, délai dépassé) : promesse rejetée, sans message
   url = String(url || '').trim();
   if (!/^(https?:|data:image\/)/i.test(url)) url = 'https://' + url;
-  var host = window.ardoiseHost && typeof window.ardoiseHost.fetchImage === 'function';
+  var host = hoteImages();
   function blobOf(u) { return fetch(u, { credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); }); }
   var p = blobOf(url).catch(function (e) {
     if (!host || /^data:/i.test(url)) throw e;

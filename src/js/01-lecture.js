@@ -62,6 +62,8 @@ function ardoiseReader() {
     window.addEventListener('scroll', hide, true);
     window.addEventListener('resize', hide);
   }
+  // bloc affiché d'une section (page exportée : #b-<id> ; éditeur : .blk[data-id]), null sans identifiant
+  function section(id) { return id ? document.getElementById('b-' + id) || document.querySelector('.blk[data-id="' + id + '"]') : null; }
   function foldHidden(levels, folded) {
     // règle de pliage (éditeur et page exportée) : un titre plié (niveau > 0) masque la suite jusqu'au prochain titre de niveau égal ou inférieur (0 : en-tête, pied) ; r[i] = titre plié le plus extérieur qui masque i, ou -1
     var r = [], cur = -1;
@@ -197,7 +199,6 @@ function ardoiseReader() {
       if (!noScroll) scrollTo(0, 0);
       spy();
     }
-    function section(bloc) { return bloc ? document.getElementById('b-' + bloc) || document.querySelector('.blk[data-id="' + bloc + '"]') : null; }
     function cible(pid, bloc) {
       // page d'une adresse : celle qui contient la section si elle existe (section déplacée), sinon la page nommée
       var s = section(bloc), t = (s && s.closest('.pg')) || document.querySelector('.pg[data-pgid="' + pid + '"]');
@@ -279,19 +280,18 @@ function ardoiseReader() {
   function navSpy(sauter) {
     // section en cours surlignée dans le sommaire ; clic sur une section : défilement sans changer l'adresse, ou confié à
     // sauter(id) (export statique : entrée d'historique, page de la section ouverte au besoin)
-    function target(id) { return document.getElementById('b-' + id) || document.querySelector('.blk[data-id="' + id + '"]'); }
     var tick = 0;
     function spy() {
       tick = 0;
       var links = Array.prototype.slice.call(document.querySelectorAll('.pnav-side .toc-p.on a[data-sec]')), act = null;
-      links.forEach(function (a) { var t = target(a.getAttribute('data-sec')); if (t && t.offsetParent !== null && t.getBoundingClientRect().top <= 140) act = a; });
+      links.forEach(function (a) { var t = section(a.getAttribute('data-sec')); if (t && t.offsetParent !== null && t.getBoundingClientRect().top <= 140) act = a; });
       if (!act && links.length) act = links[0];
       links.forEach(function (a) { a.classList.toggle('on', a === act); });
     }
     window.addEventListener('scroll', function () { if (!tick) tick = requestAnimationFrame(spy); }, { passive: true });
     document.addEventListener('click', function (e) {
       var a = e.target.closest && e.target.closest('a[data-sec]'); if (!a) return;
-      var t = target(a.getAttribute('data-sec')); if (!t) return;
+      var t = section(a.getAttribute('data-sec')); if (!t) return;
       e.preventDefault(); if (sauter) { sauter(a.getAttribute('data-sec')); return; }
       foldReveal(t); t.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });

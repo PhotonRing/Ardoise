@@ -234,7 +234,7 @@ function lienWikiMd(cible) {
   for (var i = 0; i < pages.length; i++) {
     if (cles.indexOf(sansAccents(pageTitle(pages[i], i))) < 0) continue;
     var x = sec && i !== liensMd.cur ? sectionsOf(pages[i]).filter(function (y) { return sansAccents(y.t) === sansAccents(sec); })[0] : null;
-    return { href: '#pg-' + pages[i].id + (x ? '/' + x.id : ''), texte: texte };
+    return { href: adressePage(pages, i, x && x.id), texte: texte };
   }
   return { href: '', texte: texte };
 }
