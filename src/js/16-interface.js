@@ -208,6 +208,7 @@ function fileMenuHTML() {
     mi('sync', '⇄', 'Synchronisation…', doc.sync ? 'Active · ' + doc.sync.relay : 'Garder plusieurs copies à jour, en direct') +
     '<div class="hr"></div>' +
     mi('json-copy', '{ }', 'Copier le JSON', 'Pour le faire modifier par une IA') + mi('json-import', '⇥', 'Importer du JSON…', 'Remplace le contenu de la page') +
+    mi('md-import', '⇥', 'Importer du Markdown…', 'Remplace le contenu de la page courante') +
     '<div class="hr"></div>' +
     (doc.lock ? mi('pw-set', '🔒', 'Changer le mot de passe', isSealed() ? 'Édition protégée · contenu chiffré' : 'L’édition est protégée') +
                 (isSealed() ? mi('pw-unseal', '🔓', 'Ne plus chiffrer le contenu', 'Le document redevient lisible sans mot de passe') : mi('pw-seal', '🔐', 'Chiffrer le contenu…', 'Mot de passe demandé pour ouvrir le document')) +
@@ -225,6 +226,7 @@ function fileMenuAct(k) {
   else if (k === 'print') printPage();
   else if (k === 'json-copy') copyJSON();
   else if (k === 'json-import') importJSON();
+  else if (k === 'md-import') importMarkdown();
   else if (k === 'help') showHelp();
   else if (k === 'sync') synDialog();
   else if (k === 'update') openUpdate();
