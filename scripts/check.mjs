@@ -63,6 +63,19 @@ const ANCIENS = [
   [/\b(htimer|hpos|histMarks|restoreHist|histGo)\b/, 'ancienne variable d\'historique'],
   [/(^|[^.\w$])doc\s*=(?!=)/, 'réaffectation du document hors de la session'],
 ];
+// Noms de premier niveau : tous les fichiers de src/js forment un seul script, un nom déclaré deux fois remplace le premier sans erreur
+{
+  const vus = new Map();
+  for (const f of readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js')).sort()) {
+    sansTextes(js(f)).split('\n').forEach((ligne, i) => {
+      const m = ligne.match(/^(?:function\s*\*?\s*|var\s+|let\s+|const\s+)([\w$]+)/);
+      if (!m) return;
+      if (vus.has(m[1])) throw new Error(`noms : ${m[1]} déclaré dans ${vus.get(m[1])} et dans ${f}:${i + 1}`);
+      vus.set(m[1], `${f}:${i + 1}`);
+    });
+  }
+  console.log(`noms : OK (${vus.size} noms de premier niveau, aucun en double)`);
+}
 for (const f of readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js') && x !== '05-session.js')) {
   sansTextes(js(f)).split('\n').forEach((ligne, i) => {
     for (const [re, quoi] of ANCIENS) if (re.test(ligne)) throw new Error(`session : ${quoi} dans ${f}:${i + 1} : ${ligne.trim()}`);
