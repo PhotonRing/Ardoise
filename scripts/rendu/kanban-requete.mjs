@@ -90,3 +90,12 @@ test('office : requête kanban, cartes aux champs choisis avec « Attend », col
   egal(office({ view: 'table', colonnes: { mode: 'seulement', noms: ['titre', '#attend'], ordre: [] } }).texte, 'Titre\tAttend\nÉcrire\tRelire, Valider\nRelire\t\nPublier\tValider\nValider\t');
   egal(office({ view: 'list', colonnes: { mode: 'seulement', noms: ['titre', '#attend'], ordre: [] } }).texte.split('\n')[0], '- Titre Écrire · Attend Relire, Valider', 'liste');
 });
+
+test('requête kanban : colonne « Attend » avec la règle de Source en tête de la vue liste (ticket 01) ; déplacer Attend laisse Source hors de l\'ordre', () => {
+  const li = resultat(rendu({ view: 'list', colonnes: { mode: 'sauf', noms: [], ordre: [] } })).match(/<li>([\s\S]*?)<\/li>/)[1];
+  egal([...li.matchAll(/class="q-src"|<span class="q-k">([^<]*)/g)].map((m) => m[1] || 'Source'), ['Source', 'Titre', 'Colonne', 'Priorité', 'Échéance', 'Responsable', 'Attend']);
+  const { ctx, d } = monter(doc({ view: 'list' })), b = d.pages[0].blocks[1];
+  const dp = ctx.qColonnesDispo(b, ctx.queryRecords(b, d, 0), true).dispo;
+  egal(pur(ctx.qColBasculer(b, dp, '#attend')), { mode: 'sauf', noms: [], ordre: [] }, 'cocher Attend');
+  egal(pur(ctx.qColDeplacer(b, dp, '#attend', 1)), { mode: 'sauf', noms: ['#attend'], ordre: ['#attend', 'titre', 'colonne', 'priorité', 'échéance', 'responsable'] });
+});
