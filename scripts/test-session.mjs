@@ -12,7 +12,7 @@ const OUVERTURE = '\n(function () {\n';
 const entete = js('00-entete.js');
 if (!entete.startsWith(OUVERTURE)) throw new Error('00-entete.js : ouverture de l\'IIFE introuvable, adapter le banc');
 const SOURCE = entete.slice(OUVERTURE.length) +
-  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '05-tableau.js', '07-requetes.js'].map(js).join('\n');
+  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-markdown.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '05-tableau.js', '07-requetes.js'].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'session.js' });
 
 // Un contexte neuf : faux document, horloge factice ; toast et synFlush appartiennent à l'interface (17, 24)
@@ -796,6 +796,17 @@ test('libellé : un geste peut donner le libellé complet de son étape ({ etape
   egal(libelles(m)[0], 'Accueil : page importée du Markdown');
   m.s.annuler();
   egal(libelles(m)[1], 'Accueil : page importée du Markdown', 'rétablir reprend le même libellé');
+});
+
+test('libellé : l\'import Markdown remplace la page en une étape « page importée du Markdown », défaite d\'un seul Ctrl+Z', () => {
+  const m = monter();
+  const r = m.ctx.blocsDuMarkdown('# Note\n\nUn\n\n- a', []);
+  m.s.modifier(() => { m.doc.pages[0].blocks = r.blocs.map((b) => m.ctx.mk(b.type, b)); }, null, { etape: m.ctx.ETAPE_MARKDOWN });
+  egal(libelles(m)[0], 'page importée du Markdown');
+  egal(blocsDe(m).map((b) => b.type), ['p', 'list']);
+  m.s.annuler();
+  egal(blocsDe(m), [{ html: 'a', id: 'b1', type: 'p' }], 'un seul Ctrl+Z rend la page d\'avant');
+  egal(libelles(m), ['', 'page importée du Markdown']);
 });
 
 test('libellé : bloc ajouté, supprimé, déplacé', () => {
