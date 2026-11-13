@@ -89,6 +89,8 @@ obsidian/           plugin Obsidian (main.js, manifest.json, styles.css)
 build.mjs           assemble src/ en dist/ardoise.html et le plugin dans dist/obsidian/ (Node.js, sans dépendance)
 scripts/check.mjs   vérifications du fichier assemblé et des migrations du format
 scripts/fixtures/   documents de référence des migrations (format-N.json → format-N.attendu.json)
+                    et presse-papier/ : extraits de collage depuis les tableurs
+scripts/capturer-presse-papier.sh  enregistre le vrai presse-papier (Wayland) en extraits de collage
 scripts/geo/        génération de src/data/geo.json depuis Natural Earth
 .github/workflows/  CI et publication des releases
 ```
