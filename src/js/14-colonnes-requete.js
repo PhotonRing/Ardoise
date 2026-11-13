@@ -1,4 +1,4 @@
-/* ---------- Choix des colonnes d'une requête (formulaire d'édition) ----------
+/* ---------- Choix des colonnes d'une requête (formulaire d'édition), colonnes Y de la vue regroupée ----------
    Mode, cases, poignée et Alt+↑ / Alt+↓ sur une case ; le nouveau champ colonnes vient des fonctions pures de 07-requetes.js
    (qColMode, qColBasculer, qColDeplacer). Chaque geste est une étape « colonnes modifiées » (05-libelle-etape.js). */
 function colonnesBloc(el) { var x = el.closest('.blk'); return x ? byId(x.dataset.id) : null; }
@@ -13,6 +13,13 @@ app.addEventListener('change', function (e) {
   var el = e.target, b; if (mode !== 'edit') return;
   if (el.matches('select[data-qcolmode]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColMode(b, dp, el.value); });
   else if (el.matches('input[data-qcol]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColBasculer(b, dp, el.dataset.qcol); }, el.dataset.qcol);
+  else if (el.matches('input[data-qregy]') && (b = colonnesBloc(el))) {
+    // vue regroupée : colonnes Y dont on veut les valeurs uniques (qRegBasculerY, 07-requetes.js)
+    var cle = el.dataset.qregy, ys = qRegBasculerY(b, queryRecords(b, doc, doc.cur), cle);
+    holdBar(b.id); session.modifier(function () { b.regY = ys; }, { b: b.id }, 'vue modifiée');
+    var c = $$('.blk[data-id="' + b.id + '"] input[data-qregy]', app).filter(function (x) { return x.dataset.qregy === cle; })[0];
+    if (c) c.focus({ preventScroll: true });
+  }
 });
 app.addEventListener('keydown', function (e) {
   var el = e.target;

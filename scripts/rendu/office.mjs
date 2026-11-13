@@ -197,3 +197,14 @@ test('office : une fiche de faits ou un tableau sans ligne n\'écrit aucun table
   const doc = { v: 6, title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'f', type: 'facts', items: [] }, { id: 't', type: 'table', rows: [] }] }] };
   for (const id of ['f', 't']) { const { html, texte } = office(id, doc); vrai(!html.includes('<table'), id + ' : ' + html); egal(texte, '', id + ' : texte brut'); }
 });
+
+test('office : vue regroupée en fiches (titre gras avec le nombre, tableau à deux colonnes) et en tableau', () => {
+  const page = (q) => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 't1', type: 'table', rows: [['Adversaire', 'Technique'], ['APT28', P('T1059')], ['apt28', 'T1071'], ['', 'T1566']] },
+    { id: 'q', type: 'query', title: 'Synthèse', src: 'table', scope: 'doc', view: 'regroupee', regX: 'adversaire', regY: ['technique'], ...q },
+  ] }] });
+  const f = office('q', page({}));
+  egal(f.texte, 'Synthèse\nAPT28 (2)\nTechnique\t#T1059, T1071\n(vide) (1)\nTechnique\tT1566');
+  vrai(/<b[^>]*>APT28 \(2\)<\/b>|font-weight:bold[^>]*>APT28 \(2\)/.test(f.html), 'titre en gras');
+  egal(office('q', page({ regForme: 'tableau', sortBy: '#n', sortDir: 'asc' })).texte, 'Synthèse\nAdversaire\tTechnique\tLignes\n(vide)\tT1566\t1\nAPT28\t#T1059, T1071\t2');
+});
