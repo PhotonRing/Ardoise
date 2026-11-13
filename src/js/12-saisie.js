@@ -423,7 +423,10 @@ app.addEventListener('paste', function (e) {
   var el = e.target;
   if (mode !== 'edit') return;
   var cd = e.clipboardData; if (!cd) return;
-  var files = Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
+  var html = cd.getData('text/html'), text = cd.getData('text/plain');
+  // une plage de tableur (Calc, Excel) arrive aussi en image : la plage l'emporte
+  var plage = el.classList && el.classList.contains('fld') && el.hasAttribute('data-rich') ? grilleDuPressePapier(html, text) : null;   // 05-presse-papier.js
+  var files = plage ? [] : Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
   if (files.length && !el.matches('textarea')) {
     e.preventDefault();
     var host = el.closest && el.closest('.blk'); var b = host ? byId(host.dataset.id) : null;
@@ -435,8 +438,6 @@ app.addEventListener('paste', function (e) {
   }
   if (!el.classList || !el.classList.contains('fld')) return;
   e.preventDefault();
-  var html = cd.getData('text/html'), text = cd.getData('text/plain');
-  var plage = el.hasAttribute('data-rich') ? grilleDuPressePapier(html, text) : null;   // 05-presse-papier.js
   if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));

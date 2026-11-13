@@ -35,9 +35,11 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     for (let i = 0; i < 40 && !(await evalue('!!document.querySelector(".fld[data-b=t1]")')); i++) await attendre(50);
 
     // collage synthétique (DataTransfer) dans le champ choisi, qui reçoit d'abord le focus
-    const coller = async (sel, html, texte) => {
+    // avecImage : comme LibreOffice Calc et Excel, le presse-papier porte aussi une image de la plage
+    const coller = async (sel, html, texte, avecImage) => {
       const ok = await evalue(`(() => { const f = document.querySelector(${JSON.stringify(sel)}); if (!f) return false; f.focus();
         const dt = new DataTransfer(); if (${JSON.stringify(html)}) dt.setData('text/html', ${JSON.stringify(html)}); dt.setData('text/plain', ${JSON.stringify(texte)});
+        if (${!!avecImage}) dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'plage.png', { type: 'image/png' }));
         f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
       if (!ok) echec('champ introuvable : ' + sel);
       await attendre(150);
@@ -71,9 +73,10 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     const seul = await grille('t1');
     if (seul.length !== 2 || seul[1][0] !== 'Lyonun deux' && seul[1][0] !== 'un deuxLyon') echec('texte multiligne : ' + JSON.stringify(seul));
 
-    // paragraphe vide : remplacé par un tableau, première ligne en en-tête, gras et lien de Calc gardés, couleurs perdues
+    // paragraphe vide : remplacé par un tableau, première ligne en en-tête, gras et lien de Calc gardés, couleurs perdues ;
+    // l'image de la plage que Calc joint au presse-papier ne l'emporte pas sur le tableau
     mesure();
-    await coller('.fld[data-b="v1"]', fixture('calc'), TSV);
+    await coller('.fld[data-b="v1"]', fixture('calc'), TSV, true);
     const ordre = await blocs();
     if (JSON.stringify(ordre) !== JSON.stringify(['table', 'table', 'x1'])) echec('paragraphe vide : blocs ' + JSON.stringify(ordre));
     const nt = await tableau();
