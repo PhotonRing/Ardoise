@@ -781,6 +781,18 @@ test('libellé : texte modifié, avec la page, le type de bloc et ses premiers m
 });
 
 const blocsDe = (m) => m.doc.pages[0].blocks;
+test('libellé : un sommet du modèle diamant modifié, nommé par le titre seul, défait en un Ctrl+Z', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'd1', type: 'diamond', title: 'Campagne X', adversaire: 'APT28', capacite: '', infrastructure: '', victime: 'Mairie' }); });
+  m.s.saisir(() => { blocsDe(m)[1].capacite = 'Mimikatz'; });
+  m.s.valider();
+  egal(libelles(m)[0], 'Accueil · Modèle diamant « Campagne X » : texte modifié');
+  m.s.annuler();
+  egal(blocsDe(m)[1].capacite, '', 'un seul Ctrl+Z défait la frappe');
+  m.s.modifier(() => { blocsDe(m)[1].title = ''; });
+  m.s.modifier(() => { blocsDe(m)[1].victime = 'Mairie de X'; });
+  egal(libelles(m)[0], 'Accueil · Modèle diamant « APT28 Mairie de X » : texte modifié', 'sans titre : les sommets');
+});
 test('libellé : plusieurs modifications dans une étape, la première puis le nombre des autres', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Deux' }, { id: 'b3', type: 'p', html: 'Trois' }); });

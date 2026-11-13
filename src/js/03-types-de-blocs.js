@@ -24,9 +24,11 @@ var T = {
   footer:  { label: 'Pied de page', ic: '§', desc: 'Sources, auteur, date', kw: 'pied footer sources', make: function () { return { html: '' }; } },
   map:     { label: 'Carte', ic: '◎', desc: 'Points, zones, cercles, itinéraires · hors ligne ou plan / satellite', kw: 'carte map geo port ville zone cercle itineraire route trajet distance localisation monde', make: function () { return { height: 420, bg: 'vector', view: { lat: 30, lon: 10, z: 1.6 }, markers: [], zones: [], routes: [], list: true, cities: true, lock: false, hideBg: false }; } },
   timeline: { label: 'Chronologie', ic: '⟿', desc: 'Événements datés, verticale ou horizontale', kw: 'timeline chronologie frise evenements dates historique deroule',
-    make: function () { return { orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] }; } }
+    make: function () { return { orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] }; } },
+  diamond: { label: 'Modèle diamant', ic: '◇', desc: 'Adversaire, capacité, infrastructure et victime en losange', kw: 'diamant diamond modele intrusion adversaire capacite infrastructure victime cti menace evenement',
+    make: function () { return { title: '', adversaire: '', capacite: '', infrastructure: '', victime: '' }; } }
 };
-var ORDER = ['p', 'h2', 'h3', 'subtitle', 'step', 'summary', 'query', 'kanban', 'header', 'facts', 'cards', 'check', 'list', 'code', 'table', 'timeline', 'note', 'details', 'image', 'map', 'divider', 'footer'];
+var ORDER = ['p', 'h2', 'h3', 'subtitle', 'step', 'summary', 'query', 'kanban', 'header', 'facts', 'cards', 'check', 'list', 'code', 'table', 'timeline', 'note', 'details', 'image', 'map', 'divider', 'footer', 'diamond'];
 function mk(type, props) { var b = T[type].make(); b.id = uid(); b.type = type; for (var k in props) b[k] = props[k]; return b; }
 function chk(arr) { return arr.map(function (h) { return { html: h, done: false }; }); }
 

@@ -36,7 +36,7 @@ function renderPage(d, ctx) {
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
-      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3') at += ' id="b-' + b.id + '"';
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond') at += ' id="b-' + b.id + '"';   // diamant : cible du lien d'une requête
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
@@ -62,6 +62,8 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
+// sommets du modèle diamant : clé du champ et nom, dans l'ordre de la pile (Adversaire, Capacité, Infrastructure, Victime)
+var DIA_SOMMETS = [['adversaire', 'Adversaire'], ['capacite', 'Capacité'], ['infrastructure', 'Infrastructure'], ['victime', 'Victime']];
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
@@ -268,6 +270,18 @@ function renderBlock(b, d, ctx, num) {
       return '<div class="tl">' + tlh + (cardsOn ? '<div class="tl-det">' + det.map(function (it) {
         return '<div class="tl-card c-' + esc(it.color || 'accent') + '"><div class="tl-card-h"><i class="tl-dot"></i><span class="tl-h-date">' + esc(it.date) + '</span></div><div class="tl-card-t">' + R(it.title) + '</div><div class="tl-card-x">' + R(it.text) + '</div></div>';
       }).join('') + '</div>' : '') + '</div>';
+    case 'diamond':
+      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
+      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
+      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
+      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
+        DIA_SOMMETS.map(function (s) {
+          var v = b[s[0]];
+          return '<div class="dia-s dia-' + s[0] + '"><span class="dia-n">' + s[1] + '</span>' +
+            (e || !isBlank(v) ? f('div', 'dia-v', s[0], v, { ph: s[1], ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
+        }).join('') + '</div></div>';
     case 'divider': return '<hr class="sep">';
     case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
   }
