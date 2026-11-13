@@ -3,9 +3,9 @@
 var ENTREES_BLOC = [
   { ic: '⎘', label: 'Copier pour Office', fn: function (b) { copierPourOffice(b); } },
   { ic: 'W', label: 'Exporter en Word (.docx)', fn: function (b) { exporterBlocWord(b); } },
-  { ic: '⊟', label: 'Mettre dans un groupe', quand: function (b) { var o = position(b); return !!o && !o.parent && !HORS_GROUPE[b.type]; }, fn: function (b) { mettreEnGroupe(b); } },
-  { ic: '⇱', label: 'Sortir du groupe', quand: function (b) { var o = position(b); return !!o && !!o.parent; }, fn: function (b) { sortirBloc(b); } },
-  { ic: '⊞', label: 'Dégrouper', quand: function (b) { return b.type === 'group'; }, fn: function (b) { degrouperBloc(b); } }
+  { ic: '⊟', label: 'Mettre dans un groupe', quand: function (b) { var o = position(b); return !!o && !o.parent && !HORS_GROUPE[b.type]; }, fn: function (b) { gesteMettreDansGroupe(b); } },
+  { ic: '⇱', label: 'Sortir du groupe', quand: function (b) { var o = position(b); return !!o && !!o.parent; }, fn: function (b) { gesteSortirDuGroupe(b); } },
+  { ic: '⊞', label: 'Dégrouper', quand: function (b) { return b.type === 'group'; }, fn: function (b) { gesteDegrouper(b); } }
 ];
 function ouvrirMenuBloc(ancre, b) {
   closePop();

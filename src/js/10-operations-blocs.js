@@ -65,12 +65,12 @@ function replaceBlock(b, type) {
 }
 
 // menu ⋯ d'un bloc : envelopper dans un groupe neuf (curseur dans son titre), sortir du groupe, dégrouper
-function mettreEnGroupe(b) {
+function gesteMettreDansGroupe(b) {
   var g = null; session.modifier(function () { g = mettreDansGroupe(doc.blocks, b.id); });
   if (g) focusField(g.id, 'title', false);
 }
-function sortirBloc(b) { session.modifier(function () { sortirDuGroupe(doc.blocks, b.id); }); focusField(b.id, null, false); }
-function degrouperBloc(g) {
+function gesteSortirDuGroupe(b) { session.modifier(function () { sortirDuGroupe(doc.blocks, b.id); }); focusField(b.id, null, false); }
+function gesteDegrouper(g) {
   var premier = g.blocks[0];
   session.modifier(function () { degrouper(doc.blocks, g.id); });
   if (premier) focusField(premier.id, null, false);

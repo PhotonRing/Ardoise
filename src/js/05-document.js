@@ -149,7 +149,8 @@ function degrouper(blocks, gid) {
 function byId(id) { var o = ouEst(doc.blocks, id); return o ? o.b : null; }
 // position d'un bloc de la page affichée : { liste, i, parent } (liste : la page ou le groupe qui le contient), ou null
 function position(b) { var o = b ? ouEst(doc.blocks, b.id) : null; return o && o.b === b ? o : null; }
-function idx(b) { return doc.blocks.indexOf(b); }   // position au premier niveau seulement (-1 pour un bloc d'un groupe)
+// position au premier niveau seulement (-1 pour un bloc d'un groupe) : ses appels ne reçoivent que des blocs de la page, un enfant passe par position
+function idx(b) { return doc.blocks.indexOf(b); }
 function getPath(o, k) { var p = k.split('.'); for (var i = 0; i < p.length; i++) { if (o == null) return undefined; o = o[p[i]]; } return o; }
 function ligneVide(l) { return l.every(function (v) { return !v; }); }   // ligne (ou colonne) de tableau sans texte
 function setPath(o, k, v) { var p = k.split('.'); for (var i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v; }
