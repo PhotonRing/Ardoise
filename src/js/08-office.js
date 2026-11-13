@@ -193,6 +193,25 @@ function officeCartesKanban(cards, S, txt, para) {
   });
   return out;
 }
+// carte d'une requête en vue kanban : titre en gras, puis les champs choisis dans leur ordre (07-requetes.js) ; priorité,
+// échéance et responsable voisins partagent un paragraphe gris ; « Attend » en rouge si la carte est bloquée
+function officeCarteRequete(b, r, S, txt, para, source) {
+  var k = r.kb, out = [para(officeMettreForme(S(k.title), 'gras', true))], meta = [];
+  var fin = function () { if (meta.length) out.push(para([txt(meta.join(' · '), { couleur: OFFICE_CLAIR.muted })])); meta = []; };
+  qChampsAffiches(b).forEach(function (c) {
+    if (c.cle === 'priorite') { if (KB_PRIO[k.prio]) meta.push('Priorité ' + k.prio.toUpperCase() + ' (' + KB_PRIO[k.prio] + ')'); }
+    else if (c.cle === 'echeance') { if (k.due) meta.push('Échéance : ' + kbDate(k.due, true)); }
+    else if (c.cle === 'responsable') { if (String(k.who || '').trim()) meta.push('Responsable : ' + String(k.who).trim()); }
+    else {
+      fin();
+      if (c.cle === 'texte' && !officeVide(S(k.html))) out.push(para(S(k.html)));
+      else if (c.cle === 'attend' && r.attend.length) out.push(para([txt('Attend : ' + qAttendTexte(r), { couleur: r.bloquee ? OFFICE_CLAIR.bad : OFFICE_CLAIR.muted })]));
+      else if (c.cle === 'source') out.push(para([source(r)]));
+    }
+  });
+  fin();
+  return out;
+}
 // requête figée : ses résultats tels qu'affichés (lecture, tri enregistré), sans commande
 function officeRequete(b, d, pi, S, txt, para) {
   var out = [], ctx = renderCtx(d, { page: pi, view: 'export' }), recs = queryRecords(b, d, pi), src = b.src || 'facts', view = b.view || 'table';
@@ -208,7 +227,7 @@ function officeRequete(b, d, pi, S, txt, para) {
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') {
     var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
-      if (src === 'kanban') return officeCartesKanban([r.kb], S, txt, para);
+      if (src === 'kanban') return officeCarteRequete(b, r, S, txt, para, source);
       if (src === 'check') return [para([txt(r.done ? '☑ ' : '☐ ')].concat(element(r)))];
       var o = kc.cellsOf(r);   // colonnes choisies dans leur ordre ; la carte n'a pas de source, comme avant le choix des colonnes
       return [para(kc.cols.filter(function (c) { return !c.source && o[c.j] && !officeVide(S(o[c.j].v)); }).reduce(function (a, c) { return a.concat(a.length ? [txt(' · ')] : [], [txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(o[c.j])); }, []))];
@@ -222,7 +241,7 @@ function officeRequete(b, d, pi, S, txt, para) {
   var plus = recs.length < total ? [para([txt(recs.length + ' premiers résultats sur ' + total, { couleur: OFFICE_CLAIR.muted })])] : [];
   // colonnes choisies, dans l'ordre choisi (07-requetes.js) ; Source et, pour les cases, ✓ et Élément en sont
   var cc = qColonnesAffichees(b, recs, view === 'list');
-  var cellule = function (c, r, o) { return c.source ? [source(r)] : c.coche ? [txt(r.done ? '☑' : '☐')] : c.element ? element(r) : o[c.j] ? valeur(o[c.j]) : []; };
+  var cellule = function (c, r, o) { return c.source ? [source(r)] : c.coche ? [txt(r.done ? '☑' : '☐')] : c.element ? element(r) : c.attend ? [txt(qAttendTexte(r))] : o[c.j] ? valeur(o[c.j]) : []; };
   if (view === 'list') {
     out.push({ t: 'liste', ordonnee: false, items: recs.map(function (r) {
       var o = cc.cellsOf(r), segs = [];
@@ -233,6 +252,7 @@ function officeRequete(b, d, pi, S, txt, para) {
       }
       cc.cols.forEach(function (c) {
         if (c.source) segs = segs.concat(segs.length ? [txt(' · ')] : [], [source(r)]);
+        else if (c.attend) { if (qAttendTexte(r)) segs = segs.concat(segs.length ? [txt(' · ')] : [], [txt('Attend ', { couleur: OFFICE_CLAIR.muted }), txt(qAttendTexte(r))]); }
         else if (o[c.j] && !officeVide(S(o[c.j].v))) segs = segs.concat(segs.length ? [txt(' · ')] : [], [txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(o[c.j]));
       });
       return { niveau: 0, segs: segs };

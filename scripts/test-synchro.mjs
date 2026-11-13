@@ -205,6 +205,14 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const r2 = swap(x, synDiff(x.a, x.da, ma), synDiff(x.b, x.db, mb)), c = r2.pages[0].blocks[0].colonnes;
   expect(c.ordre.join() === '#source,risque' && c.noms.join() === 'état,hôte' && c.mode === 'sauf', 'ordre et noms réglés à deux : ' + JSON.stringify(c));
 }
+{ // requête kanban : l'un règle les champs des cartes, l'autre le filtre « Bloquées » ; tout converge
+  const Q = { id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', tags: [], match: 'any', view: 'kanban' };
+  const x = pair({ pages: [{ id: 'p', blocks: [Q] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].champs = { masques: ['texte'], ordre: ['attend'] };
+  const nb = clone(x.db); nb.pages[0].blocks[0].bloquees = true;
+  const q = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)).pages[0].blocks[0];
+  expect(JSON.stringify(q.champs) === '{"masques":["texte"],"ordre":["attend"]}' && q.bloquees === true, 'champs et bloquées : ' + JSON.stringify(q));
+}
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));
 if (games >= 50 && (!snaps || !reloads)) throw new Error('instantanés non exercés');

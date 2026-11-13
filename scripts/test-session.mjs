@@ -880,6 +880,20 @@ test('libellé : dépendance entre cartes de kanban ajoutée puis retirée', () 
   egal(libelles(m), ['Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée']);
 });
 
+test('libellé : champs des cartes et filtre « Bloquées » d\'une requête kanban, un Ctrl+Z chacun', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', view: 'kanban' }); });
+  const q = () => blocsDe(m)[1];
+  m.s.modifier(() => { q().champs = { masques: ['attend', 'texte'], ordre: [] }; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : champs des cartes modifiés');
+  m.s.modifier(() => { q().bloquees = true; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés');
+  m.s.annuler();
+  egal('bloquees' in q(), false, 'annuler : filtre retiré');
+  m.s.annuler();
+  egal('champs' in q(), false, 'annuler : champs d\'avant');
+});
+
 test('libellé : colonnes d\'une requête modifiées, un Ctrl+Z rend la requête sans choix', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' }); });

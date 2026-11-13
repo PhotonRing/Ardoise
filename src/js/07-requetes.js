@@ -95,9 +95,11 @@ function queryRecords(b, d, pi, noTags) {
       });
       else bl.cards.forEach(function (c, ci) { var t = textOf(c.title); (c.checks || []).forEach(function (it, j) { add(it, 'cards.' + ci + '.checks.' + j + '.done', t); }); });
     } else if (b.src === 'kanban' && bl.type === 'kanban') {
+      var index = kbCards(bl);   // dépendances : index des cartes calculé une fois par kanban (07-kanban.js)
       (bl.cols || []).forEach(function (c, ci) {
         (c.cards || []).forEach(function (k) {
-          recs.push({ x: x, kb: k, late: kbLate(k.due, ci === bl.cols.length - 1), due: String(k.due || ''), prio: KB_PRIO[k.prio] ? k.prio : '', who: tagKey(k.who || ''), col: tagKey(c.title || ''), colName: String(c.title || '').trim() || 'Colonne ' + (ci + 1), tags: pillKeys((k.title || '') + ' ' + (k.html || '')),
+          var dp = kbDeps(bl, k.id, index);
+          recs.push({ x: x, kb: k, bloquee: dp.blocked, attend: dp.waits, late: kbLate(k.due, ci === bl.cols.length - 1), due: String(k.due || ''), prio: KB_PRIO[k.prio] ? k.prio : '', who: tagKey(k.who || ''), col: tagKey(c.title || ''), colName: String(c.title || '').trim() || 'Colonne ' + (ci + 1), tags: pillKeys((k.title || '') + ' ' + (k.html || '')),
             cells: [{ k: 'Titre', v: k.title }, { k: 'Colonne', v: esc(c.title || '') }, { k: 'Priorité', v: KB_PRIO[k.prio] ? k.prio.toUpperCase() : '' }, { k: 'Échéance', v: k.due ? kbDate(k.due) : '' }, { k: 'Responsable', v: esc(k.who || '') }] });
         });
       });
@@ -138,6 +140,7 @@ function qKbKeep(b) {
   var who = b.kbWho || '', pr = b.kbPrio || '', due = b.kbDue || '', n = Math.max(1, Math.min(999, Math.round(+b.kbDueN) || 7)), u = b.kbDueU || 'j';
   var today = kbToday(), lim = kbToday(n, u);
   return function (r) {
+    if (b.bloquees && !r.bloquee) return false;   // « Bloquées » : une carte attendue n'est pas dans la dernière colonne
     if (who && (who === '-' ? r.who : r.who !== who)) return false;
     if (pr && (pr === '-' ? r.prio : pr === 'p12' ? r.prio !== 'p1' && r.prio !== 'p2' : r.prio !== pr)) return false;
     if (!due) return true;
@@ -295,6 +298,7 @@ function qSorted(b, d, ctx, recs) {
     if (sp.by === 'src') return { s: qSrcText(d, r.x) };
     if (sp.by === 'txt') return qSortKey(r.html);
     if (sp.by === 'done') return { n: r.done ? 1 : 0 };
+    if (sp.by === 'att') return qAttendTexte(r) ? { s: qAttendTexte(r) } : null;
     var k = sp.by.slice(2); for (var i = 0; i < r.cells.length; i++) if (r.cells[i].k.toLowerCase() === k) return qSortKey(r.cells[i].v);
     return null;
   };
@@ -336,8 +340,7 @@ function qKanban(b, d, ctx, recs) {
   var src = b.src || 'facts', qg = qRegroupements(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
   var cc = src === 'kanban' ? null : qColonnesAffichees(b, recs), cols = cc ? cc.cols : [];
   var card = function (r) {
-    if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
-      (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(d, r.x) + '</article>'; }
+    if (src === 'kanban') return qCarteKanban(b, d, r);
     // carte des autres sources : colonnes choisies dans leur ordre (Source à sa place), sans la colonne de regroupement
     // les valeurs voisines (case et élément, ou paires clé valeur) vont dans un même conteneur ; Source le coupe là où elle est rangée
     var o = cc.cellsOf(r), kvs = [], parts = [], boite = src === 'check' ? 'q-it' : 'q-kvs';
@@ -355,6 +358,41 @@ function qKanban(b, d, ctx, recs) {
     return '<section class="kb-col"><div class="kb-head"><span class="kb-title">' + esc(g.name) + '</span><span class="kb-n">' + g.recs.length + '</span></div><div class="kb-list">' + (g.recs.map(card).join('') || '<p class="kb-empty">—</p>') + '</div></section>';
   }).join('') + '</div></div>';
 }
+// Champs des cartes d'une requête en vue kanban (champ champs : { masques, ordre }) ; absent = champs d'avant, sans « Attend ».
+// Le titre est toujours affiché ; l'ordre et le masquage suivent la règle du choix des colonnes (mode « Toutes sauf… »).
+var Q_CHAMPS = [{ cle: 'texte', nom: 'Texte' }, { cle: 'priorite', nom: 'Priorité' }, { cle: 'echeance', nom: 'Échéance' }, { cle: 'responsable', nom: 'Responsable' }, { cle: 'source', nom: 'Source' }, { cle: 'attend', nom: 'Attend' }];
+function qChampsReglage(b) {
+  var ch = b.champs || {};
+  return { colonnes: { mode: 'sauf', noms: Array.isArray(ch.masques) ? ch.masques : b.champs ? [] : ['attend'], ordre: Array.isArray(ch.ordre) ? ch.ordre : [] } };
+}
+function qChampsRanges(b) { return qColonnesRangees(qChampsReglage(b), Q_CHAMPS); }
+function qChampVisible(b, cle) { return qColonneVisible(qChampsReglage(b), cle); }
+function qChampsAffiches(b) { return qColonnesChoisies(qChampsReglage(b), Q_CHAMPS); }
+// gestes : nouveau champ champs, d'après les gestes du choix des colonnes
+function qChampsNeuf(c) { return { masques: c.noms, ordre: c.ordre }; }
+function qChampBasculer(b, cle) { return qChampsNeuf(qColBasculer(qChampsReglage(b), Q_CHAMPS, cle)); }
+function qChampDeplacer(b, cle, vers) { return qChampsNeuf(qColDeplacer(qChampsReglage(b), Q_CHAMPS, cle, vers)); }
+function qCarteKanban(b, d, r) {
+  // titre, puis les champs choisis dans leur ordre ; priorité, échéance et responsable voisins partagent une ligne
+  // « Attend » sans lien de défilement : la carte attendue n'est pas toujours sur la page de la requête
+  var k = r.kb, parts = ['<div class="kb-ct">' + R(k.title) + '</div>'], meta = [];
+  var fin = function () { if (meta.length) parts.push('<div class="kb-meta">' + meta.join('') + '</div>'); meta = []; };
+  qChampsAffiches(b).forEach(function (c) {
+    if (c.cle === 'priorite') meta.push(kbPrio(r.prio));
+    else if (c.cle === 'echeance') { if (k.due) meta.push('<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>'); }
+    else if (c.cle === 'responsable') meta.push(kbWho(k.who));
+    else {
+      fin();
+      if (c.cle === 'texte' && !isBlank(k.html)) parts.push('<div class="kb-tx">' + R(k.html) + '</div>');
+      else if (c.cle === 'attend') parts.push(kbAttendHtml(r.x.blk, r.attend, r.bloquee, true));
+      else if (c.cle === 'source') parts.push(qSource(d, r.x));
+    }
+    meta = meta.filter(Boolean);
+  });
+  fin();
+  return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + (r.bloquee ? ' kb-blocked' : '') + '">' + parts.join('') + '</article>';
+}
+function qAttendTexte(r) { return (r.attend || []).map(kbCardTitle).join(', '); }   // colonne « Attend » : titres des cartes attendues
 // colonnes réunies par nom, dans l'ordre d'apparition, et cellules d'un résultat rangées par colonne (partagé avec l'export Office)
 function qColonnes(recs) {
   var cols = [], ck = {};
@@ -363,26 +401,29 @@ function qColonnes(recs) {
 }
 // Choix des colonnes (champ colonnes : { mode : 'toutes' | 'sauf' | 'seulement', noms, ordre }) ; absent = toutes. Clé d'une colonne :
 // son nom sans casse ni espaces superflus, « Source » a la clé réservée '#source' ; une clé inconnue est ignorée (colonne disparue ou renommée)
-var Q_SOURCE = '#source';
+var Q_SOURCE = '#source', Q_ATTEND = '#attend';
 function qCleCol(nom) { return tagKey(nom); }
+// réglage en vigueur : sans choix, une requête sur les cartes de kanban masque « Attend » (affichée en la cochant)
+function qColReglage(b) { return b.colonnes || (b.src === 'kanban' ? { mode: 'sauf', noms: [Q_ATTEND], ordre: [] } : {}); }
 function qColonneVisible(b, cle) {
-  var ch = b.colonnes || {}, noms = Array.isArray(ch.noms) ? ch.noms : [];
+  var ch = qColReglage(b), noms = Array.isArray(ch.noms) ? ch.noms : [];
   return ch.mode === 'sauf' ? noms.indexOf(cle) < 0 : ch.mode === 'seulement' ? noms.indexOf(cle) >= 0 : true;
 }
 function qColonnesRangees(b, dispo) {
   // dispo : [{ cle, nom… }] dans l'ordre d'apparition → les mêmes, celles de ordre d'abord, puis les autres dans leur ordre
-  var ordre = b.colonnes && Array.isArray(b.colonnes.ordre) ? b.colonnes.ordre : [], out = [];
+  var ch = qColReglage(b), ordre = Array.isArray(ch.ordre) ? ch.ordre : [], out = [];
   ordre.forEach(function (k) { dispo.forEach(function (c) { if (c.cle === k && out.indexOf(c) < 0) out.push(c); }); });
   return out.concat(dispo.filter(function (c) { return out.indexOf(c) < 0; }));
 }
 function qColonnesChoisies(b, dispo) { return qColonnesRangees(b, dispo).filter(function (c) { return qColonneVisible(b, c.cle); }); }
-// colonnes disponibles d'une requête (cases à cocher : ✓, Élément, Source ; sinon colonnes réunies puis Source) et cellules d'un résultat ;
+// colonnes disponibles d'une requête (cases à cocher : ✓, Élément, Source ; sinon colonnes réunies, Attend pour les cartes de kanban, puis Source) et cellules d'un résultat ;
 // en vue liste (hors cases), Source reste en tête tant qu'elle n'a pas été déplacée (partagé avec le formulaire et l'export Office)
 function qColonnesDispo(b, recs, liste) {
   var src = { cle: Q_SOURCE, nom: 'Source', source: true };
   if ((b.src || 'facts') === 'check') return { dispo: [{ cle: '✓', nom: '✓', coche: true }, { cle: 'élément', nom: 'Élément', element: true }, src], cellsOf: function () { return []; } };
   var cc = qColonnes(recs), dispo = cc.cols.map(function (n, j) { return { cle: qCleCol(n), nom: n, j: j }; });
-  var bouge = b.colonnes && Array.isArray(b.colonnes.ordre) && b.colonnes.ordre.indexOf(Q_SOURCE) >= 0;
+  var ch = qColReglage(b), bouge = Array.isArray(ch.ordre) && ch.ordre.indexOf(Q_SOURCE) >= 0;
+  if (b.src === 'kanban') dispo.push({ cle: Q_ATTEND, nom: 'Attend', attend: true });
   return { dispo: dispo.concat([src]), tete: liste && !bouge ? src : null, cellsOf: cc.cellsOf };
 }
 function qColonnesAffichees(b, recs, liste) {
@@ -395,7 +436,7 @@ function qColNeuf(dispo, mode, noms, ordre) {
   var la = function (k) { return dispo.some(function (c) { return c.cle === k; }); };
   return { mode: mode, noms: noms.filter(la), ordre: ordre.filter(la) };
 }
-function qColActuel(b) { var ch = b.colonnes || {}; return { mode: ch.mode === 'sauf' || ch.mode === 'seulement' ? ch.mode : 'toutes', noms: (ch.noms || []).slice(), ordre: (ch.ordre || []).slice() }; }
+function qColActuel(b) { var ch = qColReglage(b); return { mode: ch.mode === 'sauf' || ch.mode === 'seulement' ? ch.mode : 'toutes', noms: (ch.noms || []).slice(), ordre: (ch.ordre || []).slice() }; }
 function qColBasculer(b, dispo, cle) {
   var ch = qColActuel(b), at = ch.noms.indexOf(cle);
   if (ch.mode === 'toutes') return qColNeuf(dispo, 'sauf', [cle], ch.ordre);
@@ -414,7 +455,7 @@ function qColDeplacer(b, dispo, cle, vers) {
   cles.splice(at, 1); cles.splice(Math.max(0, Math.min(cles.length, vers)), 0, cle);
   return qColNeuf(dispo, ch.mode, ch.noms, cles);
 }
-function qColTri(c) { return c.source ? 'src' : c.coche ? 'done' : c.element ? 'txt' : 'c:' + c.nom.toLowerCase(); }   // clé de tri d'une colonne
+function qColTri(c) { return c.source ? 'src' : c.coche ? 'done' : c.element ? 'txt' : c.attend ? 'att' : 'c:' + c.nom.toLowerCase(); }   // clé de tri d'une colonne
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
   ctx = renderCtx(d, ctx);
@@ -438,12 +479,12 @@ function queryResult(b, d, ctx) {
       var o = cellsOf(r), parts = [], kvs = [], vu = false;
       // les valeurs voisines vont dans une même suite ; Source les coupe là où elle est rangée
       var fin = function () { if (kvs.length) parts.push('<span class="q-kvs">' + kvs.join('') + '</span>'); kvs = []; };
-      cols.forEach(function (c) { if (c.source) { fin(); parts.push(qSource(d, r.x)); } else if (o[c.j] && !isBlank(o[c.j].v)) { vu = true; kvs.push('<span class="q-kv"><span class="q-k">' + esc(c.nom) + '</span> ' + val(o[c.j]) + '</span>'); } });
+      cols.forEach(function (c) { if (c.source) { fin(); parts.push(qSource(d, r.x)); } else if (c.attend) { if (qAttendTexte(r)) { vu = true; kvs.push('<span class="q-kv"><span class="q-k">Attend</span> ' + esc(qAttendTexte(r)) + '</span>'); } } else if (o[c.j] && !isBlank(o[c.j].v)) { vu = true; kvs.push('<span class="q-kv"><span class="q-k">' + esc(c.nom) + '</span> ' + val(o[c.j]) + '</span>'); } });
       fin(); if (!vu) parts.push('<span class="q-kvs"><span class="muted">—</span></span>');
       return '<li>' + parts.join('') + '</li>';
     }).join('') + '</ul>' + more;
   }
-  var td = function (c, r, o) { return c.source ? '<td>' + qSource(d, r.x) + '</td>' : c.coche ? '<td class="q-boxc">' + qBox(d, ctx, r) + '</td>' : c.element ? '<td>' + item(r) + '</td>' : '<td>' + (o[c.j] ? val(o[c.j]) : '') + '</td>'; };
+  var td = function (c, r, o) { return c.source ? '<td>' + qSource(d, r.x) + '</td>' : c.coche ? '<td class="q-boxc">' + qBox(d, ctx, r) + '</td>' : c.element ? '<td>' + item(r) + '</td>' : c.attend ? '<td>' + esc(qAttendTexte(r)) + '</td>' : '<td>' + (o[c.j] ? val(o[c.j]) : '') + '</td>'; };
   return '<div class="tablewrap"><table class="q-table"><thead><tr>' + cols.map(function (c) { return qTh(b, ctx, qColTri(c), c.nom); }).join('') + '</tr></thead><tbody>' +
     recs.map(function (r) { var o = cellsOf(r); return '<tr' + (r.done ? ' class="done"' : '') + '>' + cols.map(function (c) { return td(c, r, o); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + more;
 }
@@ -461,7 +502,8 @@ function queryForm(b, d, ctx) {
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   return '<div class="q-form">' +
     '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + o('diamond', b.src, 'les modèles diamant') + '</select></label>' +
-    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) : '') +
+    (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) +
+      '<label class="q-tog" title="Cartes dont une carte attendue n’est pas dans la dernière colonne de son kanban"><input type="checkbox" data-qbloquees' + (b.bloquees ? ' checked' : '') + '> bloquées seulement</label>' : '') +
     (b.src === 'check' ? '<select data-act="set" data-prop="state" title="État des cases">' + o('all', b.state || 'all', 'toutes') + o('done', b.state, 'cochées') + o('todo', b.state, 'non cochées') + '</select>' : '') +
     '<label>dans <select data-act="set" data-prop="scope" class="q-scope">' + scopes + '</select></label>' +
     (pageScope ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') +
@@ -474,12 +516,20 @@ function queryForm(b, d, ctx) {
       qSortOptions(b, queryRecords(b, d, pi)).map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select></label>' +
       (b.sortBy ? '<select data-act="set" data-prop="sortDir" title="Sens du tri">' + o('asc', b.sortDir || 'asc', 'croissant') + o('desc', b.sortDir, 'décroissant') + '</select>' : '') +
       (b.view === 'kanban' ? '' : '<label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + ' résultats' : 'tous'); }).join('') + '</select></label>') : '') +
-    (b.view === 'count' || (b.src === 'kanban' && b.view === 'kanban') ? '' : qColForm(b, queryRecords(b, d, pi))) +
+    (b.view === 'count' ? '' : b.src === 'kanban' && b.view === 'kanban' ? qChampsForm(b) : qColForm(b, queryRecords(b, d, pi))) +
     '</div>';
+}
+function qChampsForm(b) {
+  // champs des cartes en vue kanban : le titre est fixe, puis une ligne par champ (poignée, case) ; gestes : 14-colonnes-requete.js
+  return '<div class="q-colonnes"><span class="q-lbl">Champs des cartes</span> <span class="muted q-hint">(titre toujours affiché)</span>' +
+    '<ol class="q-cols" data-qliste="champs">' + qChampsRanges(b).map(function (c) {
+      return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +
+        '<label><input type="checkbox" data-qchamp="' + esc(c.cle) + '"' + (qChampVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
+    }).join('') + '</ol></div>';
 }
 function qColForm(b, recs) {
   // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js
-  var mode = (b.colonnes && b.colonnes.mode) || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
+  var mode = qColReglage(b).mode || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
   return '<div class="q-colonnes"><label><span class="q-lbl">Colonnes</span> <select data-qcolmode title="Colonnes affichées">' + o('toutes', 'toutes') + o('sauf', 'toutes sauf…') + o('seulement', 'seulement…') + '</select></label>' +
     '<ol class="q-cols">' + qColonnesRangees(b, qColonnesDispo(b, recs).dispo).map(function (c) {
       return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +

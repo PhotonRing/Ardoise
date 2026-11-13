@@ -1,25 +1,37 @@
-/* ---------- Choix des colonnes d'une requête (formulaire d'édition) ----------
-   Mode, cases, poignée et Alt+↑ / Alt+↓ sur une case ; le nouveau champ colonnes vient des fonctions pures de 07-requetes.js
-   (qColMode, qColBasculer, qColDeplacer). Chaque geste est une étape « colonnes modifiées » (05-libelle-etape.js). */
+/* ---------- Choix des colonnes et des champs des cartes d'une requête (formulaire d'édition) ----------
+   Mode, cases, poignée et Alt+↑ / Alt+↓ sur une case ; le nouveau champ colonnes (ou champs, liste data-qliste="champs") vient des
+   fonctions pures de 07-requetes.js (qColMode, qColBasculer, qColDeplacer, qChampBasculer, qChampDeplacer). Chaque geste est une
+   étape « colonnes modifiées » ou « champs des cartes modifiés » ; la case « bloquées seulement », « filtres modifiés » (05-libelle-etape.js). */
 function colonnesBloc(el) { var x = el.closest('.blk'); return x ? byId(x.dataset.id) : null; }
 function ecrireColonnes(b, calcul, focus) {
   var neuf = calcul(qColonnesDispo(b, queryRecords(b, doc, doc.cur)).dispo);
   holdBar(b.id); session.modifier(function () { b.colonnes = neuf; });
   // la case touchée garde le focus après le rendu
-  var c = focus && $$('.blk[data-id="' + b.id + '"] input[data-qcol]', app).filter(function (x) { return x.dataset.qcol === focus; })[0];
+  caseFocus(b, focus);
+}
+function caseFocus(b, focus) {
+  var c = focus && $$('.blk[data-id="' + b.id + '"] input[data-qcol], .blk[data-id="' + b.id + '"] input[data-qchamp]', app).filter(function (x) { return (x.dataset.qcol || x.dataset.qchamp) === focus; })[0];
   if (c) c.focus({ preventScroll: true });
+}
+function ecrireChamps(b, neuf, focus) { holdBar(b.id); session.modifier(function () { b.champs = neuf; }); caseFocus(b, focus); }
+// déplacement d'une ligne de la liste li (colonnes ou champs des cartes) au rang vers
+function deplacerLigne(b, li, cle, vers) {
+  if (li.parentNode.dataset.qliste === 'champs') ecrireChamps(b, qChampDeplacer(b, cle, vers), cle);
+  else ecrireColonnes(b, function (dp) { return qColDeplacer(b, dp, cle, vers); }, cle);
 }
 app.addEventListener('change', function (e) {
   var el = e.target, b; if (mode !== 'edit') return;
   if (el.matches('select[data-qcolmode]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColMode(b, dp, el.value); });
   else if (el.matches('input[data-qcol]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColBasculer(b, dp, el.dataset.qcol); }, el.dataset.qcol);
+  else if (el.matches('input[data-qchamp]') && (b = colonnesBloc(el))) ecrireChamps(b, qChampBasculer(b, el.dataset.qchamp), el.dataset.qchamp);
+  else if (el.matches('input[data-qbloquees]') && (b = colonnesBloc(el))) { holdBar(b.id); session.modifier(function () { if (el.checked) b.bloquees = true; else delete b.bloquees; }); }
 });
 app.addEventListener('keydown', function (e) {
   var el = e.target;
-  if (mode !== 'edit' || !e.altKey || e.ctrlKey || e.metaKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !el.matches || !el.matches('input[data-qcol]')) return;
+  if (mode !== 'edit' || !e.altKey || e.ctrlKey || e.metaKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !el.matches || !el.matches('input[data-qcol], input[data-qchamp]')) return;
   e.preventDefault(); e.stopPropagation();
-  var b = colonnesBloc(el), li = el.closest('.q-col'), at = $$('.q-col', li.parentNode).indexOf(li), cle = el.dataset.qcol;
-  if (b && at + (e.key === 'ArrowUp' ? -1 : 1) >= 0) ecrireColonnes(b, function (dp) { return qColDeplacer(b, dp, cle, at + (e.key === 'ArrowUp' ? -1 : 1)); }, cle);
+  var b = colonnesBloc(el), li = el.closest('.q-col'), at = $$('.q-col', li.parentNode).indexOf(li), cle = el.dataset.qcol || el.dataset.qchamp;
+  if (b && at + (e.key === 'ArrowUp' ? -1 : 1) >= 0) deplacerLigne(b, li, cle, at + (e.key === 'ArrowUp' ? -1 : 1));
 });
 // glisser par la poignée : la colonne se pose avant ou après la ligne visée, selon la moitié survolée
 var colGlisse = null;
@@ -50,6 +62,6 @@ app.addEventListener('drop', function (e) {
   if (!t || t.li === g.li) return;
   var lis = $$('.q-col', t.li.parentNode), de = lis.indexOf(g.li), vers = lis.indexOf(t.li) + (t.apres ? 1 : 0);
   if (vers > de) vers--;   // la colonne quitte sa place avant d'être posée
-  var b = colonnesBloc(t.li); if (b) ecrireColonnes(b, function (dp) { return qColDeplacer(b, dp, g.cle, vers); });
+  var b = colonnesBloc(t.li); if (b) deplacerLigne(b, t.li, g.cle, vers);
 });
 app.addEventListener('dragend', function () { if (colGlisse) colFin(); });
