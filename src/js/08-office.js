@@ -205,6 +205,22 @@ function officeRequete(b, d, pi, S, txt, para) {
     return out;
   }
   if (!recs.length) { out.push(para([txt('Aucun résultat.', { couleur: OFFICE_CLAIR.muted })])); return out; }
+  if (view === 'regroupee' && src === 'table') {
+    // vue regroupée (07-requetes.js) : fiches (titre gras avec le nombre, tableau clé / valeurs uniques) ou tableau (X, Y…, Lignes)
+    var rg = qRegReglage(b, recs), sp = qRegTri(b, ctx, rg), gr = qGroupesTries(qRegrouper(recs, rg.x, rg.ys), sp.by, sp.dir), glim = Math.max(0, +b.limit || 0), gtot = gr.length;
+    if (glim && gr.length > glim) gr = gr.slice(0, glim);
+    var uniques = function (g, y) { return g.uniques[y].reduce(function (a, v, i) { return a.concat(i ? [txt(', ')] : [], S(v)); }, []); };
+    var nomX = function (g) { return g.vide ? [txt('(vide)', { couleur: OFFICE_CLAIR.muted })] : S(g.valeur); };
+    if (b.regForme === 'tableau') out.push({ t: 'tableau', entete: true, lignes: [[rg.nom(rg.x)].concat(rg.ys.map(rg.nom), ['Lignes']).map(function (c) { return [para([txt(c)])]; })].concat(gr.map(function (g) {
+      return [[para(nomX(g))]].concat(rg.ys.map(function (y) { return [para(uniques(g, y))]; }), [[para([txt(String(g.n))])]]);
+    })) });
+    else gr.forEach(function (g) {
+      out.push(para([txt((g.vide ? '(vide)' : htmlText(g.valeur).replace(/\s+/g, ' ').trim()) + ' (' + g.n + ')', { gras: true })]));
+      if (rg.ys.length) out.push({ t: 'tableau', entete: false, lignes: rg.ys.map(function (y) { return [[para([txt(rg.nom(y), { gras: true })])], [para(uniques(g, y))]]; }) });
+    });
+    if (gr.length < gtot) out.push(para([txt(gr.length + ' premiers groupes sur ' + gtot, { couleur: OFFICE_CLAIR.muted })]));
+    return out;
+  }
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') {
     var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
