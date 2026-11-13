@@ -1167,6 +1167,67 @@ for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une �
   egal(possible(m.s.historique()), { annuler: false, retablir: true });
 });
 
+// ---------- étape ouverte (fenêtre d'une puce de requête) ----------
+const FEN = { etape: 'Accueil · Requête « Incidents » : filtres modifiés' };
+test('étape ouverte : plusieurs modifications forment une seule étape, nommée, qu\'un seul Ctrl+Z défait', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'), null, 'texte modifié');
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.modifier(() => ecrire(m, 'd'));
+  m.s.fermerEtape();
+  egal(libelles(m), [FEN.etape, '']);
+  egal(m.sync.filter((x) => x === 'envoyer').length, 3, 'chaque changement part vers les autres copies');
+  m.s.annuler();
+  egal(m.texte(), 'a');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+  m.s.retablir();
+  egal(m.texte(), 'd');
+});
+test('étape ouverte : une modification reçue entre deux changements ne coupe pas l\'étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  recevoir(m, (e) => { e.title = 'Reçu'; });
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.fermerEtape();
+  egal(m.doc.title, 'Reçu');
+  m.s.annuler();
+  egal(m.texte(), 'a', 'un seul Ctrl+Z (le faux adaptateur ne rebase pas le reçu)');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+test('étape ouverte : annuler pendant la fenêtre, puis modifier, crée une nouvelle étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.annuler();
+  m.s.modifier(() => ecrire(m, 'c'));
+  egal(m.texte(), 'c');
+  m.s.annuler();
+  egal(m.texte(), 'a');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+test('étape ouverte : revenir à l\'état de départ ne laisse aucune étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.modifier(() => ecrire(m, 'a'));
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.fermerEtape();
+  egal(libelles(m), [FEN.etape, '']);
+});
+test('après fermerEtape, une modification est une étape ordinaire', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.fermerEtape();
+  m.s.modifier(() => ecrire(m, 'c'));
+  egal(libelles(m)[0], 'Accueil · Paragraphe « c » : texte modifié');
+  m.s.annuler();
+  egal(m.texte(), 'b');
+});
+
 for (const [nom, fn] of tests) {
   try { fn(); n++; } catch (e) { console.error(`ÉCHEC : ${nom}\n${e.stack || e.message}`); process.exit(1); }
 }
