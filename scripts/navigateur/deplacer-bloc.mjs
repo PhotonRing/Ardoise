@@ -79,6 +79,14 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   mesure();
   if (!(await evalue(VISIBLE('s3')))) echec('« Ouvrir » ne montre pas la section déplacée sur la page cible');
   if (await evalue(`getComputedStyle(document.querySelector('.toast')).display !== 'none'`)) echec('le message reste affiché après « Ouvrir »');
+  // « Ouvrir » passe par la navigation : adresse de la page réelle, Précédent ramène à la page de départ
+  const cur = 'window.ardoise.doc.pages[[...document.querySelectorAll(\'[aria-current="page"][data-pg]\')].map((b) => +b.getAttribute(\'data-pg\'))[0]].id';
+  const adr = await evalue('location.hash'); mesure();
+  if (adr !== '#pg-p2/s3') echec('adresse après « Ouvrir » : ' + adr);
+  await evalue('history.back(), true'); await attendre(300); mesure();
+  if (await evalue(cur) !== 'p1') echec('Précédent après « Ouvrir » ne ramène pas à Accueil : ' + await evalue(cur));
+  await evalue('history.forward(), true'); await attendre(300);
+  if (await evalue(cur) !== 'p2') echec('Suivant après Précédent ne revient pas sur Suite');
 
   // le lien vers l'ancienne adresse de la section (#pg-p1/s1) la retrouve : Ctrl+clic en édition depuis Accueil
   await evalue(`document.querySelector('[data-pg="0"]').click(), true`); await attendre(100);
@@ -86,6 +94,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   mesure();
   if (await evalue('window.ardoise.doc.pages.findIndex((p) => p.blocks.some((b) => b.id === "hd2"))') !== await evalue(`+document.querySelector('[aria-current="page"][data-pg]').getAttribute('data-pg')`)) echec('le lien n\'ouvre pas la page réelle de la section');
   if (!(await evalue(VISIBLE('s1')))) echec('le lien n\'amène pas la section déplacée dans la fenêtre (édition)');
+  if (await evalue('location.hash') !== '#pg-p2/s1') echec('adresse après le lien : ' + await evalue('location.hash') + ', attendu la page réelle #pg-p2/s1');
 
   // même lien dans l'export statique : la page qui contient la section s'affiche
   await evalue(`(() => { const B = window.Blob; window.Blob = function (parts, o) { window.__export = parts.join(''); return new B(parts, o); }; return true; })()`);
