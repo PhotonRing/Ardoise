@@ -82,7 +82,7 @@ var TEMPLATES = {
           { label: 'Cartes terminées', tags: [], match: 'any', state: 'all', col: 'fait', total: 'all' },
           { label: 'Cartes Prod terminées', tags: ['prod'], match: 'any', state: 'all', col: 'fait', total: 'filter', ttags: ['prod'], tmatch: 'any' }] }),
         mk('p', { html: 'La puce des colonnes choisit celles à montrer : toutes, « Toutes sauf… » ou « Seulement… », dans l’ordre voulu (glissez les lignes de sa fenêtre). Ici, toutes sauf la priorité :' }),
-        mk('query', { title: 'Échéances', src: 'kanban', scope: 'here', view: 'table', sortBy: 'c:échéance', sortDir: 'asc', limit: 5, colonnes: { mode: 'sauf', noms: ['priorité'], ordre: [] }, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
+        mk('query', { title: 'Échéances', src: 'kanban', scope: 'here', view: 'table', sortBy: 'c:échéance', sortDir: 'asc', limit: 5, colonnes: { mode: 'sauf', noms: ['priorité', '#attend'], ordre: [] }, cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
         mk('p', { html: 'Une requête sur les cartes peut aussi filtrer par responsable, par priorité et par échéance (dépassée, aujourd’hui, dans les prochains jours, semaines ou mois…). Celle-ci montre les cartes P1 ou P2 en retard ou à rendre dans les 3 mois :' }),
         mk('query', { title: 'Urgences', src: 'kanban', scope: 'here', view: 'list', kbPrio: 'p12', kbDue: 'soon', kbDueN: 3, kbDueU: 'm', sortBy: 'c:échéance', sortDir: 'asc', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }),
         mk('p', { html: 'Le filtre <b>Bloquées</b> garde les cartes qui attendent une carte pas encore finie, et la colonne <b>Attend</b> (masquée par défaut, cochée ici) dit laquelle :' }),

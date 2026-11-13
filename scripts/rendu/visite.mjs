@@ -46,7 +46,8 @@ test('visite guidée : choix des colonnes, cartes bloquées, vue regroupée et c
   const res = (b) => ctx.queryResult(b, d, { page: i, view: 'read' });
   const sauf = qs.find((b) => b.colonnes && b.colonnes.mode === 'sauf');
   vrai(sauf, 'une requête « Toutes sauf… »');
-  vrai(!/>Priorité</.test(res(sauf)) && />Échéance/.test(res(sauf)), 'Priorité masquée, Échéance gardée');
+  const hs = res(sauf);
+  vrai(!/>Priorité</.test(hs) && !/>Attend</.test(hs) && />Échéance/.test(hs), 'Priorité et Attend masquées, Échéance gardée');
   const bloq = qs.find((b) => b.src === 'kanban' && b.bloquees);
   vrai(bloq, 'une requête kanban « Bloquées »');
   const hb = res(bloq);
