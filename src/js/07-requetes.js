@@ -1,7 +1,7 @@
 /* ---------- Bloc requête ---------- */
 // Recherche dans le document, sans syntaxe : les fiches de faits, les lignes de tableaux ou les cases à cocher
 // d'une portée (document, page, page et sous-pages, section), filtrées par pastilles ; vue tableau, liste ou nombre.
-var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'], kanban: ['Cartes de kanban', 'carte', 'cartes'] };
+var Q_SRC = { facts: ['Fiches de faits', 'fiche', 'fiches'], table: ['Lignes de tableaux', 'ligne', 'lignes'], check: ['Cases à cocher', 'case', 'cases'], kanban: ['Cartes de kanban', 'carte', 'cartes'], diamond: ['Modèles diamant', 'modèle', 'modèles'] };
 function pillKeys(html) {
   // noms des pastilles d'un texte enrichi
   var out = [];
@@ -68,8 +68,10 @@ function queryBlocks(b, d, pi) {
   } else return [];
   for (var i = from; i < to; i++) {
     var sec = null;
-    pages[i].blocks.forEach(function (x, j) {
-      if (foldLevel(x) > 0) sec = x; else if (foldLevel(x) === 0) sec = null;
+    // blocs d'un groupe compris : ils appartiennent à la section du groupe (j : position du bloc ou de son groupe)
+    blocsDe(pages[i].blocks, function (x, liste, k, parent) {
+      var j = parent ? pages[i].blocks.indexOf(parent) : k;
+      if (!parent) { if (foldLevel(x) > 0) sec = x; else if (foldLevel(x) === 0) sec = null; }
       if (region && (j < region[0] || j >= region[1])) return;
       if (x !== b) list.push({ blk: x, pi: i, sec: sec });
     });
@@ -101,6 +103,10 @@ function queryRecords(b, d, pi, noTags) {
       });
     } else if ((b.src || 'facts') === 'facts' && bl.type === 'facts') {
       recs.push({ x: x, cells: bl.items.map(function (it) { return { k: String(it.k || '').trim() || 'Clé', v: it.v, alert: it.alert }; }), tags: pillKeys(bl.items.map(function (it) { return it.v; }).join(' ')) });
+    } else if (b.src === 'diamond' && bl.type === 'diamond') {
+      // un résultat par modèle diamant : titre puis sommets (DIA_SOMMETS : 03-types-de-blocs.js) ; pastilles de tous les champs
+      var dc = [{ k: 'Titre', v: bl.title }].concat(DIA_SOMMETS.map(function (s) { return { k: s.nom, v: bl[s.cle] }; }));
+      recs.push({ x: x, cells: dc, tags: pillKeys(dc.map(function (c) { return c.v || ''; }).join(' ')) });
     }
   });
   // kanban : une colonne, un responsable, une priorité, une échéance
@@ -201,23 +207,30 @@ function qScopeHref(b) {
 function qDefCard(b) { return b.src === 'check' ? { label: '', tags: [], match: 'any', state: 'done', total: 'all' } : { label: '', tags: [], match: 'any', state: 'all', total: 'none' }; }
 function qCardLabel(b, c, names) {
   // texte par défaut d'une carte (remplacé par le texte saisi)
-  var src = b.src || 'facts', base = src === 'check' ? (c.state === 'done' ? 'cases cochées' : c.state === 'todo' ? 'cases à cocher restantes' : 'cases à cocher') : src === 'table' ? 'lignes de tableaux' : src === 'kanban' ? 'cartes' + (c.col ? ' en ' + (names['\u0000col:' + c.col] || c.col) : '') : 'fiches de faits';
+  var src = b.src || 'facts', base = src === 'check' ? (c.state === 'done' ? 'cases cochées' : c.state === 'todo' ? 'cases à cocher restantes' : 'cases à cocher') : src === 'table' ? 'lignes de tableaux' : src === 'kanban' ? 'cartes' + (c.col ? ' en ' + (names['\u0000col:' + c.col] || c.col) : '') : src === 'diamond' ? 'modèles diamant' : 'fiches de faits';
   var t = (c.tags || []).map(function (k) { return names[k] || k; });
   return base + (t.length ? ' · ' + t.join(c.match === 'all' ? ' + ' : ' ou ') : '');
+}
+// compteurs de la vue nombre : { num, tot (null sans total), def (texte par défaut), label (texte affiché) } par carte (partagé avec l'export Office)
+function qCompteurs(b, d, pi, recs) {
+  var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
+  if (b.src === 'kanban') kbColumns(b, d, pi).forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
+  return (b.cards && b.cards.length ? b.cards : [qDefCard(b)]).map(function (c) {
+    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate, c.tcol).length : null, def = qCardLabel(b, c, names);
+    return { num: filterRecs(recs, c.tags, c.match, c.state, c.col).length, tot: tot, def: def, label: String(c.label || '').trim() || def };
+  });
 }
 function qCards(b, d, ctx, recs) {
   var pi = ctx.page, e = ctx.edit;
   // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui ont ses
   // propres pastilles (et, pour les cases, leur état), éventuellement rapportés à un total
-  var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
   var avail = e ? scopeTags(b, d, pi, recs) : null, cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], chk = b.src === 'check', kbc = b.src === 'kanban' ? kbColumns(b, d, pi) : [];
-  kbc.forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
+  var compteurs = qCompteurs(b, d, pi, recs);
   var o = function (v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
   var stSel = function (p, cur) { if (kbc.length || b.src === 'kanban') return qColSel(b, p.replace(/state$/, 'col'), (function () { var m = p.match(/^cards\.(\d+)\.(t?)state$/); return m ? cards[+m[1]][m[2] + 'col'] : ''; })(), kbc); return chk ? '<select data-act="set" data-prop="' + p + '">' + o('all', cur || 'all', 'toutes') + o('done', cur, 'cochées') + o('todo', cur, 'non cochées') + '</select>' : ''; };
   return '<div class="q-cards">' + cards.map(function (c, i) {
-    var num = filterRecs(recs, c.tags, c.match, c.state, c.col).length;
-    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? filterRecs(recs, c.ttags, c.tmatch, c.tstate, c.tcol).length : null;
-    var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0, def = qCardLabel(b, c, names);
+    var cpt = compteurs[i], num = cpt.num, tot = cpt.tot, def = cpt.def;
+    var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0;
     var lab = e ? '<span class="fld q-lab" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="cards.' + i + '.label" data-nl data-ph="' + esc(def) + '">' + esc(c.label || '') + '</span>'
       : '<span class="q-lab">' + esc(String(c.label || '').trim() || def) + '</span>';
     var form = !e ? '' : '<div class="q-cform">' +
@@ -234,8 +247,10 @@ function qCards(b, d, ctx, recs) {
   }).join('') + (e ? '<button type="button" class="q-cadd" data-act="q-card-add" title="Ajouter une carte de nombre">+ Carte</button>' : '') + '</div>';
 }
 function qSource(d, x) {
+  // lien vers la section du résultat ; un modèle diamant, ancré (id b-<id>, 07-rendu.js), est visé lui-même
   var pg = d.pages[x.pi], t = pageTitle(pg, x.pi), st = x.sec ? textOf(x.sec.type === 'step' ? x.sec.title : x.sec.html) : '';
-  return '<a class="q-src" href="#pg-' + esc(pg.id) + (x.sec ? '/' + esc(x.sec.id) : '') + '">' + esc(t) + (st ? ' › ' + esc(st) : '') + '</a>';
+  var cible = x.blk && x.blk.type === 'diamond' ? x.blk.id : x.sec ? x.sec.id : '';
+  return '<a class="q-src" href="#pg-' + esc(pg.id) + (cible ? '/' + esc(cible) : '') + '">' + esc(t) + (st ? ' › ' + esc(st) : '') + '</a>';
 }
 var viewSort = {};   // tri choisi en lecture d'un clic sur un en-tête (id du bloc → { by, dir }) : jamais enregistré
 var viewFiltre = {};   // filtre des lignes d'un tableau ou d'une requête (id du bloc → texte cherché ; champ ouvert si la clé existe) : jamais enregistré
@@ -302,9 +317,8 @@ function qTh(b, ctx, key, label) {
   if (ctx.static) return '<th>' + esc(label) + '</th>';
   return '<th><button type="button" class="q-th" data-qsort="' + esc(key) + '" title="Trier">' + esc(label) + (on ? '<span class="q-dir">' + (sp.dir === 'desc' ? ' ↓' : ' ↑') + '</span>' : '') + '</button></th>';
 }
-function qKanban(b, d, ctx, recs) {
-  var pi = ctx.page;
-  // résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie
+// résultats regroupés en colonnes : colonne du kanban, état des cases, ou valeur d'une colonne choisie (gb) ; partagé avec l'export Office
+function qRegroupements(b, d, pi, recs) {
   var src = b.src || 'facts', groups = [], gi = {};
   var add = function (key, name, r) { if (!(key in gi)) { gi[key] = groups.length; groups.push({ name: name, recs: [] }); } if (r) groups[gi[key]].recs.push(r); };
   var gb = src === 'check' || src === 'kanban' ? '' : (b.groupBy || (qSortOptions(b, recs)[0] || [''])[0]);
@@ -316,6 +330,10 @@ function qKanban(b, d, ctx, recs) {
     var c = null; for (var i = 0; i < r.cells.length; i++) if ('c:' + r.cells[i].k.toLowerCase() === gb) c = r.cells[i];
     var t = c ? htmlText(c.v).replace(/\s+/g, ' ').trim() : ''; add(t.toLowerCase(), t || '(vide)', r);
   });
+  return { groups: groups, gb: gb };
+}
+function qKanban(b, d, ctx, recs) {
+  var src = b.src || 'facts', qg = qRegroupements(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
   var card = function (r) {
     if (src === 'kanban') { var k = r.kb; return '<article class="kb-card' + (r.prio ? ' prio-' + r.prio : '') + '"><div class="kb-ct">' + R(k.title) + '</div>' + (isBlank(k.html) ? '' : '<div class="kb-tx">' + R(k.html) + '</div>') +
       (k.due || k.who || r.prio ? '<div class="kb-meta">' + kbPrio(r.prio) + (k.due ? '<span class="kb-due' + (r.late ? ' late' : '') + '">' + esc(kbDate(k.due, true)) + '</span>' : '') + kbWho(k.who) + '</div>' : '') + qSource(d, r.x) + '</article>'; }
@@ -325,6 +343,12 @@ function qKanban(b, d, ctx, recs) {
   return '<div class="kb kb-q"><div class="kb-cols">' + groups.map(function (g) {
     return '<section class="kb-col"><div class="kb-head"><span class="kb-title">' + esc(g.name) + '</span><span class="kb-n">' + g.recs.length + '</span></div><div class="kb-list">' + (g.recs.map(card).join('') || '<p class="kb-empty">—</p>') + '</div></section>';
   }).join('') + '</div></div>';
+}
+// colonnes réunies par nom, dans l'ordre d'apparition, et cellules d'un résultat rangées par colonne (partagé avec l'export Office)
+function qColonnes(recs) {
+  var cols = [], ck = {};
+  recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
+  return { cols: cols, cellsOf: function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; } };
 }
 function queryResult(b, d, ctx) {
   // résultats du bloc requête b, rendu dans la page ctx.page du document d
@@ -345,9 +369,7 @@ function queryResult(b, d, ctx) {
       recs.map(function (r) { return '<tr' + (r.done ? ' class="done"' : '') + '><td class="q-boxc">' + qBox(d, ctx, r) + '</td><td>' + item(r) + '</td><td>' + qSource(d, r.x) + '</td></tr>'; }).join('') + '</tbody></table></div>' + more;
   }
   // fiches de faits et lignes de tableaux : colonnes réunies par nom, dans l'ordre d'apparition
-  var cols = [], ck = {};
-  recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
-  var cellsOf = function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; };
+  var cc = qColonnes(recs), cols = cc.cols, cellsOf = cc.cellsOf;
   if (view === 'list') {
     return '<ul class="q-list">' + recs.map(function (r) {
       var parts = cellsOf(r).map(function (c, j) { return c && !isBlank(c.v) ? '<span class="q-kv"><span class="q-k">' + esc(cols[j]) + '</span> ' + val(c) + '</span>' : ''; }).filter(Boolean);
@@ -370,7 +392,7 @@ function queryForm(b, d, ctx) {
   var want = b.tags || [], chips = qChips(d, 'q-tag', null, scopeTags(b, d, pi), want, 'tous les résultats');
   var pageScope = sc === 'here' || /^pg:/.test(sc);
   return '<div class="q-form">' +
-    '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + '</select></label>' +
+    '<label>Chercher <select data-act="set" data-prop="src">' + o('facts', b.src, 'les fiches de faits') + o('table', b.src, 'les lignes de tableaux') + o('check', b.src, 'les cases à cocher') + o('kanban', b.src, 'les cartes de kanban') + o('diamond', b.src, 'les modèles diamant') + '</select></label>' +
     (b.src === 'kanban' ? qColSel(b, 'col', b.col, kbColumns(b, d, pi)) + qKbForm(b, d, pi) : '') +
     (b.src === 'check' ? '<select data-act="set" data-prop="state" title="État des cases">' + o('all', b.state || 'all', 'toutes') + o('done', b.state, 'cochées') + o('todo', b.state, 'non cochées') + '</select>' : '') +
     '<label>dans <select data-act="set" data-prop="scope" class="q-scope">' + scopes + '</select></label>' +

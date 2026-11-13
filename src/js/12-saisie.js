@@ -48,7 +48,7 @@ app.addEventListener('input', function (e) {
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || doc.blocks.some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
+  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
@@ -78,7 +78,7 @@ app.addEventListener('change', function (e) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
     if (b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast')) { var sy = scrollY; render(); scrollTo(0, sy); var cb = $('[data-b="' + b.id + '"][data-k="' + el.dataset.k + '"]', app); if (cb) cb.focus({ preventScroll: true }); }
-    if (doc.blocks.some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+    if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
     return;
   }
   if (el.matches('.ch-v')) {
@@ -102,7 +102,7 @@ app.addEventListener('change', function (e) {
   if (el.matches('.ch-src')) {
     // source des valeurs : saisie dans la liste, ou un tableau du document (colonnes devinées)
     var bsrc = byId(el.dataset.b), tid = el.value, tb = null;
-    doc.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === tid) tb = x; }); });
+    doc.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) { if (x.id === tid) tb = x; }); });
     keepView(bsrc); chPaste = null;
     session.modifier(function () { if (!tid || !tb) delete bsrc.choro.src; else { var g = chGuessCols(tb); bsrc.choro.src = { b: tid, k: g.k, v: g.v }; } }); return;
   }
@@ -217,13 +217,13 @@ app.addEventListener('keydown', function (e) {
       if (lt.length) { newLineTabs(el, lt.length); return; }
       if (caretAtEnd(el) && (el.textContent.replace(/\u200B/g, '') === '' || (lb.multi && lb.line === ''))) {
         b.html = sanitize(el.innerHTML);   // la ligne vide finale disparaît (l'assainissement retire les sauts de ligne finaux)
-        insertAt(idx(b) + 1, 'p', b.indent > 0 ? { indent: b.indent } : {}); return;
+        insertAfter(b, 'p', b.indent > 0 ? { indent: b.indent } : {}); return;
       }
       document.execCommand('insertLineBreak'); return;
     }
     if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'subtitle', 'step'].indexOf(b.type) >= 0) {
       if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
-      insertAt(idx(b) + 1, 'p', {}); return;
+      insertAfter(b, 'p', {}); return;
     }
     nextField(el, 1); return;
   }
@@ -253,11 +253,12 @@ app.addEventListener('keydown', function (e) {
       }
     }
     if (b.type === 'p') {
-      var i = idx(b), pb = doc.blocks[i - 1];
-      if (el.textContent === '' && doc.blocks.length > 1) { e.preventDefault(); deleteBlock(b, true); return; }
+      // dans sa liste : la page, ou le groupe qui le contient (un groupe peut rester vide)
+      var o = position(b), i = o.i, pb = o.liste[i - 1];
+      if (el.textContent === '' && (o.parent || doc.blocks.length > 1)) { e.preventDefault(); deleteBlock(b, true); return; }
       if (pb && ['p', 'h2', 'h3', 'subtitle'].indexOf(pb.type) >= 0) {
         e.preventDefault(); var html = sanitize(el.innerHTML);
-        session.modifier(function () { pb.html = pb.html + html; doc.blocks.splice(i, 1); }, { b: pb.id, end: true }); return;
+        session.modifier(function () { pb.html = pb.html + html; o.liste.splice(i, 1); }, { b: pb.id, end: true }); return;
       }
     }
   }
@@ -388,7 +389,7 @@ function indentPara(b, el, d) {
   session.saisir(function () { if (n) b.indent = n; else delete b.indent; }); session.valider();
   for (var i = 1; i <= 6; i++) el.classList.toggle('ind-' + i, i === n);
 }
-function slashMenu(el, b) { openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }); }
+function slashMenu(el, b) { var o = position(b); openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }, !!(o && o.parent)); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
 function listIndent(b, i, d, el) {
   // change le niveau d'un élément de liste ; ses sous-éléments le suivent
@@ -406,7 +407,7 @@ function splitItem(b, k, el) {
   if (el.textContent === '' && (b.type === 'list' || b.type === 'check') && arr[lp.i] && +arr[lp.i].lv > 0) { listIndent(b, lp.i, -1, el); return; }   // élément vide en retrait : il remonte d'un niveau
   if (el.textContent === '' && lp.i === arr.length - 1 && arr.length > 1 && b.type !== 'cards') {
     // Entrée sur un élément vide en fin de liste : sortir de la liste
-    session.modifier(function () { arr.pop(); }); insertAt(idx(b) + 1, 'p', {}); return;
+    session.modifier(function () { arr.pop(); }); insertAfter(b, 'p', {}); return;
   }
   var tail = extractTail(el); var head = sanitize(el.innerHTML);
   session.modifier(function () {
@@ -462,8 +463,8 @@ function collerPlage(el, g) {
     lastCell = { b: b.id, r: x.r, c: x.c }; return;
   }
   if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
-  var nb = mk('table', { rows: g });
-  session.modifier(function () { doc.blocks.splice(idx(b), 1, nb); revealBlock(nb.id); });
+  var nb = mk('table', { rows: g }), o = position(b);
+  session.modifier(function () { o.liste.splice(o.i, 1, nb); revealBlock(nb.id); });
   focusField(nb.id, null, false);
 }
 // Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée

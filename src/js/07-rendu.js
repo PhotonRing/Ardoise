@@ -36,7 +36,7 @@ function renderPage(d, ctx) {
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
-      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3') at += ' id="b-' + b.id + '"';
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond') at += ' id="b-' + b.id + '"';   // diamant : cible du lien d'une requête
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
@@ -55,6 +55,13 @@ function anchorBlock(d, ctx, id) {
   ctx = renderCtx(d, ctx);
   var blocks = d.pages[ctx.page].blocks, edit = ctx.edit, fi = foldInfo(blocks, edit ? null : foldedIn(ctx));
   var shown = function (b) { return !fi.hidden[b.id] && (edit || !!renderBlock(b, d, ctx, null)); };
+  // bloc d'un groupe : lui-même si son groupe est affiché et ouvert, sinon l'ancrage de son groupe
+  var go = ouEst(blocks, id);
+  if (go && go.parent) {
+    var gp = go.parent, gplie = !edit && ctx.folds[gp.id] != null ? !!ctx.folds[gp.id] : !!gp.folded;
+    if (!gplie && !fi.hidden[gp.id]) return id;
+    id = gp.id;
+  }
   var a = fi.hidden[id] || id, i = -1, j;
   blocks.forEach(function (b, k) { if (b.id === a) i = k; });
   if (i < 0 || shown(blocks[i])) return a;
@@ -158,6 +165,21 @@ function renderBlock(b, d, ctx, num) {
         }).join('') + '</tbody></table></div>';
     case 'note':
       return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
+    case 'group':
+      // groupe repliable : son pli d'édition est enregistré (folded) ; en lecture, un <details> que chacun plie pour soi
+      var gk = b.blocks || [], gn = gk.length, gplie = e ? !!b.folded : ((ctx.folds || {})[b.id] != null ? !!ctx.folds[b.id] : !!b.folded);
+      if (e) return '<div class="grp grp-edit' + (gplie ? ' grp-plie' : '') + '"><div class="grp-head"><button type="button" class="grp-v" data-act="fold" aria-expanded="' + !gplie + '" title="' + (gplie ? 'Déplier' : 'Plier') + ' le groupe">›</button>' +
+        f('span', 'grp-t', 'title', b.title, { ph: 'Titre du groupe', nl: 1 }) +
+        (gplie ? '<button type="button" class="grp-n" data-act="fold" title="Déplier le groupe">' + (gn ? gn + ' bloc' + (gn > 1 ? 's' : '') : 'vide') + '</button>' : '') + '</div>' +
+        (gplie ? '' : '<div class="grp-body">' + gk.map(function (c) { return wrapEdit(c, renderBlock(c, d, ctx, null), 0, editorUi, d.pages.length); }).join('') +
+          (gn ? '' : '<div class="grp-vide">Glissez des blocs ici ou ajoutez-en un</div>') +
+          '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
+      return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
+        var ci = renderBlock(c, d, ctx, null);
+        // ancrage de la bascule (19-mode-lecture-edition.js) ; un modèle diamant garde sa cible de lien (id b-<id>), même dans l'export
+        var at = (c.type === 'diamond' ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
+        return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
+      }).join('') + '</div></details>';
     case 'details':
       if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
       return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
@@ -268,6 +290,18 @@ function renderBlock(b, d, ctx, num) {
       return '<div class="tl">' + tlh + (cardsOn ? '<div class="tl-det">' + det.map(function (it) {
         return '<div class="tl-card c-' + esc(it.color || 'accent') + '"><div class="tl-card-h"><i class="tl-dot"></i><span class="tl-h-date">' + esc(it.date) + '</span></div><div class="tl-card-t">' + R(it.title) + '</div><div class="tl-card-x">' + R(it.text) + '</div></div>';
       }).join('') + '</div>' : '') + '</div>';
+    case 'diamond':
+      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
+      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
+      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
+      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
+        DIA_SOMMETS.map(function (s) {
+          var v = b[s.cle];
+          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
+            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
+        }).join('') + '</div></div>';
     case 'divider': return '<hr class="sep">';
     case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
   }
@@ -372,9 +406,15 @@ function foldInfo(blocks, isFolded) {
   r.forEach(function (h, i) { if (h < 0) return; var hid = blocks[h].id; hidden[blocks[i].id] = hid; count[hid] = (count[hid] || 0) + 1; });
   return { hidden: hidden, count: count };
 }
+// bloc caché en édition : par une section pliée (lui ou son groupe), ou par son groupe plié
+function cacheEnEdition(blocks, id) {
+  var o = ouEst(blocks, id); if (!o) return false;
+  return !!foldInfo(blocks).hidden[(o.parent || o.b).id] || !!(o.parent && o.parent.folded);
+}
 function revealBlock(id, blocks) {
-  // déplie les sections qui masquent ce bloc, parmi blocks (par défaut, la page affichée)
+  // déplie le groupe qui contient ce bloc et les sections qui le masquent, parmi blocks (par défaut, la page affichée)
   blocks = blocks || doc.blocks;
+  var o = ouEst(blocks, id); if (o && o.parent) { o.parent.folded = false; id = o.parent.id; }
   for (var n = 0; n < 20; n++) { var h = foldInfo(blocks).hidden[id], hb = h && blocks.filter(function (b) { return b.id === h; })[0]; if (!hb) return; delete hb.folded; }
 }
 function wrapEdit(b, inner, nHidden, editorUi, nPages) {
@@ -383,7 +423,7 @@ function wrapEdit(b, inner, nHidden, editorUi, nPages) {
     (fl ? '<button type="button" class="fold-t" data-act="fold" aria-expanded="' + !b.folded + '" title="' + (b.folded ? 'Déplier' : 'Plier') + ' la section (en édition seulement)">›</button>' : '') +
     '<div class="blk-gut"><button type="button" class="g-add" data-act="add-after" title="Insérer un bloc dessous">+</button><button type="button" class="g-drag" data-act="drag" title="Glisser pour déplacer">⋮⋮</button></div>' +
     '<div class="collant"><div class="blk-bar"><span class="tname">' + T[b.type].label + '</span>' + (s ? '<span class="bsep"></span>' + s : '') + '<span class="bsep"></span>' +
-    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && b.type !== 'footer' && nPages > 1 ? act('deplacer-page', '⇥', 'Déplacer vers la page…') : '') +
+    act('add-after', '+', 'Insérer un bloc dessous') + act('up', '↑', 'Monter (Alt+↑)') + act('down', '↓', 'Descendre (Alt+↓)') + act('dup', '⧉', 'Dupliquer') + (b.type !== 'header' && b.type !== 'footer' && nPages > 1 ? act('deplacer-page', '⇥', 'Déplacer vers la page…') : '') + act('menu-bloc', '⋯', 'Plus d’actions') +
     '<button type="button" class="del" data-act="del" title="Supprimer">✕</button></div></div>' + inner +
     (fl && b.folded ? '<button type="button" class="fold-more" data-act="fold">' + (nHidden ? '⋯ ' + nHidden + ' bloc' + (nHidden > 1 ? 's' : '') + ' masqué' + (nHidden > 1 ? 's' : '') : 'Section pliée, sans contenu') + ' · déplier</button>' : '') + '</div>';
 }
@@ -410,8 +450,8 @@ function pageIndex(pages, pid) { for (var i = 0; i < pages.length; i++) if (page
 function pageLv(pages, i) { return +pages[i].lv || 0; }
 function pageEnd(pages, i) { var lv = pageLv(pages, i), j = i + 1; while (j < pages.length && pageLv(pages, j) > lv) j++; return j; }   // fin de la page et de ses sous-pages (exclue)
 // déplacement d'un bloc vers une autre page : page qui contient un bloc (-1 sinon) ; blocs emportés à partir de l'indice i
-// (un titre de section emporte ce qu'il masquerait s'il était seul plié, plié ou non ; un autre bloc part seul)
-function pageDuBloc(pages, bid) { for (var i = 0; i < pages.length; i++) for (var j = 0; j < pages[i].blocks.length; j++) if (pages[i].blocks[j].id === bid) return i; return -1; }
+// (un titre de section emporte ce qu'il masquerait s'il était seul plié, plié ou non ; un autre bloc part seul, un groupe avec ses blocs)
+// pageDuBloc : 05-document.js (enfants des groupes compris)
 function uniteDuBloc(blocks, i) {
   var levels = blocks.map(foldLevel); if (levels[i] <= 0) return 1;
   return 1 + Reader.foldHidden(levels, levels.map(function (_, j) { return j === i; })).filter(function (h) { return h === i; }).length;
@@ -420,9 +460,10 @@ function uniteDuBloc(blocks, i) {
 // pliée qui la recevrait est dépliée. Rend le nombre de blocs déplacés, ou false (en-tête ou pied de page, même page, bloc ou page absents)
 function deplacerVersPage(pages, de, bid, vers) {
   var src = pages[de], dst = pages[vers]; if (!src || !dst || de === vers) return false;
-  var i = -1; src.blocks.forEach(function (b, k) { if (b.id === bid) i = k; });
-  if (i < 0 || src.blocks[i].type === 'header' || src.blocks[i].type === 'footer') return false;
-  var seg = src.blocks.splice(i, uniteDuBloc(src.blocks, i)), at = dst.blocks.length;
+  var o = ouEst(src.blocks, bid);
+  if (!o || o.b.type === 'header' || o.b.type === 'footer') return false;
+  // un bloc d'un groupe part seul ; un bloc de la page emporte son unité (un groupe part entier)
+  var seg = o.liste.splice(o.i, o.parent ? 1 : uniteDuBloc(src.blocks, o.i)), at = dst.blocks.length;
   while (at > 0 && dst.blocks[at - 1].type === 'footer') at--;
   Array.prototype.splice.apply(dst.blocks, [at, 0].concat(seg));
   revealBlock(bid, dst.blocks);
@@ -525,7 +566,7 @@ function refreshDerived() {
   }
   // blocs requête de la page : résultats et formulaire recalculés après la saisie (une pastille ajoutée ou retirée
   // d'un texte change les puces du filtre, un titre change la liste des portées)
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'query') return;
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
@@ -539,7 +580,7 @@ function refreshDerived() {
     }
   });
   // blocs sommaire de la page : la liste suit les titres saisis
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'summary') return;
     var box = $('.blk[data-id="' + b.id + '"] .toc-blk-l', app); if (!box) return;
     var h = summaryList(b, doc, vc.page) || summaryEmpty(b); if (box.innerHTML !== h) box.innerHTML = h;
@@ -602,7 +643,7 @@ function chRaw(v) {
 // Source « tableau » : les valeurs sont lues dans un bloc tableau du document (colonne des pays, colonne des valeurs)
 function chTables(d) {
   var out = [];
-  d.pages.forEach(function (pg, pi) { pg.blocks.forEach(function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
+  d.pages.forEach(function (pg, pi) { blocsDe(pg.blocks, function (x) { if (x.type === 'table' && x.rows && x.rows.length) out.push({ b: x, pg: pg, pi: pi }); }); });
   return out;
 }
 function chTableLabel(d, t) {
@@ -622,7 +663,7 @@ function chView(b, d) {
   var ch = b.choro; if (!ch || !ch.src) return ch;
   var out = {}; for (var k in ch) out[k] = ch[k];
   var info = { n: 0, bad: [], dup: [], missing: false }, data = {}, t = null;
-  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
+  d.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) { if (x.id === ch.src.b && x.type === 'table') t = x; }); });
   if (!t) info.missing = true;
   else {
     if (!MapKit) MapKit = ardoiseMapKit();
@@ -691,10 +732,10 @@ function chRefresh(b) {
   $$('.ch-row[data-b="' + b.id + '"]', app).forEach(function (r) { var col = S.color(vw.data[r.dataset.id]); r.querySelector('.ch-sw').style.background = col || ''; });
   if (m) m.setChoro(vw);
 }
-function chLinked(tableId) { return doc.blocks.some(function (x) { return x.type === 'map' && x.choro && x.choro.src && x.choro.src.b === tableId; }); }
+function chLinked(tableId) { return tousBlocs(doc.blocks).some(function (x) { return x.type === 'map' && x.choro && x.choro.src && x.choro.src.b === tableId; }); }
 function chRefreshLinked() {
   // tableau source modifié : cartes et listes des données mises à jour (sauf pendant une saisie dans la liste)
-  doc.blocks.forEach(function (b) {
+  tousBlocs(doc.blocks).forEach(function (b) {
     if (b.type !== 'map' || !b.choro || !b.choro.src) return;
     var m = mapOf(b.id); if (m) m.setChoro(chView(b, doc));
     var w = $('.ch-wrap[data-b="' + b.id + '"]', app); if (w && !w.contains(document.activeElement)) { var h = choroPanel(b, doc, viewCtx().editor); if (w.outerHTML !== h) w.outerHTML = h; }
@@ -763,7 +804,7 @@ function routeNear(d, lat, lon, except) {
   if (!MapKit) MapKit = ardoiseMapKit();
   var best = '', bd = 50;
   var see = function (n, la, lo) { if (!n) return; var m = MapKit.gcDist([lat, lon], [la, lo]); if (m < bd) { bd = m; best = n; } };
-  d.pages.forEach(function (pg) { pg.blocks.forEach(function (x) {
+  d.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) {
     if (x.type !== 'map') return;
     (x.markers || []).forEach(function (mk) { see(String(mk.label || '').trim(), +mk.lat, +mk.lon); });
     (x.routes || []).forEach(function (r, i) {

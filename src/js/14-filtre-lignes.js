@@ -51,7 +51,7 @@ function poserFiltre(b) {
 function poserFiltres(avant) {
   // après chaque rendu de la page : barres posées, filtres réappliqués, champ qui avait le focus rendu
   if (!doc) return;
-  doc.blocks.forEach(function (b) { if (filtrable(b)) poserFiltre(b); });
+  tousBlocs(doc.blocks).forEach(function (b) { if (filtrable(b)) poserFiltre(b); });   // tableaux des groupes compris
   var q = avant && $('.filtre[data-filtre="' + avant.id + '"] .filtre-q', app);
   if (q) { q.focus({ preventScroll: true }); try { q.setSelectionRange(avant.s, avant.e); } catch (_) {} }
 }

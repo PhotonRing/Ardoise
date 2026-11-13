@@ -781,6 +781,24 @@ test('libellé : texte modifié, avec la page, le type de bloc et ses premiers m
 });
 
 const blocsDe = (m) => m.doc.pages[0].blocks;
+test('libellé : un sommet du modèle diamant modifié, nommé par le titre seul, défait en un Ctrl+Z', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'd1', type: 'diamond', title: 'Campagne X', adversaire: 'APT28', capacite: '', infrastructure: '', victime: 'Mairie' }); });
+  m.s.saisir(() => { blocsDe(m)[1].capacite = 'Mimikatz'; });
+  m.s.valider();
+  egal(libelles(m)[0], 'Accueil · Modèle diamant « Campagne X » : texte modifié');
+  m.s.annuler();
+  egal(blocsDe(m)[1].capacite, '', 'un seul Ctrl+Z défait la frappe');
+  m.s.modifier(() => { blocsDe(m)[1].title = ''; });
+  m.s.modifier(() => { blocsDe(m)[1].victime = 'Mairie de X'; });
+  egal(libelles(m)[0], 'Accueil · Modèle diamant « APT28 Mairie de X » : texte modifié', 'sans titre : les sommets');
+});
+test('libellé : une page nommée par son en-tête (sans nom saisi) porte le nom affiché, pas « Sans titre »', () => {
+  const m = monter();
+  m.s.remplacer({ title: 'Doc', pages: [{ id: 'p1', title: '', blocks: [{ id: 'hd', type: 'header', title: 'Visite <i>guidée</i>' }, { id: 'b1', type: 'p', html: 'a' }] }] }, 'demarrage');
+  m.s.modifier(() => { blocsDe(m)[1].html = 'Bonjour'; });
+  egal(libelles(m)[0], 'Visite guidée · Paragraphe « Bonjour » : texte modifié');
+});
 test('libellé : plusieurs modifications dans une étape, la première puis le nombre des autres', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'b2', type: 'h2', html: 'Deux' }, { id: 'b3', type: 'p', html: 'Trois' }); });
@@ -1054,6 +1072,71 @@ test('libellé, deux copies : une modification reçue n\'apparaît jamais, ni po
   a.s.annuler(); a.s.annuler();
   egal(lib(a), ['', 'Accueil · Paragraphe « a-A » : texte modifié'], 'rétablir ne décrit que l\'étape locale');
   egal(lib(b), ['Accueil · Paragraphe « c-B » : bloc ajouté', ''], 'chez B, rien de A');
+});
+
+// Groupe repliable : les blocs d'un groupe ont leurs propres libellés ; le groupe entier part et revient en une étape
+const AVEC_GROUPE = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+  { id: 'b1', type: 'p', html: 'a' },
+  { id: 'g1', type: 'group', title: 'Détails', blocks: [{ id: 'c1', type: 'p', html: 'un' }, { id: 'c2', type: 'p', html: 'deux' }] },
+] }] });
+const groupe = (m) => m.doc.pages[0].blocks[1];
+
+test('groupe : supprimer un groupe est une étape, un seul Ctrl+Z le rend entier ; un seul libellé', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  const avant = JSON.stringify(m.doc.pages);
+  m.s.modifier(() => { m.doc.pages[0].blocks.splice(1, 1); });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : bloc supprimé');
+  m.s.annuler();
+  egal(JSON.stringify(m.doc.pages), avant, 'groupe rendu avec son contenu');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+
+test('groupe : un bloc d\'un groupe est libellé pour lui-même (texte modifié, ajouté, supprimé)', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  m.s.modifier(() => { groupe(m).blocks[0].html = 'un bis'; });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « un bis » : texte modifié');
+  m.s.modifier(() => { groupe(m).blocks.push({ id: 'c3', type: 'p', html: 'trois' }); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « trois » : bloc ajouté');
+  m.s.modifier(() => { groupe(m).blocks.splice(1, 1); });
+  egal(libelles(m)[0], 'Accueil · Paragraphe « deux » : bloc supprimé');
+});
+
+test('groupe : plier et déplier le groupe en édition sont des étapes nommées', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  m.s.modifier(() => { groupe(m).folded = true; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : groupe plié');
+  m.s.modifier(() => { groupe(m).folded = false; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Détails » : groupe déplié');
+  m.s.modifier(() => { groupe(m).title = 'Plus'; });
+  egal(libelles(m)[0], 'Accueil · Groupe repliable « Plus » : texte modifié');
+});
+
+test('groupe : un import renumérote les identifiants en double, blocs des groupes compris', () => {
+  const m = monter();
+  const d = AVEC_GROUPE(); d.pages[0].blocks[1].blocks[1].id = 'b1';
+  m.s.remplacer(d, 'import');
+  const vus = [m.doc.pages[0].blocks[0].id, ...groupe(m).blocks.map((b) => b.id), groupe(m).id];
+  egal(new Set(vus).size, 4, 'identifiants uniques');
+});
+
+// Ranger les blocs : chaque geste est une étape, un seul Ctrl+Z rend la page d'avant, et un seul libellé le nomme
+const GESTES = [
+  ['dépôt dans un groupe', (c, bl) => c.rangerBloc(bl, 'b1', { id: 'c1', before: false }), 'Accueil · Groupe repliable « Détails » : bloc ajouté au groupe'],
+  ['glissé hors du groupe', (c, bl) => c.rangerBloc(bl, 'c2', { id: 'b1', before: true }), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Monter qui sort du groupe', (c, bl) => c.sortirDuGroupe(bl, 'c1', true), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Sortir du groupe', (c, bl) => c.sortirDuGroupe(bl, 'c2'), 'Accueil · Groupe repliable « Détails » : bloc sorti du groupe'],
+  ['Mettre dans un groupe', (c, bl) => c.mettreDansGroupe(bl, 'b1'), 'Accueil · Groupe repliable « a » : bloc ajouté au groupe'],
+  ['Dégrouper', (c, bl) => c.degrouper(bl, 'g1'), 'Accueil · Groupe repliable « Détails » : groupe défait'],
+  ['réordonner dans le groupe', (c, bl) => c.rangerBloc(bl, 'c1', { id: 'c2', before: false }), 'Accueil · Paragraphe « un » : bloc déplacé'],
+];
+for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une étape, libellée, qu\'un seul Ctrl+Z défait', () => {
+  const m = monter(); m.s.remplacer(AVEC_GROUPE(), 'demarrage');
+  const avant = JSON.stringify(m.doc.pages);
+  m.s.modifier(() => { geste(m.ctx, m.doc.pages[0].blocks); });
+  egal(libelles(m)[0], libelle);
+  m.s.annuler();
+  egal(JSON.stringify(m.doc.pages), avant, 'page d\'avant');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
 });
 
 for (const [nom, fn] of tests) {

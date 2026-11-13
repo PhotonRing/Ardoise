@@ -10,7 +10,7 @@
 // Une modification locale est retrouvée en comparant le document avant et après (synDiff) ; elle produit des
 // opérations JSON, appliquées sur place puis envoyées aux autres copies, qui les appliquent dans n'importe quel
 // ordre et autant de fois que nécessaire (synApply) : toutes les copies arrivent au même document.
-var SYN_TEXT = { html: 1, title: 1, lede: 1, eyebrow: 1, text: 1, code: 1, name: 1, caption: 1, alt: 1, k: 1, v: 1, date: 1, label: 1, segl: 1, who: 1, num: 1 };
+var SYN_TEXT = { html: 1, title: 1, lede: 1, eyebrow: 1, text: 1, code: 1, name: 1, caption: 1, alt: 1, k: 1, v: 1, date: 1, label: 1, segl: 1, who: 1, num: 1, adversaire: 1, capacite: 1, infrastructure: 1, victime: 1 };
 var SYN_RAW = { code: 1 };   // texte brut : découpé caractère par caractère, sans reconnaître de balises
 function synCmp(a, b) { return a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0); }
 function synTokens(s, raw) {

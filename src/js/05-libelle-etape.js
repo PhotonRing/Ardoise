@@ -7,6 +7,8 @@ var LIBELLE_MOTS = 40;   // longueur des premiers mots d'un bloc, en caractères
 var LIBELLE_REGLAGES = [['title', 'Titre du document'], ['palette', 'Palette'], ['typo', 'Typographie'], ['width', 'Largeur'],
   ['theme', 'Thème'], ['nav', 'Navigation'], ['mapKey', 'Clé de carte']];
 // premiers mots d'un bloc : ses textes dans l'ordre (champs de texte, cellules), sans balise, tronqués
+// texte enrichi sans texte visible (pur : isBlank passe par le DOM)
+function libelleVide(h) { return !htmlText(h || '').trim(); }
 function libelleMots(b) {
   var t = [];
   function lire(x, k) {
@@ -15,13 +17,19 @@ function libelleMots(b) {
     if (Array.isArray(x)) { x.forEach(function (e) { lire(e, k); }); return; }
     if (x && typeof x === 'object') Object.keys(x).forEach(function (c) { if (c !== 'id' && c !== 'type') lire(x[c], k === 'rows' ? k : c); });
   }
-  lire(b, '');
+  // modèle diamant ou groupe titré : son titre seul le nomme (« Modèle diamant « Campagne X » »), sinon ses textes
+  if ((b.type === 'diamond' || b.type === 'group') && !libelleVide(b.title)) lire(b.title, 'title'); else lire(b, '');
   var m = t.join(' ').replace(/\s+/g, ' ').trim();
   return m.length > LIBELLE_MOTS ? m.slice(0, LIBELLE_MOTS).trim() + '…' : m;
 }
+// nom affiché d'une page (comme pageTitle, sans DOM) : grand titre de son en-tête, sinon le nom saisi
+function libelleNomPage(pg) {
+  var h = (pg.blocks || []).filter(function (x) { return x.type === 'header'; })[0], t = h ? htmlText(h.title || '').replace(/\s+/g, ' ').trim() : '';
+  return t || (pg.title || '').trim() || 'Sans titre';
+}
 function libelleBloc(pg, b) {
   var mots = libelleMots(b), ty = T[b.type] ? T[b.type].label : 'Bloc';
-  return (pg.title || 'Sans titre') + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
+  return libelleNomPage(pg) + ' · ' + ty + (mots ? ' « ' + mots + ' »' : '');
 }
 // libellé complet de l'étape d'un bloc déplacé vers une autre page : noms affichés des pages source et cible (pageTitle,
 // grand titre de l'en-tête), qui valent mieux ici que pg.title, vide pour une page nommée par son en-tête
@@ -63,6 +71,7 @@ function libelleGrille(ra, rb) {
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return 'bloc modifié';
+  if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
   if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
     // une seule colonne bascule par étape : réduite si l'une l'est devenue
     var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
@@ -79,13 +88,38 @@ function libelleNature(ba, b) {
   return 'bloc modifié';
 }
 // modifications des blocs d'une page présente avant et après ; nature : celle du geste, donnée par l'appelant (collage, vidage d'une plage)
-function libellesBlocs(pa, pg, out, nature) {
-  var o = libelleOrdre(pa.blocks, pg.blocks);
-  pa.blocks.forEach(function (b) { if (!o.enB['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
-  pg.blocks.forEach(function (b) {
+function libellesBlocs(pa, pg, out, nature) { libellesListe(pa, pg, pa.blocks, pg.blocks, out, nature, libellesRangement(pa, pg, out)); }
+// blocs qui changent de groupe : un libellé par groupe touché (bloc ajouté au groupe, sorti du groupe, groupe défait) ;
+// rend les identifiants dont l'ajout ou la suppression est ainsi déjà dit (le bloc rangé, le groupe neuf ou défait)
+function libellesRangement(pa, pg, out) {
+  var avant = {}, apres = {}, saute = {}, dits = {};
+  blocsDe(pa.blocks, function (b, l, i, g) { avant['$' + b.id] = { b: b, g: g }; });   // blocsDe : 05-document.js
+  blocsDe(pg.blocks, function (b, l, i, g) { apres['$' + b.id] = { b: b, g: g }; });
+  function dire(pgx, g, quoi) { var t = libelleBloc(pgx, g) + ' : ' + quoi; if (!dits[t]) { dits[t] = 1; out.push(t); } }
+  Object.keys(apres).forEach(function (k) {
+    var a = avant[k], b = apres[k]; if (!a || (a.g ? a.g.id : null) === (b.g ? b.g.id : null)) return;
+    saute[k] = 1;
+    if (b.g) { dire(pg, b.g, 'bloc ajouté au groupe'); if (!avant['$' + b.g.id]) saute['$' + b.g.id] = 1; }
+    else if (apres['$' + a.g.id]) dire(pg, apres['$' + a.g.id].b, 'bloc sorti du groupe');
+    else { dire(pa, a.g, 'groupe défait'); saute['$' + a.g.id] = 1; }
+  });
+  return saute;
+}
+// une liste de blocs (la page, ou les blocs d'un groupe présent avant et après) : un groupe ajouté ou supprimé donne un
+// seul libellé ; sinon le groupe est comparé sans ses blocs, et ses blocs ont leurs propres libellés ; saute : blocs rangés
+function libellesListe(pa, pg, la, lb, out, nature, saute) {
+  var o = libelleOrdre(la, lb);
+  la.forEach(function (b) { if (!o.enB['$' + b.id] && !saute['$' + b.id]) out.push(libelleBloc(pa, b) + ' : bloc supprimé'); });
+  lb.forEach(function (b) {
     var ba = o.enA['$' + b.id];
-    if (!ba) { out.push(libelleBloc(pg, b) + ' : bloc ajouté'); return; }
+    if (!ba) { if (!saute['$' + b.id]) out.push(libelleBloc(pg, b) + ' : bloc ajouté'); return; }
     if (!o.garde['$' + b.id]) out.push(libelleBloc(pg, b) + ' : bloc déplacé');
+    if (ba.type === 'group' && b.type === 'group') {
+      var sa = libelleSans(ba, 'blocks'), sb = libelleSans(b, 'blocks');
+      if (sa !== sb) out.push(libelleBloc(pg, b) + ' : ' + (nature || libelleNature(JSON.parse(sa), JSON.parse(sb))));
+      libellesListe(pa, pg, ba.blocks || [], b.blocks || [], out, nature, saute);
+      return;
+    }
     if (JSON.stringify(ba) !== JSON.stringify(b)) out.push(libelleBloc(pg, b) + ' : ' + (nature || libelleNature(ba, b)));
   });
 }

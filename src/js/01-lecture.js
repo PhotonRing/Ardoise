@@ -102,7 +102,9 @@ function ardoiseReader() {
     return open;
   }
   function foldReveal(el) {
-    // lecture : déplie les sections qui masquent el, la plus extérieure d'abord (comme revealBlock dans l'éditeur)
+    // lecture : ouvre le groupe repliable qui contient el, puis déplie les sections qui le masquent, la plus extérieure
+    // d'abord (comme revealBlock dans l'éditeur)
+    var g = el.closest('details.grp'); if (g && !g.open) { g.open = true; window.dispatchEvent(new Event('resize')); }
     var x = el.closest('[data-fh]'); if (!x) return;
     for (var k = 0; k < 20; k++) {
       var list = foldList(x), h = foldApply(list)[list.indexOf(x)];
@@ -133,8 +135,8 @@ function ardoiseReader() {
     });
   }
   function printPrep(on) {
-    // impression : blocs dépliables ouverts et titres groupés avec leur suite, puis tout est rétabli
-    Array.prototype.forEach.call(document.querySelectorAll(on ? 'details.fold:not([open])' : 'details.fold[data-pr]'), function (d) { if (on) { d.open = true; d.setAttribute('data-pr', ''); } else { d.open = false; d.removeAttribute('data-pr'); } });
+    // impression : blocs dépliables et groupes repliables ouverts, titres groupés avec leur suite, puis tout est rétabli
+    Array.prototype.forEach.call(document.querySelectorAll(on ? 'details.fold:not([open]), details.grp:not([open])' : 'details.fold[data-pr], details.grp[data-pr]'), function (d) { if (on) { d.open = true; d.setAttribute('data-pr', ''); } else { d.open = false; d.removeAttribute('data-pr'); } });
     printKeep(on);
   }
   function viewScript() {

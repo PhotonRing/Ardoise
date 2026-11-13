@@ -72,5 +72,6 @@ test('page exportée : le script de lecture démarre sans globale de l\'éditeur
   for (const t of ['beforeprint', 'afterprint', 'resize', 'scroll']) vrai(page.ecoute.window[t], 'écouteur ' + t + ' attendu');
   vrai(page.cherche.includes('.pg'), 'pages de l\'export cherchées');
   page.ecoute.window.beforeprint.forEach((f) => f());
-  vrai(page.cherche.includes('details.fold:not([open])'), 'impression : blocs dépliables ouverts');
+  vrai(page.cherche.some((s) => s.split(', ').includes('details.fold:not([open])')), 'impression : blocs dépliables ouverts');
+  vrai(page.cherche.some((s) => s.split(', ').includes('details.grp:not([open])')), 'impression : groupes repliables ouverts');
 });

@@ -37,7 +37,8 @@ var MIGRATIONS = [
     if (Object.keys(tags).length) d.tags = tags;
   } },
   { from: 3, desc: 'Nouveau bloc « Requête » (aucune conversion)', run: function () {} },
-  { from: 4, desc: 'Nouveau bloc « Kanban » ; retrait ligne par ligne des paragraphes (aucune conversion)', run: function () {} }
+  { from: 4, desc: 'Nouveau bloc « Kanban » ; retrait ligne par ligne des paragraphes (aucune conversion)', run: function () {} },
+  { from: 5, desc: 'Nouveaux blocs « Groupe repliable » et « Modèle diamant » (aucune conversion)', run: function () {} }
 ];
 // --- outils des migrations (sans DOM : vérifiés aussi par scripts/check.mjs dans Node) ---
 var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1 };
@@ -47,7 +48,8 @@ function migStrings(d, fn) {
     if (Array.isArray(o)) { for (var i = 0; i < o.length; i++) { if (typeof o[i] === 'string') o[i] = fn(o[i]); else if (o[i] && typeof o[i] === 'object') walk(o[i]); } return; }
     for (var k in o) { if (MIG_SKIP[k]) continue; var v = o[k]; if (typeof v === 'string') { if (v.indexOf('<') >= 0) o[k] = fn(v); } else if (v && typeof v === 'object') walk(v); }
   }
-  migBlocks(d, walk);
+  // walk descend déjà dans les blocs d'un groupe : chaque bloc du premier niveau, une seule fois
+  (Array.isArray(d.pages) ? d.pages : []).forEach(function (pg) { if (pg && Array.isArray(pg.blocks)) pg.blocks.forEach(function (b) { if (b && typeof b === 'object') walk(b); }); });
 }
 function htmlText(html) {
   // texte d'un fragment HTML assaini (balises retirées, entités courantes décodées)
@@ -71,7 +73,11 @@ function nextTagColor(tags) {
   var best = 0; for (var j = 1; j < TAG_COLORS; j++) if (n[j] < n[best]) best = j;
   return best;
 }
-function migBlocks(d, fn) { (Array.isArray(d.pages) ? d.pages : []).forEach(function (pg) { if (pg && Array.isArray(pg.blocks)) pg.blocks.forEach(function (b) { if (b && typeof b === 'object') fn(b); }); }); }
+// chaque bloc du JSON brut, blocs d'un groupe compris (un seul niveau)
+function migBlocks(d, fn) {
+  var un = function (b) { if (b && typeof b === 'object') { fn(b); if (b.type === 'group' && Array.isArray(b.blocks)) b.blocks.forEach(function (c) { if (c && typeof c === 'object') fn(c); }); } };
+  (Array.isArray(d.pages) ? d.pages : []).forEach(function (pg) { if (pg && Array.isArray(pg.blocks)) pg.blocks.forEach(un); });
+}
 function docFormat(d) { return Math.max(1, Math.floor(+d.v) || 1); }   // sans numéro : format 1 (anciens fichiers, JSON écrit à la main)
 function migrate(d) {
   // renvoie { doc, from, newer, steps } ; doc est une copie migrée (ou le document lui-même s'il est déjà au format courant)

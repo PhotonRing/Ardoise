@@ -21,6 +21,7 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '01-lecture.js',
     '01-moteur-carte.js',
     '03-types-de-blocs.js',
+    '04-modeles.js',
     '05-document.js',
     '05-markdown.js',
     '05-migrations.js',
@@ -30,7 +31,10 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '07-kanban.js',
     '07-rendu.js',
     '07-requetes.js',
+    '08-docx.js',
+    '08-office.js',
     '09-adresse.js',
+    '22-exporter-word.js',   // nom du fichier Word (nomExportWord) ; rien d'autre n'y tourne au chargement
   ].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });
 

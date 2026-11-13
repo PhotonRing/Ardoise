@@ -23,6 +23,13 @@ function normBlocks(arr, newer) {
     if (nb.type === 'kanban') kbCleanDeps(nb);
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
+    if (nb.type === 'group') {
+      // groupe : ses blocs, un seul niveau ; un bloc refusé dans un groupe est remis dans la page juste après lui
+      var dedans = [], dehors = [];
+      (Array.isArray(b.blocks) ? b.blocks : []).forEach(function (c) { (c && HORS_GROUPE[c.type] ? dehors : dedans).push(c); });
+      nb.blocks = normBlocks(dedans, newer); nb.folded = !!nb.folded; nb.title = String(nb.title || '');
+      Array.prototype.push.apply(out, normBlocks(dehors, newer));
+    }
   });
   return out;
 }
@@ -74,7 +81,7 @@ function normalize(d) {
   }
   return out;
 }
-var TEMPLATES_V = 5;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
+var TEMPLATES_V = 6;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
 function template(kind) { var t = TEMPLATES[kind](); t.v = TEMPLATES_V; return t; }
 var sealed = null, origStored = '';   // fichier chiffré en attente du mot de passe
 function loadInitial() {
@@ -85,7 +92,64 @@ function loadInitial() {
   if (!d) { d = normalize(template('tour')); d.id = uid() + uid(); freshDoc = true; }
   return d;
 }
-function byId(id) { for (var i = 0; i < doc.blocks.length; i++) if (doc.blocks[i].id === id) return doc.blocks[i]; return null; }
+/* Parcours des blocs d'une page, enfants des groupes compris (un seul niveau) : fn(bloc, liste qui le contient, position
+   dans cette liste, groupe parent ou null), les enfants d'un groupe juste après lui. Pur : sert aussi aux bancs. */
+function blocsDe(blocks, fn) {
+  (blocks || []).forEach(function (b, i) {
+    fn(b, blocks, i, null);
+    if (b && b.type === 'group' && Array.isArray(b.blocks)) b.blocks.forEach(function (c, j) { fn(c, b.blocks, j, b); });
+  });
+}
+// liste plate des blocs d'une page, enfants compris
+function tousBlocs(blocks) { var out = []; blocsDe(blocks, function (b) { out.push(b); }); return out; }
+// où est le bloc id parmi les blocs d'une page : { b, liste, i, parent } (parent : le groupe qui le contient, sinon null), ou null
+function ouEst(blocks, id) {
+  var r = null;
+  blocsDe(blocks, function (b, liste, i, parent) { if (!r && b && b.id === id) r = { b: b, liste: liste, i: i, parent: parent }; });
+  return r;
+}
+// page qui contient un bloc, enfants des groupes compris (-1 sinon)
+function pageDuBloc(pages, bid) { for (var i = 0; i < pages.length; i++) if (ouEst(pages[i].blocks, bid)) return i; return -1; }
+// copie profonde d'un bloc, identifiant neuf pour lui et pour chaque bloc qu'il contient
+function copieBloc(b) {
+  var c = JSON.parse(JSON.stringify(b)); c.id = uid();
+  if (c.type === 'group' && Array.isArray(c.blocks)) c.blocks.forEach(function (x) { x.id = uid(); });
+  return c;
+}
+/* Ranger les blocs d'une page dans ses groupes : chaque geste rend false (ou null) sans rien changer s'il est refusé.
+   Un groupe vidé reste en place ; les types de HORS_GROUPE n'entrent jamais dans un groupe. */
+// déplace le bloc bid avant ou après le bloc cible.id (de la page ou d'un groupe), ou à la fin du groupe cible.dans
+function rangerBloc(blocks, bid, cible) {
+  var o = ouEst(blocks, bid), t = ouEst(blocks, cible.dans || cible.id); if (!o || !t || t.b === o.b) return false;
+  if (cible.dans && (t.b.type !== 'group' || t.parent)) return false;
+  var dest = cible.dans ? t.b.blocks : t.liste;
+  if (dest !== blocks && HORS_GROUPE[o.b.type]) return false;
+  o.liste.splice(o.i, 1);
+  dest.splice(cible.dans ? dest.length : dest.indexOf(t.b) + (cible.before ? 0 : 1), 0, o.b);
+  return true;
+}
+// sort un bloc de son groupe : juste après le groupe, ou juste avant
+function sortirDuGroupe(blocks, bid, avant) {
+  var o = ouEst(blocks, bid); if (!o || !o.parent) return false;
+  o.liste.splice(o.i, 1); blocks.splice(blocks.indexOf(o.parent) + (avant ? 0 : 1), 0, o.b);
+  return true;
+}
+// enveloppe un bloc de la page dans un groupe neuf, sans titre, placé à sa place ; rend le groupe
+function mettreDansGroupe(blocks, bid) {
+  var o = ouEst(blocks, bid); if (!o || o.parent || HORS_GROUPE[o.b.type]) return null;
+  var g = mk('group', {}); g.blocks = [o.b]; blocks.splice(o.i, 1, g);
+  return g;
+}
+// remet les blocs d'un groupe à sa place, dans l'ordre, et retire le groupe
+function degrouper(blocks, gid) {
+  var o = ouEst(blocks, gid); if (!o || o.parent || o.b.type !== 'group') return false;
+  Array.prototype.splice.apply(blocks, [o.i, 1].concat(o.b.blocks));
+  return true;
+}
+function byId(id) { var o = ouEst(doc.blocks, id); return o ? o.b : null; }
+// position d'un bloc de la page affichée : { liste, i, parent } (liste : la page ou le groupe qui le contient), ou null
+function position(b) { var o = b ? ouEst(doc.blocks, b.id) : null; return o && o.b === b ? o : null; }
+// position au premier niveau seulement (-1 pour un bloc d'un groupe) : ses appels ne reçoivent que des blocs de la page, un enfant passe par position
 function idx(b) { return doc.blocks.indexOf(b); }
 function getPath(o, k) { var p = k.split('.'); for (var i = 0; i < p.length; i++) { if (o == null) return undefined; o = o[p[i]]; } return o; }
 function ligneVide(l) { return l.every(function (v) { return !v; }); }   // ligne (ou colonne) de tableau sans texte
@@ -94,9 +158,11 @@ function docTitle() {
   var h = doc.pages[0].blocks.filter(function (b) { return b.type === 'header'; })[0];
   return (h && textOf(h.title)) || doc.title || 'Sans titre';
 }
+// nom de fichier lisible tiré d'un titre : sans accents ni caractère interdit, 60 caractères au plus ('page' s'il ne reste rien)
+function nomDeFichier(titre) { return String(titre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page'; }
 function fileName() {
-  var s = docTitle().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
-  if (!/\.html?$/i.test(s)) s = (s || 'page') + '.html';
+  var s = nomDeFichier(docTitle());
+  if (!/\.html?$/i.test(s)) s = s + '.html';
   return s;
 }
 // nom du fichier local d'où la page est ouverte (dernier segment décodé de l'adresse) ; null hors d'un fichier local

@@ -23,7 +23,7 @@ function exportStatic() {
     navHTML(doc, { page: 0, view: 'export' }) + doc.pages.map(function (pg, i) {
       return '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, { page: i, view: 'export' }) + '</div>';
     }).join('\n') + '\n<script>' + readerScript() + '<\/script>\n' +
-    (doc.pages.some(function (pg) { return pg.blocks.some(function (b) { return b.type === 'map'; }); }) ?
+    (doc.pages.some(function (pg) { return tousBlocs(pg.blocks).some(function (b) { return b.type === 'map'; }); }) ?
       '<script id="ardoise-geo" type="application/json">' + $('#ardoise-geo').textContent + '<\/script>\n<script>\n' + ardoiseMapKit.toString() +
       '\n(function () { var K = ardoiseMapKit(); Array.prototype.forEach.call(document.querySelectorAll(".map[data-state]"), function (el) { var st = JSON.parse(el.getAttribute("data-state")); K.mount(el, st, { edit: false, locked: !!st.lock, hideBg: !!st.hideBg }); }); })();\n<\/script>\n' : '') +
     '</body>\n</html>\n';
@@ -50,7 +50,7 @@ function importJSON() {
       var r = session.remplacer(d, 'import');   // identifiant, mot de passe, clé de carte et date gardés ; étape annulable
       if (r.refus === 'plus-recent') { $('#jerr', bg).textContent = 'Ce JSON vient d’une version plus récente d’Ardoise (format ' + r.format + ') : mettez d’abord Ardoise à jour.'; return false; }
       if (r.refus) { $('#jerr', bg).textContent = r.message ? 'Conversion impossible : ' + r.message : 'Il manque un tableau « blocks » (ou « pages »).'; return false; }
-      var nb = 0; doc.pages.forEach(function (pg) { nb += pg.blocks.length; });
+      var nb = 0; doc.pages.forEach(function (pg) { nb += tousBlocs(pg.blocks).length; });   // blocs des groupes compris
       pageHash(0);
       toast(nb + ' blocs importés' + (doc.pages.length > 1 ? ' sur ' + doc.pages.length + ' pages' : ''));
     } }]);

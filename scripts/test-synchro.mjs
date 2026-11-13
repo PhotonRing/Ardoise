@@ -157,6 +157,15 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   expect(r.pages[0].blocks.map((b) => b.id).join() === 'n2,c,n1', 'blocs ajoutés : ' + r.pages[0].blocks.map((b) => b.id));
   expect(r.pages[0].blocks[1].items[0].done === true && r.pages[0].blocks[1].items[0].html === 'lait entier', 'case cochée et modifiée');
 }
+{ // modèle diamant : deux personnes écrivent dans le même sommet, puis dans deux sommets ; frappes fusionnées caractère par caractère
+  const D = { id: 'd', type: 'diamond', title: 'Campagne', adversaire: 'APT28', capacite: '', infrastructure: '', victime: 'Mairie' };
+  const x = pair({ pages: [{ id: 'p', blocks: [D] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].adversaire = 'APT28 (Fancy Bear)'; na.pages[0].blocks[0].capacite = 'Mimikatz';
+  const nb = clone(x.db); nb.pages[0].blocks[0].adversaire = 'Groupe APT28'; nb.pages[0].blocks[0].victime = 'Mairie de X'; nb.pages[0].blocks[0].title = 'Campagne X';
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)), d = r.pages[0].blocks[0];
+  expect(d.adversaire === 'Groupe APT28 (Fancy Bear)', 'diamant, même sommet : ' + d.adversaire);
+  expect(d.capacite === 'Mimikatz' && d.victime === 'Mairie de X' && d.title === 'Campagne X', 'diamant, sommets différents : ' + JSON.stringify(d));
+}
 { // un bloc supprimé d'un côté, modifié de l'autre : il reste supprimé
   const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'x' }, { id: 'c', type: 'p', html: 'y' }] }] });
   const na = clone(x.da); na.pages[0].blocks.shift();
@@ -169,6 +178,19 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const na = clone(x.da); na.palette = 'bleu'; const nb = clone(x.db); nb.palette = 'vert';
   const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
   expect(r.palette === 'bleu' || r.palette === 'vert', 'réglage');
+}
+{ // groupe repliable : l'autre copie le reçoit avec son contenu et son pli ; deux frappes dans un bloc du groupe fusionnées
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'avant' }] }] });
+  const na = clone(x.da); na.pages[0].blocks.push({ id: 'g', type: 'group', title: 'Détails', folded: true, blocks: [{ id: 'c', type: 'p', html: 'Bonjour le monde' }] });
+  const r0 = swap(x, synDiff(x.a, x.da, na), []);
+  expect(r0.pages[0].blocks[1].type === 'group' && r0.pages[0].blocks[1].folded === true && r0.pages[0].blocks[1].blocks[0].html === 'Bonjour le monde', 'groupe reçu');
+  x.da = clone(r0); x.db = clone(r0);
+  const ma = clone(x.da); ma.pages[0].blocks[1].blocks[0].html = 'Bonjour le <b>vaste</b> monde'; ma.pages[0].blocks[1].title = 'Détails A';
+  const mb = clone(x.db); mb.pages[0].blocks[1].blocks[0].html = 'Bonjour tout le monde !'; mb.pages[0].blocks[1].blocks.push({ id: 'c2', type: 'p', html: 'ajout B' });
+  const r = swap(x, synDiff(x.a, x.da, ma), synDiff(x.b, x.db, mb));
+  const g = r.pages[0].blocks[1];
+  expect(g.blocks[0].html === 'Bonjour tout le <b>vaste</b> monde !', 'frappe dans un bloc d\'un groupe : ' + g.blocks[0].html);
+  expect(g.title === 'Détails A' && g.blocks.map((b) => b.id).join() === 'c,c2', 'titre et bloc ajouté au groupe');
 }
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));
