@@ -24,20 +24,29 @@ var liensMd = null;   // pages du document pendant une conversion (liens [[…]]
 function blocsDuMarkdownLu(lignes) {
   var r = { entete: null, blocs: [], imagesManquantes: 0, images: [] }, fin = finYamlMd(lignes);
   if (fin > 0) { var fiche = ficheYamlMd(lignes.slice(1, fin)); if (fiche.items.length) r.blocs.push(fiche); lignes = lignes.slice(fin + 1); }
+  // une image devient un bloc Image juste après le bloc qui la contenait ; distante : à télécharger (images), sinon à remettre
+  function poserImages(images) {
+    images.forEach(function (im) {
+      if (im.distante) r.images.push({ bloc: r.blocs.length, url: im.url, nom: im.nom }); else r.imagesManquantes++;
+      r.blocs.push({ type: 'image', src: '', caption: esc(im.distante ? im.alt : im.nom), alt: im.alt });
+    });
+  }
   decouperMarkdown(lignes).forEach(function (g) {
     if (g.sorte === 'titre') {
       var html = enLigneMd(g.texte);
       if (g.niveau === 1 && !r.entete) r.entete = { title: html };
       else r.blocs.push({ type: g.niveau <= 2 ? 'h2' : g.niveau === 3 ? 'h3' : 'subtitle', html: html });
     } else if (g.sorte === 'paragraphe') {
-      // une image sort du paragraphe en bloc Image juste après lui ; distante : à télécharger (images), sinon à remettre
       var x = imagesDuParagrapheMd(g.lignes.join('\n'));
       if (x.texte) r.blocs.push({ type: 'p', html: enLigneMd(x.texte) });
-      x.images.forEach(function (im) {
-        if (im.distante) r.images.push({ bloc: r.blocs.length, url: im.url, nom: im.nom }); else r.imagesManquantes++;
-        r.blocs.push({ type: 'image', src: '', caption: esc(im.distante ? im.alt : im.nom), alt: im.alt });
-      });
-    } else r.blocs.push(blocDuGroupe(g));
+      poserImages(x.images);
+    } else {
+      // images d'un élément de liste ou d'une ligne de tableau : sorties comme celles d'un paragraphe, après le bloc entier
+      var imgs = [], sortir = function (t) { var y = imagesDuParagrapheMd(t); if (!y.images.length) return t; imgs = imgs.concat(y.images); return y.texte; };
+      if (g.sorte === 'liste') g.elements.forEach(function (e) { e.texte = sortir(e.texte); });
+      else if (g.sorte === 'tableau') g.lignes = g.lignes.map(sortir);
+      r.blocs.push(blocDuGroupe(g)); poserImages(imgs);
+    }
   });
   return r;
 }

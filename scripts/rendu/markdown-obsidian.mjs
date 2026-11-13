@@ -81,6 +81,20 @@ test('obsidian : une image au milieu d\'un paragraphe sort en bloc Image juste a
   egal(md('Texte').images, []);
 });
 
+test('obsidian : une image dans un élément de liste ou une cellule de tableau sort en bloc Image juste après la liste ou le tableau', () => {
+  const r = md('- un ![Logo](https://ex.fr/logo.png) deux\n- ![[plan.png]]\n\n| A | B |\n|---|---|\n| ![](photo.jpg) x | y |\n\nFin', [], 0);
+  egal(r.blocs, [
+    { type: 'list', ordered: false, items: [{ html: 'un deux' }, { html: '' }] },
+    { type: 'image', src: '', caption: 'Logo', alt: 'Logo' },
+    { type: 'image', src: '', caption: 'plan.png', alt: '' },
+    { type: 'table', rows: [['A', 'B'], ['x', 'y']] },
+    { type: 'image', src: '', caption: 'photo.jpg', alt: '' },
+    { type: 'p', html: 'Fin' }]);
+  egal(r.images, [{ bloc: 1, url: 'https://ex.fr/logo.png', nom: 'logo.png' }]);
+  egal(r.imagesManquantes, 2);
+  egal(blocs('- [x] fait ![](a.png)')[0], { type: 'check', items: [{ html: 'fait', done: true }] }, 'case cochée');
+});
+
 test('obsidian : note de référence avec propriétés (syntaxe documentée d\'Obsidian, fixtures/markdown/note-obsidian-proprietes.md)', () => {
   const r = md(readFileSync(new URL('../fixtures/markdown/note-obsidian-proprietes.md', import.meta.url), 'utf8'), PAGES, 0);
   egal(r.entete, { title: 'Point d\'étape' });
