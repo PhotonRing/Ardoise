@@ -171,6 +171,6 @@ function pgDragEnd() { pgDropClear(); $$('.toc-pr.dragging', app).forEach(functi
 app.addEventListener('dragend', function () { if (pgDrag != null) pgDragEnd(); });
 // lecture : le pli d'un groupe repliable (<details>) est gardé pour la session, jamais enregistré, pour survivre à un nouveau rendu
 document.addEventListener('toggle', function (e) {
-  var g = e.target; if (mode !== 'view' || !g.matches || !g.matches('details.grp[data-bid]')) return;
+  var g = e.target; if (mode !== 'view' || !g.matches || !g.matches('details.grp[data-bid]') || g.hasAttribute('data-pr')) return;   // ouvert pour l'impression : pas un geste du lecteur
   viewFold[g.dataset.bid] = !g.open;
 }, true);

@@ -58,7 +58,18 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   const ferme = await evalue(`({ open: document.querySelector('details.grp').open, f: ${GROUPE}.folded })`);
   mesure();
   if (ferme.open || ferme.f !== false) echec('lecture : pli du lecteur ' + JSON.stringify(ferme));
+  // adresse d'un bloc du groupe plié : le groupe s'ouvre (lecture), puis se déplie (édition)
+  await evalue(`location.hash = '#pg-p1/c1', true`); await attendre(200);
+  mesure();
+  if (!(await evalue(`document.querySelector('details.grp').open`))) echec('lecture : l\'adresse d\'un bloc d\'un groupe plié n\'ouvre pas le groupe');
+  await evalue(`location.hash = '#pg-p1', true`); await attendre(100);
   await evalue(TOUCHE('e', { ctrlKey: true })); await attendre(150);
+  await evalue(`document.querySelector('.blk[data-id="g1"] .grp-v').click(), true`); await attendre(50);
+  await evalue(`location.hash = '#pg-p1/c1', true`); await attendre(200);
+  mesure();
+  if (await evalue(`${GROUPE}.folded`) !== false || !(await evalue(`!!document.querySelector('.blk[data-id="c1"]')`))) echec('édition : l\'adresse d\'un bloc d\'un groupe plié ne le déplie pas');
+  await evalue(TOUCHE('z', { ctrlKey: true })); await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(50);
+  if (await evalue(`${GROUPE}.folded`) !== false) echec('deux Ctrl+Z ne ramènent pas le groupe ouvert');
 
   // insertion d'un groupe en fin de page : un paragraphe vide dedans, le curseur dans le titre
   await evalue(`document.querySelector('[data-act="add-end"]').click(), true`); await attendre(50);
