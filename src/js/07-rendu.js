@@ -579,11 +579,12 @@ function refreshDerived() {
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
       var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); }   // le champ du filtre est hors de .q-res
     }
-    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-form', app);
-    if (form && !form.contains(document.activeElement)) {   // pas pendant le choix d'une liste
-      var tmp = document.createElement('div'); tmp.innerHTML = queryForm(b, doc, vc);
-      var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) form.replaceWith(nf);
+    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces', app);
+    if (form && !form.contains(document.activeElement)) {   // pas pendant que le focus est sur une puce
+      var tmp = document.createElement('div'); tmp.innerHTML = qLignePuces(b, doc, vc.page);
+      var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) { form.replaceWith(nf); if (fen && fen.b === b.id) fenPlacer(); }
     }
+    if (fen && fen.b === b.id && !fen.p.contains(document.activeElement)) fenGarnir();   // pastilles de la portée, noms de page
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   tousBlocs(doc.blocks).forEach(function (b) {
@@ -627,6 +628,7 @@ function render(focus) {
   Reader.tlFit(app);
   poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
   poserPlage();   // plage de cellules surlignée, après le filtre qui décide des lignes visibles (14-plage-cellules.js)
+  fenApresRendu();   // fenêtre d'une puce de requête ouverte : regarnie sous sa puce (16-puces-requete.js)
   renderChrome();
   suivreHautEcran();
   updateCheat();
