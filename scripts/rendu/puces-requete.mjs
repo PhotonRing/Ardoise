@@ -67,6 +67,11 @@ test('puces : vue regroupée (lignes de tableaux seulement), sans puce de colonn
   egal(puces({ view: 'regroupee' }).slice(3), ['Regroupée', 'Sans tri']);
   egal(puces({ view: 'regroupee', sortBy: '#n', sortDir: 'desc' })[4], 'Tri : Nombre de lignes ↓');
   egal(puces({ view: 'regroupee', src: 'facts' })[3], 'Tableau', 'une autre source retombe sur le tableau');
+  egal(puces({ view: 'regroupee', regX: 'incident', sortBy: 'c:incident' })[4], 'Tri : Incident ↑', 'tri sur X');
+  egal(puces({ view: 'regroupee', regX: 'incident', sortBy: 'c:échéance', sortDir: 'desc' })[4], 'Sans tri', 'un tri resté de la vue tableau, sans effet sur les groupes');
+  const { ctx, d } = monter(doc({ view: 'regroupee', regX: 'incident', sortBy: 'c:échéance', sortDir: 'desc' }));
+  const fen = ctx.qFenetre(d.pages[0].blocks[3], d, 0, 'sort');
+  vrai(/<option value="" selected>/.test(fen) && !fen.includes('data-qset="sortDir"'), 'fenêtre du tri : « Sans tri » choisi, sans sens');
 });
 
 test('puces : tri sur une colonne, croissant ou décroissant', () => {

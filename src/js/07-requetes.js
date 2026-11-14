@@ -506,7 +506,11 @@ function qRegReglage(b, recs) {
   var ys = (Array.isArray(b.regY) ? b.regY : []).filter(function (k, i, a) { return la(k) && k !== x && a.indexOf(k) === i; });
   return { x: x, ys: ys, nom: nom, dispo: dispo };
 }
-function qRegTri(b, ctx, rg) { var sp = qSortSpec(b, ctx); return sp.by === '#n' || (sp.by.slice(0, 2) === 'c:' && qCleCol(sp.by.slice(2)) === rg.x) ? sp : { by: '', dir: 'asc' }; }
+// tri des groupes : sur X ou sur le nombre de lignes ; un autre tri (resté de la vue tableau) ne joue pas : « Sans tri »
+function qRegTriDe(sp, rg) { return sp.by === '#n' || (sp.by.slice(0, 2) === 'c:' && qCleCol(sp.by.slice(2)) === rg.x) ? sp : { by: '', dir: 'asc' }; }
+function qRegTri(b, ctx, rg) { return qRegTriDe(qSortSpec(b, ctx), rg); }
+// tri réglé dans le bloc qui joue vraiment (puce et fenêtre du tri)
+function qTriBloc(b, d, pi) { var sp = { by: b.sortBy || '', dir: b.sortDir === 'desc' ? 'desc' : 'asc' }; return qVue(b) === 'regroupee' ? qRegTriDe(sp, qRegReglage(b, queryRecords(b, d, pi))) : sp; }
 function qRegSources(d, g) {
   // liens vers les lignes réunies : une entrée par source distincte, avec le nombre de lignes qui en viennent
   var vu = [], n = {};
@@ -672,10 +676,10 @@ function qColsLibelle(b, d, pi, v) {
   return vus === tous ? 'Toutes les colonnes' : vus + (vus > 1 ? ' colonnes' : ' colonne') + ' sur ' + tous;
 }
 function qTriLibelle(b, d, pi) {
-  var by = b.sortBy || ''; if (!by) return 'Sans tri';
+  var sp = qTriBloc(b, d, pi), by = sp.by; if (!by) return 'Sans tri';
   var nom = by === '#n' ? 'Nombre de lignes' : by === 'att' ? 'Attend' : '';
   if (!nom) qSortOptions(b, queryRecords(b, d, pi)).forEach(function (x) { if (x[0] === by) nom = x[1]; });
-  return 'Tri : ' + (nom || by.replace(/^c:/, '')) + (b.sortDir === 'desc' ? ' ↓' : ' ↑');
+  return 'Tri : ' + (nom || by.replace(/^c:/, '')) + (sp.dir === 'desc' ? ' ↓' : ' ↑');
 }
 // puces de la ligne : [{ cle, quoi, libelle, prop? }] ; cle : src, scope, f:<champ du filtre>, plus, view, cols, sort
 function qPuces(b, d, pi) {
@@ -752,8 +756,9 @@ function qFenetre(b, d, pi, cle) {
   if (cle === 'cols') return v === 'kanban' && src === 'kanban' ? h('Champs des cartes') + qChampsForm(b) : h('Colonnes affichées') + qColForm(b, queryRecords(b, d, pi));
   if (cle === 'sort') {
     var opts = v === 'regroupee' ? (function (rg) { return [['c:' + rg.nom(rg.x).toLowerCase(), rg.nom(rg.x)], ['#n', 'Nombre de lignes']]; })(qRegReglage(b, queryRecords(b, d, pi))) : qSortOptions(b, queryRecords(b, d, pi));
-    return h('Trier') + '<div class="q-fen-b"><select data-act="set" data-prop="sortBy" aria-label="Trier par">' + o('', b.sortBy || '', 'Sans tri (ordre du document)') + opts.map(function (x) { return o(x[0], b.sortBy || '', esc(x[1])); }).join('') + '</select>' +
-      (b.sortBy ? seg('sortDir', b.sortDir === 'desc' ? 'desc' : 'asc', [['asc', 'croissant ↑'], ['desc', 'décroissant ↓']]) : '') + '</div>';
+    var tri = qTriBloc(b, d, pi);
+    return h('Trier') + '<div class="q-fen-b"><select data-act="set" data-prop="sortBy" aria-label="Trier par">' + o('', tri.by, 'Sans tri (ordre du document)') + opts.map(function (x) { return o(x[0], tri.by, esc(x[1])); }).join('') + '</select>' +
+      (tri.by ? seg('sortDir', tri.dir, [['asc', 'croissant ↑'], ['desc', 'décroissant ↓']]) : '') + '</div>';
   }
   return '';
 }
