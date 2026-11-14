@@ -24,9 +24,9 @@ const ETAT = (id) => `(() => {
   const bar = document.querySelector('.filtre[data-filtre="${id}"]'); if (!bar) return null;
   const host = ${JSON.stringify(id)} === 't1' ? bar.nextElementSibling : bar.parentNode.querySelector('.q-res');
   const trs = [...host.querySelectorAll('tbody > tr')];
-  const vis = trs.filter((tr) => !tr.hidden && getComputedStyle(tr).display !== 'none').map((tr) => tr.cells[0].textContent.trim());
+  const vis = trs.filter((tr) => tr.getClientRects().length > 0).map((tr) => tr.cells[0].textContent.trim());
   const q = bar.querySelector('.filtre-q'), vide = bar.querySelector('.filtre-vide');
-  return { vis, total: trs.length, n: (bar.querySelector('.filtre-n') || {}).textContent || '', vide: !!vide && !vide.hidden,
+  return { vis, total: trs.length, n: (bar.querySelector('.filtre-n') || {}).textContent || '', vide: !!vide && vide.getClientRects().length > 0,
     champ: !!q, valeur: q ? q.value : null, focus: !!q && document.activeElement === q,
     loupe: getComputedStyle(bar.querySelector('.filtre-b')).opacity, thead: !!host.querySelector('thead tr') && getComputedStyle(host.querySelector('thead tr')).display !== 'none' };
 })()`;

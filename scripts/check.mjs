@@ -63,6 +63,17 @@ const ANCIENS = [
   [/\b(htimer|hpos|histMarks|restoreHist|histGo)\b/, 'ancienne variable d\'historique'],
   [/(^|[^.\w$])doc\s*=(?!=)/, 'réaffectation du document hors de la session'],
 ];
+// Bancs navigateur : un test vérifie ce qui est visible (outils visibles, ordreEcran, ou getClientRects), jamais l'attribut hidden,
+// que le CSS peut annuler (vérification c32 du lot 5) ; écrire hidden pour préparer une capture reste permis
+{
+  const dossier = new URL('../scripts/navigateur/', import.meta.url);
+  for (const f of readdirSync(dossier).filter((x) => x.endsWith('.mjs'))) {
+    readFileSync(new URL(f, dossier), 'utf8').split('\n').forEach((ligne, i) => {
+      if (/\.hidden\b(?!\s*=[^=])/.test(ligne)) throw new Error(`bancs navigateur : lecture de .hidden dans ${f}:${i + 1} ; vérifier ce qui est visible (outils visibles, ordreEcran)`);
+    });
+  }
+  console.log('bancs navigateur : OK (aucune lecture de .hidden)');
+}
 // Noms de premier niveau : tous les fichiers de src/js forment un seul script, un nom déclaré deux fois remplace le premier sans erreur
 {
   const vus = new Map();

@@ -26,7 +26,7 @@ const ETAT = (q) => `(() => {
 const puce = (q, cle) => `document.querySelector('.blk[data-id="${q}"] [data-qpuce="${cle}"]')`;
 
 export const nom = 'ligne de puces de requête';
-export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, visibles, mesure, echec }) {
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
   const touche = async (key, code, mods = 0) => { for (const type of ['keyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: { Escape: 27, Enter: 13, Tab: 9 }[key], modifiers: mods, ...(key === 'Enter' && type === 'keyDown' ? { text: '\r' } : {}) }); await attendre(60); };
   // vrai clic de souris au centre d'un élément (ou en un point), ramené au milieu de l'écran s'il est caché (barre du bloc collante)
@@ -64,7 +64,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await cliquer(`document.querySelector('.q-fen [data-qfiltre="tags"]')`);
   await cliquer(`document.querySelector('.q-fen .q-fen-q')`);
   await cdp('Input.insertText', { text: 'urg' }); await attendre(80);
-  attendu('recherche : seule « urgent » reste', (await evalue(`[...document.querySelectorAll('.q-fen .q-chip')].filter((c) => c.getClientRects().length > 0).map((c) => c.textContent).join()`)) === 'urgent', 'recherche');
+  attendu('recherche : seule « urgent » reste', (await visibles('.q-fen .q-chip')).join() === 'urgent', 'recherche');
   await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="urgent"]')`);
   e = await etat();
   attendu('pastille posée : puce du filtre, résultat filtré, fenêtre ouverte sous la nouvelle puce', e.puces[2] === 'urgent' && e.lignes.join() === '1,3' && e.fen === 'q1:Pastilles' && e.ouverte === 'urgent', e);

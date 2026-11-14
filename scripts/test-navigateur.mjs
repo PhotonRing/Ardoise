@@ -1,6 +1,6 @@
 // Banc navigateur : dist/ardoise.html ouvert dans Chromium sans affichage, piloté par le protocole DevTools (sans dépendance).
 // Les sujets sont rangés dans scripts/navigateur/ : un fichier par sujet, qui exporte `nom` et une fonction par défaut
-// recevant les outils ci-dessous (ecran, charger, evalue, cdp, attendre, dialogues, mesure, echec), pour que des tickets parallèles n'éditent pas le même fichier.
+// recevant les outils ci-dessous (ecran, charger, evalue, cdp, attendre, dialogues, visibles, ordreEcran, mesure, echec), pour que des tickets parallèles n'éditent pas le même fichier.
 // Sans Chromium (ou sans WebSocket dans Node), le banc est ignoré en local et échoue en CI.  node scripts/test-navigateur.mjs [sujet…]
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
@@ -57,6 +57,14 @@ const charger = async () => { await cdp('Page.navigate', { url: page }); for (le
 const ecran = (largeur, mobile, hauteur = 760) => cdp('Emulation.setDeviceMetricsOverride', { width: largeur, height: hauteur, deviceScaleFactor: mobile ? 2.625 : 1, mobile });
 
 const dossier = new URL('./navigateur/', import.meta.url);
+// Ce que voit l'utilisateur, pas l'état du DOM : un élément compte s'il occupe une place à l'écran (le CSS peut annuler hidden
+// ou réordonner les éléments). visibles : textes des éléments affichés, dans l'ordre du DOM ; ordreEcran : textes dans l'ordre
+// de lecture à l'écran (ligne par ligne, 8 px de tolérance, puis de gauche à droite). `texte` (facultatif) : corps d'une
+// fonction de l'élément `x` qui rend le texte voulu, par défaut son textContent.
+const VISIBLE = `(x) => x.getClientRects().length > 0 && getComputedStyle(x).visibility !== 'hidden'`;
+const visibles = (sel, texte = 'return x.textContent.trim()') => evalue(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(${VISIBLE}).map((x) => { ${texte} })`);
+const ordreEcran = (sel, texte = 'return x.textContent.trim()') => evalue(`(() => { const pos = (x) => { const r = x.getBoundingClientRect(); return [r.top, r.left]; };
+  return [...document.querySelectorAll(${JSON.stringify(sel)})].filter(${VISIBLE}).sort((a, b) => { const p = pos(a), q = pos(b); return Math.abs(p[0] - q[0]) > 8 ? p[0] - q[0] : p[1] - q[1]; }).map((x) => { ${texte} }); })()`);
 const choisis = process.argv.slice(2);
 const fichiers = readdirSync(dossier).filter((f) => f.endsWith('.mjs')).sort().filter((f) => !choisis.length || choisis.includes(f.replace(/\.mjs$/, '')));
 const echecs = []; let n = 0;
@@ -64,7 +72,7 @@ await cdp('Runtime.enable'); await cdp('Page.enable');
 for (const f of fichiers) {
   const sujet = await import(new URL(f, dossier)), nom = sujet.nom || f.replace(/\.mjs$/, '');
   enCours = 'le sujet ' + nom;
-  const outils = { ecran, charger, evalue, cdp, attendre, dialogues, mesure: () => { n++; }, echec: (m) => echecs.push(`[${nom}] ${m}`) };
+  const outils = { ecran, charger, evalue, cdp, attendre, dialogues, visibles, ordreEcran, mesure: () => { n++; }, echec: (m) => echecs.push(`[${nom}] ${m}`) };
   try { await sujet.default(outils); } catch (e) { echecs.push(`[${nom}] erreur : ${e.stack || e.message}`); }
 }
 ws.close();

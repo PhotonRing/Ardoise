@@ -1,4 +1,6 @@
 /* ===== Page : design repris des artefacts "php2shell Response Runbook" et "split_bundle.py" ===== */
+/* l'attribut hidden masque toujours, quel que soit le display d'un composant */
+[hidden]{display:none!important}
 :root{
   box-sizing:border-box;
   --bg:#f5f7f8; --surface:#ffffff; --fg:#17212b; --muted:#566573; --line:#d9e0e5;
@@ -143,9 +145,7 @@ pre.cmd{font:13.5px/1.55 var(--f-mono);background:var(--code-soft);border:1px so
 .filtre-x{width:28px;height:28px;padding:0;border:0;border-radius:6px;background:none;color:var(--muted);font:18px/1 var(--f-body);cursor:pointer}
 .filtre-x:hover{background:var(--accent-soft);color:var(--accent)}
 .filtre-vide{flex-basis:100%;margin:0;text-align:right;font:13px var(--f-body);color:var(--muted)}
-.filtre-vide[hidden]{display:none}
 table.filtrable thead th:last-child{padding-right:40px}
-.tablewrap tbody>tr[hidden]{display:none}
 @media print{.filtre{display:none!important}table.filtrable thead th:last-child{padding-right:12px}}
 .pill{display:inline-block;font:600 12px/1 var(--f-body);padding:4px 8px;border-radius:999px;white-space:nowrap}
 /* pastilles : couleur du nom (pa-N, posée au rendu) ou de la pastille (pc-N) */
@@ -330,7 +330,6 @@ footer.b-foot a{color:var(--accent)}
 .mdot{width:10px;height:10px;border-radius:50%;background:var(--accent);display:inline-block;flex:none}
 /* données par pays : légende et infobulle */
 .map-leg{position:absolute;left:10px;bottom:10px;max-width:min(260px,calc(100% - 20px));background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 9px 6px;font:11px/1.3 var(--f-body);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.1);pointer-events:none}
-.map-leg[hidden],.map-tip[hidden]{display:none}
 .map-leg .lg-t{display:flex;gap:6px;align-items:baseline;margin-bottom:5px;flex-wrap:wrap}
 .map-leg .lg-t b{font-weight:600;font-size:11.5px}
 .map-leg .lg-t small{color:var(--muted);font-size:10.5px}
@@ -389,7 +388,6 @@ button.toc-f:hover{color:var(--accent)}
 .toc-pr.drop-before::before{top:-1px} .toc-pr.drop-after::after{bottom:-1px}
 /* onglets : seconde rangée avec les sous-pages de la page de premier niveau affichée */
 .tabs-sub{margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px));display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;border-top:1px dashed var(--line)}
-.tabs-sub[hidden]{display:none}
 .tabs-sub .ptab{font-weight:500;font-size:13px;padding:9px 10px 8px}
 .tabs-sub .ptab-w.d2 .ptab::before{content:"› ";opacity:.5} .tabs-sub .ptab-w.d3 .ptab::before,.tabs-sub .ptab-w.d4 .ptab::before{content:"›› ";opacity:.5}
 ol.toc-s{padding:4px 0 8px 10px;border-left:1px solid var(--line);margin-left:12px}
