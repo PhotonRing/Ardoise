@@ -880,6 +880,34 @@ test('libellé : dépendance entre cartes de kanban ajoutée puis retirée', () 
   egal(libelles(m), ['Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée', 'Accueil · Kanban « À faire Écrire Relire » : dépendance modifiée']);
 });
 
+test('libellé : champs des cartes et filtre « Bloquées » d\'une requête kanban, un Ctrl+Z chacun', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', view: 'kanban' }); });
+  const q = () => blocsDe(m)[1];
+  m.s.modifier(() => { q().champs = { masques: ['attend', 'texte'], ordre: [] }; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : champs des cartes modifiés');
+  m.s.modifier(() => { q().bloquees = true; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés');
+  m.s.annuler();
+  egal('bloquees' in q(), false, 'annuler : filtre retiré');
+  m.s.annuler();
+  egal('champs' in q(), false, 'annuler : champs d\'avant');
+});
+
+test('libellé : colonnes d\'une requête modifiées, un Ctrl+Z rend la requête sans choix', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' }); });
+  const q = () => blocsDe(m)[1];
+  m.s.modifier(() => { q().colonnes = { mode: 'sauf', noms: ['état'], ordre: [] }; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : colonnes modifiées');
+  m.s.modifier(() => { q().colonnes.ordre = ['#source']; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : colonnes modifiées', 'ordre');
+  m.s.annuler(); m.s.annuler();
+  egal('colonnes' in q(), false, 'annuler : plus de choix');
+  m.s.modifier(() => { q().view = 'list'; });
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : bloc modifié', 'autre réglage : libellé inchangé');
+});
+
 test('libellé : colonne de kanban réduite puis affichée, annulée puis rétablie', () => {
   const m = monter();
   m.s.modifier(() => { blocsDe(m).push({ id: 'kb', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [] }, { id: 'c2', title: 'Fait', cards: [{ id: 'k1', title: 'Écrire' }] }] }); });
@@ -1137,6 +1165,82 @@ for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une �
   m.s.annuler();
   egal(JSON.stringify(m.doc.pages), avant, 'page d\'avant');
   egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+
+// ---------- étape ouverte (fenêtre d'une puce de requête) ----------
+const FEN = { etape: 'Accueil · Requête « Incidents » : filtres modifiés' };
+test('étape ouverte : plusieurs modifications forment une seule étape, nommée, qu\'un seul Ctrl+Z défait', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'), null, 'texte modifié');
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.modifier(() => ecrire(m, 'd'));
+  m.s.fermerEtape();
+  egal(libelles(m), [FEN.etape, '']);
+  egal(m.sync.filter((x) => x === 'envoyer').length, 3, 'chaque changement part vers les autres copies');
+  m.s.annuler();
+  egal(m.texte(), 'a');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+  m.s.retablir();
+  egal(m.texte(), 'd');
+});
+test('étape ouverte : une modification reçue entre deux changements ne coupe pas l\'étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  recevoir(m, (e) => { e.title = 'Reçu'; });
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.fermerEtape();
+  egal(m.doc.title, 'Reçu');
+  m.s.annuler();
+  egal(m.texte(), 'a', 'un seul Ctrl+Z (le faux adaptateur ne rebase pas le reçu)');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+test('étape ouverte : annuler pendant la fenêtre, puis modifier, crée une nouvelle étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.annuler();
+  m.s.modifier(() => ecrire(m, 'c'));
+  egal(m.texte(), 'c');
+  m.s.annuler();
+  egal(m.texte(), 'a');
+  egal(possible(m.s.historique()), { annuler: false, retablir: true });
+});
+test('étape ouverte : revenir à l\'état de départ ne laisse aucune étape', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.modifier(() => ecrire(m, 'a'));
+  egal(possible(m.s.historique()), { annuler: false, retablir: false });
+  m.s.modifier(() => ecrire(m, 'c'));
+  m.s.fermerEtape();
+  egal(libelles(m), [FEN.etape, '']);
+});
+test('deux copies : étape ouverte revenue à son départ après une arrivée, aucune étape vide ne reste annulable', () => {
+  const { a, b } = relier();
+  a.s.ouvrirEtape(FEN);
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'x'; });
+  b.s.modifier(() => { b.ctx.doc.pages[0].blocks[1].html = 'b-B'; });
+  echanger(a, b);
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'a'; });
+  a.s.fermerEtape();
+  egal([a.bloc('b1'), a.bloc('b2')], ['a', 'b-B']);
+  egal(possible(a.s.historique()), { annuler: false, retablir: false }, 'l\'étape revenue à son départ disparaît');
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'c'; });
+  a.s.annuler();
+  egal([a.bloc('b1'), a.bloc('b2')], ['a', 'b-B'], 'une modification suivante reste une seule étape, qui garde le reçu');
+  egal(possible(a.s.historique()), { annuler: false, retablir: true });
+});
+test('après fermerEtape, une modification est une étape ordinaire', () => {
+  const m = monter();
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => ecrire(m, 'b'));
+  m.s.fermerEtape();
+  m.s.modifier(() => ecrire(m, 'c'));
+  egal(libelles(m)[0], 'Accueil · Paragraphe « c » : texte modifié');
+  m.s.annuler();
+  egal(m.texte(), 'b');
 });
 
 for (const [nom, fn] of tests) {

@@ -81,10 +81,11 @@ test('requête « Modèles diamant » : lien vers le bloc, vues liste et nombre'
   vrai(req({ view: 'count' }).includes('<b>2</b><span class="q-lab">modèles diamant</span>'), 'nombre');
 });
 
-test('requête « Modèles diamant » : proposée dans le formulaire et portée de section', () => {
+test('requête « Modèles diamant » : proposée dans la fenêtre de la source et portée de section', () => {
   const { ctx, d } = monter(REQ({}));
-  const h = ctx.renderPage(d, { page: 0, view: 'edit' });
-  vrai(/<option value="diamond" selected>les modèles diamant<\/option>/.test(h), 'option du formulaire');
+  const h = ctx.renderPage(d, { page: 0, view: 'edit' }), q = d.pages[0].blocks.find((x) => x.type === 'query');
+  vrai(h.includes('<small>Chercher</small> Modèles diamant'), 'puce de la source');
+  vrai(/data-qset="src" data-v="diamond" aria-pressed="true"><span>Modèles diamant</.test(ctx.qFenetre(q, d, 0, 'src')), 'choix de la fenêtre');
   const brut = { title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
     { id: 's1', type: 'h2', html: 'Un' }, { id: 'd1', type: 'diamond', title: 'Dans un' },
     { id: 's2', type: 'h2', html: 'Deux' }, { id: 'd2', type: 'diamond', title: 'Dans deux' },

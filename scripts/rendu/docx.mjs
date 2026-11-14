@@ -188,3 +188,12 @@ test('docx : une fiche de faits ou un tableau sans ligne n\'écrit aucun tableau
   vrai(!doc.includes('<w:tbl>'), 'aucun tableau attendu : ' + doc.slice(0, 400));
   vrai(doc.includes('>fin</w:t>'), 'le reste de la page');
 });
+
+test('docx : carte de chaleur, cases teintées (fond de cellule) et texte blanc au palier le plus foncé', () => {
+  const { doc } = produire({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 't1', type: 'table', rows: [['Tactique', 'Technique'], ['Exécution', 'T1059'], ['Exécution', 'T1059'], ['Impact', 'T1486']] },
+    { id: 'q', type: 'query', src: 'table', scope: 'doc', view: 'chaleur', chX: 'tactique', chY: 'technique' },
+  ] }] });
+  vrai(/<w:shd w:val="clear" w:color="auto" w:fill="B4540A"\/><\/w:tcPr>(?:(?!<\/w:tc>)[\s\S])*?<w:color w:val="FFFFFF"\/>(?:(?!<\/w:tc>)[\s\S])*?T1059/.test(doc), 'T1059 : accent pur, texte blanc');
+  vrai(/<w:shd w:val="clear" w:color="auto" w:fill="FBF5F0"\/><\/w:tcPr>(?:(?!<\/w:tc>)[\s\S])*?T1486/.test(doc), 'T1486 : palier le plus clair');
+});

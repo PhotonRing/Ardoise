@@ -146,6 +146,27 @@ test('office : requête figée comme affichée (tableau, liste, nombre « texte 
   egal(office('q', page({ view: 'count', cards: [{ label: 'Avec OK', tags: ['ok'], match: 'any', state: 'all', total: 'all' }] })).texte, 'Hôtes\nAvec OK : 1 / 2');
 });
 
+test('office : requête aux colonnes choisies (tableau, liste, en colonnes, cases)', () => {
+  const page = (q, plus) => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'f1', type: 'facts', items: [{ k: 'Hôte', v: 'srv1' }, { k: 'Risque', v: 'haut' }, { k: 'Note', v: 'n' }] },
+    ...(plus || []),
+    { id: 'q', type: 'query', title: 'Hôtes', src: 'facts', scope: 'doc', tags: [], match: 'any', ...q },
+  ] }] });
+  const ch = { mode: 'sauf', noms: ['note'], ordre: ['#source', 'risque'] };
+  egal(office('q', page({ view: 'table', colonnes: ch })).texte, 'Hôtes\nSource\tRisque\tHôte\nAccueil\thaut\tsrv1');
+  egal(office('q', page({ view: 'table', colonnes: { mode: 'seulement', noms: ['hôte'], ordre: [] } })).texte, 'Hôtes\nHôte\nsrv1', 'Source masquée');
+  egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['note'], ordre: ['risque'] } })).texte, 'Hôtes\n- Accueil · Risque haut · Hôte srv1', 'liste : Source en tête');
+  egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['#source'], ordre: [] } })).texte, 'Hôtes\n- Hôte srv1 · Risque haut · Note n', 'liste sans Source');
+  // en colonnes, la carte suit l'écran : colonnes choisies dans leur ordre, sans celle du regroupement, Source à sa place
+  // (texte d'une case du tableau : ses paragraphes joints par une espace)
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nRisque haut Accueil', 'en colonnes : Note masquée, Source affichée');
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:risque', colonnes: { mode: 'sauf', noms: [], ordre: ['hôte', '#source', 'risque', 'note'] } })).texte, 'Hôtes\nhaut (1)\nHôte srv1 Accueil Note n', 'en colonnes : Source rangée au milieu');
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note', '#source'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nRisque haut', 'en colonnes : Source masquée');
+  egal(office('q', page({ src: 'check', view: 'kanban' }, [{ id: 'c1', type: 'check', items: [{ html: 'fait', done: true }] }])).texte, 'Hôtes\nNon cochées (0)\tCochées (1)\n\t☑ fait Accueil', 'cases en colonnes : Source affichée');
+  const cases = [{ id: 'c1', type: 'check', items: [{ html: 'fait', done: true }] }];
+  egal(office('q', page({ src: 'check', view: 'table', colonnes: { mode: 'sauf', noms: ['#source'], ordre: ['élément'] } }, cases)).texte, 'Hôtes\nÉlément\t✓\nfait\t☑');
+});
+
 // groupe et modèle diamant (lot 6) : le groupe arrive ouvert, titre en gras puis ses blocs ; le diamant en tableau
 const DOC6 = { v: 6, title: 'Doc', tags: { apt: { c: 1 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 'g1', type: 'group', title: 'Détails <i>repliés</i>', folded: true, blocks: [
@@ -180,4 +201,30 @@ test('office : modèle diamant en tableau, titre puis les quatre sommets nommés
 test('office : une fiche de faits ou un tableau sans ligne n\'écrit aucun tableau', () => {
   const doc = { v: 6, title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'f', type: 'facts', items: [] }, { id: 't', type: 'table', rows: [] }] }] };
   for (const id of ['f', 't']) { const { html, texte } = office(id, doc); vrai(!html.includes('<table'), id + ' : ' + html); egal(texte, '', id + ' : texte brut'); }
+});
+
+test('office : vue regroupée en fiches (titre gras avec le nombre, tableau à deux colonnes) et en tableau', () => {
+  const page = (q) => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 't1', type: 'table', rows: [['Adversaire', 'Technique'], ['APT28', P('T1059')], ['apt28', 'T1071'], ['', 'T1566']] },
+    { id: 'q', type: 'query', title: 'Synthèse', src: 'table', scope: 'doc', view: 'regroupee', regX: 'adversaire', regY: ['technique'], ...q },
+  ] }] });
+  const f = office('q', page({}));
+  egal(f.texte, 'Synthèse\nAPT28 (2)\nTechnique\t#T1059, T1071\n(vide) (1)\nTechnique\tT1566');
+  vrai(/<b[^>]*>APT28 \(2\)<\/b>|font-weight:bold[^>]*>APT28 \(2\)/.test(f.html), 'titre en gras');
+  egal(office('q', page({ regForme: 'tableau', sortBy: '#n', sortDir: 'asc' })).texte, 'Synthèse\nAdversaire\tTechnique\tLignes\n(vide)\tT1566\t1\nAPT28\t#T1059, T1071\t2');
+});
+
+test('office : carte de chaleur en tableau aux cases teintées (couleurs du thème clair), sous-cases sous leur case, légende', () => {
+  const page = (q, palette) => ({ title: 'Doc', palette, pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 't1', type: 'table', rows: [['Tactique', 'Technique', 'Sous', 'Score'], ['Exécution', 'T1059', '.001', '3,5'], ['Persistance', 'T1053', '', '1'], ['exécution', 'T1204', '', '1']] },
+    { id: 'q', type: 'query', title: 'Matrice', src: 'table', scope: 'doc', view: 'chaleur', chX: 'tactique', chY: 'technique', chZ: 'sous', chN: 'score', ...q },
+  ] }] });
+  const f = office('q', page({}));
+  egal(f.texte, 'Matrice\nExécution (4,5)\tPersistance (1)\nT1059  3,5\tT1053  1\n› .001  3,5\t\nT1204  1\t\nÉchelle : de 1 (clair) à 3,5 (foncé), somme de Score');
+  const t = f.e.find((x) => x.t === 'tableau');
+  // T1059 et .001 au palier le plus foncé (accent pur), T1053 et T1204 au plus clair (6 % d'accent sur blanc)
+  egal(t.fonds, [[null, null], ['#b4540a', '#fbf5f0'], ['#b4540a', null], ['#fbf5f0', null]]);
+  vrai(/background:#b4540a[^>]*>[\s\S]*?color:#ffffff[^>]*>T1059/.test(f.html), 'palier foncé : texte blanc');
+  vrai(/background:#fbf5f0/.test(f.html), 'palier clair');
+  egal(office('q', page({}, 'indigo')).e.find((x) => x.t === 'tableau').fonds[1][0], '#4848c0', 'accent de la palette du document');
 });

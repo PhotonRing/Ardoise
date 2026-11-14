@@ -37,3 +37,27 @@ test('visite guidée : le kanban montre une dépendance et une colonne réduite'
   vrai(/Attend : /.test(h) && /Bloque : /.test(h), 'Attend et Bloque affichés');
   vrai(/data-red/.test(h), 'une colonne réduite');
 });
+
+// Origine : spec requetes-avancees, ticket 06 (user story 60) : la page « Suivi de projet » montre les requêtes avancées
+test('visite guidée : choix des colonnes, cartes bloquées, vue regroupée et carte de chaleur sur la page de suivi', () => {
+  const { ctx, brut } = visite();
+  const d = ctx.normalize(brut);
+  const i = d.pages.findIndex((pg) => pg.id === 'suivi'), qs = d.pages[i].blocks.filter((b) => b.type === 'query');
+  const res = (b) => ctx.queryResult(b, d, { page: i, view: 'read' });
+  const sauf = qs.find((b) => b.colonnes && b.colonnes.mode === 'sauf');
+  vrai(sauf, 'une requête « Toutes sauf… »');
+  const hs = res(sauf);
+  vrai(!/>Priorité</.test(hs) && !/>Attend</.test(hs) && />Échéance/.test(hs), 'Priorité et Attend masquées, Échéance gardée');
+  const bloq = qs.find((b) => b.src === 'kanban' && b.bloquees);
+  vrai(bloq, 'une requête kanban « Bloquées »');
+  const hb = res(bloq);
+  vrai(/Migrer la base/.test(hb) && !/Rédiger le guide/.test(hb), 'seule la carte bloquée');
+  vrai(/Attend/.test(hb) && /Tests de charge/.test(hb), 'colonne Attend affichée');
+  const reg = qs.find((b) => b.view === 'regroupee' && b.src === 'table');
+  vrai(reg && ctx.qRegReglage(reg, ctx.queryRecords(reg, d, i)).x === reg.regX, 'vue regroupée sur sa colonne');
+  vrai(/q-reg/.test(res(reg)) && /Messagerie/.test(res(reg)), 'vue regroupée rendue');
+  const ch = qs.find((b) => b.view === 'chaleur' && b.src === 'table');
+  const rc = ch && ctx.qChReglage(ch, ctx.queryRecords(ch, d, i));
+  vrai(rc && rc.x === ch.chX && rc.y === ch.chY && rc.n === ch.chN, 'carte de chaleur sur ses colonnes');
+  vrai(/q-ch/.test(res(ch)), 'carte de chaleur rendue');
+});

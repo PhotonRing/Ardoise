@@ -117,7 +117,7 @@ function renderBlock(b, d, ctx, num) {
     case 'kanban': return kanbanHTML(b, ctx, f);
     case 'query':
       return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? queryForm(b, d, ctx) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
+        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -579,11 +579,12 @@ function refreshDerived() {
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
       var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); }   // le champ du filtre est hors de .q-res
     }
-    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-form', app);
-    if (form && !form.contains(document.activeElement)) {   // pas pendant le choix d'une liste
-      var tmp = document.createElement('div'); tmp.innerHTML = queryForm(b, doc, vc);
-      var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) form.replaceWith(nf);
+    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces', app);
+    if (form && !form.contains(document.activeElement)) {   // pas pendant que le focus est sur une puce
+      var tmp = document.createElement('div'); tmp.innerHTML = qLignePuces(b, doc, vc.page);
+      var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) { form.replaceWith(nf); if (fen && fen.b === b.id) fenPlacer(); }
     }
+    if (fen && fen.b === b.id && !fen.p.contains(document.activeElement)) fenGarnir();   // pastilles de la portée, noms de page
   });
   // blocs sommaire de la page : la liste suit les titres saisis
   tousBlocs(doc.blocks).forEach(function (b) {
@@ -627,6 +628,7 @@ function render(focus) {
   Reader.tlFit(app);
   poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
   poserPlage();   // plage de cellules surlignée, après le filtre qui décide des lignes visibles (14-plage-cellules.js)
+  fenApresRendu();   // fenêtre d'une puce de requête ouverte : regarnie sous sa puce (16-puces-requete.js)
   renderChrome();
   suivreHautEcran();
   updateCheat();
