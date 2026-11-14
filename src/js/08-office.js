@@ -265,12 +265,21 @@ function officeRequete(b, d, pi, S, txt, para) {
   }
   recs = qSorted(b, d, ctx, recs);
   if (view === 'kanban') {
-    var groupes = qRegroupements(b, d, pi, recs).groups, carte = function (r) {
+    var qg = qRegroupements(b, d, pi, recs), groupes = qg.groups, carte = function (r) {
       if (src === 'kanban') return officeCarteRequete(b, r, S, txt, para, source);
-      if (src === 'check') return [para([txt(r.done ? '☑ ' : '☐ ')].concat(element(r)))];
-      var o = kc.cellsOf(r);   // colonnes choisies dans leur ordre ; la carte n'a pas de source, comme avant le choix des colonnes
-      return [para(kc.cols.filter(function (c) { return !c.source && o[c.j] && !officeVide(S(o[c.j].v)); }).reduce(function (a, c) { return a.concat(a.length ? [txt(' · ')] : [], [txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })], valeur(o[c.j])); }, []))];
-    }, kc = src === 'kanban' || src === 'check' ? null : qColonnesAffichees(b, recs);
+      // comme à l'écran (qKanban) : colonnes choisies dans leur ordre, sans celle du regroupement ; Source, à sa place, coupe la carte
+      var o = kc.cellsOf(r), sep = src === 'check' ? ' ' : ' · ', segs = [], out = [];
+      var fin = function () { if (segs.length) out.push(para(segs)); segs = []; };
+      var mettre = function (x) { segs = segs.concat(segs.length ? [txt(sep)] : [], x); };
+      kc.cols.forEach(function (c) {
+        if (c.source) { fin(); out.push(para([source(r)])); }
+        else if (c.coche) mettre([txt(r.done ? '☑' : '☐')]);
+        else if (c.element) mettre(element(r));
+        else if (o[c.j] && 'c:' + c.nom.toLowerCase() !== qg.gb && !officeVide(S(o[c.j].v))) mettre([txt(c.nom + ' ', { couleur: OFFICE_CLAIR.muted })].concat(valeur(o[c.j])));
+      });
+      fin();
+      return out;
+    }, kc = src === 'kanban' ? null : qColonnesAffichees(b, recs);
     out.push({ t: 'tableau', entete: true, lignes: [groupes.map(function (g) { return [para([txt(g.name + ' (' + g.recs.length + ')')])]; }),
       groupes.map(function (g) { return g.recs.reduce(function (a, r) { return a.concat(carte(r)); }, []); })] });
     return out;

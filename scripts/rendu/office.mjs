@@ -157,7 +157,12 @@ test('office : requête aux colonnes choisies (tableau, liste, en colonnes, case
   egal(office('q', page({ view: 'table', colonnes: { mode: 'seulement', noms: ['hôte'], ordre: [] } })).texte, 'Hôtes\nHôte\nsrv1', 'Source masquée');
   egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['note'], ordre: ['risque'] } })).texte, 'Hôtes\n- Accueil · Risque haut · Hôte srv1', 'liste : Source en tête');
   egal(office('q', page({ view: 'list', colonnes: { mode: 'sauf', noms: ['#source'], ordre: [] } })).texte, 'Hôtes\n- Hôte srv1 · Risque haut · Note n', 'liste sans Source');
-  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nHôte srv1 · Risque haut', 'en colonnes : Note masquée');
+  // en colonnes, la carte suit l'écran : colonnes choisies dans leur ordre, sans celle du regroupement, Source à sa place
+  // (texte d'une case du tableau : ses paragraphes joints par une espace)
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nRisque haut Accueil', 'en colonnes : Note masquée, Source affichée');
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:risque', colonnes: { mode: 'sauf', noms: [], ordre: ['hôte', '#source', 'risque', 'note'] } })).texte, 'Hôtes\nhaut (1)\nHôte srv1 Accueil Note n', 'en colonnes : Source rangée au milieu');
+  egal(office('q', page({ view: 'kanban', groupBy: 'c:hôte', colonnes: { mode: 'sauf', noms: ['note', '#source'], ordre: [] } })).texte, 'Hôtes\nsrv1 (1)\nRisque haut', 'en colonnes : Source masquée');
+  egal(office('q', page({ src: 'check', view: 'kanban' }, [{ id: 'c1', type: 'check', items: [{ html: 'fait', done: true }] }])).texte, 'Hôtes\nNon cochées (0)\tCochées (1)\n\t☑ fait Accueil', 'cases en colonnes : Source affichée');
   const cases = [{ id: 'c1', type: 'check', items: [{ html: 'fait', done: true }] }];
   egal(office('q', page({ src: 'check', view: 'table', colonnes: { mode: 'sauf', noms: ['#source'], ordre: ['élément'] } }, cases)).texte, 'Hôtes\nÉlément\t✓\nfait\t☑');
 });
