@@ -79,7 +79,6 @@ html.sheet-on{overflow:hidden}
 .fab:hover,.fab:focus-within,.fab.dirty{opacity:1}
 .fab .ub{border-radius:999px}
 /* synchronisation : état et personnes présentes */
-.syn[hidden]{display:none}
 .syn-b{display:inline-flex;align-items:center;gap:0;height:30px;padding:0 8px 0 9px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--fg);cursor:pointer}
 .syn-b:hover{border-color:var(--accent)}
 .syn-b>i{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:4px}
@@ -438,7 +437,6 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-col.q-drop-apres{box-shadow:3px 0 0 var(--accent)}
 .q-grip{cursor:grab;color:var(--muted);padding:0 4px;user-select:none;letter-spacing:-2px}
 .q-chip{border:0;cursor:pointer;opacity:.45}
-.q-chip[hidden]{display:none}
 .q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
 .q-chip:hover{opacity:.85}
 .q-hint{font-size:12px}

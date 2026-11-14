@@ -114,7 +114,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await evalue(basculer); await attendre(80);
   await evalue(`document.querySelector('.filtre[data-filtre="q1"] .filtre-b').click()`); await attendre(50);
   await cdp('Input.insertText', { text: 'srv' }); await attendre(80);
-  const vis = await evalue(`[...document.querySelector('.filtre[data-filtre="q1"]').parentNode.querySelectorAll('.q-res tbody tr')].filter((tr) => !tr.hidden && getComputedStyle(tr).display !== 'none').map((tr) => tr.cells[0].textContent.trim())`);
+  const vis = await evalue(`[...document.querySelector('.filtre[data-filtre="q1"]').parentNode.querySelectorAll('.q-res tbody tr')].filter((tr) => tr.getClientRects().length > 0).map((tr) => tr.cells[0].textContent.trim())`);
   const th = await evalue(`[...document.querySelector('.filtre[data-filtre="q1"]').parentNode.querySelectorAll('.q-res thead th')].map((t) => t.textContent.trim())`);
   attendu('loupe : filtre la vue tableau aux colonnes choisies', vis.join('|') === 'srv1|srv2' && th.join('|') === 'Hôte|Risque', { vis, th });
 
