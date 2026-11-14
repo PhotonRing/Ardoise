@@ -97,4 +97,30 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   attendu('360 px : puces dans la carte, fenêtre entière, sans défilement de page', m.page <= 0 && m.puces && m.fen && m.droite <= 360, m);
   await touche('Escape', 'Escape');
   await ecran(1000, false);
+
+  // anciennes cartes sans id (document 1.23, aucun id donné à l'ouverture) : la fenêtre de la 2e carte vise la 2e carte, qui reçoit un id
+  const ancien = JSON.parse(JSON.stringify(DOC)); ancien.pages[0].blocks[1].cards.forEach((c) => delete c.id);
+  await evalue(`window.ardoise.load(${JSON.stringify(ancien)})`); await attendre(80);
+  e = await etat(); attendu('ouverture : pas d\'id donné aux anciennes cartes', e.bloc.cards.every((c) => !('id' in c)), e.bloc.cards);
+  await cliquer(puce('plus:n1:filtres'));
+  await cliquer(`document.querySelector('.q-fen [data-qfiltre="kbWho"]')`);
+  await cliquer(caseV('alice'));
+  e = await etat();
+  const c2 = e.bloc.cards[1], fa = c2.filtres && c2.filtres[0];
+  attendu('Alice cochée depuis une ancienne carte : filtre sur la 2e carte, qui reçoit un id, fenêtre sous sa puce',
+    !e.bloc.cards[0].filtres && !('id' in e.bloc.cards[0]) && typeof c2.id === 'string' && fa && fa.vals.join() === 'alice' && e.ouverte === 'f:' + fa.id && e.cartes[1].puces[0] === 'Responsable : Alice', e);
+  await cliquer(caseV('bob'));
+  e = await etat(); attendu('Bob coché : même carte', e.bloc.cards[1].filtres[0].vals.join() === 'alice,bob' && !e.bloc.cards[0].filtres, e.bloc.cards);
+  await touche('Escape', 'Escape');
+
+  // filtre d'une carte resté d'une autre source (kanban puis cases à cocher) : il compte, sa fenêtre reste ouverte quand on le règle
+  const autre = JSON.parse(JSON.stringify(DOC)); Object.assign(autre.pages[0].blocks[1], { src: 'check', cards: [{ id: 'n1', label: 'Faites', total: 'none', filtres: [{ id: 'fc', prop: 'col', vals: ['fait'] }] }] });
+  await evalue(`window.ardoise.load(${JSON.stringify(autre)})`); await attendre(80);
+  await cliquer(puce('f:fc'));
+  e = await etat(); attendu('fenêtre « Colonne du kanban » ouverte depuis la puce de la carte', e.fen === 'Colonne du kanban' && e.ouverte === 'f:fc', e);
+  await cliquer(caseV('en cours'));
+  e = await etat(); attendu('En cours cochée : fenêtre encore ouverte, valeur ajoutée', e.fen === 'Colonne du kanban' && e.ouverte === 'f:fc' && e.bloc.cards[0].filtres[0].vals.join() === 'fait,en cours', e);
+  await cliquer(caseV('fait'));
+  e = await etat(); attendu('Fait décochée : fenêtre encore ouverte', e.fen === 'Colonne du kanban' && e.bloc.cards[0].filtres[0].vals.join() === 'en cours', e);
+  await touche('Escape', 'Escape');
 }

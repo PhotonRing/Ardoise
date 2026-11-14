@@ -54,8 +54,9 @@ function libelleFeuilles(a, b, k, rows, out) {
   out.push({ k: typeof a === typeof b && typeof b !== 'object' ? k : '', rows: rows && typeof b === 'string', v: b });
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
-function libelleSansFiltres(b) { var o = {}; for (var k in b) if (k !== 'filtres') o[k] = b[k]; return JSON.stringify(o); }
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
+// bloc sans ses filtres, premier niveau seulement : les filtres des cartes de nombre restent comparés
+function libelleSansFiltres(b) { var o = {}; for (var k in b) if (k !== 'filtres') o[k] = b[k]; return JSON.stringify(o); }
 // tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; sinon null (collage et vidage d'une plage donnent leur nature)
 function libelleGrille(ra, rb) {
   var J = JSON.stringify, i;

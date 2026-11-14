@@ -14,7 +14,7 @@ function normBlocks(arr, newer) {
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
     // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
-    if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) nb.cards = [qDefCard(nb)];
+    if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) { nb.cards = [qDefCard(nb)]; delete nb.cards[0].id; }   // sans id, comme en 1.23 (qNormFiltres)
     // requête : le miroir des anciens filtres (05-migrations.js) n'est jamais repris en mémoire ; listes de filtres assainies
     if (nb.type === 'query' && !newer) { oterAnciensFiltres(nb); qNormFiltres(nb); }
     if (nb.type === 'kanban') nb.cols = (Array.isArray(nb.cols) ? nb.cols : []).filter(function (c) { return c && typeof c === 'object'; }).map(function (c) {

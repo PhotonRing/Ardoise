@@ -163,7 +163,6 @@ function qFiltresSource(b, liste) {
   return (liste || []).filter(function (f) { return f && ok[f.prop]; });
 }
 // --- lecture et réglage des listes de filtres (bloc : hote = b, cle 'filtres' ; carte de nombre : hote = carte, cle 'filtres' ou 'tfiltres') ---
-function qFiltreDe(liste, prop) { return (liste || []).filter(function (f) { return f && f.prop === prop; })[0] || null; }
 // identifiant neuf, unique dans le bloc (cartes comprises) ; tiré au hasard : deux copies qui ajoutent chacune un filtre en gardent deux
 function qIdFiltre(b) {
   var pris = {}, note = function (l) { (l || []).forEach(function (f) { if (f) pris['$' + f.id] = 1; }); };
@@ -171,27 +170,25 @@ function qIdFiltre(b) {
   var id; do id = uid(); while (pris['$' + id]); return id;
 }
 function qFiltreParId(liste, id) { return (liste || []).filter(function (f) { return f && f.id === id; })[0] || null; }
-// cible d'un réglage : nom de propriété (premier filtre de cette propriété : cartes de nombre) ou { id, prop, mode }
-// (filtre de la ligne de puces ; sans id, ou id disparu, un nouveau filtre de cette propriété et de ce mode)
-function qCibleFiltre(hote, cle, ref) { return typeof ref === 'string' ? qFiltreDe(hote[cle], ref) : ref.id ? qFiltreParId(hote[cle], ref.id) : null; }
+// cible d'un réglage : { id, prop, mode } (sans id, ou id disparu, un nouveau filtre de cette propriété et de ce mode)
+function qCibleFiltre(hote, cle, ref) { return ref.id ? qFiltreParId(hote[cle], ref.id) : null; }
 function qNouveauFiltre(b, hote, cle, ref) {
-  var f = { id: qIdFiltre(b), prop: typeof ref === 'string' ? ref : ref.prop, vals: [] };
+  var f = { id: qIdFiltre(b), prop: ref.prop, vals: [] };
   if (ref.mode === 'tous' || ref.mode === 'aucun') f.mode = ref.mode;
   if (f.prop === 'valeur') f.colonne = String(ref.colonne || '');
   (hote[cle] || (hote[cle] = [])).push(f); return f;
 }
-// choix d'une valeur unique : '' (ou 'all' pour l'état des cases) retire le filtre ; 'p12' coche P1 et P2 ; rend le filtre (null : retiré)
+// choix d'une valeur unique (état des cases, bloquées, échéance) : rend le filtre
 function qReglerFiltre(b, hote, cle, ref, v) {
-  var f = qCibleFiltre(hote, cle, ref), prop = typeof ref === 'string' ? ref : ref.prop;
-  if (v == null || v === '' || (prop === 'state' && v === 'all')) { if (f) qRetirerFiltre(hote, cle, f); return null; }
-  if (!f) f = qNouveauFiltre(b, hote, cle, ref);
-  f.vals = prop === 'kbPrio' && v === 'p12' ? ['p1', 'p2'] : [String(v)];
+  var f = qCibleFiltre(hote, cle, ref) || qNouveauFiltre(b, hote, cle, ref);
+  f.vals = [String(v)];
   return f;
 }
 // coche ou décoche une valeur ; la dernière décochée retire le filtre (rend null) ; le mode reste
 function qBasculerValeur(b, hote, cle, ref, val) {
-  var f = qCibleFiltre(hote, cle, ref) || qNouveauFiltre(b, hote, cle, ref), at = f.vals.indexOf(val);
-  if (at >= 0) f.vals.splice(at, 1); else f.vals.push(val);
+  var f = qCibleFiltre(hote, cle, ref) || qNouveauFiltre(b, hote, cle, ref);
+  // décocher retire toutes les occurrences : deux copies qui cochent la même valeur en même temps la mettent en double
+  if (f.vals.indexOf(val) >= 0) f.vals = f.vals.filter(function (x) { return x !== val; }); else f.vals.push(val);
   if (!f.vals.length) { qRetirerFiltre(hote, cle, f); return null; }
   return f;
 }
@@ -206,19 +203,24 @@ function qChangerColonne(b, d, pi, cle, ref, colonne, hote) {
 }
 // retire un filtre ; une liste vide est supprimée
 function qRetirerFiltre(hote, cle, f) { var l = hote[cle] || [], at = l.indexOf(f); if (at >= 0) l.splice(at, 1); if (!l.length) delete hote[cle]; }
-// normalisation : filtres à propriété connue et valeurs non vides (« Valeur d'une colonne » : avec sa colonne), identifiants présents et uniques dans le bloc, listes vides supprimées
+// normalisation : filtres à propriété connue et valeurs non vides, sans doublon (« Valeur d'une colonne » : avec sa colonne), identifiants présents et uniques dans le bloc, listes vides supprimées
 function qNormFiltres(b) {
   var pris = {}, net = function (o, cle) {
     var l = Array.isArray(o[cle]) ? o[cle].filter(function (f) { return f && typeof f === 'object' && Q_PROPS[f.prop] && Array.isArray(f.vals) && f.vals.length && (f.prop !== 'valeur' || typeof f.colonne === 'string'); }) : [];
-    l.forEach(function (f) { if (typeof f.id !== 'string' || !f.id || pris['$' + f.id]) { do f.id = uid(); while (pris['$' + f.id]); } pris['$' + f.id] = 1; });
+    l.forEach(function (f) {
+      if (typeof f.id !== 'string' || !f.id || pris['$' + f.id]) { do f.id = uid(); while (pris['$' + f.id]); } pris['$' + f.id] = 1;
+      f.vals = f.vals.filter(function (v, i) { return f.vals.indexOf(v) === i; });   // valeur cochée par deux copies en même temps
+    });
     if (l.length) o[cle] = l; else delete o[cle];
   };
   net(b, 'filtres');
-  // cartes de nombre : identifiant présent et unique dans le bloc (la fenêtre d'un filtre vise sa carte par lui, 16-puces-requete.js)
+  // cartes de nombre : identifiant unique dans le bloc (la fenêtre d'un filtre vise sa carte par lui, 16-puces-requete.js) ; une carte
+  // sans id n'en reçoit pas (repérée par son rang, qCleCarte) : un id tiré à l'ouverture la doublerait en synchro, chaque copie la remplaçant
   var cartes = {};
   (Array.isArray(b.cards) ? b.cards : []).forEach(function (c) {
     if (!c || typeof c !== 'object') return;
     net(c, 'filtres'); net(c, 'tfiltres');
+    if (c.id == null) return;
     if (typeof c.id !== 'string' || !c.id || cartes['$' + c.id]) { do c.id = uid(); while (cartes['$' + c.id]); } cartes['$' + c.id] = 1;
   });
 }
@@ -267,11 +269,11 @@ function qKbWhos(b, d, pi) {
   });
   return out.sort(function (a, c) { return a.name.localeCompare(c.name, 'fr', { sensitivity: 'base' }); });
 }
-function scopeTags(b, d, pi, recs) {
+function scopeTags(b, d, pi) {
   // pastilles présentes dans les éléments cherchés de la portée (fiches, lignes ou cases), dans l'ordre du document
   var names = {}, out = [];
   docTags(d).forEach(function (t) { names[t.key] = t.name; });
-  (recs || queryRecords(b, d, pi, true)).forEach(function (r) { r.tags.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); });
+  queryRecords(b, d, pi, true).forEach(function (r) { r.tags.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); });
   return out.map(function (k) { return { key: k, name: names[k] || k }; });
 }
 function kbColumns(b, d, pi) {
@@ -782,7 +784,7 @@ function queryResult(b, d, ctx) {
 // Ligne de puces (édition) : le réglage se lit comme une phrase, chaque puce ouvre sa fenêtre (16-puces-requete.js).
 // Un filtre posé est un élément de la liste filtres ; ne pas le poser veut dire « tous ».
 var Q_VUES = { table: 'Tableau', list: 'Liste', kanban: 'En colonnes', count: 'Nombre', regroupee: 'Regroupée', chaleur: 'Carte de chaleur' };
-var Q_PRIO = { p1: 'P1', p2: 'P2', p3: 'P3', p12: 'P1 ou P2', '-': 'Sans priorité' };   // p12 : choix de la fenêtre, coche P1 et P2
+var Q_PRIO = { p1: 'P1', p2: 'P2', p3: 'P3', '-': 'Sans priorité' };
 var Q_UNITE = { j: ['jour', 'jours'], s: ['semaine', 'semaines'], m: ['mois', 'mois'] };
 // filtres de chaque source, dans l'ordre de la ligne : [champ, nom dans « + Filtre »]
 var Q_FILTRE_TAGS = [['tags', 'Pastilles']];

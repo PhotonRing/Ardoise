@@ -4,6 +4,7 @@
 // aboutir exactement au même document.  node scripts/test-synchro.mjs [parties] [graine]
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { contexte as appli } from './rendu/commun.mjs';
 
 const ctx = vm.createContext({});
 vm.runInContext(readFileSync(new URL('../src/js/05-synchro-moteur.js', import.meta.url), 'utf8') +
@@ -232,6 +233,16 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const pb = clone(x.db); delete pb.pages[0].blocks[0].filtres[0].mode;
   const r4 = swap(x, [], synDiff(x.b, x.db, pb));
   expect(!('mode' in r4.pages[0].blocks[0].filtres[0]), 'mode : dernière écriture gagne');
+}
+{ // document 1.23 synchronisé (format 6) : deux copies passent à la nouvelle version et l'ouvrent ; la normalisation ne donne pas d'id
+  // aux anciennes cartes de nombre (repérées par leur rang), sinon chaque copie supprimerait la carte et insérerait la sienne
+  const ancien = { v: '1.23.0', id: 'd', title: 'Doc', pages: [{ id: 'p', title: 'Accueil', blocks: [
+    { id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', view: 'count', cards: [{ label: '', tags: [], match: 'any', state: 'all', col: 'fait', total: 'none' }] },
+    { id: 'q7', type: 'query', title: '1.7', src: 'facts', scope: 'doc', view: 'count' }] }] };
+  const x = pair(clone(ancien)), ouvrir = () => appli().normalize(clone(ancien));
+  const r = swap(x, synDiff(x.a, x.da, ouvrir()), synDiff(x.b, x.db, ouvrir())), bl = r.pages[0].blocks;
+  expect(bl[0].cards.length === 1 && bl[0].cards[0].filtres[0].vals[0] === 'fait', 'carte de nombre migrée par deux copies : ' + JSON.stringify(bl[0].cards));
+  expect(bl[1].cards.length === 1, 'carte par défaut (1.7) ajoutée par deux copies : ' + JSON.stringify(bl[1].cards));
 }
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));

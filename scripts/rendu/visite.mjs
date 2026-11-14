@@ -48,7 +48,7 @@ test('visite guidée : choix des colonnes, cartes bloquées, vue regroupée et c
   vrai(sauf, 'une requête « Toutes sauf… »');
   const hs = res(sauf);
   vrai(!/>Priorité</.test(hs) && !/>Attend</.test(hs) && />Échéance/.test(hs), 'Priorité et Attend masquées, Échéance gardée');
-  const bloq = qs.find((b) => b.src === 'kanban' && ctx.qFiltreDe(b.filtres, 'bloquees'));
+  const bloq = qs.find((b) => b.src === 'kanban' && (b.filtres || []).find((f) => f.prop === 'bloquees'));
   vrai(bloq, 'une requête kanban « Bloquées »');
   const hb = res(bloq);
   vrai(/Migrer la base/.test(hb) && !/Rédiger le guide/.test(hb), 'seule la carte bloquée');

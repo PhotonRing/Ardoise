@@ -62,11 +62,14 @@ test('cartes de nombre : la fenêtre d\'une puce de carte est celle de la requê
   vrai(t.ctx.qFenetre(t.b, t.d, 0, 'n:valeur:un:statut').includes('data-v="ouvert"'), 'fenêtre en attente');
 });
 
-test('cartes de nombre : identifiant de carte donné par qDefCard et la normalisation, unique dans le bloc', () => {
+test('cartes de nombre : identifiant donné par qDefCard ; la normalisation rend unique un id en double mais n\'en donne pas à une ancienne carte (repérée par son rang)', () => {
   const { ctx, b } = monte({ cards: [{ label: '', total: 'none' }, { id: 'z', label: '', total: 'none' }, { id: 'z', label: '', total: 'none' }] });
   const ids = b.cards.map((c) => c.id);
-  vrai(ids.every((x) => typeof x === 'string' && x) && new Set(ids).size === 3 && ids[1] === 'z', JSON.stringify(ids));
+  vrai(!('id' in b.cards[0]) && ids[1] === 'z' && typeof ids[2] === 'string' && ids[2] && ids[2] !== 'z', JSON.stringify(ids));
+  vrai(ctx.qCarteDeCle(b, 'n0') === b.cards[0] && ctx.qCarteDeCle(b, 'n1') === null, 'clé de rang : seulement une carte sans id');
   vrai(typeof ctx.qDefCard(b).id === 'string', 'qDefCard');
+  const v17 = monte({ cards: undefined }).b;
+  vrai(v17.cards.length === 1 && !('id' in v17.cards[0]), 'carte par défaut d\'une requête 1.7 : sans id ' + JSON.stringify(v17.cards));
 });
 
 test('cartes de nombre : au changement de source, une carte sans texte dont les filtres sont vides ou ceux du défaut reprend le défaut', () => {

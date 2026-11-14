@@ -135,8 +135,8 @@ test('réglage par identifiant : cocher, changer de mode, décocher la dernière
   const n = ctx.qBasculerValeur(b, b, 'filtres', { prop: 'kbWho', mode: 'aucun' }, '-');
   egal(vue()[1], { id: n.id, prop: 'kbWho', vals: ['-'], mode: 'aucun' }, 'nouveau filtre créé à la première valeur, avec le mode de la fenêtre');
   egal(titres({ src: 'kanban', filtres: vue() }, 7), ['Écrire'], 'urgent, sauf Sans responsable');
-  ctx.qReglerFiltre(b, b, 'filtres', { id: n.id, prop: 'kbWho' }, '');
-  egal(vue().length, 1, 'valeur vide : filtre retiré');
+  egal(ctx.qBasculerValeur(b, b, 'filtres', { id: n.id, prop: 'kbWho', mode: 'aucun' }, '-'), null, 'dernière valeur décochée : filtre retiré');
+  egal(vue().length, 1);
   const bq = ctx.qReglerFiltre(b, b, 'filtres', { prop: 'bloquees' }, 'oui');
   ctx.qReglerFiltre(b, b, 'filtres', { id: bq.id, prop: 'bloquees' }, 'non');
   egal(titres({ src: 'kanban', filtres: vue() }, 7), ['Relire'], 'urgent et non bloquées');
@@ -146,7 +146,7 @@ test('format 7 : les anciens champs ne sont jamais lus ni gardés en mémoire ; 
   const { ctx, d, b } = requete({ src: 'kanban', col: 'fait', kbPrio: 'p1', tags: ['urgent'], match: 'all', bloquees: true, cards: [{ label: '', col: 'fait', total: 'filter', ttags: ['x'] }] }, 7);
   egal(ctx.queryRecords(b, d, 0).length, 4);
   egal(['col', 'kbPrio', 'tags', 'match', 'bloquees'].filter((k) => k in b), []);
-  egal(Object.keys(b.cards[0]).sort(), ['id', 'label', 'total']);
+  egal(Object.keys(b.cards[0]).sort(), ['label', 'total']);   // ancienne carte : pas d'id donné à l'ouverture (repérée par son rang)
   const { b: b2 } = requete({ src: 'kanban', filtres: [F('col', ['fait'], { id: 'x' }), { id: 'x', prop: 'kbWho', vals: ['-'] }, { prop: 'tags', vals: [] }, { prop: 'inconnu', vals: ['a'] }], cards: [{ filtres: [{ id: 'x', prop: 'tags', vals: ['a'] }] }] }, 7);
   const ids = [...b2.filtres, ...b2.cards[0].filtres].map((f) => f.id);
   egal(b2.filtres.map((f) => f.prop), ['col', 'kbWho']);
@@ -188,4 +188,13 @@ test('vue « En colonnes » : aucune carte retenue, la colonne retenue s\'affich
   const t = ctx.officeTexte(ctx.officeBloc(d.pages[0].blocks[3], d, { page: 0 }));
   vrai(t.includes('Fait') && !t.includes('Aucun résultat'), 'Office : colonne Fait, pas de « Aucun résultat » : ' + t);
   egal(titres({ src: 'kanban', view: 'kanban', filtres: [F('col', ['fait'], { mode: 'aucun' }), F('col', ['fait'])] }, 7), [], 'sans colonne retenue : rien');
+});
+
+test('valeur cochée à deux en même temps (doublon après synchro) : la normalisation dédoublonne, décocher retire toutes les occurrences', () => {
+  const { b } = requete({ src: 'kanban', filtres: [{ id: 'f1', prop: 'col', vals: ['à faire', 'fait', 'fait'] }] }, 7);
+  egal(b.filtres[0].vals, ['à faire', 'fait'], 'normalisation');
+  const { ctx, b: b2 } = requete({ src: 'kanban', filtres: [{ id: 'f1', prop: 'col', vals: ['à faire'] }] }, 7);
+  b2.filtres[0].vals.push('fait', 'fait');   // fusion reçue sans nouvelle normalisation
+  ctx.qBasculerValeur(b2, b2, 'filtres', { id: 'f1', prop: 'col' }, 'fait');
+  egal(b2.filtres[0].vals, ['à faire'], 'un seul décochage');
 });
