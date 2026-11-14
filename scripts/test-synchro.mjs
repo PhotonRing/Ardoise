@@ -2,7 +2,7 @@
 // un document de type Ardoise, s'échangent leurs opérations par un relais simulé (dans le désordre de leurs
 // connexions, en double, après une période hors ligne, ou en repartant d'un instantané), et doivent toutes
 // aboutir exactement au même document.  node scripts/test-synchro.mjs [parties] [graine]
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { contexte as appli } from './rendu/commun.mjs';
 
@@ -243,6 +243,17 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const r = swap(x, synDiff(x.a, x.da, ouvrir()), synDiff(x.b, x.db, ouvrir())), bl = r.pages[0].blocks;
   expect(bl[0].cards.length === 1 && bl[0].cards[0].filtres[0].vals[0] === 'fait', 'carte de nombre migrée par deux copies : ' + JSON.stringify(bl[0].cards));
   expect(bl[1].cards.length === 1, 'carte par défaut (1.7) ajoutée par deux copies : ' + JSON.stringify(bl[1].cards));
+}
+{ // ouvrir un document est déterministe : chaque copie d'un document synchronisé le normalise de son côté, un id
+  // tiré au hasard pour un élément qui n'en a pas ferait diverger les copies (lot 7 : cartes de nombre dédoublées).
+  // Documents de référence des formats qu'une copie synchronisée peut avoir (synchro depuis la 1.13, format 5) ;
+  // un document synchronisé porte toujours son id.
+  const dossier = new URL('./fixtures/', import.meta.url);
+  for (const f of readdirSync(dossier).filter((n) => /^format-\d+\.json$/.test(n) && +n.match(/\d+/)[0] >= 5)) {
+    const brut = { id: 'doc-synchronise', ...JSON.parse(readFileSync(new URL(f, dossier), 'utf8')) };
+    const a = JSON.stringify(appli().normalize(clone(brut))), b = JSON.stringify(appli().normalize(clone(brut)));
+    expect(a === b, `${f} : deux ouvertures donnent deux documents différents (id tiré au hasard à la normalisation ?)`);
+  }
 }
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));
