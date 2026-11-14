@@ -43,6 +43,15 @@ test('carte de chaleur : somme de N, virgule française et espaces de milliers l
   vrai(/nombre de lignes/.test(rendu({})), 'légende sans N : nombre de lignes');
 });
 
+test('carte de chaleur : N lue comme le tri la lit (point des milliers, unité courte, pourcentage)', () => {
+  const t = TAB('t1', [['Service', 'Durée'], ['VPN', '1.234,5'], ['VPN', '4 h'], ['Mail', '12 %'], ['Mail', '2,5 €'], ['Mail', 'élevé']]);
+  const { ctx, d } = monter({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [t, { id: 'q', type: 'query', src: 'table', scope: 'doc', view: 'chaleur', chX: 'service', chY: 'service', chN: 'durée' }] }] });
+  const h = ctx.renderPage(d, { page: 0, view: 'read' });
+  egal(colonnes(h.slice(h.indexOf('class="q-res"'))), ['VPN1238,5', 'Mail14,5']);
+  egal(['1.234,5', '4 h', '12 %', '1 234,5', '-3', 'élevé', ''].map((v) => ctx.qNombre(v)), [1234.5, 4, 12, 1234.5, -3, 0, 0]);
+  egal(ctx.qSortKey('1.234,5'), { n: 1234.5 }, 'le tri lit aussi le point des milliers');
+});
+
 test('carte de chaleur : teinte selon la place du total entre min et max, échelle commune aux cases et sous-cases, légende', () => {
   const { ctx } = monter(doc({}));
   egal([1, 2, 3, 4, 5].map((t) => ctx.qChPalier(t, 1, 5)), [0, 1, 2, 3, 4]);

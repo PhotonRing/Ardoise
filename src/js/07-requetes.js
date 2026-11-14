@@ -255,15 +255,22 @@ function lignesAffichees(lignes, terme, connues, gardees) {
   // affichée : correspond, ou ajoutée depuis le dernier changement du terme (absente de connues), ou gardée (focus pendant la saisie)
   return lignes.map(function (l) { return connues.indexOf(l) < 0 || gardees.indexOf(l) >= 0 || ligneCorrespond(l, terme); });
 }
+// nombre d'un texte, pour le tri comme pour la colonne N : espaces de milliers, ou points de milliers devant une virgule
+// décimale (1.234,5), virgule ou point décimal, unité courte (4 h, 12 %, 3 €) ; null si ce n'est pas un nombre
+function qLireNombre(t) {
+  var m = String(t).replace(/[\s\u00a0\u202f]+/g, '').match(/^([-+]?)(\d{1,3}(?:\.\d{3})+,\d+|\d+(?:[.,]\d+)?)[%€$a-zA-Z]{0,4}$/);
+  if (!m) return null;
+  var n = +(/,/.test(m[2]) && /\./.test(m[2]) ? m[2].replace(/\./g, '') : m[2]).replace(',', '.');
+  return m[1] === '-' ? -n : n;
+}
 function qSortKey(v) {
   // valeur de tri : nombre, date (jj/mm/aaaa, aaaa-mm-jj) ou texte ; vide : toujours à la fin
   var t = htmlText(v).replace(/\s+/g, ' ').trim(), m;
   if (!t) return null;
   if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) return { d: Date.UTC(+m[1], +m[2] - 1, +m[3]) };
   if ((m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) return { d: Date.UTC(m[3].length === 2 ? 2000 + +m[3] : +m[3], +m[2] - 1, +m[1]) };
-  var n = t.replace(/[\s  ]/g, '').replace(',', '.').match(/^-?\d+(\.\d+)?/);
-  if (n && /^-?[\d\s  ]+([.,]\d+)?\s*[%€$a-zA-Z]{0,4}$/.test(t)) return { n: +n[0] };
-  return { s: t };
+  var n = qLireNombre(t);
+  return n != null ? { n: n } : { s: t };
 }
 function qCompare(a, b) {
   if (!a || !b) return !a && !b ? 0 : !a ? 1 : -1;
@@ -535,11 +542,8 @@ function qRegroupee(b, d, ctx, recs) {
 // Carte de chaleur (vue « Carte de chaleur ») : une colonne par valeur de X, une case par valeur de Y, des sous-cases par valeur de Z ;
 // X, Y et Z comparés sur la cellule entière (qRegrouper), total = somme de la colonne N (nombre de lignes sans N) ; une seule échelle pour cases et sous-cases
 var Q_CH_PALIERS = [6, 16, 28, 42, 100];   // part de la couleur d'accent de chaque palier, en % (page.css : .q-ch-p0 à .q-ch-p4)
-function qNombre(html) {
-  // nombre d'une cellule : virgule ou point décimal, espaces de milliers ignorés ; une valeur non numérique compte 0
-  var t = htmlText(String(html || '')).replace(/[\s  ]+/g, '').replace(',', '.');
-  return /^[-+]?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : 0;
-}
+// nombre d'une cellule (lu comme pour le tri) ; une valeur non numérique compte 0
+function qNombre(html) { var n = qLireNombre(htmlText(String(html || ''))); return n == null ? 0 : n; }
 function qNombreFr(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
 function qChReglage(b, recs) {
   // colonnes X, Y, Z (facultative) et N (facultative) retenues, clés connues seulement ; X absent : première colonne, Y absent : la suivante
