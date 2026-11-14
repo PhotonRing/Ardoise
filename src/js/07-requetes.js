@@ -425,6 +425,8 @@ function qRegroupements(b, d, pi, recs) {
   });
   return { groups: groups, gb: gb };
 }
+// vue « En colonnes » d'une requête sur un kanban : des colonnes restent retenues par les filtres, à afficher même vides
+function qColonnesRetenues(b, d, pi, view) { return view === 'kanban' && (b.src || 'facts') === 'kanban' && qRegroupements(b, d, pi, []).groups.length > 0; }
 function qKanban(b, d, ctx, recs) {
   var src = b.src || 'facts', qg = qRegroupements(b, d, ctx.page, recs), groups = qg.groups, gb = qg.gb;
   var cc = src === 'kanban' ? null : qColonnesAffichees(b, recs), cols = cc ? cc.cols : [];
@@ -695,7 +697,7 @@ function queryResult(b, d, ctx) {
   ctx = renderCtx(d, ctx);
   var recs = queryRecords(b, d, ctx.page), src = b.src || 'facts', view = b.view || 'table';
   if (view === 'count') return qCards(b, d, ctx, recs);
-  if (!recs.length) return '<p class="muted q-empty">Aucun résultat.</p>';
+  if (!recs.length && !qColonnesRetenues(b, d, ctx.page, view)) return '<p class="muted q-empty">Aucun résultat.</p>';
   if (view === 'regroupee' && src === 'table') return qRegroupee(b, d, ctx, recs);   // le tri vise les groupes ; une autre source retombe sur le tableau
   if (view === 'chaleur' && src === 'table') return qChaleurVue(b, d, ctx, recs);   // ordre de première apparition, ni tri ni limite
   recs = qSorted(b, d, ctx, recs);

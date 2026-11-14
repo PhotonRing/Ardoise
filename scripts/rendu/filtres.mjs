@@ -176,3 +176,16 @@ test('miroir des anciens champs à l\'écriture : premier filtre « l\'une de »
   egal(['col', 'kbPrio', 'tags', 'match'].filter((k) => k in relu), []);
   egal(relu.filtres, q.filtres);
 });
+
+// vérification c22 du lot 7 : sans aucune carte, les colonnes retenues restent affichées, vides (écran et Office)
+test('vue « En colonnes » : aucune carte retenue, la colonne retenue s\'affiche vide au lieu de « Aucun résultat »', () => {
+  const q = { src: 'kanban', view: 'kanban', filtres: [F('col', ['fait']), F('tags', ['urgent'])] };
+  const { ctx, d } = monter(doc(q, 7));
+  const h = ctx.renderPage(d, { page: 0, view: 'read' });
+  const res = h.slice(h.indexOf('class="q-res"'));
+  egal([...res.matchAll(/<span class="kb-title">([\s\S]*?)<\/span>/g)].map((m) => m[1]), ['Fait'], 'écran : colonne Fait');
+  vrai(!res.includes('Aucun résultat'), 'écran : pas de « Aucun résultat »');
+  const t = ctx.officeTexte(ctx.officeBloc(d.pages[0].blocks[3], d, { page: 0 }));
+  vrai(t.includes('Fait') && !t.includes('Aucun résultat'), 'Office : colonne Fait, pas de « Aucun résultat » : ' + t);
+  egal(titres({ src: 'kanban', view: 'kanban', filtres: [F('col', ['fait'], { mode: 'aucun' }), F('col', ['fait'])] }, 7), [], 'sans colonne retenue : rien');
+});
