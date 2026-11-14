@@ -61,3 +61,24 @@ test('visite guidée : choix des colonnes, cartes bloquées, vue regroupée et c
   vrai(rc && rc.x === ch.chX && rc.y === ch.chY && rc.n === ch.chN, 'carte de chaleur sur ses colonnes');
   vrai(/q-ch/.test(res(ch)), 'carte de chaleur rendue');
 });
+
+// Origine : spec filtres-logiques, ticket 05 (user story 46) : la visite montre un filtre à plusieurs valeurs, un « sauf »,
+// un filtre « Valeur d'une colonne » et une carte de nombre avec sa ligne de puces
+test('visite guidée : filtres à plusieurs valeurs, « sauf », « Valeur d\'une colonne » et carte de nombre à puces', () => {
+  const { ctx, brut } = visite();
+  const d = ctx.normalize(brut);
+  const i = d.pages.findIndex((pg) => pg.id === 'suivi'), qs = d.pages[i].blocks.filter((b) => b.type === 'query');
+  const nb = qs.find((b) => b.view === 'count' && (b.cards || []).some((c) => (c.filtres || []).some((f) => f.mode === 'aucun')));
+  vrai(nb, 'une carte de nombre avec un filtre « sauf »');
+  const lu = ctx.queryResult(nb, d, { page: i, view: 'read' });
+  vrai(/<b>3<small> \/ 5<\/small><\/b><span class="q-lab">Cartes ouvertes hors Recette</.test(lu), 'à faire ou en cours, sauf Recette : 3 sur 5');
+  const ed = ctx.queryResult(nb, d, { page: i, view: 'edit' });
+  vrai(/Colonne : À faire ou En cours/.test(ed), 'puce à plusieurs valeurs sur la carte');
+  vrai(/sauf Recette/.test(ed), 'puce « sauf » sur la carte');
+  const val = qs.find((b) => b.src === 'table' && (b.filtres || []).some((f) => f.prop === 'valeur'));
+  vrai(val, 'une requête « Valeur d\'une colonne »');
+  const hv = ctx.queryResult(val, d, { page: i, view: 'read' });
+  egal((hv.match(/Majeure|Critique/g) || []).length, 4, 'les 4 incidents majeurs ou critiques');
+  vrai(!/Mineure/.test(hv), 'aucun incident mineur');
+  vrai(/Gravité : Majeure ou Critique/.test(ctx.renderPage(d, { page: i, view: 'edit' })), 'puce de la colonne Gravité');
+});
