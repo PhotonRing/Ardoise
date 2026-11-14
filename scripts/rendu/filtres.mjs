@@ -40,13 +40,13 @@ test('format 6 : filtres du bloc kanban, mêmes résultats après migration', ()
   egal(titres({ src: 'check', state: 'todo' }), ['deux', 'trois <span class="pill">urgent</span>']);
 });
 
-test('format 6 : comptes et totaux des cartes de nombre, mêmes après migration', () => {
-  egal(comptes({ ...KBQ, cards: [{ label: '', tags: [], match: 'any', state: 'all', col: 'fait', total: 'all' }] }), [[1, 4, 'cartes en Fait']]);
-  egal(comptes({ ...KBQ, cards: [{ label: 'x', tags: ['urgent', 'client'], match: 'all', state: 'all', total: 'filter', ttags: ['client'], tmatch: 'any', tcol: 'à faire' }] }), [[1, 1, 'cartes · urgent + client']]);
-  egal(comptes({ src: 'check', cards: [{ label: '', tags: ['urgent'], match: 'any', state: 'done', total: 'filter', ttags: ['urgent'], tstate: 'all' }] }), [[1, 2, 'cases cochées · urgent']]);
-  egal(comptes({ src: 'check' }), [[1, 3, 'cases cochées']]);
+test('format 6 : comptes et totaux des cartes de nombre, mêmes après migration (texte par défaut : source puis libellés des filtres, ticket 04)', () => {
+  egal(comptes({ ...KBQ, cards: [{ label: '', tags: [], match: 'any', state: 'all', col: 'fait', total: 'all' }] }), [[1, 4, 'cartes · Colonne : Fait']]);
+  egal(comptes({ ...KBQ, cards: [{ label: 'x', tags: ['urgent', 'client'], match: 'all', state: 'all', total: 'filter', ttags: ['client'], tmatch: 'any', tcol: 'à faire' }] }), [[1, 1, 'cartes · urgent et client']]);
+  egal(comptes({ src: 'check', cards: [{ label: '', tags: ['urgent'], match: 'any', state: 'done', total: 'filter', ttags: ['urgent'], tstate: 'all' }] }), [[1, 2, 'cases à cocher · urgent · Cochées']]);
+  egal(comptes({ src: 'check' }), [[1, 3, 'cases à cocher · Cochées']]);
   // carte d'une autre source avec un état : rien ne passe, comme avant
-  egal(comptes({ src: 'table', cards: [{ label: '', tags: [], match: 'any', state: 'done', total: 'all' }] }), [[0, 3, 'lignes de tableaux']]);
+  egal(comptes({ src: 'table', cards: [{ label: '', tags: [], match: 'any', state: 'done', total: 'all' }] }), [[0, 3, 'lignes de tableaux · Cochées']]);
 });
 
 test('format 6 : vue « En colonnes » ne garde que la colonne filtrée', () => {
@@ -146,7 +146,7 @@ test('format 7 : les anciens champs ne sont jamais lus ni gardés en mémoire ; 
   const { ctx, d, b } = requete({ src: 'kanban', col: 'fait', kbPrio: 'p1', tags: ['urgent'], match: 'all', bloquees: true, cards: [{ label: '', col: 'fait', total: 'filter', ttags: ['x'] }] }, 7);
   egal(ctx.queryRecords(b, d, 0).length, 4);
   egal(['col', 'kbPrio', 'tags', 'match', 'bloquees'].filter((k) => k in b), []);
-  egal(Object.keys(b.cards[0]).sort(), ['label', 'total']);
+  egal(Object.keys(b.cards[0]).sort(), ['id', 'label', 'total']);
   const { b: b2 } = requete({ src: 'kanban', filtres: [F('col', ['fait'], { id: 'x' }), { id: 'x', prop: 'kbWho', vals: ['-'] }, { prop: 'tags', vals: [] }, { prop: 'inconnu', vals: ['a'] }], cards: [{ filtres: [{ id: 'x', prop: 'tags', vals: ['a'] }] }] }, 7);
   const ids = [...b2.filtres, ...b2.cards[0].filtres].map((f) => f.id);
   egal(b2.filtres.map((f) => f.prop), ['col', 'kbWho']);

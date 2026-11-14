@@ -45,7 +45,9 @@ test('une requête qui filtre par responsable, colonne ou pastille absente n\'in
   const q1 = d.pages[2].blocks[0];
   const h = ctx.renderPage(d, { page: 2, view: 'edit' }) + fen(ctx, q1, d, 2, 'tags') + fen(ctx, q1, d, 2, 'kbWho') + fen(ctx, q1, d, 2, 'col');
   egal(JSON.stringify(d.tags), avant, 'registre inchangé');
-  for (const nom of ['inconnue', 'autre', 'encore']) {
+  // cartes de nombre (ticket 04) : pastilles absentes dans les puces de la carte, grises
+  for (const nom of ['autre', 'encore']) vrai(h.includes('<span class="pill">' + nom + '</span></button>'), 'puce de carte « ' + nom + ' » grise');
+  for (const nom of ['inconnue']) {
     const p = puces(h)[nom];
     vrai(p, 'puce « ' + nom + ' » gardée :\n' + h);
     vrai(!/\bpa-\d/.test(p.cls) && /\bq-gone\b/.test(p.cls), 'puce « ' + nom + ' » grise et marquée absente : ' + p.cls);

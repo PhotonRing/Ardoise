@@ -1192,6 +1192,31 @@ test('étape ouverte : deux filtres de même propriété réglés dans une fenê
   m.s.annuler();
   egal(JSON.stringify(q()), avant, 'un seul Ctrl+Z défait toute la fenêtre');
 });
+test('étape ouverte : fenêtre d\'un filtre de carte de nombre (compte puis total) = une étape ; × sur une puce de carte = une étape', () => {
+  const m = monter(), c = m.ctx;
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'kanban', scope: 'doc', view: 'count', cards: [{ id: 'n1', label: '', total: 'filter' }] }); });
+  const q = () => blocsDe(m)[1], carte = () => q().cards[0], avant = JSON.stringify(q());
+  m.s.ouvrirEtape(FEN);
+  let f = null;
+  m.s.modifier(() => { f = c.qBasculerValeur(q(), carte(), 'filtres', { prop: 'kbWho', mode: 'un' }, 'alice'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), carte(), 'filtres', { id: f.id, prop: 'kbWho' }, '-'); });
+  m.s.modifier(() => { c.qModeFiltre(carte(), 'filtres', { id: f.id }, 'aucun'); });
+  m.s.fermerEtape();
+  egal(libelles(m)[0], FEN.etape);
+  egal(carte().filtres.map((x) => x.vals.join('+') + ':' + x.mode), ['alice+-:aucun']);
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => { c.qReglerFiltre(q(), carte(), 'tfiltres', { prop: 'bloquees' }, 'non'); });
+  m.s.fermerEtape();
+  const t = carte().tfiltres[0];
+  egal(c.qTrouverFiltre(q(), t.id).cle, 'tfiltres', 'filtre du total retrouvé par son id');
+  m.s.modifier(() => { const r = c.qTrouverFiltre(q(), f.id); c.qRetirerFiltre(r.hote, r.cle, r.f); }, null, 'filtres modifiés');
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : filtres modifiés', '× : une étape');
+  egal([carte().filtres, carte().tfiltres.length], [undefined, 1], '× retire ce filtre-là seulement');
+  m.s.annuler(); m.s.annuler();
+  egal(carte().filtres.length, 1, 'deux Ctrl+Z : × puis la fenêtre du total');
+  m.s.annuler();
+  egal(JSON.stringify(q()), avant, 'un seul Ctrl+Z défait la fenêtre du compte');
+});
 test('étape ouverte : plusieurs modifications forment une seule étape, nommée, qu\'un seul Ctrl+Z défait', () => {
   const m = monter();
   m.s.ouvrirEtape(FEN);

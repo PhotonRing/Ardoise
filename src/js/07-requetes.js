@@ -198,8 +198,9 @@ function qBasculerValeur(b, hote, cle, ref, val) {
 function qModeFiltre(hote, cle, ref, mode) { var f = qCibleFiltre(hote, cle, ref); if (!f) return; if (mode === 'tous' || mode === 'aucun') f.mode = mode; else delete f.mode; }
 // « Valeur d'une colonne » : changer de colonne efface les valeurs cochées, donc retire un filtre posé ; rend la clé de la fenêtre
 // en attente sur la nouvelle colonne (Q_CLE_ATTENTE), même mode (« toutes » revient à « l'une de » si la colonne n'a pas de pastilles)
-function qChangerColonne(b, d, pi, cle, ref, colonne) {
-  var f = ref.id && qFiltreParId(b[cle], ref.id); if (f) qRetirerFiltre(b, cle, f);
+function qChangerColonne(b, d, pi, cle, ref, colonne, hote) {
+  hote = hote || b;   // carte de nombre : hote = la carte, cle 'filtres' ou 'tfiltres'
+  var f = ref.id && qFiltreParId(hote[cle], ref.id); if (f) qRetirerFiltre(hote, cle, f);
   var mode = ref.mode === 'tous' && !qValeursColonne(qRecsPortee(b, d, pi), colonne).pastilles ? 'un' : ref.mode || 'un';
   return 'n:valeur:' + mode + ':' + colonne;
 }
@@ -213,7 +214,13 @@ function qNormFiltres(b) {
     if (l.length) o[cle] = l; else delete o[cle];
   };
   net(b, 'filtres');
-  (Array.isArray(b.cards) ? b.cards : []).forEach(function (c) { if (c && typeof c === 'object') { net(c, 'filtres'); net(c, 'tfiltres'); } });
+  // cartes de nombre : identifiant présent et unique dans le bloc (la fenêtre d'un filtre vise sa carte par lui, 16-puces-requete.js)
+  var cartes = {};
+  (Array.isArray(b.cards) ? b.cards : []).forEach(function (c) {
+    if (!c || typeof c !== 'object') return;
+    net(c, 'filtres'); net(c, 'tfiltres');
+    if (typeof c.id !== 'string' || !c.id || cartes['$' + c.id]) { do c.id = uid(); while (cartes['$' + c.id]); } cartes['$' + c.id] = 1;
+  });
 }
 // Libellé d'un filtre (puces, texte des cartes de nombre) ; noms : { tags, col, kbWho, valeur : { clé : nom }, colonnes : { clé : nom } }
 var Q_FILTRE_TITRES = { col: 'Colonne', kbWho: 'Responsable', kbPrio: 'Priorité' };
@@ -242,7 +249,8 @@ function qNomsFiltres(b, d, pi) {
   var noms = { tags: qNomsTags(d), col: {}, kbWho: {} };
   if (b.src === 'kanban') { kbColumns(b, d, pi).forEach(function (x) { noms.col[x.key] = x.name; }); qKbWhos(b, d, pi).forEach(function (x) { noms.kbWho[x.key] = x.name; }); }
   // « Valeur d'une colonne » : noms des colonnes et des valeurs de la portée (première apparition), seulement si un tel filtre est posé
-  var fv = qFiltresSource(b, b.filtres).filter(function (f) { return f.prop === 'valeur'; });
+  var fv = [].concat(b.filtres || []); (b.cards || []).forEach(function (c) { if (c) fv = fv.concat(c.filtres || [], c.tfiltres || []); });   // cartes de nombre comprises
+  fv = qFiltresSource(b, fv).filter(function (f) { return f.prop === 'valeur'; });
   if (fv.length) {
     var recs = qRecsPortee(b, d, pi); noms.colonnes = {}; noms.valeur = {};
     qColonnesFiltre(recs).forEach(function (x) { noms.colonnes[x.key] = x.name; });
@@ -275,73 +283,81 @@ function kbColumns(b, d, pi) {
   });
   return out;
 }
-function qColSel(b, prop, cur, cols) {
-  var o = function (v, label) { return '<option value="' + esc(v) + '"' + ((cur || '') === v ? ' selected' : '') + '>' + label + '</option>'; };
-  var list = cols.slice(); if (cur && !list.some(function (x) { return x.key === cur; })) list.push({ key: cur, name: cur });
-  return '<select data-act="set" data-prop="' + prop + '" title="Colonne du kanban">' + o('', 'toutes les colonnes') + list.map(function (x) { return o(x.key, 'en « ' + esc(x.name) + ' »'); }).join('') + '</select>';
-}
-function qChips(d, act, i, avail, want, title) {
-  // pastilles cliquables d'un filtre ; une pastille choisie mais absente de la portée reste affichée (barrée)
-  // la couleur est lue au registre sans y inscrire le nom : hors registre, la puce reste grise
-  var list = avail.slice();
-  (want || []).forEach(function (k) { if (!list.some(function (t) { return t.key === k; })) list.push({ key: k, name: k, gone: true }); });
-  if (!list.length) return '<span class="muted q-hint">Aucune pastille ici.</span>';
-  return list.map(function (t) {
-    var on = (want || []).indexOf(t.key) >= 0, c = knownTagColor(d, t.key);
-    var gone = t.gone ? (c == null ? 'Absente du document · ' : 'Absente de la portée choisie · ') : '';
-    return '<button type="button" class="pill' + (c == null ? '' : ' pa-' + c) + ' q-chip' + (t.gone ? ' q-gone' : '') + '" data-act="' + act + '"' + (i != null ? ' data-i="' + i + '"' : '') + ' data-tag="' + esc(t.key) + '" aria-pressed="' + on + '" title="' + gone + (on ? 'Retirer de ' : 'Ajouter à ') + title + '">' + esc(t.name) + '</button>';
-  }).join('');
-}
 function qScopeHref(b) {
   // page ou section visée par la requête (pas de lien pour « tout le document » ni « cette page »)
   var m = String(b.scope || '').match(/^(?:pg:(.+)|sec:([^/]+)\/(.+))$/);
   return !m ? '' : m[1] ? '#pg-' + m[1] : '#pg-' + m[2] + '/' + m[3];
 }
-function qDefCard(b) { return b.src === 'check' ? { label: '', filtres: [{ id: qIdFiltre(b), prop: 'state', vals: ['done'] }], total: 'all' } : { label: '', total: 'none' }; }
-// réglage d'une carte de nombre lu dans ses filtres, sous la forme des listes « Compter » et « sur » (pastilles, état, colonne)
-function qVueCarte(c) {
-  var o = {}, lire = function (cle, pre) {
-    var t = qFiltreDe(c[cle], 'tags'), st = qFiltreDe(c[cle], 'state'), co = qFiltreDe(c[cle], 'col');
-    o[pre + 'tags'] = t ? t.vals : []; o[pre + 'match'] = t && t.mode === 'tous' ? 'all' : 'any'; o[pre + 'state'] = st ? st.vals[0] : 'all'; o[pre + 'col'] = co ? co.vals[0] : '';
-  };
-  lire('filtres', ''); lire('tfiltres', 't'); return o;
+function qDefCard(b) { return b.src === 'check' ? { id: uid(), label: '', filtres: [{ id: qIdFiltre(b), prop: 'state', vals: ['done'] }], total: 'all' } : { id: uid(), label: '', total: 'none' }; }
+// carte de nombre : clé stable dans le DOM et pour la fenêtre (son id ; sans id, son rang : bloc juste inséré ou sans carte enregistrée)
+function qCleCarte(c, i) { return (c && c.id) || 'n' + i; }
+function qCarteDeCle(b, k) {
+  var l = b.cards || [], c = l.filter(function (x) { return x && x.id === k; })[0], m = !c && String(k).match(/^n(\d+)$/);
+  return c || (m && l[+m[1]] && !l[+m[1]].id ? l[+m[1]] : null);
 }
-function qCardLabel(b, carte, names) {
-  // texte par défaut d'une carte (remplacé par le texte saisi)
-  var c = qVueCarte(carte), src = b.src || 'facts', base = src === 'check' ? (c.state === 'done' ? 'cases cochées' : c.state === 'todo' ? 'cases à cocher restantes' : 'cases à cocher') : src === 'table' ? 'lignes de tableaux' : src === 'kanban' ? 'cartes' + (c.col ? ' en ' + (names['\u0000col:' + c.col] || c.col) : '') : src === 'diamond' ? 'modèles diamant' : 'fiches de faits';
-  var t = (c.tags || []).map(function (k) { return names[k] || k; });
-  return base + (t.length ? ' · ' + t.join(c.match === 'all' ? ' + ' : ' ou ') : '');
+// filtre d'id donné, dans le bloc ou dans une carte de nombre : { f, hote, cle } ; null s'il n'existe pas
+function qTrouverFiltre(b, id) {
+  var r = null, voir = function (hote, cle) { var f = !r && qFiltreParId(hote[cle], id); if (f) r = { f: f, hote: hote, cle: cle }; };
+  voir(b, 'filtres'); (b.cards || []).forEach(function (c) { if (c) { voir(c, 'filtres'); voir(c, 'tfiltres'); } });
+  return r;
+}
+// changement de source : une carte sans texte saisi dont les filtres sont vides, ou encore ceux du défaut de l'ancienne source,
+// reprend le défaut de la nouvelle source ; les autres gardent leur réglage
+function qCartesNouvelleSource(b, avant, apres) {
+  if (!Array.isArray(b.cards)) return;
+  var vide = function (l) { return !(l || []).length; }, sig = function (c) { return JSON.stringify([(c.filtres || []).map(function (f) { return [f.prop, f.vals, f.mode || 'un']; }), c.tfiltres ? c.tfiltres.length : 0, c.total || 'none']); };
+  var def = sig(qDefCard({ src: avant })), parDefaut = function (c) { return !String(c.label || '').trim() && ((vide(c.filtres) && vide(c.tfiltres)) || sig(c) === def); };
+  b.cards = b.cards.map(function (c) {
+    if (!c || !parDefaut(c)) return c;
+    var n = qDefCard({ src: apres, filtres: b.filtres, cards: b.cards }); if (c.id) n.id = c.id; return n;
+  });
+}
+// texte par défaut d'une carte (remplacé par le texte saisi) : la source puis les libellés des filtres « Compter », séparés par « · »
+var Q_CARTE_SOURCE = { facts: 'fiches de faits', table: 'lignes de tableaux', check: 'cases à cocher', kanban: 'cartes', diamond: 'modèles diamant' };
+function qCardLabel(b, carte, noms) {
+  return [Q_CARTE_SOURCE[b.src || 'facts'] || Q_CARTE_SOURCE.facts].concat((carte.filtres || []).filter(function (f) { return f && Q_PROPS[f.prop] && f.vals && f.vals.length; }).map(function (f) { return qLibelleFiltre(f, noms); })).join(' · ');
 }
 // compteurs de la vue nombre : { num, tot (null sans total), def (texte par défaut), label (texte affiché) } par carte (partagé avec l'export Office)
 function qCompteurs(b, d, pi, recs) {
-  var names = {}; docTags(d).forEach(function (t) { names[t.key] = t.name; });
-  if (b.src === 'kanban') kbColumns(b, d, pi).forEach(function (x) { names['\u0000col:' + x.key] = x.name; });
+  var noms = qNomsFiltres(b, d, pi);
   return (b.cards && b.cards.length ? b.cards : [qDefCard(b)]).map(function (c) {
-    // filtres de la carte en plus de ceux du bloc, quelle que soit la source
-    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? qFiltrer(recs, c.tfiltres).length : null, def = qCardLabel(b, c, names);
+    // filtres de la carte en plus de ceux du bloc, quelle que soit la source (comme avant : un filtre d'une autre source compte)
+    var tot = c.total === 'all' ? recs.length : c.total === 'filter' ? qFiltrer(recs, c.tfiltres).length : null, def = qCardLabel(b, c, noms);
     return { num: qFiltrer(recs, c.filtres).length, tot: tot, def: def, label: String(c.label || '').trim() || def };
   });
 }
+// puce d'un filtre de pastilles : les pastilles elles-mêmes, dans leur couleur (ligne de la requête et lignes des cartes)
+function qPucePastilles(d, f) {
+  var noms = qNomsTags(d), l = f.vals.map(function (k) { var c = knownTagColor(d, k); return '<span class="pill' + (c == null ? '' : ' pa-' + c) + '">' + esc(noms[k] || k) + '</span>'; });
+  return f.mode === 'aucun' ? '<small>sauf</small> ' + l.join(', ') : l.join(f.mode === 'tous' ? ' <small>et</small> ' : ' <small>ou</small> ');
+}
+// puce d'un filtre posé, avec son × (data-qretirer : id du filtre, unique dans le bloc)
+function qPuceFiltre(d, f, libelle) {
+  return '<span class="q-puce-f"><button type="button" class="q-puce" data-qpuce="f:' + esc(f.id) + '" aria-haspopup="dialog" aria-expanded="false" title="' + Q_PUCE_TITRES.filtre + '">' +
+    (f.prop === 'tags' ? qPucePastilles(d, f) : esc(libelle)) + '</button><button type="button" class="q-puce-x" data-qretirer="' + esc(f.id) + '" title="Retirer ce filtre" aria-label="Retirer le filtre « ' + esc(libelle) + ' »">×</button></span>';
+}
+// petite ligne de puces d'une carte de nombre : ses filtres « Compter » (cle 'filtres') ou du total (cle 'tfiltres'), puis « + Filtre »
+// (clé plus:<carte>:<cle>) ; même fenêtre que les filtres de la requête (16-puces-requete.js)
+function qLignePucesCarte(b, d, carte, k, cle, noms, nom) {
+  return '<div class="q-puces q-cpuces" role="toolbar" aria-label="' + nom + '">' + (carte[cle] || []).filter(function (f) { return f && Q_PROPS[f.prop] && f.vals && f.vals.length; }).map(function (f) { return qPuceFiltre(d, f, qLibelleFiltre(f, noms)); }).join('') +
+    '<button type="button" class="q-puce q-puce-plus" data-qpuce="plus:' + esc(k) + ':' + cle + '" aria-haspopup="dialog" aria-expanded="false" title="' + Q_PUCE_TITRES.plus + '">+ Filtre</button></div>';
+}
 function qCards(b, d, ctx, recs) {
   var pi = ctx.page, e = ctx.edit;
-  // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui ont ses
-  // propres pastilles (et, pour les cases, leur état), éventuellement rapportés à un total
-  var avail = e ? scopeTags(b, d, pi, recs) : null, cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], chk = b.src === 'check', kbc = b.src === 'kanban' ? kbColumns(b, d, pi) : [];
+  // vue nombre : une carte par compteur, à la suite ; chaque carte compte les résultats du bloc qui passent ses propres filtres,
+  // éventuellement rapportés à un total
+  var cards = b.cards && b.cards.length ? b.cards : [qDefCard(b)], noms = e ? qNomsFiltres(b, d, pi) : null;
   var compteurs = qCompteurs(b, d, pi, recs);
   var o = function (v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; };
-  var stSel = function (p, cur) { if (kbc.length || b.src === 'kanban') return qColSel(b, p.replace(/state$/, 'col'), (function () { var m = p.match(/^cards\.(\d+)\.(t?)state$/); return m ? qVueCarte(cards[+m[1]])[m[2] + 'col'] : ''; })(), kbc); return chk ? '<select data-act="set" data-prop="' + p + '">' + o('all', cur || 'all', 'toutes') + o('done', cur, 'cochées') + o('todo', cur, 'non cochées') + '</select>' : ''; };
-  return '<div class="q-cards">' + cards.map(function (carte, i) {
-    var c = qVueCarte(carte); c.label = carte.label; c.total = carte.total;
-    var cpt = compteurs[i], num = cpt.num, tot = cpt.tot, def = cpt.def;
+  return '<div class="q-cards">' + cards.map(function (c, i) {
+    var cpt = compteurs[i], num = cpt.num, tot = cpt.tot, def = cpt.def, k = b.cards && b.cards.length ? qCleCarte(c, i) : 'n0';
     var pc = tot ? Math.min(100, Math.round(num * 100 / tot)) : 0;
     var lab = e ? '<span class="fld q-lab" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="cards.' + i + '.label" data-nl data-ph="' + esc(def) + '">' + esc(c.label || '') + '</span>'
       : '<span class="q-lab">' + esc(String(c.label || '').trim() || def) + '</span>';
     var form = !e ? '' : '<div class="q-cform">' +
-      '<div class="q-row"><span class="q-lbl">Compter</span>' + stSel('cards.' + i + '.state', c.state) + qChips(d, 'q-ctag', i, avail, c.tags, 'cette carte') +
-      ((c.tags || []).length > 1 ? '<select data-act="set" data-prop="cards.' + i + '.match">' + o('any', c.match || 'any', 'au moins une') + o('all', c.match, 'toutes') + '</select>' : '') + '</div>' +
+      '<div class="q-row"><span class="q-lbl">Compter</span>' + qLignePucesCarte(b, d, c, k, 'filtres', noms, 'Filtres de cette carte') + '</div>' +
       '<div class="q-row"><span class="q-lbl">sur</span><select data-act="set" data-prop="cards.' + i + '.total">' + o('none', c.total || 'none', 'rien (nombre seul)') + o('all', c.total, 'tous les résultats') + o('filter', c.total, 'un autre filtre…') + '</select>' +
-      (c.total === 'filter' ? stSel('cards.' + i + '.tstate', c.tstate) + qChips(d, 'q-ttag', i, avail, c.ttags, 'ce total') +
-        ((c.ttags || []).length > 1 ? '<select data-act="set" data-prop="cards.' + i + '.tmatch">' + o('any', c.tmatch || 'any', 'au moins une') + o('all', c.tmatch, 'toutes') + '</select>' : '') : '') + '</div>' +
+      (c.total === 'filter' ? qLignePucesCarte(b, d, c, k, 'tfiltres', noms, 'Filtres du total') : '') + '</div>' +
       (cards.length > 1 ? '<button type="button" class="q-cdel" data-act="q-card-del" data-i="' + i + '" title="Supprimer cette carte">×</button>' : '') + '</div>';
     var href = qScopeHref(b), tag = href && !e ? 'a' : 'div';
     return '<' + tag + ' class="q-count' + (href ? ' q-linked' : '') + '"' + (tag === 'a' ? ' href="' + esc(href) + '" title="Ouvrir la page ou la section concernée"' : '') + '><b>' + num + (tot != null ? '<small> / ' + tot + '</small>' : '') + '</b>' + lab +
@@ -822,18 +838,12 @@ function qPuces(b, d, pi) {
 }
 var Q_PUCE_TITRES = { src: 'Changer ce que la requête cherche', scope: 'Changer où chercher', filtre: 'Modifier ce filtre', plus: 'Ajouter un filtre', view: 'Changer la vue et ses réglages', cols: 'Choisir les colonnes', sort: 'Changer le tri' };
 function qLignePuces(b, d, pi) {
-  var pre = { src: 'Chercher', scope: 'dans' }, coul = function (k) { return knownTagColor(d, k); };
-  // filtre de pastilles : les pastilles elles-mêmes, dans leur couleur
-  var pastilles = function (id) {
-    var noms = qNomsTags(d), f = qFiltreParId(b.filtres, id), l = f.vals.map(function (k) { var c = coul(k); return '<span class="pill' + (c == null ? '' : ' pa-' + c) + '">' + esc(noms[k] || k) + '</span>'; });
-    return f.mode === 'aucun' ? '<small>sauf</small> ' + l.join(', ') : l.join(f.mode === 'tous' ? ' <small>et</small> ' : ' <small>ou</small> ');
-  };
+  var pre = { src: 'Chercher', scope: 'dans' };
   return '<div class="q-puces" role="toolbar" aria-label="Réglage de la requête">' + qPuces(b, d, pi).map(function (p) {
     var titre = p.cle === 'cols' && /^Cartes/.test(p.libelle) ? 'Choisir les champs des cartes' : Q_PUCE_TITRES[p.quoi];
-    var btn = '<button type="button" class="q-puce' + (p.cle === 'plus' ? ' q-puce-plus' : '') + '" data-qpuce="' + p.cle + '" aria-haspopup="dialog" aria-expanded="false" title="' + titre + '">' +
-      (pre[p.cle] ? '<small>' + pre[p.cle] + '</small> ' : '') + (p.prop === 'tags' ? pastilles(p.id) : esc(p.libelle)) + '</button>';
-    if (p.quoi !== 'filtre') return (p.cle === 'view' ? '<span class="q-puce-sep" aria-hidden="true"></span>' : '') + btn;
-    return '<span class="q-puce-f">' + btn + '<button type="button" class="q-puce-x" data-qretirer="' + esc(p.id) + '" title="Retirer ce filtre" aria-label="Retirer le filtre « ' + esc(p.libelle) + ' »">×</button></span>';
+    if (p.quoi === 'filtre') return qPuceFiltre(d, qFiltreParId(b.filtres, p.id), p.libelle);
+    return (p.cle === 'view' ? '<span class="q-puce-sep" aria-hidden="true"></span>' : '') + '<button type="button" class="q-puce' + (p.cle === 'plus' ? ' q-puce-plus' : '') + '" data-qpuce="' + p.cle + '" aria-haspopup="dialog" aria-expanded="false" title="' + titre + '">' +
+      (pre[p.cle] ? '<small>' + pre[p.cle] + '</small> ' : '') + esc(p.libelle) + '</button>';
   }).join('') + '</div>';
 }
 // contenu de la fenêtre d'une puce (cle de qPuces, ou n:<prop>:<mode>) ; gestes : data-qset (choix d'une valeur), data-qfiltre (« + Filtre »),
@@ -854,7 +864,7 @@ function qFenetre(b, d, pi, cle) {
     return h('Chercher dans') + '<div class="q-fen-b"><select data-act="set" data-prop="scope" class="q-scope" aria-label="Portée">' + scopes + '</select>' +
       (sc === 'here' || /^pg:/.test(sc) ? '<label class="q-tog"><input type="checkbox" data-qsub' + (b.sub ? ' checked' : '') + '> et ses sous-pages</label>' : '') + '</div>';
   }
-  if (cle === 'plus') return h('Ajouter un filtre') + qFiltresProposes(b).map(function (f) {
+  if (cle === 'plus' || cle.indexOf('plus:') === 0) return h('Ajouter un filtre') + qFiltresProposes(b).map(function (f) {
     return '<button type="button" class="mi" data-qfiltre="' + f.prop + '"><span>' + f.nom + (f.prop === 'bloquees' ? '<small>Attendent une carte pas finie</small>' : '') + '</span></button>';
   }).join('');
   if (/^[fn]:/.test(cle)) return qFenetreFiltre(b, d, pi, cle, h, choix, seg);
@@ -882,7 +892,9 @@ function qFenetre(b, d, pi, cle) {
 var Q_CLE_ATTENTE = /^n:(\w+):(\w+)(?::([\s\S]*))?$/;
 var Q_MODES = [['un', 'l\'une de'], ['tous', 'toutes'], ['aucun', 'aucune de']];
 function qFenetreFiltre(b, d, pi, cle, h, choix, seg) {
-  var m = cle.match(Q_CLE_ATTENTE), f = m ? { id: '', prop: m[1], vals: [], mode: m[2], colonne: m[3] } : qFiltreParId(qFiltresSource(b, b.filtres), cle.slice(2));
+  // filtre posé : de la requête (de sa source), ou d'une carte de nombre (tous ses filtres comptent, 07-requetes.js qCompteurs)
+  var m = cle.match(Q_CLE_ATTENTE), t = !m && qTrouverFiltre(b, cle.slice(2));
+  var f = m ? { id: '', prop: m[1], vals: [], mode: m[2], colonne: m[3] } : t && (t.hote !== b || qFiltresSource(b, [t.f]).length) ? t.f : null;
   if (!f || (m && !qFiltresProposes(b).some(function (x) { return x.prop === f.prop; }))) return '';
   var fid = f.id, v0 = f.vals[0] || '';
   if (f.prop === 'state') return h('État des cases') + choix('state', 'done', v0, 'Cochées', '', fid) + choix('state', 'todo', v0, 'Non cochées', '', fid);

@@ -577,9 +577,9 @@ function refreshDerived() {
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
-      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); }   // le champ du filtre est hors de .q-res
+      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); if (fen && fen.b === b.id) fenPlacer(); }   // puces des cartes de nombre : accroche de la fenêtre   // le champ du filtre est hors de .q-res
     }
-    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces', app);
+    var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces:not(.q-cpuces)', app);
     if (form && !form.contains(document.activeElement)) {   // pas pendant que le focus est sur une puce
       var tmp = document.createElement('div'); tmp.innerHTML = qLignePuces(b, doc, vc.page);
       var nf = tmp.firstChild; if (nf && !nf.isEqualNode(form)) { form.replaceWith(nf); if (fen && fen.b === b.id) fenPlacer(); }

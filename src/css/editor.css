@@ -444,21 +444,21 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-col.q-drop-avant{box-shadow:-3px 0 0 var(--accent)}
 .q-col.q-drop-apres{box-shadow:3px 0 0 var(--accent)}
 .q-grip{cursor:grab;color:var(--muted);padding:0 4px;user-select:none;letter-spacing:-2px}
-.q-chip{border:0;cursor:pointer;opacity:.45}
-.q-chip[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--pl-f,var(--accent))}
-.q-chip:hover{opacity:.85}
 .q-hint{font-size:12px}
 
 .q-cards .q-count{position:relative;flex-basis:260px}
 .q-lab.fld{display:block;min-width:8ch}
 .q-cform{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
 .q-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+/* petite ligne de puces d'une carte de nombre (ticket 04 de filtres-logiques) : sans cadre, puces compactes, retour à la ligne */
+.q-cpuces{padding:0;border:0;background:none;gap:4px;min-width:0;max-width:100%}
+.q-cpuces .q-puce,.q-cpuces .q-puce-x{min-height:28px;font-size:12.5px}
+.q-cpuces .q-puce{padding:2px 9px}
 .q-cform select{font:500 12px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:26px;padding:0 4px;max-width:100%}
 .q-cdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border:0;border-radius:5px;background:none;color:var(--muted);cursor:pointer;font:600 14px/1 var(--f-body)}
 .q-cdel:hover{background:var(--bad-soft);color:var(--bad)}
 .q-cadd{align-self:center;border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;padding:8px 14px;cursor:pointer;font:500 13px var(--f-body)}
 .q-cadd:hover{border-color:var(--accent);color:var(--accent)}
-.q-chip.q-gone{text-decoration:line-through}
 
 .kb-edit .kb-card{padding-top:26px}
 .kb-ct.fld,.kb-tx.fld{display:block}
