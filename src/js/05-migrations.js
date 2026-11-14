@@ -38,8 +38,84 @@ var MIGRATIONS = [
   } },
   { from: 3, desc: 'Nouveau bloc « Requête » (aucune conversion)', run: function () {} },
   { from: 4, desc: 'Nouveau bloc « Kanban » ; retrait ligne par ligne des paragraphes (aucune conversion)', run: function () {} },
-  { from: 5, desc: 'Nouveaux blocs « Groupe repliable » et « Modèle diamant » (aucune conversion)', run: function () {} }
+  { from: 5, desc: 'Nouveaux blocs « Groupe repliable » et « Modèle diamant » (aucune conversion)', run: function () {} },
+  { from: 6, desc: 'Filtres des requêtes en liste (plusieurs valeurs, modes « l’une de », « toutes », « aucune de »)', run: function (d) {
+    migBlocks(d, function (b) { if (b.type === 'query') migFiltresRequete(b); });
+  } }
 ];
+// --- format 7 : filtres des requêtes { id, prop, vals, mode } (filtres-logiques) ---
+// Anciens champs, dans l'ordre figé de la migration (indépendant de Q_FILTRES, 07-requetes.js, qui évoluera)
+var FILTRES_ORDRE_V7 = ['tags', 'state', 'col', 'kbWho', 'kbPrio', 'kbDue', 'bloquees'];
+var Q_ANCIENS_CHAMPS = ['tags', 'match', 'state', 'col', 'kbWho', 'kbPrio', 'kbDue', 'kbDueN', 'kbDueU', 'bloquees'];
+var Q_ANCIENS_CARTE = ['tags', 'match', 'state', 'col', 'ttags', 'tmatch', 'tstate', 'tcol'];
+// filtres d'un objet aux anciens champs : bloc (pre ''), ou carte de nombre (carte : pastilles, état et colonne ; pre 't' : son total)
+function migFiltres(o, pre, carte, id) {
+  var out = [], f = function (prop, vals, plus) { var x = { id: id(), prop: prop, vals: vals }; for (var k in plus) x[k] = plus[k]; out.push(x); };
+  FILTRES_ORDRE_V7.forEach(function (prop) {
+    var v = o[pre + prop];
+    if (prop === 'tags') { if (Array.isArray(v) && v.length) f('tags', v.map(String), o[pre + 'match'] === 'all' ? { mode: 'tous' } : {}); return; }
+    if (prop === 'state') { if (v === 'done' || v === 'todo') f('state', [v]); return; }
+    if (!v || (carte && prop !== 'col')) return;
+    if (prop === 'kbPrio') f('kbPrio', v === 'p12' ? ['p1', 'p2'] : [String(v)]);
+    else if (prop === 'kbDue') { var p = {}; if (o.kbDueN != null) p.n = o.kbDueN; if (o.kbDueU != null) p.u = o.kbDueU; f('kbDue', [String(v)], p); }
+    else if (prop === 'bloquees') f('bloquees', ['oui']);
+    else f(prop, [String(v)]);
+  });
+  return out;
+}
+// identifiants déterministes (f1, f2…, uniques dans le bloc) : deux copies qui migrent le même fichier donnent les mêmes
+function migFiltresRequete(b) {
+  var n = 0, id = function () { return 'f' + (++n); };
+  var fb = migFiltres(b, '', false, id);
+  var cartes = Array.isArray(b.cards) ? b.cards.map(function (c) { return c && typeof c === 'object' ? [migFiltres(c, '', true, id), migFiltres(c, 't', true, id)] : null; }) : [];
+  oterAnciensFiltres(b);
+  if (fb.length) b.filtres = fb;
+  cartes.forEach(function (x, i) { if (!x) return; var c = b.cards[i]; if (x[0].length) c.filtres = x[0]; if (x[1].length) c.tfiltres = x[1]; });
+}
+// retire les anciens champs d'un bloc requête et de ses cartes de nombre (à la migration et à la normalisation : jamais lus ailleurs)
+function oterAnciensFiltres(b) {
+  Q_ANCIENS_CHAMPS.forEach(function (k) { delete b[k]; });
+  if (Array.isArray(b.cards)) b.cards.forEach(function (c) { if (c && typeof c === 'object') Q_ANCIENS_CARTE.forEach(function (k) { delete c[k]; }); });
+}
+// Miroir des anciens champs, à l'écriture du fichier seulement (serializeFile, copyJSON) : une version 1.23 ou plus ancienne
+// ouvre le document en lecture seule et filtre juste dans le cas courant. Rend une copie, l'original n'est pas touché.
+function miroirFiltres(d) {
+  var o = {}; for (var k in d) o[k] = d[k];
+  if (!Array.isArray(d.pages)) return o;
+  var bloc = function (b) {
+    if (!b || typeof b !== 'object') return b;
+    if (b.type === 'group' && Array.isArray(b.blocks)) { var g = {}; for (var gk in b) g[gk] = b[gk]; g.blocks = b.blocks.map(bloc); return g; }
+    if (b.type !== 'query') return b;
+    var q = {}; for (var qk in b) q[qk] = b[qk];
+    oterAnciensFiltres(q); miroirChamps(q, q.filtres, '', false);
+    if (Array.isArray(b.cards)) q.cards = b.cards.map(function (c) {
+      if (!c || typeof c !== 'object') return c;
+      var x = {}; for (var ck in c) x[ck] = c[ck];
+      Q_ANCIENS_CARTE.forEach(function (ak) { delete x[ak]; });
+      miroirChamps(x, c.filtres, '', true); miroirChamps(x, c.tfiltres, 't', true);
+      return x;
+    });
+    return q;
+  };
+  o.pages = d.pages.map(function (pg) { if (!pg || !Array.isArray(pg.blocks)) return pg; var p = {}; for (var pk in pg) p[pk] = pg[pk]; p.blocks = pg.blocks.map(bloc); return p; });
+  return o;
+}
+// premier filtre « l'une de » à une seule valeur de chaque propriété (P1 et P2 : « p12 ») ; pastilles : premier filtre « l'une de » ou « toutes »
+function miroirChamps(o, filtres, pre, carte) {
+  var faits = {};
+  (Array.isArray(filtres) ? filtres : []).forEach(function (f) {
+    if (!f || typeof f !== 'object' || faits[f.prop] || !Array.isArray(f.vals) || !f.vals.length) return;
+    var mode = f.mode || 'un', vals = f.vals.filter(function (v, i) { return f.vals.indexOf(v) === i; });
+    if (f.prop === 'tags') { if (mode === 'aucun') return; o[pre + 'tags'] = vals.slice(); o[pre + 'match'] = mode === 'tous' ? 'all' : 'any'; faits.tags = 1; return; }
+    if (mode !== 'un' || (carte && f.prop !== 'state' && f.prop !== 'col')) return;
+    var v = vals.length === 1 ? vals[0] : f.prop === 'kbPrio' && vals.length === 2 && vals.indexOf('p1') >= 0 && vals.indexOf('p2') >= 0 ? 'p12' : null;
+    if (v == null) return;
+    faits[f.prop] = 1;
+    if (f.prop === 'bloquees') { if (v === 'oui') o.bloquees = true; return; }
+    o[pre + f.prop] = v;
+    if (f.prop === 'kbDue') { if (f.n != null) o.kbDueN = f.n; if (f.u != null) o.kbDueU = f.u; }
+  });
+}
 // --- outils des migrations (sans DOM : vérifiés aussi par scripts/check.mjs dans Node) ---
 var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1 };
 function migStrings(d, fn) {

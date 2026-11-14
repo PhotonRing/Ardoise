@@ -64,7 +64,7 @@ test('requête kanban : colonne « Attend » proposée en tableau, masquée par 
 const fenetre = (q, cle) => { const { ctx, d } = monter(doc(q)); return ctx.qFenetre(d.pages[0].blocks[1], d, 0, cle); };
 test('requête kanban : réglages en édition seulement (filtre « Bloquées » par « + Filtre », champs des cartes en vue kanban)', () => {
   vrai(fenetre({}, 'plus').includes('data-qfiltre="bloquees"'), '« + Filtre » propose Bloquées');
-  vrai(rendu({ bloquees: true }, 'edit').includes('data-qretirer="bloquees"'), 'filtre posé : puce et ×');
+  vrai(/data-qpuce="f:[^"]+"[^>]*>Bloquées<[^]*data-qretirer=/.test(rendu({ bloquees: true }, 'edit')), 'filtre posé : puce et ×');
   const ed = fenetre({ champs: { masques: ['texte'], ordre: ['source'] } }, 'cols');
   egal([...ed.matchAll(/data-qchamp="([^"]*)"( checked)?/g)].map((m) => m[1] + (m[2] ? '+' : '-')), ['source+', 'texte-', 'priorite+', 'echeance+', 'responsable+', 'attend+']);
   vrai(!ed.includes('data-qcolmode'), 'pas de choix des colonnes en vue kanban');

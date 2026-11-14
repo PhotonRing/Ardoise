@@ -58,25 +58,24 @@ app.addEventListener('beforeinput', function (e) {
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
 // réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
-// requête : un filtre ramené à « tous » et « Sans tri » suppriment leur champ (un filtre posé est un champ présent) ;
-// dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
-var Q_EFFACABLES = { col: 1, kbWho: 1, kbPrio: 1, kbDue: 1, state: 1, sortBy: 1 };
+// requête : les filtres (du bloc et des cartes de nombre) se règlent dans la fenêtre de leur puce, 16-puces-requete.js ;
+// « Sans tri » supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
 function reglerBloc(blk, prop, v, dansFenetre) {
   holdBar(blk.id); keepView(blk); session.modifier(function () {
-    if (blk.type === 'query' && Q_EFFACABLES[prop] && (v === '' || (prop === 'state' && v === 'all'))) {
-      delete blk[prop];
-      if (prop === 'kbDue') { delete blk.kbDueN; delete blk.kbDueU; }
-      if (prop === 'sortBy') delete blk.sortDir;
-      return;
-    }
+    if (blk.type === 'query' && /^cards\.\d+\./.test(prop) && !(blk.cards && blk.cards.length)) blk.cards = [qDefCard(blk)];   // « sur » d'une carte pas encore enregistrée
+    if (blk.type === 'query' && prop === 'sortBy' && v === '') { delete blk.sortBy; delete blk.sortDir; return; }
+    var avant = blk.src || 'facts';
     if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
     // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
     if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
-    if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
+    if (blk.type === 'query' && prop === 'src' && v !== avant) qCartesNouvelleSource(blk, avant, v);
   }, dansFenetre ? null : { b: blk.id });
 }
-// nombre d'un filtre de requête (échéance dans les N jours…)
-function reglerNombre(blk, prop, v) { var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id); session.modifier(function () { blk[prop] = n; }); }
+// nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid
+function reglerNombre(blk, prop, v, fid) {
+  var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
+  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var t = qTrouverFiltre(blk, fid); if (t) t.f.n = n; });   // filtre de la requête ou d'une carte
+}
 function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
   var el = e.target;

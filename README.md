@@ -49,8 +49,6 @@ Chaque document embarque **son propre éditeur**, celui de la version d'Ardoise 
 2. *Fichier → Mettre à jour Ardoise…* : Ardoise cherche la dernière version publiée. Hors ligne, *Choisir un fichier…* et prenez un `ardoise.html` téléchargé depuis les [releases](../../releases/latest).
 3. *Mettre à jour* : le fichier est réécrit avec le nouvel éditeur, le même contenu, le même mot de passe et le même chiffrement, puis il se recharge. Sur Firefox et Safari, une copie est téléchargée : mettez-la à la place de l'ancien fichier.
 
-**Dans Obsidian** : après la mise à jour du plugin, un document plus ancien affiche un bandeau *Mettre à jour vers …* ; un clic suffit (sans réseau ni mot de passe).
-
 **Et le contenu ?** Rien à faire. Quand une version change la façon dont le contenu est rangé dans le fichier (son *format*), le nouvel éditeur convertit le document tout seul à l'ouverture, et le fichier est réécrit dans le nouveau format au prochain enregistrement.
 
 **Un document plus récent que son éditeur** (par exemple enregistré en 1.6 puis rouvert avec une copie 1.5) s'affiche en lecture seule avec un bandeau *Mettre à jour…*, pour que rien ne soit perdu. Les éditeurs antérieurs à 1.5 n'ont pas cette protection : mettez à jour tous vos documents plutôt que de garder d'anciennes copies d'Ardoise.
@@ -67,17 +65,6 @@ Chacun voit les autres personnes présentes (pastilles en haut à droite, nom mo
 
 Bon à savoir : Annuler (`Ctrl+Z`) ne défait que vos propres modifications, en gardant celles reçues entre-temps ; si deux personnes changent le même réglage (couleur, case à cocher…), la dernière modification l'emporte ; un bloc déplacé pendant que quelqu'un le modifie peut perdre cette modification.
 
-## Plugin Obsidian
-
-Le plugin **Ardoise pour Obsidian** ouvre les documents Ardoise du coffre dans un onglet d'Obsidian : lecture, édition, `Ctrl+S` et auto-save fonctionnent comme dans le navigateur, mais l'enregistrement va directement dans le fichier du coffre, sans boîte de dialogue.
-
-- **Installation** : dans la [dernière release](../../releases/latest), récupérez `ardoise-obsidian.zip` et décompressez-le dans `<coffre>/.obsidian/plugins/ardoise/`, puis activez « Ardoise » dans *Paramètres → Plugins communautaires*.
-- **Ouvrir** : un clic sur un fichier `.html` du coffre l'ouvre dans Ardoise (menu contextuel « Ouvrir dans Ardoise » et commande « Ouvrir le fichier courant dans Ardoise » si un autre plugin gère déjà les `.html`). Les autres fichiers HTML s'affichent en aperçu, en lecture seule.
-- **Créer** : icône du ruban, commande « Ardoise : Nouveau document » ou « Nouveau document Ardoise » dans le menu d'un dossier.
-- **Mettre à jour** : un document créé avec une version plus ancienne que le plugin affiche un bandeau « Mettre à jour » (sans réseau ni mot de passe : seul l'éditeur embarqué est remplacé).
-- Le document s'exécute dans une iframe isolée (sans accès à Obsidian ni au coffre) et ne communique avec le plugin que pour enregistrer. Le plugin fonctionne aussi avec les documents créés par des versions antérieures d'Ardoise, qui embarquent leur propre éditeur.
-- Dans Obsidian, les brouillons de secours du navigateur (`localStorage`) ne sont pas disponibles : l'auto-save, actif par défaut, écrit dans le coffre environ une seconde après chaque modification, et les modifications en attente sont enregistrées à la fermeture de l'onglet.
-
 ## Organisation du dépôt
 
 ```
@@ -88,8 +75,7 @@ src/
   assets/ardoise.svg  icône d'Ardoise (favicon du fichier et logo de la barre, teinté selon la couleur d'accent)
   js/NN-*.js        code de l'application, concaténé dans l'ordre des numéros
   data/geo.json     fond de carte simplifié, villes et ports (généré, voir plus bas)
-obsidian/           plugin Obsidian (main.js, manifest.json, styles.css)
-build.mjs           assemble src/ en dist/ardoise.html et le plugin dans dist/obsidian/ (Node.js, sans dépendance)
+build.mjs           assemble src/ en dist/ardoise.html, et copie le relais dans dist/ardoise-relais.mjs (Node.js, sans dépendance)
 scripts/check.mjs   vérifications du fichier assemblé et des migrations du format
 scripts/fixtures/   documents de référence des migrations (format-N.json → format-N.attendu.json)
                     et presse-papier/ : extraits de collage depuis les tableurs
@@ -124,7 +110,7 @@ Pour faire évoluer le format :
 ## Assembler localement
 
 ```bash
-node build.mjs          # → dist/ardoise.html et dist/obsidian/
+node build.mjs          # → dist/ardoise.html et dist/ardoise-relais.mjs
 node scripts/check.mjs  # vérifie la syntaxe et la structure du fichier produit
 ```
 
@@ -135,7 +121,7 @@ Node.js 18 ou plus récent, aucune dépendance à installer.
 Les releases ne se font pas à la main : le workflow [`release.yml`](.github/workflows/release.yml) s'en charge.
 
 - À chaque push sur `main`, il assemble et vérifie `dist/ardoise.html`.
-- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et le plugin Obsidian (`ardoise-obsidian.zip`) en pièces jointes et des notes générées à partir des commits ; il publie aussi `ardoise.html` sur la branche `latest`, d'où les documents se mettent à jour (les pièces jointes des releases ne peuvent pas être téléchargées depuis une page web).
+- Si la version indiquée dans `package.json` n'a pas encore de tag, il crée le tag `vX.Y.Z` et la release GitHub correspondante, avec `ardoise.html` et le relais de synchronisation (`ardoise-relais.mjs`) en pièces jointes et des notes générées à partir des commits ; il publie aussi `ardoise.html` sur la branche `latest`, d'où les documents se mettent à jour (les pièces jointes des releases ne peuvent pas être téléchargées depuis une page web).
 - Une fois la release publiée, il supprime les branches dont la pull request a été fusionnée dans `main` (sauf si elles ont reçu des commits depuis la fusion).
 - Lancé à la main (*Actions → Release → Run workflow*) avec un tag, par exemple `v1.3.0`, il reconstruit ce tag et remplace les fichiers joints de sa release.
 - Pour publier une nouvelle version : augmentez `version` dans `package.json` et poussez sur `main`.

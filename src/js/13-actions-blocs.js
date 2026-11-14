@@ -28,10 +28,6 @@ app.addEventListener('click', function (e) {
       session.modifier(function () { var t = b.cols[i]; b.cols[i] = b.cols[j2]; b.cols[j2] = t; }); break;
     case 'q-card-add': session.modifier(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; b.cards.push(qDefCard(b)); }, { b: b.id, k: 'cards.' + ((b.cards && b.cards.length) || 1) + '.label' }); break;
     case 'q-card-del': if (b.cards && b.cards.length > 1) session.modifier(function () { b.cards.splice(i, 1); }); break;
-    case 'q-ctag': case 'q-ttag':
-      var ct = a.dataset.tag, cp = a.dataset.act === 'q-ctag' ? 'tags' : 'ttags';
-      session.modifier(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; var c = b.cards[i], w = c[cp] || (c[cp] = []), at = w.indexOf(ct); if (at >= 0) w.splice(at, 1); else w.push(ct); }); break;
-    case 'q-tag': var tk = a.dataset.tag; session.modifier(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); }); break;
     case 'fold': delete viewFold[b.id]; session.modifier(function () { if (b.type === 'group') b.folded = !b.folded; else if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;
     case 'down': moveBlock(b, 1); break;

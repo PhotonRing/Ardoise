@@ -31,7 +31,10 @@ test('comptage : apparitions de chaque nom du registre comme pastille, et pages 
 });
 
 // puces d'un rendu : nom → classes et titre
-const puces = (h) => Object.fromEntries([...h.matchAll(/<button type="button" class="([^"]*q-chip[^"]*)"[^>]*title="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[3], { cls: m[1], title: m[2] }]));
+// (cases de la fenêtre d'un filtre : classes de la case et de sa pastille, titre de la case)
+const puces = (h) => Object.fromEntries([...h.matchAll(/<button type="button" class="([^"]*q-chip[^"]*)"[^>]*title="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[3], { cls: m[1], title: m[2] }])
+  .concat([...h.matchAll(/<label class="(q-case[^"]*)"(?: title="([^"]*)")?><input [^>]*><span class="(pill[^"]*)">([^<]*)</g)].map((m) => [m[4], { cls: m[1] + ' ' + m[3], title: m[2] || '' }])));
+const fen = (ctx, b, d, pi, prop) => ctx.qFenetre(b, d, pi, 'f:' + b.filtres.find((f) => f.prop === prop).id);
 
 test('une requête qui filtre par responsable, colonne ou pastille absente n\'inscrit rien au registre', () => {
   const { ctx, d } = monter({ ...DOC, pages: [...DOC.pages, { id: 'p3', title: 'Requêtes', blocks: [
@@ -40,9 +43,11 @@ test('une requête qui filtre par responsable, colonne ou pastille absente n\'in
   ] }] });
   const avant = JSON.stringify(d.tags);
   const q1 = d.pages[2].blocks[0];
-  const h = ctx.renderPage(d, { page: 2, view: 'edit' }) + ctx.qFenetre(q1, d, 2, 'f:tags') + ctx.qFenetre(q1, d, 2, 'f:kbWho') + ctx.qFenetre(q1, d, 2, 'f:col');
+  const h = ctx.renderPage(d, { page: 2, view: 'edit' }) + fen(ctx, q1, d, 2, 'tags') + fen(ctx, q1, d, 2, 'kbWho') + fen(ctx, q1, d, 2, 'col');
   egal(JSON.stringify(d.tags), avant, 'registre inchangé');
-  for (const nom of ['inconnue', 'autre', 'encore']) {
+  // cartes de nombre (ticket 04) : pastilles absentes dans les puces de la carte, grises
+  for (const nom of ['autre', 'encore']) vrai(h.includes('<span class="pill">' + nom + '</span></button>'), 'puce de carte « ' + nom + ' » grise');
+  for (const nom of ['inconnue']) {
     const p = puces(h)[nom];
     vrai(p, 'puce « ' + nom + ' » gardée :\n' + h);
     vrai(!/\bpa-\d/.test(p.cls) && /\bq-gone\b/.test(p.cls), 'puce « ' + nom + ' » grise et marquée absente : ' + p.cls);
@@ -71,7 +76,7 @@ test('nom d\'une pastille retirée de tous les textes : celui vu au rendu pendan
 
 test('une pastille de la fenêtre du filtre prend la couleur du registre ; absente de la portée mais au registre, elle garde sa couleur', () => {
   const { ctx, d } = monter(DOC);
-  const p = puces(ctx.qFenetre(d.pages[1].blocks.find((x) => x.id === 'b3'), d, 1, 'f:tags'));
+  const p = puces(fen(ctx, d.pages[1].blocks.find((x) => x.id === 'b3'), d, 1, 'tags'));
   vrai(/\bpa-0\b/.test(p.OK.cls) && !/q-gone/.test(p.OK.cls), 'OK : couleur 0 : ' + p.OK.cls);
   vrai(/\bpa-2\b/.test(p.ancienne.cls) && /q-gone/.test(p.ancienne.cls) && p.ancienne.title.startsWith('Absente de la portée'), 'ancienne : ' + JSON.stringify(p.ancienne));
 });

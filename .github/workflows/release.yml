@@ -1,8 +1,8 @@
 name: Release
 
 # À chaque push sur main : assemble dist/ardoise.html, puis, si la version de package.json
-# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec ardoise.html, le plugin Obsidian (zip) et le
-# relais de synchronisation (ardoise-relais.mjs) en pièces jointes.
+# n'a pas encore de tag, crée le tag vX.Y.Z et la release GitHub avec ardoise.html et le relais de
+# synchronisation (ardoise-relais.mjs) en pièces jointes.
 # Lancé à la main avec un tag (ex. v1.3.0) : reconstruit ce tag et remplace les fichiers joints de sa release.
 on:
   push:
@@ -42,9 +42,6 @@ jobs:
         id: version
         run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Préparer le zip du plugin Obsidian
-        run: (cd dist/obsidian && zip -q ../ardoise-obsidian.zip main.js manifest.json styles.css)
-
       - name: Republier les fichiers de la release ${{ inputs.tag }}
         if: inputs.tag != ''
         env:
@@ -52,10 +49,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
         run: |
-          gh release upload "$TAG" dist/ardoise.html dist/ardoise-obsidian.zip dist/ardoise-relais.mjs --clobber
-          # retire les autres fichiers joints (anciennes versions qui joignaient aussi le contenu du zip)
+          gh release upload "$TAG" dist/ardoise.html dist/ardoise-relais.mjs --clobber
+          # retire les autres fichiers joints (anciennes versions : contenu du zip, plugin Obsidian)
           gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r name; do
-            case "$name" in ardoise.html|ardoise-obsidian.zip|ardoise-relais.mjs) ;; *) gh release delete-asset "$TAG" "$name" --yes && echo "Retiré : $name" ;; esac
+            case "$name" in ardoise.html|ardoise-relais.mjs) ;; *) gh release delete-asset "$TAG" "$name" --yes && echo "Retiré : $name" ;; esac
           done
 
       - name: Créer le tag et la release si la version est nouvelle
@@ -73,7 +70,7 @@ jobs:
           notes="$RUNNER_TEMP/notes.md"
           git log -1 --format=%b "$GITHUB_SHA" > "$notes"
           if grep -q '[^[:space:]]' "$notes"; then source_notes=(--notes-file "$notes"); else source_notes=(--generate-notes); fi
-          gh release create "$TAG" dist/ardoise.html dist/ardoise-obsidian.zip dist/ardoise-relais.mjs \
+          gh release create "$TAG" dist/ardoise.html dist/ardoise-relais.mjs \
             --target "$GITHUB_SHA" \
             --title "Ardoise $TAG" \
             "${source_notes[@]}"

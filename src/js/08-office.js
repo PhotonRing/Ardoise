@@ -228,7 +228,7 @@ function officeRequete(b, d, pi, S, txt, para) {
     qCompteurs(b, d, pi, recs).forEach(function (c) { out.push(para([txt(c.label + ' : '), txt(c.num + (c.tot != null ? ' / ' + c.tot : ''), { gras: true })])); });
     return out;
   }
-  if (!recs.length) { out.push(para([txt('Aucun résultat.', { couleur: OFFICE_CLAIR.muted })])); return out; }
+  if (!recs.length && !qColonnesRetenues(b, d, pi, view)) { out.push(para([txt('Aucun résultat.', { couleur: OFFICE_CLAIR.muted })])); return out; }
   if (view === 'regroupee' && src === 'table') {
     // vue regroupée (07-requetes.js) : fiches (titre gras avec le nombre, tableau clé / valeurs uniques) ou tableau (X, Y…, Lignes)
     var rg = qRegReglage(b, recs), sp = qRegTri(b, ctx, rg), gr = qGroupesTries(qRegrouper(recs, rg.x, rg.ys), sp.by, sp.dir), glim = Math.max(0, +b.limit || 0), gtot = gr.length;

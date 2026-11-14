@@ -630,7 +630,7 @@ test('un document déjà normalisé reste identique une fois remplacé', () => {
   egal(m.doc.sync.key, 'k');
 });
 
-// --- remplacer : import JSON, chargement externe (plugin Obsidian), brouillon ---
+// --- remplacer : import JSON, chargement externe (window.ardoise.load), brouillon ---
 const ENTRANT = () => ({ id: 'autre', title: 'Importé', savedAt: '2020-01-01T00:00:00.000Z', mapKey: 'cle-entrante',
   lock: { salt: 's2', hash: 'h2', iter: 1000 },
   pages: [{ id: 'q1', title: 'A', blocks: [{ id: 'y1', type: 'p', html: 'importé' }] }, { id: 'q2', title: 'B', blocks: [] }, { id: 'q3', title: 'C', blocks: [] }] });
@@ -886,10 +886,12 @@ test('libellé : champs des cartes et filtre « Bloquées » d\'une requête kan
   const q = () => blocsDe(m)[1];
   m.s.modifier(() => { q().champs = { masques: ['attend', 'texte'], ordre: [] }; });
   egal(libelles(m)[0], 'Accueil · Requête « Suivi » : champs des cartes modifiés');
-  m.s.modifier(() => { q().bloquees = true; });
+  m.s.modifier(() => { q().filtres = [{ id: 'f1', prop: 'bloquees', vals: ['oui'] }]; });
   egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés');
-  m.s.annuler();
-  egal('bloquees' in q(), false, 'annuler : filtre retiré');
+  m.s.modifier(() => { q().filtres[0].vals = ['non']; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés', 'valeur d\'un filtre posé');
+  m.s.annuler(); m.s.annuler();
+  egal('filtres' in q(), false, 'annuler : filtre retiré');
   m.s.annuler();
   egal('champs' in q(), false, 'annuler : champs d\'avant');
 });
@@ -1169,6 +1171,52 @@ for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une �
 
 // ---------- étape ouverte (fenêtre d'une puce de requête) ----------
 const FEN = { etape: 'Accueil · Requête « Incidents » : filtres modifiés' };
+test('étape ouverte : deux filtres de même propriété réglés dans une fenêtre forment une étape ; × sur l\'un en fait une autre', () => {
+  const m = monter(), c = m.ctx;
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'kanban', scope: 'doc', view: 'table', filtres: [{ id: 'a', prop: 'tags', vals: ['urgent'] }] }); });
+  const q = () => blocsDe(m)[1], avant = JSON.stringify(q());
+  m.s.ouvrirEtape(FEN);
+  let f = null;
+  m.s.modifier(() => { f = c.qBasculerValeur(q(), q(), 'filtres', { prop: 'tags', mode: 'aucun' }, 'archivé'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), q(), 'filtres', { id: f.id, prop: 'tags' }, 'clos'); });
+  m.s.modifier(() => { c.qModeFiltre(q(), 'filtres', { id: f.id }, 'un'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), q(), 'filtres', { id: 'a', prop: 'tags' }, 'client'); });
+  m.s.fermerEtape();
+  egal(libelles(m)[0], FEN.etape);
+  egal(q().filtres.map((x) => x.vals.join('+') + ':' + (x.mode || 'un')), ['urgent+client:un', 'archivé+clos:un']);
+  m.s.modifier(() => { c.qRetirerFiltre(q(), 'filtres', c.qFiltreParId(q().filtres, 'a')); }, null, 'filtres modifiés');
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : filtres modifiés', '× : une étape');
+  egal(q().filtres.map((x) => x.id), [f.id], '× retire ce filtre-là seulement');
+  m.s.annuler();
+  egal(q().filtres.length, 2, 'un Ctrl+Z rend le filtre retiré');
+  m.s.annuler();
+  egal(JSON.stringify(q()), avant, 'un seul Ctrl+Z défait toute la fenêtre');
+});
+test('étape ouverte : fenêtre d\'un filtre de carte de nombre (compte puis total) = une étape ; × sur une puce de carte = une étape', () => {
+  const m = monter(), c = m.ctx;
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'kanban', scope: 'doc', view: 'count', cards: [{ id: 'n1', label: '', total: 'filter' }] }); });
+  const q = () => blocsDe(m)[1], carte = () => q().cards[0], avant = JSON.stringify(q());
+  m.s.ouvrirEtape(FEN);
+  let f = null;
+  m.s.modifier(() => { f = c.qBasculerValeur(q(), carte(), 'filtres', { prop: 'kbWho', mode: 'un' }, 'alice'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), carte(), 'filtres', { id: f.id, prop: 'kbWho' }, '-'); });
+  m.s.modifier(() => { c.qModeFiltre(carte(), 'filtres', { id: f.id }, 'aucun'); });
+  m.s.fermerEtape();
+  egal(libelles(m)[0], FEN.etape);
+  egal(carte().filtres.map((x) => x.vals.join('+') + ':' + x.mode), ['alice+-:aucun']);
+  m.s.ouvrirEtape(FEN);
+  m.s.modifier(() => { c.qReglerFiltre(q(), carte(), 'tfiltres', { prop: 'bloquees' }, 'non'); });
+  m.s.fermerEtape();
+  const t = carte().tfiltres[0];
+  egal(c.qTrouverFiltre(q(), t.id).cle, 'tfiltres', 'filtre du total retrouvé par son id');
+  m.s.modifier(() => { const r = c.qTrouverFiltre(q(), f.id); c.qRetirerFiltre(r.hote, r.cle, r.f); }, null, 'filtres modifiés');
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : filtres modifiés', '× : une étape');
+  egal([carte().filtres, carte().tfiltres.length], [undefined, 1], '× retire ce filtre-là seulement');
+  m.s.annuler(); m.s.annuler();
+  egal(carte().filtres.length, 1, 'deux Ctrl+Z : × puis la fenêtre du total');
+  m.s.annuler();
+  egal(JSON.stringify(q()), avant, 'un seul Ctrl+Z défait la fenêtre du compte');
+});
 test('étape ouverte : plusieurs modifications forment une seule étape, nommée, qu\'un seul Ctrl+Z défait', () => {
   const m = monter();
   m.s.ouvrirEtape(FEN);

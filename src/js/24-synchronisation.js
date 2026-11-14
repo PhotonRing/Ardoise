@@ -11,7 +11,7 @@
 var SYN_COLORS = ['#d9480f', '#1971c2', '#2f9e44', '#9c36b5', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4'];
 var SYN_ADJ = ['curieuse', 'joyeuse', 'discrète', 'rapide', 'patiente', 'rêveuse', 'agile', 'sereine', 'vive', 'attentive', 'audacieuse', 'paisible'];
 var SYN_ANI = ['Loutre', 'Mésange', 'Hermine', 'Libellule', 'Chouette', 'Baleine', 'Gazelle', 'Panthère', 'Marmotte', 'Grue', 'Tortue', 'Abeille'];
-var synNom = '';   // sans stockage du navigateur (plugin Obsidian), le nom reste le même pendant la session
+var synNom = '';   // stockage du navigateur refusé (données de site bloquées) : le nom reste le même pendant la session
 function synName() {
   var n = ''; try { n = localStorage.getItem(LS + 'nom') || ''; } catch (_) {}
   if (!n) n = synNom;

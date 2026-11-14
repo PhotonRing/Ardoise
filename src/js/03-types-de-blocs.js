@@ -9,7 +9,7 @@ var T = {
   p:       { label: 'Paragraphe', ic: '¶', desc: 'Texte courant', kw: 'texte paragraphe', make: function () { return { html: '' }; } },
   summary: { label: 'Sommaire', ic: '☰', desc: 'Sections ou sous-pages de la page, tenu à jour', kw: 'sommaire table des matieres toc index sections sous-pages plan', make: function () { return { title: 'Sommaire', src: 'sec', sort: 'doc' }; } },
   query:   { label: 'Requête', ic: '⌕', desc: 'Fiches de faits, lignes de tableaux ou cases à cocher filtrées par pastilles : tableau, liste ou nombre', kw: 'requete query dataview filtre recherche pastille tag compteur widget tableau liste nombre',
-    make: function () { return { title: '', src: 'facts', scope: 'doc', tags: [], match: 'any', view: 'table', cards: [{ label: '', tags: [], match: 'any', state: 'all', total: 'none' }] }; } },
+    make: function () { return { title: '', src: 'facts', scope: 'doc', view: 'table', cards: [{ id: uid(), label: '', total: 'none' }] }; } },
   kanban:  { label: 'Kanban', ic: '▥', desc: 'Colonnes de cartes à déplacer (échéance et responsable facultatifs)', kw: 'kanban tableau taches suivi colonnes cartes trello projet',
     make: function () { return { cols: [{ id: uid(), title: 'À faire', cards: [] }, { id: uid(), title: 'En cours', cards: [] }, { id: uid(), title: 'Fait', cards: [] }] }; } },
   step:    { label: 'Étape numérotée', ic: '1.', desc: 'Ouvre une section avec pastille de numéro', kw: 'etape section numero step', make: function () { return { num: '', title: '', nonum: false }; } },

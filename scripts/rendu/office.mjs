@@ -144,6 +144,8 @@ test('office : requête figée comme affichée (tableau, liste, nombre « texte 
   vrai(office('q', page({ view: 'table' })).html.includes('<span style="color:#b42318">haut</span>'), 'alerte gardée');
   egal(office('q', page({ view: 'list' })).texte, 'Hôtes\n- Accueil · Hôte srv1 #OK · Risque haut\n- Accueil · Hôte srv2');
   egal(office('q', page({ view: 'count', cards: [{ label: 'Avec OK', tags: ['ok'], match: 'any', state: 'all', total: 'all' }] })).texte, 'Hôtes\nAvec OK : 1 / 2');
+  // cartes à filtres (ticket 04) : mêmes comptes et même texte par défaut qu'à l'écran
+  egal(office('q', page({ view: 'count', cards: [{ id: 'n', label: '', filtres: [{ id: 'a', prop: 'valeur', colonne: 'risque', vals: [''], mode: 'aucun' }], total: 'filter', tfiltres: [{ id: 'b', prop: 'tags', vals: ['ok'], mode: 'aucun' }] }] })).texte, 'Hôtes\nfiches de faits · Risque : sauf (vide) : 1 / 1');
 });
 
 test('office : requête aux colonnes choisies (tableau, liste, en colonnes, cases)', () => {

@@ -30,7 +30,7 @@ function serializeFile() {
   // renvoie une promesse du fichier complet ; chiffré si le document le demande
   doc.savedAt = new Date().toISOString();
   doc.title = docTitle();
-  var json = JSON.stringify(synSaved(doc));
+  var json = JSON.stringify(miroirFiltres(synSaved(doc)));   // anciens champs des filtres pour les versions 1.23 et antérieures (05-migrations.js)
   return (isSealed() ? sealJSON(json).then(function (env) {
     return JSON.stringify({ v: VERSION, id: doc.id, palette: doc.palette, typo: doc.typo, theme: doc.theme, enc: env });
   }) : Promise.resolve(json)).then(function (stored) { return buildFile(stored); });
@@ -78,9 +78,9 @@ function oublierFichier() { fileHandle = null; poigneeReprise = null; handleGran
 function dropHandle(h) { oublierFichier(); nomEcarte = h.name; forgetHandle(); }
 // poignée choisie dans le sélecteur : elle remplace la précédente
 function adopterPoignee(h) { if (h !== fileHandle) { poigneeReprise = null; nomEcarte = null; } fileHandle = h; handleGranted = true; }
-// poignée déjà utilisée : nom du fichier ouvert si elle est reprise, puis lecture (l'écriture recréerait un fichier déplacé) ; sans objet dans Obsidian
+// poignée déjà utilisée : nom du fichier ouvert si elle est reprise, puis lecture (l'écriture recréerait un fichier déplacé)
 function verifierPoignee(h) {
-  if (window.ardoiseHost || !h.getFile) return Promise.resolve();
+  if (!h.getFile) return Promise.resolve();
   if (h === poigneeReprise && !memeNomQueFichierOuvert(h.name, location.href)) { var e = new Error(STALE_MSG); e.name = 'NotFoundError'; return Promise.reject(e); }
   return h.getFile().then(function () {});
 }
@@ -274,8 +274,7 @@ function applyUpdate(tpl) {
       }).then(function (r) { return r === 'dl' ? r : putHandle(h); }).then(function (r) {
         if (r === 'dl') return;
         afterSave(); toast('Ardoise ' + versionOf(html) + ' installée · rechargement…');
-        // dans Obsidian, le plugin recharge lui-même le document mis à jour
-        if (!window.ardoiseHost) setTimeout(function () { location.reload(); }, 800);
+        setTimeout(function () { location.reload(); }, 800);
       });
     });
   }).catch(saveFailed);

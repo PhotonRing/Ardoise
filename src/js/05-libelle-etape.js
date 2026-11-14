@@ -55,6 +55,8 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
+// bloc sans ses filtres, premier niveau seulement : les filtres des cartes de nombre restent comparés
+function libelleSansFiltres(b) { var o = {}; for (var k in b) if (k !== 'filtres') o[k] = b[k]; return JSON.stringify(o); }
 // tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; sinon null (collage et vidage d'une plage donnent leur nature)
 function libelleGrille(ra, rb) {
   var J = JSON.stringify, i;
@@ -80,7 +82,7 @@ function libelleNature(ba, b) {
   if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
   if (b.type === 'query' && libelleSans(ba, 'colonnes') === libelleSans(b, 'colonnes')) return 'colonnes modifiées';   // choix des colonnes (07-requetes.js)
   if (b.type === 'query' && libelleSans(ba, 'champs') === libelleSans(b, 'champs')) return 'champs des cartes modifiés';
-  if (b.type === 'query' && libelleSans(ba, 'bloquees') === libelleSans(b, 'bloquees')) return 'filtres modifiés';   // filtre « Bloquées »
+  if (b.type === 'query' && libelleSansFiltres(ba) === libelleSansFiltres(b)) return 'filtres modifiés';   // filtres du bloc (pas ceux des cartes de nombre)
   if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
     var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
   }
