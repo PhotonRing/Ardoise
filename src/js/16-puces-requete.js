@@ -80,7 +80,8 @@ function fenBrancher(p) {
     var x = e.target.closest('[data-qset], [data-qfiltre], [data-act=q-tag]'); if (!x || !fen || mode !== 'edit') return;
     var b = bloc(); if (!b) return;
     if (x.dataset.qset) { reglerBloc(b, x.dataset.qset, x.dataset.v, true); return; }
-    if (x.dataset.act === 'q-tag') { var tk = x.dataset.tag; holdBar(b.id); session.modifier(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); }); return; }
+    // la dernière pastille décochée retire le filtre (et son « toutes / une »)
+    if (x.dataset.act === 'q-tag') { var tk = x.dataset.tag; holdBar(b.id); session.modifier(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); if (!w.length) { delete b.tags; delete b.match; } }); return; }
     var prop = x.dataset.qfiltre;
     if (prop === 'bloquees') { holdBar(b.id); session.modifier(function () { b.bloquees = true; }); fenFermer(); return; }
     fen.cle = 'f:' + prop; fen.ancre = qFiltrePose(b, prop) ? fen.cle : 'plus';
@@ -112,6 +113,12 @@ app.addEventListener('click', function (e) {
   if (fen && fen.b === b.id && fen.ancre === pc.dataset.qpuce) { closePop(); return; }
   fenOuvrir(b.id, pc.dataset.qpuce, e.detail === 0);
 });
+// un geste qui commence hors de la fenêtre (glisser d'une ligne, d'une carte, au doigt) la ferme d'abord : il fait sa propre étape ;
+// pointerdown, car un glisser empêche souvent mousedown ; puces et barre d'outils (annuler) gardent la fenêtre
+function fenDehors(t) { return fen && t && t.closest && !fen.p.contains(t) && !t.closest('[data-qpuce], [data-ui]'); }
+document.addEventListener('pointerdown', function (e) { if (fenDehors(e.target)) closePop(); }, true);
+// de même, une frappe hors de la fenêtre (touches de modification seules mises à part) clôt son étape
+document.addEventListener('keydown', function (e) { if (fenDehors(e.target) && ['Escape', 'Shift', 'Control', 'Alt', 'Meta', 'AltGraph'].indexOf(e.key) < 0) closePop(); }, true);
 // Échap, où que soit le focus : la fenêtre se ferme et la puce reprend le focus (avant le raccourci global, 24-raccourcis-globaux.js)
 document.addEventListener('keydown', function (e) { if (fen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fenFermer(); } }, true);
 window.addEventListener('scroll', function (e) { if (fen && !(e.target.nodeType === 1 && fen.p.contains(e.target))) fenPlacer(); }, true);

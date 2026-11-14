@@ -1217,6 +1217,21 @@ test('étape ouverte : revenir à l\'état de départ ne laisse aucune étape', 
   m.s.fermerEtape();
   egal(libelles(m), [FEN.etape, '']);
 });
+test('deux copies : étape ouverte revenue à son départ après une arrivée, aucune étape vide ne reste annulable', () => {
+  const { a, b } = relier();
+  a.s.ouvrirEtape(FEN);
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'x'; });
+  b.s.modifier(() => { b.ctx.doc.pages[0].blocks[1].html = 'b-B'; });
+  echanger(a, b);
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'a'; });
+  a.s.fermerEtape();
+  egal([a.bloc('b1'), a.bloc('b2')], ['a', 'b-B']);
+  egal(possible(a.s.historique()), { annuler: false, retablir: false }, 'l\'étape revenue à son départ disparaît');
+  a.s.modifier(() => { a.ctx.doc.pages[0].blocks[0].html = 'c'; });
+  a.s.annuler();
+  egal([a.bloc('b1'), a.bloc('b2')], ['a', 'b-B'], 'une modification suivante reste une seule étape, qui garde le reçu');
+  egal(possible(a.s.historique()), { annuler: false, retablir: true });
+});
 test('après fermerEtape, une modification est une étape ordinaire', () => {
   const m = monter();
   m.s.ouvrirEtape(FEN);

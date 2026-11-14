@@ -11,6 +11,7 @@ const TABLE = { id: 't1', type: 'table', rows: [['Réf', 'Incident', 'Gravité']
 const DOC = { title: 'Puces', pages: [{ id: 'p1', title: 'Accueil', blocks: [TABLE, KB,
   { id: 'q1', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' },
   { id: 'q2', type: 'query', title: 'Cartes', src: 'kanban', scope: 'doc', view: 'table' },
+  { id: 'n1', type: 'p', html: 'Note' },
 ] }] };
 const MODE = `document.documentElement.classList.contains('is-edit')`;
 const basculer = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))`;
@@ -28,9 +29,9 @@ export const nom = 'ligne de puces de requête';
 export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
   const touche = async (key, code, mods = 0) => { for (const type of ['keyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: { Escape: 27, Enter: 13, Tab: 9 }[key], modifiers: mods, ...(key === 'Enter' && type === 'keyDown' ? { text: '\r' } : {}) }); await attendre(60); };
-  // vrai clic de souris au centre d'un élément (ou en un point)
+  // vrai clic de souris au centre d'un élément (ou en un point), ramené au milieu de l'écran s'il est caché (barre du bloc collante)
   const cliquer = async (expr) => {
-    const p = typeof expr === 'string' ? await evalue(`(() => { const el = ${expr}, h = el.getBoundingClientRect(); if (h.top < 0 || h.bottom > innerHeight) el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`) : expr;
+    const p = typeof expr === 'string' ? await evalue(`(() => { const el = ${expr}, h = el.getBoundingClientRect(), d = document.elementFromPoint(h.left + h.width / 2, h.top + h.height / 2); if (h.top < 0 || h.bottom > innerHeight || !d || !el.contains(d)) el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`) : expr;
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
     await attendre(90);
   };
@@ -119,6 +120,55 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   attendu('Échap après « + Filtre » : focus sur la puce posée', (await etat('q2')).focus === 'f:kbPrio', 'focus');
   await cliquer(`document.querySelector('.blk[data-id="q2"] [data-qretirer="kbPrio"]')`);
   e = await etat('q2'); attendu('× : priorité retirée', !('kbPrio' in e.bloc) && e.lignes.length === 3, e.bloc);
+
+  // dernière pastille décochée : le filtre est retiré (ni tableau vide, ni « toutes » laissé), la fenêtre reste sous « + Filtre »
+  await cliquer(puce('q1', 'plus'));
+  await cliquer(`document.querySelector('.q-fen [data-qfiltre="tags"]')`);
+  await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="urgent"]')`);
+  await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="client"]')`);
+  await cliquer(`document.querySelector('.q-fen [data-qset="match"][data-v="all"]')`);
+  await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="urgent"]')`);
+  await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="client"]')`);
+  e = await etat();
+  attendu('dernière pastille décochée : filtre retiré', !('tags' in e.bloc) && !('match' in e.bloc) && e.puces[2] === '+ Filtre' && e.lignes.join() === '3,1,2' && e.fen === 'q1:Pastilles', e);
+  await touche('Escape', 'Escape');
+
+  // fenêtre ouverte puis glisser d'une ligne de tableau par sa poignée : la fenêtre se ferme au début du geste, qui est sa propre
+  // étape ; un Ctrl+Z défait le glisser seul et garde les colonnes choisies
+  const visible = `(() => { const f = document.querySelector('.q-fen'); return !!f && f.getClientRects().length > 0; })()`;
+  const cellules = `[...document.querySelectorAll('.blk[data-id="t1"] tr')].map((tr) => tr.cells[0].textContent.trim()).join()`;
+  await cliquer(puce('q1', 'cols'));
+  await cliquer(`document.querySelector('.q-fen input[data-qcol="gravité"]')`);
+  e = await etat(); attendu('colonne Gravité décochée', e.puces[4] !== 'Toutes les colonnes' && /colonnes modifiées/.test(e.annuler), e);
+  const c1 = await evalue(`(() => { const c = document.querySelector('.blk[data-id="t1"] [data-k="rows.1.1"]'); c.scrollIntoView({ block: 'center' }); const r = c.getBoundingClientRect(), r3 = document.querySelector('.blk[data-id="t1"] [data-k="rows.3.1"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, y3: r3.bottom - 2 }; })()`);
+  await attendre(60);
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c1.x, y: c1.y, button: 'none' }); await attendre(60);
+  const g = await evalue(`(() => { const g = document.querySelector('.tgrip-row'), r = g.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; })()`);
+  if (!g) echec('poignée de ligne invisible');
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: g.x, y: g.y, button: 'none' }); await attendre(40);
+  await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: g.x, y: g.y, button: 'left', clickCount: 1 }); await attendre(60);
+  attendu('glisser commencé : fenêtre fermée à l\'écran', !(await evalue(visible)), 'fenêtre visible');
+  for (const y of [g.y + 20, c1.y3]) { await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: g.x, y, button: 'left', buttons: 1 }); await attendre(40); }
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: g.x, y: c1.y3, button: 'left', clickCount: 1 }); await attendre(80);
+  attendu('ligne glissée en bas', (await evalue(cellules)) === 'Réf,2,3,1', await evalue(cellules));
+  await touche('z', 'KeyZ', 2);
+  e = await etat();
+  attendu('Ctrl+Z : le glisser seul est défait, Gravité reste masquée', (await evalue(cellules)) === 'Réf,1,2,3' && e.puces[4] !== 'Toutes les colonnes' && JSON.stringify(e.bloc.colonnes || null).includes("gravité"), { c: await evalue(cellules), e });
+  await touche('z', 'KeyZ', 2);
+  e = await etat(); attendu('second Ctrl+Z : colonnes rendues', e.puces[4] === 'Toutes les colonnes', e.puces);
+
+  // fenêtre ouverte, frappe hors d'elle (focus dans un paragraphe sans passer par la fenêtre) : l'étape de la fenêtre est close avant
+  await cliquer(puce('q1', 'cols'));
+  await cliquer(`document.querySelector('.q-fen input[data-qcol="gravité"]')`);
+  await evalue(`(() => { document.activeElement.blur(); const n = document.querySelector('.blk[data-id="n1"] [contenteditable]'); n.focus(); return true; })()`);
+  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38, modifiers: 1 });
+  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowUp', code: 'ArrowUp', windowsVirtualKeyCode: 38, modifiers: 1 }); await attendre(80);
+  const ordre = `window.ardoise.doc.pages[0].blocks.map((b) => b.id).join()`;
+  attendu('Alt+↑ : paragraphe monté, fenêtre fermée', (await evalue(ordre)) === 't1,kb,q1,n1,q2' && !(await evalue(visible)), await evalue(ordre));
+  await touche('z', 'KeyZ', 2);
+  e = await etat();
+  attendu('Ctrl+Z : seul le déplacement est défait', (await evalue(ordre)) === 't1,kb,q1,q2,n1' && e.puces[4] !== 'Toutes les colonnes', { o: await evalue(ordre), p: e.puces });
+  await touche('z', 'KeyZ', 2);
 
   // téléphone : la ligne passe à la ligne, la fenêtre prend la largeur du bloc, jamais de défilement de page
   await ecran(360, true); await evalue(basculer); await attendre(60); await evalue(basculer); await attendre(120);

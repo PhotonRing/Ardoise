@@ -52,15 +52,19 @@ function creerSession(adaptateur) {
     return true;
   }
   // modification dans l'étape ouverte, déjà au sommet de la pile : l'état remplace celui de l'étape (même libellé) ;
-  // revenu à l'état d'avant l'étape, l'étape disparaît
+  // revenu à l'état d'avant l'étape (avec les modifications reçues entre-temps : rebaser), l'étape disparaît
   function fondre() {
     clearTimeout(minuteur); minuteur = null;
     var s = JSON.stringify(doc);
     if (pile[pos] === s) return;
-    if (pos > 0 && pile[pos - 1] === s) { pile.pop(); marques.pop(); libelles.pop(); pos--; groupe.pos = -1; }
+    // l'état d'avant prend alors les modifications reçues, comme le fait recevoir
+    if (pos > 0 && (pile[pos - 1] === s || memeEtat(sy.rebaser(pile[pos - 1], marques[pos - 1]), s))) { pile.pop(); marques.pop(); libelles.pop(); pos--; pile[pos] = s; groupe.pos = -1; }
     else { pile[pos] = s; marques[pos] = sy.marque(); }
     sy.envoyer();
   }
+  // même document, à l'ordre des clés près (le rebasage réécrit l'état)
+  function memeEtat(a, b) { return a === b || JSON.stringify(trier(JSON.parse(a))) === JSON.stringify(trier(JSON.parse(b))); }
+  function trier(v) { if (!v || typeof v !== 'object') return v; if (Array.isArray(v)) return v.map(trier); var o = {}; Object.keys(v).sort().forEach(function (k) { o[k] = trier(v[k]); }); return o; }
   function valider() { if (minuteur) { etape(); prevenir('historique', etat()); } }
   function aller(d, focus) {
     valider();
