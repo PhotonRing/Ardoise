@@ -31,7 +31,6 @@ app.addEventListener('click', function (e) {
     case 'q-ctag': case 'q-ttag':
       var ct = a.dataset.tag, cp = a.dataset.act === 'q-ctag' ? 'filtres' : 'tfiltres';
       session.modifier(function () { if (!b.cards || !b.cards.length) b.cards = [qDefCard(b)]; qBasculerValeur(b, b.cards[i], cp, 'tags', ct); }); break;
-    case 'q-tag': var tk = a.dataset.tag; session.modifier(function () { qBasculerValeur(b, b, 'filtres', 'tags', tk); }); break;
     case 'fold': delete viewFold[b.id]; session.modifier(function () { if (b.type === 'group') b.folded = !b.folded; else if (b.folded) delete b.folded; else b.folded = true; }); break;
     case 'up': moveBlock(b, -1); break;
     case 'down': moveBlock(b, 1); break;

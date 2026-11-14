@@ -72,7 +72,8 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await touche('Escape', 'Escape');
   await ouvrir('plus');
   await evalue(`document.querySelector('.q-fen [data-qfiltre="bloquees"]').click()`); await attendre(80);
-  attendu('Bloquées : puce posée, fenêtre fermée', await evalue(`!document.querySelector('.q-fen') && document.querySelector('.blk[data-id="q1"] [data-qpuce="f:bloquees"]').textContent === 'Bloquées'`), 'puce');
+  attendu('Bloquées : puce posée, sa fenêtre ouverte', await evalue(`document.querySelector('.q-fen h4').textContent === 'Bloquées' && document.querySelector('.blk[data-id="q1"] [data-qpuce^="f:"]').textContent === 'Bloquées'`), 'puce');
+  await touche('Escape', 'Escape');
   e = await etat();
   attendu('bloquées seulement : Écrire seule', e.bloquees && e.cartes.length === 1 && e.cartes[0].startsWith('Écrire:'), e);
   attendu('bloquées seulement : libellé', /Requête « Suivi » : filtres modifiés/.test(e.annuler), e.annuler);

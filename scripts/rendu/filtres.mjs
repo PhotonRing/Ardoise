@@ -117,6 +117,29 @@ test('vue « En colonnes » : colonnes retenues par « aucune de » et par deux 
   const groupes = (filtres) => { const { ctx, d, b } = requete({ src: 'kanban', view: 'kanban', filtres }, 7); return ctx.qRegroupements(b, d, 0, ctx.queryRecords(b, d, 0)).groups.map((g) => g.name); };
   egal(groupes([F('col', ['fait'], { mode: 'aucun' })]), ['À faire', 'En cours']);
   egal(groupes([F('col', ['fait'], { mode: 'aucun' }), F('col', ['en cours', 'fait'])]), ['En cours']);
+  egal(groupes([F('col', ['fait', 'à faire'])]), ['À faire', 'Fait'], '« l\'une de » : ces colonnes, dans l\'ordre du kanban, vide comprise');
+});
+
+// ticket 02 : réglage d'un filtre de la ligne de puces par son identifiant (deux filtres de même propriété)
+test('réglage par identifiant : cocher, changer de mode, décocher la dernière valeur ne touche que ce filtre', () => {
+  const { ctx, d, b } = requete({ src: 'kanban', filtres: [{ id: 'a', prop: 'tags', vals: ['urgent'] }, { id: 'b', prop: 'tags', vals: ['client'], mode: 'aucun' }] }, 7);
+  const vue = () => JSON.parse(JSON.stringify(b.filtres || []));
+  ctx.qBasculerValeur(b, b, 'filtres', { id: 'b', prop: 'tags' }, 'urgent');
+  egal(vue()[1], { id: 'b', prop: 'tags', vals: ['client', 'urgent'], mode: 'aucun' }, 'coché sur b, mode gardé');
+  egal(titres({ src: 'kanban', filtres: vue() }, 7), [], 'urgent ET sauf client, urgent');
+  ctx.qModeFiltre(b, 'filtres', { id: 'b' }, 'un');
+  egal(vue()[1].mode, undefined, '« l\'une de » : mode absent');
+  egal(ctx.qBasculerValeur(b, b, 'filtres', { id: 'b', prop: 'tags' }, 'client') !== null, true);
+  egal(ctx.qBasculerValeur(b, b, 'filtres', { id: 'b', prop: 'tags' }, 'urgent'), null, 'dernière valeur : filtre retiré');
+  egal(vue(), [{ id: 'a', prop: 'tags', vals: ['urgent'] }], 'l\'autre filtre de pastilles reste');
+  const n = ctx.qBasculerValeur(b, b, 'filtres', { prop: 'kbWho', mode: 'aucun' }, '-');
+  egal(vue()[1], { id: n.id, prop: 'kbWho', vals: ['-'], mode: 'aucun' }, 'nouveau filtre créé à la première valeur, avec le mode de la fenêtre');
+  egal(titres({ src: 'kanban', filtres: vue() }, 7), ['Écrire'], 'urgent, sauf Sans responsable');
+  ctx.qReglerFiltre(b, b, 'filtres', { id: n.id, prop: 'kbWho' }, '');
+  egal(vue().length, 1, 'valeur vide : filtre retiré');
+  const bq = ctx.qReglerFiltre(b, b, 'filtres', { prop: 'bloquees' }, 'oui');
+  ctx.qReglerFiltre(b, b, 'filtres', { id: bq.id, prop: 'bloquees' }, 'non');
+  egal(titres({ src: 'kanban', filtres: vue() }, 7), ['Relire'], 'urgent et non bloquées');
 });
 
 test('format 7 : les anciens champs ne sont jamais lus ni gardés en mémoire ; identifiants uniques dans le bloc', () => {

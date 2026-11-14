@@ -80,19 +80,84 @@ test('puces : tri sur une colonne, croissant ou décroissant', () => {
   egal(puces({ sortBy: 'src' })[5], 'Tri : Source ↑');
 });
 
-test('« + Filtre » propose seulement les filtres de la source, et marque ceux déjà posés', () => {
+test('« + Filtre » propose toujours tous les filtres de la source, même ceux déjà posés', () => {
   const { ctx } = monter(doc({}));
-  const f = (b) => ctx.qFiltresProposes(b).map((x) => x.prop + (x.pose ? '*' : ''));
+  const f = (b) => ctx.qFiltresProposes(b).map((x) => x.prop);
   egal(f({ src: 'table' }), ['tags']);
-  egal(f({ src: 'facts', filtres: [{ id: 'f1', prop: 'tags', vals: ['urgent'] }] }), ['tags*']);
-  egal(f({ src: 'check', filtres: [{ id: 'f1', prop: 'state', vals: ['done'] }] }), ['tags', 'state*']);
-  egal(f({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }), ['tags', 'col', 'kbWho', 'kbPrio*', 'kbDue', 'bloquees']);
+  egal(f({ src: 'check', filtres: [{ id: 'f1', prop: 'state', vals: ['done'] }] }), ['tags', 'state']);
+  egal(f({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }), ['tags', 'col', 'kbWho', 'kbPrio', 'kbDue', 'bloquees']);
+  const { ctx: c2, d } = monter(doc({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }));
+  vrai(!c2.qFenetre(d.pages[0].blocks[3], d, 0, 'plus').includes('déjà là'), 'plus de « déjà là »');
+});
+
+const F = (id, prop, vals, plus) => ({ id, prop, vals, ...plus });
+test('puces : un même filtre posé deux fois donne deux puces f:<id>, dans l\'ordre des filtres', () => {
+  const q = { src: 'kanban', filtres: [F('a', 'tags', ['urgent', 'client']), F('b', 'col', ['en cours']), F('c', 'tags', ['client'], { mode: 'aucun' })] };
+  egal(cles(q).slice(2, 6), ['f:a', 'f:b', 'f:c', 'plus']);
+  egal(puces(q).slice(2, 5), ['urgent ou client', 'Colonne : En cours', 'sauf client']);
+  const { ctx, d } = monter(doc(q));
+  const ed = ctx.renderPage(d, { page: 0, view: 'edit' });
+  vrai(ed.includes('data-qretirer="a"') && ed.includes('data-qretirer="c"') && !ed.includes('data-qretirer="tags"'), '× par identifiant');
+});
+
+test('puces : libellés de Q7 (plusieurs valeurs, « sauf », Sans responsable, Non bloquées)', () => {
+  const p = (filtres) => puces({ src: 'kanban', filtres }).slice(2, 2 + filtres.length);
+  egal(p([F('a', 'col', ['en cours', 'fait'])]), ['Colonne : En cours ou Fait']);
+  egal(p([F('a', 'col', ['fait'], { mode: 'aucun' })]), ['Colonne : sauf Fait']);
+  egal(p([F('a', 'kbPrio', ['p1', 'p2']), F('b', 'kbPrio', ['p3'], { mode: 'aucun' })]), ['P1 ou P2', 'Priorité : sauf P3']);
+  egal(p([F('a', 'kbWho', ['alice', 'bob']), F('b', 'kbWho', ['alice'], { mode: 'aucun' }), F('c', 'kbWho', ['-'])]), ['Responsable : Alice ou Bob', 'Responsable : sauf Alice', 'Sans responsable']);
+  egal(p([F('a', 'bloquees', ['oui']), F('b', 'bloquees', ['non'])]), ['Bloquées', 'Non bloquées']);
+  egal(p([F('a', 'tags', ['urgent', 'client'], { mode: 'tous' })]), ['urgent et client']);
+});
+
+test('puces : pastilles en couleur jointes par « ou », « et », ou précédées de « sauf »', () => {
+  const ligne = (filtres) => { const { ctx, d } = monter(doc({ filtres })); return ctx.qLignePuces(d.pages[0].blocks[3], d, 0); };
+  vrai(/urgent<\/span> <small>ou<\/small> <span class="pill[^"]*">client/.test(ligne([F('a', 'tags', ['urgent', 'client'])])), 'ou');
+  vrai(/urgent<\/span> <small>et<\/small> <span/.test(ligne([F('a', 'tags', ['urgent', 'client'], { mode: 'tous' })])), 'et');
+  vrai(/<small>sauf<\/small> <span class="pill[^"]*">urgent<\/span>, <span class="pill[^"]*">client/.test(ligne([F('a', 'tags', ['urgent', 'client'], { mode: 'aucun' })])), 'sauf');
+});
+
+const fenetre = (q, cle) => { const { ctx, d } = monter(doc(q)); return ctx.qFenetre(d.pages[0].blocks[3], d, 0, cle); };
+const modes = (h) => [...h.matchAll(/data-qmode="(\w+)"[^>]*aria-pressed="(\w+)"[^>]*>([^<]+)/g)].map((m) => m[3] + (m[2] === 'true' ? '*' : ''));
+const cochees = (h) => [...h.matchAll(/<input type="checkbox" data-qval data-v="([^"]*)"( checked)?/g)].map((m) => m[1] + (m[2] ? '*' : ''));
+test('fenêtre d\'un filtre à plusieurs valeurs : segments selon la propriété, puis une case par valeur', () => {
+  const kb = (filtres) => ({ src: 'kanban', filtres });
+  let h = fenetre(kb([F('a', 'col', ['fait'], { mode: 'aucun' })]), 'f:a');
+  egal(modes(h), ['l\'une de', 'aucune de*']);
+  egal(cochees(h), ['en cours', 'fait*']);
+  vrai(h.indexOf('data-qmode') < h.indexOf('data-qval'), 'segments au-dessus des cases');
+  h = fenetre(kb([F('a', 'kbWho', ['-', 'alice'])]), 'f:a');
+  egal(modes(h), ['l\'une de*', 'aucune de']);
+  egal(cochees(h), ['alice*', 'bob', '-*']);
+  vrai(h.includes('Sans responsable'), 'Sans responsable');
+  egal(cochees(fenetre(kb([F('a', 'kbPrio', ['p1', 'p2'])]), 'f:a')), ['p1*', 'p2*', 'p3', '-']);
+  h = fenetre({ filtres: [F('a', 'tags', ['urgent'], { mode: 'tous' })] }, 'f:a');
+  egal(modes(h), ['l\'une de', 'toutes*', 'aucune de']);
+  egal(cochees(h), ['urgent*', 'client']);
+  vrai(h.includes('q-fen-q'), 'recherche des pastilles');
+  vrai(!fenetre(kb([F('a', 'col', ['fait'])]), 'f:a').includes('q-fen-q'), 'liste courte : pas de recherche');
+});
+
+test('fenêtre en attente (n:<prop>:<mode>) : rien de coché, le mode choisi ; valeur cochée disparue gardée', () => {
+  const h = fenetre({ src: 'kanban' }, 'n:col:aucun');
+  egal(modes(h), ['l\'une de', 'aucune de*']);
+  egal(cochees(h), ['en cours', 'fait']);
+  egal(cochees(fenetre({ src: 'kanban', filtres: [F('a', 'col', ['archives'])] }, 'f:a')), ['en cours', 'fait', 'archives*']);
+  egal(fenetre({ src: 'kanban' }, 'f:inconnu'), '', 'filtre disparu : rien');
+});
+
+test('fenêtre à valeur unique : Bloquées / Non bloquées, échéance, état des cases, visant le filtre par son id', () => {
+  let h = fenetre({ src: 'kanban', filtres: [F('a', 'bloquees', ['non'])] }, 'f:a');
+  vrai(/data-qset="bloquees" data-fid="a" data-v="non" aria-pressed="true"/.test(h) && h.includes('>Bloquées<'), 'Non bloquées choisi');
+  h = fenetre({ src: 'kanban', filtres: [F('a', 'kbDue', ['late']), F('b', 'kbDue', ['next'], { n: 3, u: 's' })] }, 'f:b');
+  vrai(/data-qset="kbDue" data-fid="b" data-v="next" aria-pressed="true"/.test(h) && /data-prop="kbDueN" data-fid="b"[^>]*value="3"/.test(h) && /data-qset="kbDueU" data-fid="b" data-v="s" aria-pressed="true"/.test(h), 'second filtre d\'échéance');
+  vrai(/data-qset="state" data-fid="" data-v="todo"/.test(fenetre({ src: 'check' }, 'n:state:un')), 'état des cases en attente');
 });
 
 test('ligne de puces rendue en édition seulement : ni en lecture ni à l\'export ; plus d\'ancien formulaire', () => {
   const { ctx, d } = monter(doc({ tags: ['urgent'] }));
   const ed = ctx.renderPage(d, { page: 0, view: 'edit' });
-  vrai(ed.includes('class="q-puces"') && ed.includes('data-qpuce="f:tags"') && ed.includes('data-qretirer="tags"'), 'édition : puces et × du filtre');
+  vrai(ed.includes('class="q-puces"') && /data-qpuce="f:[^"]+"/.test(ed) && /data-qretirer="[^"]+"/.test(ed), 'édition : puces et × du filtre');
   vrai(!ed.includes('class="q-form"'), 'l\'ancien formulaire a disparu');
   for (const vue of ['read', 'export']) vrai(!ctx.renderPage(d, { page: 0, view: vue }).includes('q-puce'), vue + ' : aucune puce');
 });

@@ -58,9 +58,8 @@ app.addEventListener('beforeinput', function (e) {
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
 // réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
-// requête : un filtre (liste filtres du bloc ou d'une carte de nombre, 07-requetes.js) ramené à « tous » est retiré ; « Sans tri »
-// supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
-var Q_REGLAGES_FILTRE = { col: 1, kbWho: 1, kbPrio: 1, kbDue: 1, state: 1 };
+// requête : un filtre d'une carte de nombre (07-requetes.js) ramené à « tous » est retiré (ceux du bloc se règlent dans la fenêtre
+// de leur puce, 16-puces-requete.js) ; « Sans tri » supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
 function reglerBloc(blk, prop, v, dansFenetre) {
   holdBar(blk.id); keepView(blk); session.modifier(function () {
     var mc = blk.type === 'query' && prop.match(/^cards\.(\d+)\.(t?)(state|col|match)$/);
@@ -70,9 +69,6 @@ function reglerBloc(blk, prop, v, dansFenetre) {
       if (mc[3] === 'match') qModeFiltre(carte, cle, 'tags', v === 'all' ? 'tous' : 'un'); else qReglerFiltre(blk, carte, cle, mc[3], v);
       return;
     }
-    if (blk.type === 'query' && Q_REGLAGES_FILTRE[prop]) { qReglerFiltre(blk, blk, 'filtres', prop, v); return; }
-    if (blk.type === 'query' && prop === 'match') { qModeFiltre(blk, 'filtres', 'tags', v === 'all' ? 'tous' : 'un'); return; }
-    if (blk.type === 'query' && prop === 'kbDueU') { var fu = qFiltreDe(blk.filtres, 'kbDue'); if (fu) fu.u = v; return; }
     if (blk.type === 'query' && prop === 'sortBy' && v === '') { delete blk.sortBy; delete blk.sortDir; return; }
     if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
     // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
@@ -80,10 +76,10 @@ function reglerBloc(blk, prop, v, dansFenetre) {
     if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !qFiltreDe(c.filtres, 'tags') && !qFiltreDe(c.tfiltres, 'tags') ? qDefCard(blk) : c; });
   }, dansFenetre ? null : { b: blk.id });
 }
-// nombre d'un filtre de requête (échéance dans les N jours…)
-function reglerNombre(blk, prop, v) {
+// nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid
+function reglerNombre(blk, prop, v, fid) {
   var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
-  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var f = qFiltreDe(blk.filtres, 'kbDue'); if (f) f.n = n; });
+  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var f = qFiltreParId(blk.filtres, fid); if (f) f.n = n; });
 }
 function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {

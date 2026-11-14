@@ -1171,6 +1171,27 @@ for (const [nom, geste, libelle] of GESTES) test('ranger : ' + nom + ' est une �
 
 // ---------- étape ouverte (fenêtre d'une puce de requête) ----------
 const FEN = { etape: 'Accueil · Requête « Incidents » : filtres modifiés' };
+test('étape ouverte : deux filtres de même propriété réglés dans une fenêtre forment une étape ; × sur l\'un en fait une autre', () => {
+  const m = monter(), c = m.ctx;
+  m.s.modifier(() => { blocsDe(m).push({ id: 'q', type: 'query', title: 'Incidents', src: 'kanban', scope: 'doc', view: 'table', filtres: [{ id: 'a', prop: 'tags', vals: ['urgent'] }] }); });
+  const q = () => blocsDe(m)[1], avant = JSON.stringify(q());
+  m.s.ouvrirEtape(FEN);
+  let f = null;
+  m.s.modifier(() => { f = c.qBasculerValeur(q(), q(), 'filtres', { prop: 'tags', mode: 'aucun' }, 'archivé'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), q(), 'filtres', { id: f.id, prop: 'tags' }, 'clos'); });
+  m.s.modifier(() => { c.qModeFiltre(q(), 'filtres', { id: f.id }, 'un'); });
+  m.s.modifier(() => { c.qBasculerValeur(q(), q(), 'filtres', { id: 'a', prop: 'tags' }, 'client'); });
+  m.s.fermerEtape();
+  egal(libelles(m)[0], FEN.etape);
+  egal(q().filtres.map((x) => x.vals.join('+') + ':' + (x.mode || 'un')), ['urgent+client:un', 'archivé+clos:un']);
+  m.s.modifier(() => { c.qRetirerFiltre(q(), 'filtres', c.qFiltreParId(q().filtres, 'a')); }, null, 'filtres modifiés');
+  egal(libelles(m)[0], 'Accueil · Requête « Incidents » : filtres modifiés', '× : une étape');
+  egal(q().filtres.map((x) => x.id), [f.id], '× retire ce filtre-là seulement');
+  m.s.annuler();
+  egal(q().filtres.length, 2, 'un Ctrl+Z rend le filtre retiré');
+  m.s.annuler();
+  egal(JSON.stringify(q()), avant, 'un seul Ctrl+Z défait toute la fenêtre');
+});
 test('étape ouverte : plusieurs modifications forment une seule étape, nommée, qu\'un seul Ctrl+Z défait', () => {
   const m = monter();
   m.s.ouvrirEtape(FEN);

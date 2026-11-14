@@ -419,6 +419,14 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-fen .q-num{font:500 13px var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;height:30px;padding:0 6px;width:64px}
 .q-fen-q{width:100%;height:32px;padding:0 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);font:14px var(--f-body)}
 .q-fen-pills{display:flex;flex-wrap:wrap;gap:6px}
+.q-fen .q-modes{padding:0;flex-basis:100%}
+.q-fen-cases{display:flex;flex-direction:column;align-items:stretch;flex-basis:100%;max-height:260px;overflow-y:auto;min-width:0}
+.q-case{display:flex;align-items:center;gap:8px;min-height:32px;padding:2px 6px;border-radius:6px;color:var(--fg);cursor:pointer;overflow-wrap:anywhere}
+.q-case:hover{background:var(--hover,var(--accent-soft))}
+.q-case input{flex:none;margin:0;width:16px;height:16px}
+.q-case .pill{font-size:12px}
+.q-case.q-gone{color:var(--muted)}
+.q-case.q-gone span{text-decoration:line-through}
 .q-fen .q-colonnes{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:0 4px 6px}
 .q-fen .q-cols{flex-direction:column;flex-wrap:nowrap}
 .q-fen .q-col{display:flex;padding:4px 8px 4px 2px}
