@@ -38,7 +38,7 @@ const CONTRASTES = `(() => {
 })()`;
 
 export const nom = 'carte de chaleur';
-export default async function ({ ecran, charger, evalue, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
   const etat = () => evalue(ETAT);
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
 
@@ -56,6 +56,28 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   await evalue(`document.querySelector('[data-qid="q1"] .q-ch-c').click()`); await attendre(60);
   e = await etat();
   attendu('clic sur une case : rien de filtré', e.cases === 8 && e.view === 'chaleur', e);
+
+  // à la souris : la bulle touche la case ; en descendant de la case vers la bulle, le pointeur ne traverse aucune autre case
+  // et la bulle reste celle de la case quittée (colonne de trois cases : Exécution)
+  const D3 = JSON.parse(JSON.stringify(DOC)); D3.pages[0].blocks[1].chY = 'sous-technique';
+  await evalue(`window.ardoise.load(${JSON.stringify(D3)})`); await attendre(80);
+  const c = await evalue(`(() => { const col = [...document.querySelectorAll('[data-qid="q1"] .q-ch-col')].find((x) => x.querySelector('h4').textContent.startsWith('Exécution'));
+    const cs = col.querySelectorAll('.q-ch-c'); cs[0].scrollIntoView({ block: 'center' }); const r = cs[0].getBoundingClientRect(), r2 = cs[1].getBoundingClientRect();
+    return { n: cs.length, x: Math.round(r.left + 12), y: Math.round(r.top + r.height / 2), bas: r.bottom, haut2: r2.top }; })()`);
+  await attendre(60);
+  const vue = `(() => { const t = document.querySelector('.tl-bubble.q-ch-bulle'); if (!t || !t.getClientRects().length) return null; const r = t.getBoundingClientRect();
+    return { haut: r.top, gauche: r.left, droite: r.right, texte: t.textContent }; })()`;
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y, button: 'none' }); await attendre(80);
+  const b0 = await evalue(vue);
+  attendu('survol à la souris : bulle collée sous la case', c.n === 2 && b0 && b0.haut <= c.bas + 1 && b0.haut >= c.bas - 4 && b0.gauche <= c.x && b0.droite >= c.x, { c, b0 });
+  let trajet = true;
+  for (let y = c.y; y <= (b0 ? b0.haut : c.bas) + 12; y += 3) {
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y, button: 'none' }); await attendre(15);
+    const b = await evalue(vue); if (!b || b.texte !== (b0 && b0.texte)) { trajet = { y, b }; break; }
+  }
+  attendu('de la case à la bulle : la même bulle reste ouverte', trajet === true, trajet);
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 990, y: 5, button: 'none' }); await attendre(60);
+  await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await attendre(80);
 
   // contraste du texte des cases, clair et sombre, toutes les palettes
   const faibles = (await evalue(CONTRASTES)).filter((x) => x.r < 4.5);

@@ -48,11 +48,22 @@ function ardoiseReader() {
       tip.innerHTML = src.innerHTML;
       if (chaleur) tip.classList.add('q-ch-bulle'); else tip.style.setProperty('--bc', getComputedStyle(dot).backgroundColor);
       document.body.appendChild(tip);
-      var d = chaleur ? it.querySelector('.q-ch-n').getBoundingClientRect() : dot.getBoundingClientRect(), r = date && date.textContent ? date.getBoundingClientRect() : d, w = tip.offsetWidth, h = tip.offsetHeight;
+      if (chaleur) { placerBulleCase(it); return; }
+      var d = dot.getBoundingClientRect(), r = date && date.textContent ? date.getBoundingClientRect() : d, w = tip.offsetWidth, h = tip.offsetHeight;
       var cx = d.left + d.width / 2, left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2)), top = r.bottom + 12;
       if (top + h > innerHeight - 8 && d.top - h - 14 > 8) { top = d.top - h - 14; tip.classList.add('up'); }
       tip.style.left = left + 'px'; tip.style.top = top + 'px';
       tip.style.setProperty('--ax', Math.max(18, Math.min(w - 18, cx - left)) + 'px');
+      requestAnimationFrame(function () { if (tip) tip.classList.add('on'); });
+    }
+    // case de carte de chaleur : bulle collée à la case (sous sa propre bande, avant ses sous-cases), au moins aussi large,
+    // pour que le pointeur qui descend vers elle ne traverse aucune autre case
+    function placerBulleCase(it) {
+      var c = it.getBoundingClientRect(), sous = it.querySelector(':scope > .q-ch-sous'), bas = sous ? sous.getBoundingClientRect().top : c.bottom;
+      tip.style.minWidth = Math.min(c.width, innerWidth - 16) + 'px';
+      var w = tip.offsetWidth, h = tip.offsetHeight, left = Math.max(8, Math.min(innerWidth - w - 8, c.left)), top = bas - 1;
+      if (top + h > innerHeight - 8 && c.top - h + 1 > 8) { top = c.top - h + 1; tip.classList.add('up'); }
+      tip.style.left = left + 'px'; tip.style.top = top + 'px';
       requestAnimationFrame(function () { if (tip) tip.classList.add('on'); });
     }
     document.addEventListener('pointerover', function (e) {

@@ -488,6 +488,7 @@ span.q-box{cursor:default}
 .q-ch-lv{font:500 12px var(--f-mono);margin:0 4px}
 .q-ch-leg .muted{margin-left:6px}
 .tl-bubble.q-ch-bulle{pointer-events:auto;max-width:min(340px,calc(100vw - 16px));max-height:min(60vh,360px);overflow:auto}
+.tl-bubble.q-ch-bulle::before{display:none}   /* collée à la case : pas de pointe */
 .tl-bubble ul.q-ch-l{margin:0;padding:0 0 0 14px;display:flex;flex-direction:column;gap:3px;font-size:12.5px}
 @media print{.q-ch-wrap{overflow:visible}.q-ch{grid-auto-flow:row;grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}.q-ch-col{break-inside:avoid;page-break-inside:avoid}}
 a.q-count{text-decoration:none;color:inherit}
