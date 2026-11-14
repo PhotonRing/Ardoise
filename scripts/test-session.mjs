@@ -630,7 +630,7 @@ test('un document déjà normalisé reste identique une fois remplacé', () => {
   egal(m.doc.sync.key, 'k');
 });
 
-// --- remplacer : import JSON, chargement externe (plugin Obsidian), brouillon ---
+// --- remplacer : import JSON, chargement externe (window.ardoise.load), brouillon ---
 const ENTRANT = () => ({ id: 'autre', title: 'Importé', savedAt: '2020-01-01T00:00:00.000Z', mapKey: 'cle-entrante',
   lock: { salt: 's2', hash: 'h2', iter: 1000 },
   pages: [{ id: 'q1', title: 'A', blocks: [{ id: 'y1', type: 'p', html: 'importé' }] }, { id: 'q2', title: 'B', blocks: [] }, { id: 'q3', title: 'C', blocks: [] }] });

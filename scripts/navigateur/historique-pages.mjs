@@ -148,7 +148,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     attendu('ouverture sur une page supprimée : première page et « Page introuvable »', o3.pg === 'p1' && /Page introuvable/.test(o3.toast), o3);
     const o4 = await ouvrir('#edit');
     attendu('ouverture sur #edit : édition, adresse gardée', o4.edit && o4.pg === 'p1' && o4.h === '#edit', o4);
-    // plugin Obsidian : Ardoise dans une iframe ; changer de page n'ajoute rien à l'historique du haut
+    // Ardoise intégrée dans une iframe (par un autre site) : changer de page n'ajoute rien à l'historique du haut
     await ouvrir('');
     const n0 = await evalue('history.length');
     await evalue(`new Promise((r) => { const i = document.createElement('iframe'); i.style.cssText = 'width:900px;height:600px'; i.onload = () => r(true); i.src = ${JSON.stringify('file://' + f)}; document.body.appendChild(i); })`);

@@ -15,17 +15,6 @@ if (!/<style id="page-css">[\s\S]+?<\/style>/.test(html) || !/<style id="editor-
 if (/\{\{[\w./-]+\}\}/.test(html)) throw new Error('marqueur de gabarit non remplacé');
 console.log('dist/ardoise.html : OK');
 
-// Plugin Obsidian : syntaxe, document embarqué identique, manifeste cohérent
-const dir = new URL('../dist/obsidian/', import.meta.url);
-const main = readFileSync(new URL('main.js', dir), 'utf8');
-new vm.Script(main, { filename: 'obsidian/main.js' });
-if (main.includes('__ARDOISE_TEMPLATE__') || !main.includes(JSON.stringify(html))) throw new Error('plugin Obsidian : document embarqué absent ou différent');
-const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));
-const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-if (manifest.id !== 'ardoise' || manifest.version !== version) throw new Error('plugin Obsidian : manifeste incohérent');
-readFileSync(new URL('styles.css', dir), 'utf8');
-console.log('dist/obsidian : OK');
-
 // Migrations du format du document (src/js/05-migrations.js) : une étape par format, sans trou,
 // et chaque document de scripts/fixtures/format-N.json donne exactement format-N.attendu.json
 const js = (f) => readFileSync(new URL('../src/js/' + f, import.meta.url), 'utf8');
