@@ -1,0 +1,247 @@
+{
+  "v": 7,
+  "title": "Document 1.23",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Suivi",
+      "blocks": [
+        {
+          "id": "kb",
+          "type": "kanban",
+          "cols": [
+            {
+              "id": "c1",
+              "title": "À faire",
+              "cards": [
+                {
+                  "id": "k1",
+                  "title": "Écrire <span class=\"pill\">urgent</span>",
+                  "who": "Alice",
+                  "prio": "p1",
+                  "due": "2020-01-01"
+                }
+              ]
+            },
+            {
+              "id": "c2",
+              "title": "Fait",
+              "cards": [
+                {
+                  "id": "k2",
+                  "title": "Livrer",
+                  "who": "",
+                  "prio": "p2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "q1",
+          "type": "query",
+          "title": "Urgences",
+          "src": "kanban",
+          "scope": "doc",
+          "view": "list",
+          "cards": [
+            {
+              "label": "",
+              "total": "none"
+            }
+          ],
+          "filtres": [
+            {
+              "id": "f1",
+              "prop": "tags",
+              "vals": [
+                "urgent",
+                "client"
+              ],
+              "mode": "tous"
+            },
+            {
+              "id": "f2",
+              "prop": "state",
+              "vals": [
+                "done"
+              ]
+            },
+            {
+              "id": "f3",
+              "prop": "col",
+              "vals": [
+                "à faire"
+              ]
+            },
+            {
+              "id": "f4",
+              "prop": "kbWho",
+              "vals": [
+                "alice"
+              ]
+            },
+            {
+              "id": "f5",
+              "prop": "kbPrio",
+              "vals": [
+                "p1",
+                "p2"
+              ]
+            },
+            {
+              "id": "f6",
+              "prop": "kbDue",
+              "vals": [
+                "soon"
+              ],
+              "n": 3,
+              "u": "m"
+            },
+            {
+              "id": "f7",
+              "prop": "bloquees",
+              "vals": [
+                "oui"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "type": "query",
+          "title": "Comptes",
+          "src": "kanban",
+          "scope": "doc",
+          "view": "count",
+          "cards": [
+            {
+              "label": "Terminées",
+              "total": "all",
+              "filtres": [
+                {
+                  "id": "f2",
+                  "prop": "col",
+                  "vals": [
+                    "fait"
+                  ]
+                }
+              ]
+            },
+            {
+              "label": "",
+              "total": "filter",
+              "filtres": [
+                {
+                  "id": "f3",
+                  "prop": "tags",
+                  "vals": [
+                    "prod",
+                    "client"
+                  ],
+                  "mode": "tous"
+                }
+              ],
+              "tfiltres": [
+                {
+                  "id": "f4",
+                  "prop": "tags",
+                  "vals": [
+                    "prod"
+                  ]
+                },
+                {
+                  "id": "f5",
+                  "prop": "col",
+                  "vals": [
+                    "fait"
+                  ]
+                }
+              ]
+            }
+          ],
+          "filtres": [
+            {
+              "id": "f1",
+              "prop": "kbPrio",
+              "vals": [
+                "-"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g",
+          "type": "group",
+          "title": "Cases",
+          "blocks": [
+            {
+              "id": "ch",
+              "type": "check",
+              "items": [
+                {
+                  "html": "a",
+                  "done": true
+                }
+              ]
+            },
+            {
+              "id": "q3",
+              "type": "query",
+              "src": "check",
+              "scope": "doc",
+              "view": "count",
+              "cards": [
+                {
+                  "label": "",
+                  "total": "filter",
+                  "filtres": [
+                    {
+                      "id": "f3",
+                      "prop": "tags",
+                      "vals": [
+                        "urgent"
+                      ]
+                    },
+                    {
+                      "id": "f4",
+                      "prop": "state",
+                      "vals": [
+                        "done"
+                      ]
+                    }
+                  ],
+                  "tfiltres": [
+                    {
+                      "id": "f5",
+                      "prop": "state",
+                      "vals": [
+                        "todo"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "filtres": [
+                {
+                  "id": "f1",
+                  "prop": "state",
+                  "vals": [
+                    "todo"
+                  ]
+                },
+                {
+                  "id": "f2",
+                  "prop": "kbWho",
+                  "vals": [
+                    "-"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

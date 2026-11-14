@@ -58,25 +58,33 @@ app.addEventListener('beforeinput', function (e) {
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
 // réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
-// requête : un filtre ramené à « tous » et « Sans tri » suppriment leur champ (un filtre posé est un champ présent) ;
-// dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
-var Q_EFFACABLES = { col: 1, kbWho: 1, kbPrio: 1, kbDue: 1, state: 1, sortBy: 1 };
+// requête : un filtre (liste filtres du bloc ou d'une carte de nombre, 07-requetes.js) ramené à « tous » est retiré ; « Sans tri »
+// supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
+var Q_REGLAGES_FILTRE = { col: 1, kbWho: 1, kbPrio: 1, kbDue: 1, state: 1 };
 function reglerBloc(blk, prop, v, dansFenetre) {
   holdBar(blk.id); keepView(blk); session.modifier(function () {
-    if (blk.type === 'query' && Q_EFFACABLES[prop] && (v === '' || (prop === 'state' && v === 'all'))) {
-      delete blk[prop];
-      if (prop === 'kbDue') { delete blk.kbDueN; delete blk.kbDueU; }
-      if (prop === 'sortBy') delete blk.sortDir;
+    var mc = blk.type === 'query' && prop.match(/^cards\.(\d+)\.(t?)(state|col|match)$/);
+    if (mc) {
+      if (!blk.cards || !blk.cards.length) blk.cards = [qDefCard(blk)];
+      var carte = blk.cards[+mc[1]], cle = mc[2] + 'filtres'; if (!carte) return;
+      if (mc[3] === 'match') qModeFiltre(carte, cle, 'tags', v === 'all' ? 'tous' : 'un'); else qReglerFiltre(blk, carte, cle, mc[3], v);
       return;
     }
+    if (blk.type === 'query' && Q_REGLAGES_FILTRE[prop]) { qReglerFiltre(blk, blk, 'filtres', prop, v); return; }
+    if (blk.type === 'query' && prop === 'match') { qModeFiltre(blk, 'filtres', 'tags', v === 'all' ? 'tous' : 'un'); return; }
+    if (blk.type === 'query' && prop === 'kbDueU') { var fu = qFiltreDe(blk.filtres, 'kbDue'); if (fu) fu.u = v; return; }
+    if (blk.type === 'query' && prop === 'sortBy' && v === '') { delete blk.sortBy; delete blk.sortDir; return; }
     if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
     // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
     if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
-    if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !(c.tags || []).length && !(c.ttags || []).length ? qDefCard(blk) : c; });
+    if (blk.type === 'query' && prop === 'src' && blk.cards) blk.cards = blk.cards.map(function (c) { return !c.label && !qFiltreDe(c.filtres, 'tags') && !qFiltreDe(c.tfiltres, 'tags') ? qDefCard(blk) : c; });
   }, dansFenetre ? null : { b: blk.id });
 }
 // nombre d'un filtre de requête (échéance dans les N jours…)
-function reglerNombre(blk, prop, v) { var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id); session.modifier(function () { blk[prop] = n; }); }
+function reglerNombre(blk, prop, v) {
+  var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
+  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var f = qFiltreDe(blk.filtres, 'kbDue'); if (f) f.n = n; });
+}
 function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
   var el = e.target;

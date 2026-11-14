@@ -84,9 +84,9 @@ test('« + Filtre » propose seulement les filtres de la source, et marque ceux 
   const { ctx } = monter(doc({}));
   const f = (b) => ctx.qFiltresProposes(b).map((x) => x.prop + (x.pose ? '*' : ''));
   egal(f({ src: 'table' }), ['tags']);
-  egal(f({ src: 'facts', tags: ['urgent'] }), ['tags*']);
-  egal(f({ src: 'check', state: 'done' }), ['tags', 'state*']);
-  egal(f({ src: 'kanban', kbPrio: 'p1' }), ['tags', 'col', 'kbWho', 'kbPrio*', 'kbDue', 'bloquees']);
+  egal(f({ src: 'facts', filtres: [{ id: 'f1', prop: 'tags', vals: ['urgent'] }] }), ['tags*']);
+  egal(f({ src: 'check', filtres: [{ id: 'f1', prop: 'state', vals: ['done'] }] }), ['tags', 'state*']);
+  egal(f({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }), ['tags', 'col', 'kbWho', 'kbPrio*', 'kbDue', 'bloquees']);
 });
 
 test('ligne de puces rendue en édition seulement : ni en lecture ni à l\'export ; plus d\'ancien formulaire', () => {

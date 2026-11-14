@@ -19,7 +19,7 @@ const ETAT = `(() => {
   const q = document.querySelector('.blk[data-id="q1"], .q-blk[data-qid="q1"]'), a = document.activeElement, b = window.ardoise.doc.pages[0].blocks[1];
   return { cartes: [...q.querySelectorAll('.q-res .kb-card')].map((c) => c.querySelector('.kb-ct').textContent.trim() + ':' + [...c.querySelectorAll('.kb-tx, .kb-wait, .kb-who, .q-src')].map((x) => x.className.split(' ')[0]).join(',') + (c.classList.contains('kb-blocked') ? ':bloquée' : '')),
     cases: [...document.querySelectorAll('.q-fen[data-id="q1"] input[data-qchamp]')].map((c) => c.dataset.qchamp + (c.checked ? '+' : '-')),
-    focus: a && a.dataset ? a.dataset.qchamp || null : null, champs: b.champs || null, bloquees: !!b.bloquees,
+    focus: a && a.dataset ? a.dataset.qchamp || null : null, champs: b.champs || null, bloquees: (b.filtres || []).some((f) => f.prop === 'bloquees'),
     annuler: (document.querySelector('#ui [data-ui=undo]') || {}).title || '' };
 })()`;
 const caseDe = (k) => `[...document.querySelectorAll('.q-fen[data-id="q1"] input[data-qchamp]')].find((c) => c.dataset.qchamp === ${JSON.stringify(k)})`;

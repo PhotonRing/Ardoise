@@ -193,12 +193,12 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   expect(g.title === 'Détails A' && g.blocks.map((b) => b.id).join() === 'c,c2', 'titre et bloc ajouté au groupe');
 }
 { // requête : l'un règle les colonnes, l'autre un filtre et l'ordre des colonnes ; tout converge, sans texte mélangé
-  const Q = { id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', tags: [], match: 'any', view: 'table' };
+  const Q = { id: 'q', type: 'query', title: 'Incidents', src: 'table', scope: 'doc', view: 'table' };
   const x = pair({ pages: [{ id: 'p', blocks: [Q] }] });
   const na = clone(x.da); na.pages[0].blocks[0].colonnes = { mode: 'sauf', noms: ['état'], ordre: [] };
-  const nb = clone(x.db); nb.pages[0].blocks[0].tags = ['urgent'];
+  const nb = clone(x.db); nb.pages[0].blocks[0].filtres = [{ id: 'f1', prop: 'tags', vals: ['urgent'] }];
   const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)), q = r.pages[0].blocks[0];
-  expect(JSON.stringify(q.colonnes) === '{"mode":"sauf","noms":["état"],"ordre":[]}' && q.tags.join() === 'urgent', 'colonnes et filtre : ' + JSON.stringify(q));
+  expect(JSON.stringify(q.colonnes) === '{"mode":"sauf","noms":["état"],"ordre":[]}' && q.filtres[0].vals.join() === 'urgent', 'colonnes et filtre : ' + JSON.stringify(q));
   x.da = clone(r); x.db = clone(r);
   const ma = clone(x.da); ma.pages[0].blocks[0].colonnes.ordre = ['#source', 'risque'];
   const mb = clone(x.db); mb.pages[0].blocks[0].colonnes.noms = ['état', 'hôte'];
@@ -206,12 +206,32 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   expect(c.ordre.join() === '#source,risque' && c.noms.join() === 'état,hôte' && c.mode === 'sauf', 'ordre et noms réglés à deux : ' + JSON.stringify(c));
 }
 { // requête kanban : l'un règle les champs des cartes, l'autre le filtre « Bloquées » ; tout converge
-  const Q = { id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', tags: [], match: 'any', view: 'kanban' };
+  const Q = { id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', view: 'kanban' };
   const x = pair({ pages: [{ id: 'p', blocks: [Q] }] });
   const na = clone(x.da); na.pages[0].blocks[0].champs = { masques: ['texte'], ordre: ['attend'] };
-  const nb = clone(x.db); nb.pages[0].blocks[0].bloquees = true;
+  const nb = clone(x.db); nb.pages[0].blocks[0].filtres = [{ id: 'f1', prop: 'bloquees', vals: ['oui'] }];
   const q = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)).pages[0].blocks[0];
-  expect(JSON.stringify(q.champs) === '{"masques":["texte"],"ordre":["attend"]}' && q.bloquees === true, 'champs et bloquées : ' + JSON.stringify(q));
+  expect(JSON.stringify(q.champs) === '{"masques":["texte"],"ordre":["attend"]}' && q.filtres[0].prop === 'bloquees', 'champs et bloquées : ' + JSON.stringify(q));
+}
+{ // filtres d'une requête (format 7) : deux filtres posés en même temps gardés ; valeurs cochées à deux gardées ; mode : dernière écriture
+  const Q = { id: 'q', type: 'query', title: 'Suivi', src: 'kanban', scope: 'doc', view: 'table', filtres: [{ id: 'f1', prop: 'col', vals: ['à faire'] }] };
+  const x = pair({ pages: [{ id: 'p', blocks: [Q] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].filtres.push({ id: 'a1', prop: 'kbWho', vals: ['alice'] });
+  const nb = clone(x.db); nb.pages[0].blocks[0].filtres.push({ id: 'b1', prop: 'tags', vals: ['urgent'], mode: 'aucun' });
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb)), ids = r.pages[0].blocks[0].filtres.map((f) => f.id).sort().join();
+  expect(ids === 'a1,b1,f1', 'deux filtres posés en même temps : ' + ids);
+  x.da = clone(r); x.db = clone(r);
+  const ma = clone(x.da); ma.pages[0].blocks[0].filtres[0].vals.push('en cours'); ma.pages[0].blocks[0].filtres[0].mode = 'aucun';
+  const mb = clone(x.db); mb.pages[0].blocks[0].filtres[0].vals.push('fait');
+  const r2 = swap(x, synDiff(x.a, x.da, ma), synDiff(x.b, x.db, mb)), f = r2.pages[0].blocks[0].filtres[0];
+  expect(f.vals.slice().sort().join() === 'en cours,fait,à faire' && f.mode === 'aucun', 'valeurs cochées à deux : ' + JSON.stringify(f));
+  x.da = clone(r2); x.db = clone(r2);
+  const pa = clone(x.da); pa.pages[0].blocks[0].filtres[0].mode = 'tous';
+  const r3 = swap(x, synDiff(x.a, x.da, pa), []);
+  x.da = clone(r3); x.db = clone(r3);
+  const pb = clone(x.db); delete pb.pages[0].blocks[0].filtres[0].mode;
+  const r4 = swap(x, [], synDiff(x.b, x.db, pb));
+  expect(!('mode' in r4.pages[0].blocks[0].filtres[0]), 'mode : dernière écriture gagne');
 }
 const games = +(process.argv[2] || 300);
 for (let g = 0; g < games; g++) game(2 + (g % 3));

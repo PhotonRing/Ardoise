@@ -1,0 +1,30 @@
+{
+  "v": 6,
+  "title": "Document 1.23",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Suivi",
+      "blocks": [
+        { "id": "kb", "type": "kanban", "cols": [
+          { "id": "c1", "title": "À faire", "cards": [{ "id": "k1", "title": "Écrire <span class=\"pill\">urgent</span>", "who": "Alice", "prio": "p1", "due": "2020-01-01" }] },
+          { "id": "c2", "title": "Fait", "cards": [{ "id": "k2", "title": "Livrer", "who": "", "prio": "p2" }] }
+        ] },
+        { "id": "q1", "type": "query", "title": "Urgences", "src": "kanban", "scope": "doc", "view": "list",
+          "tags": ["urgent", "client"], "match": "all", "state": "done", "col": "à faire", "kbWho": "alice", "kbPrio": "p12",
+          "kbDue": "soon", "kbDueN": 3, "kbDueU": "m", "bloquees": true,
+          "cards": [{ "label": "", "tags": [], "match": "any", "state": "all", "total": "none" }] },
+        { "id": "q2", "type": "query", "title": "Comptes", "src": "kanban", "scope": "doc", "view": "count", "tags": [], "match": "any", "kbPrio": "-",
+          "cards": [
+            { "label": "Terminées", "tags": [], "match": "any", "state": "all", "col": "fait", "total": "all" },
+            { "label": "", "tags": ["prod", "client"], "match": "all", "state": "all", "col": "", "total": "filter", "ttags": ["prod"], "tmatch": "any", "tstate": "all", "tcol": "fait" }
+          ] },
+        { "id": "g", "type": "group", "title": "Cases", "blocks": [
+          { "id": "ch", "type": "check", "items": [{ "html": "a", "done": true }] },
+          { "id": "q3", "type": "query", "src": "check", "scope": "doc", "view": "count", "state": "todo", "kbWho": "-",
+            "cards": [{ "label": "", "tags": ["urgent"], "match": "any", "state": "done", "total": "filter", "ttags": [], "tmatch": "any", "tstate": "todo" }] }
+        ] }
+      ]
+    }
+  ]
+}

@@ -886,10 +886,12 @@ test('libellé : champs des cartes et filtre « Bloquées » d\'une requête kan
   const q = () => blocsDe(m)[1];
   m.s.modifier(() => { q().champs = { masques: ['attend', 'texte'], ordre: [] }; });
   egal(libelles(m)[0], 'Accueil · Requête « Suivi » : champs des cartes modifiés');
-  m.s.modifier(() => { q().bloquees = true; });
+  m.s.modifier(() => { q().filtres = [{ id: 'f1', prop: 'bloquees', vals: ['oui'] }]; });
   egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés');
-  m.s.annuler();
-  egal('bloquees' in q(), false, 'annuler : filtre retiré');
+  m.s.modifier(() => { q().filtres[0].vals = ['non']; });
+  egal(libelles(m)[0], 'Accueil · Requête « Suivi » : filtres modifiés', 'valeur d\'un filtre posé');
+  m.s.annuler(); m.s.annuler();
+  egal('filtres' in q(), false, 'annuler : filtre retiré');
   m.s.annuler();
   egal('champs' in q(), false, 'annuler : champs d\'avant');
 });

@@ -30,7 +30,7 @@ function serializeFile() {
   // renvoie une promesse du fichier complet ; chiffré si le document le demande
   doc.savedAt = new Date().toISOString();
   doc.title = docTitle();
-  var json = JSON.stringify(synSaved(doc));
+  var json = JSON.stringify(miroirFiltres(synSaved(doc)));   // anciens champs des filtres pour les versions 1.23 et antérieures (05-migrations.js)
   return (isSealed() ? sealJSON(json).then(function (env) {
     return JSON.stringify({ v: VERSION, id: doc.id, palette: doc.palette, typo: doc.typo, theme: doc.theme, enc: env });
   }) : Promise.resolve(json)).then(function (stored) { return buildFile(stored); });

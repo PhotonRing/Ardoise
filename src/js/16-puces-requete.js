@@ -81,9 +81,9 @@ function fenBrancher(p) {
     var b = bloc(); if (!b) return;
     if (x.dataset.qset) { reglerBloc(b, x.dataset.qset, x.dataset.v, true); return; }
     // la dernière pastille décochée retire le filtre (et son « toutes / une »)
-    if (x.dataset.act === 'q-tag') { var tk = x.dataset.tag; holdBar(b.id); session.modifier(function () { var w = b.tags || (b.tags = []), at = w.indexOf(tk); if (at >= 0) w.splice(at, 1); else w.push(tk); if (!w.length) { delete b.tags; delete b.match; } }); return; }
+    if (x.dataset.act === 'q-tag') { var tk = x.dataset.tag; holdBar(b.id); session.modifier(function () { qBasculerValeur(b, b, 'filtres', 'tags', tk); }); return; }
     var prop = x.dataset.qfiltre;
-    if (prop === 'bloquees') { holdBar(b.id); session.modifier(function () { b.bloquees = true; }); fenFermer(); return; }
+    if (prop === 'bloquees') { holdBar(b.id); session.modifier(function () { qReglerFiltre(b, b, 'filtres', 'bloquees', 'oui'); }); fenFermer(); return; }
     fen.cle = 'f:' + prop; fen.ancre = qFiltrePose(b, prop) ? fen.cle : 'plus';
     fenGarnir(); fenPlacer();
     var premier = $('input, select, button', p); if (premier && e.detail === 0) premier.focus({ preventScroll: true });
@@ -106,7 +106,7 @@ app.addEventListener('click', function (e) {
   if (x) {
     var prop = x.dataset.qretirer, clavier = e.detail === 0;
     closePop(); holdBar(b.id);
-    session.modifier(function () { delete b[prop]; if (prop === 'tags') delete b.match; if (prop === 'kbDue') { delete b.kbDueN; delete b.kbDueU; } }, null, 'filtres modifiés');
+    session.modifier(function () { var f = qFiltreDe(b.filtres, prop); if (f) qRetirerFiltre(b, 'filtres', f); }, null, 'filtres modifiés');
     var plus = clavier && fenPuce(b.id, 'plus'); if (plus) plus.focus({ preventScroll: true });
     return;
   }

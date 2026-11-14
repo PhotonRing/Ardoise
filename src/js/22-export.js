@@ -35,7 +35,8 @@ function copyJSON() {
   session.valider();
   var base = { v: VERSION, title: docTitle(), palette: doc.palette, typo: doc.typo, width: doc.width, theme: doc.theme, nav: doc.nav };
   if (doc.tags) base.tags = doc.tags;
-  if (doc.pages.length > 1) base.pages = doc.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.lv) o.lv = pg.lv; return o; }); else { base.pageTitle = doc.pages[0].title || undefined; base.blocks = doc.pages[0].blocks; }
+  var dm = miroirFiltres(doc);   // anciens champs des filtres, pour une version plus ancienne (05-migrations.js)
+  if (dm.pages.length > 1) base.pages = dm.pages.map(function (pg) { var o = { title: pg.title, blocks: pg.blocks }; if (pg.lv) o.lv = pg.lv; return o; }); else { base.pageTitle = dm.pages[0].title || undefined; base.blocks = dm.pages[0].blocks; }
   var t = JSON.stringify(base, null, 2);
   try { navigator.clipboard.writeText(t).then(function () { toast('JSON copié dans le presse-papiers'); }, function () { showJSON(t); }); } catch (_) { showJSON(t); }
 }

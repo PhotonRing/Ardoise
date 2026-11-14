@@ -73,20 +73,20 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="client"]')`);
   await cliquer(`document.querySelector('.q-fen [data-qset="match"][data-v="all"]')`);
   e = await etat();
-  attendu('« toutes » : urgent et client', e.puces[2] === 'urgent et client' && e.lignes.join() === '3' && e.bloc.match === 'all', e);
+  attendu('« toutes » : urgent et client', e.puces[2] === 'urgent et client' && e.lignes.join() === '3' && e.bloc.filtres[0].mode === 'tous', e);
   attendu('une seule étape nommée pour la fenêtre', /^Annuler : Accueil · Requête « Incidents » : filtres modifiés \(/.test(e.annuler), e.annuler);
   // clic ailleurs : fermée ; un seul Ctrl+Z défait toute la fenêtre
   await cliquer({ x: 990, y: 740 });
   attendu('clic ailleurs : fenêtre fermée', !(await evalue(`!!document.querySelector('.q-fen')`)), 'fenêtre');
   await touche('z', 'KeyZ', 2);
   e = await etat();
-  attendu('un Ctrl+Z : plus aucun filtre', !(e.bloc.tags || []).length && e.lignes.join() === '1,2,3' && e.puces[2] === '+ Filtre', e);
+  attendu('un Ctrl+Z : plus aucun filtre', !e.bloc.filtres && e.lignes.join() === '1,2,3' && e.puces[2] === '+ Filtre', e);
   await touche('z', 'KeyZ', 10);   // Ctrl+Maj+Z : rétablit le filtre
   e = await etat(); attendu('rétablir : filtre revenu', e.puces[2] === 'urgent et client', e.puces);
 
   // × retire le filtre : champ supprimé
   await cliquer(`document.querySelector('.blk[data-id="q1"] [data-qretirer="tags"]')`);
-  e = await etat(); attendu('× : champ supprimé', !('tags' in e.bloc) && !('match' in e.bloc) && e.puces[2] === '+ Filtre', e.bloc);
+  e = await etat(); attendu('× : champ supprimé', !('filtres' in e.bloc) && e.puces[2] === '+ Filtre', e.bloc);
 
   // clavier : Tab jusqu'à la puce du tri, Entrée ouvre (focus dans la fenêtre), Échap ferme et rend le focus à la puce
   await evalue(`${puce('q1', 'cols')}.focus()`); await touche('Tab', 'Tab');
@@ -119,7 +119,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   await touche('Escape', 'Escape');
   attendu('Échap après « + Filtre » : focus sur la puce posée', (await etat('q2')).focus === 'f:kbPrio', 'focus');
   await cliquer(`document.querySelector('.blk[data-id="q2"] [data-qretirer="kbPrio"]')`);
-  e = await etat('q2'); attendu('× : priorité retirée', !('kbPrio' in e.bloc) && e.lignes.length === 3, e.bloc);
+  e = await etat('q2'); attendu('× : priorité retirée', !(e.bloc.filtres || []).some((f) => f.prop === 'kbPrio') && e.lignes.length === 3, e.bloc);
 
   // dernière pastille décochée : le filtre est retiré (ni tableau vide, ni « toutes » laissé), la fenêtre reste sous « + Filtre »
   await cliquer(puce('q1', 'plus'));
@@ -130,7 +130,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="urgent"]')`);
   await cliquer(`document.querySelector('.q-fen .q-chip[data-tag="client"]')`);
   e = await etat();
-  attendu('dernière pastille décochée : filtre retiré', !('tags' in e.bloc) && !('match' in e.bloc) && e.puces[2] === '+ Filtre' && e.lignes.join() === '3,1,2' && e.fen === 'q1:Pastilles', e);
+  attendu('dernière pastille décochée : filtre retiré', !('filtres' in e.bloc) && e.puces[2] === '+ Filtre' && e.lignes.join() === '3,1,2' && e.fen === 'q1:Pastilles', e);
   await touche('Escape', 'Escape');
 
   // fenêtre ouverte puis glisser d'une ligne de tableau par sa poignée : la fenêtre se ferme au début du geste, qui est sa propre
