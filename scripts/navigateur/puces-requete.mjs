@@ -62,7 +62,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   const caseV = (v) => `document.querySelector('.q-fen input[data-qval][data-v=${JSON.stringify(v)}]')`;
   const mode = (m) => `document.querySelector('.q-fen [data-qmode="${m}"]')`;
   await cliquer(puce('q1', 'plus'));
-  attendu('« + Filtre » sur des lignes de tableaux : seulement les pastilles', (await evalue(`[...document.querySelectorAll('.q-fen [data-qfiltre]')].map((x) => x.dataset.qfiltre).join()`)) === 'tags', 'filtres proposés');
+  attendu('« + Filtre » sur des lignes de tableaux : pastilles et valeur d\'une colonne', (await evalue(`[...document.querySelectorAll('.q-fen [data-qfiltre]')].map((x) => x.dataset.qfiltre).join()`)) === 'tags,valeur', 'filtres proposés');
   await cliquer(`document.querySelector('.q-fen [data-qfiltre="tags"]')`);
   e = await etat();
   attendu('Pastilles : fenêtre en attente sous « + Filtre », rien de posé', e.fen === 'q1:Pastilles' && e.ouverte === '+ Filtre' && !e.bloc.filtres, e);

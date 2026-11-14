@@ -83,7 +83,7 @@ test('puces : tri sur une colonne, croissant ou décroissant', () => {
 test('« + Filtre » propose toujours tous les filtres de la source, même ceux déjà posés', () => {
   const { ctx } = monter(doc({}));
   const f = (b) => ctx.qFiltresProposes(b).map((x) => x.prop);
-  egal(f({ src: 'table' }), ['tags']);
+  egal(f({ src: 'table' }), ['tags', 'valeur']);
   egal(f({ src: 'check', filtres: [{ id: 'f1', prop: 'state', vals: ['done'] }] }), ['tags', 'state']);
   egal(f({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }), ['tags', 'col', 'kbWho', 'kbPrio', 'kbDue', 'bloquees']);
   const { ctx: c2, d } = monter(doc({ src: 'kanban', filtres: [{ id: 'f1', prop: 'kbPrio', vals: ['p1'] }] }));

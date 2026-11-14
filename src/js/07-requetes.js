@@ -78,7 +78,8 @@ function queryBlocks(b, d, pi) {
   }
   return list;
 }
-function queryRecords(b, d, pi, noTags) {
+// résultats de la portée, avant les filtres (valeurs proposées par la fenêtre d'un filtre) ; queryRecords les filtre
+function qRecsPortee(b, d, pi) {
   var recs = [];
   queryBlocks(b, d, pi).forEach(function (x) {
     var bl = x.blk;
@@ -111,8 +112,11 @@ function queryRecords(b, d, pi, noTags) {
       recs.push({ x: x, cells: dc, tags: pillKeys(dc.map(function (c) { return c.v || ''; }).join(' ')) });
     }
   });
+  return recs;
+}
+function queryRecords(b, d, pi, noTags) {
   // filtres de la source (ET) ; sans les pastilles pour lister celles de la portée (scopeTags)
-  return qFiltrer(recs, qFiltresSource(b, b.filtres).filter(function (f) { return !noTags || f.prop !== 'tags'; }));
+  return qFiltrer(qRecsPortee(b, d, pi), qFiltresSource(b, b.filtres).filter(function (f) { return !noTags || f.prop !== 'tags'; }));
 }
 /* ---------- Filtres d'une requête (format 7, spec filtres-logiques) ----------
    Un filtre : { id, prop, vals, mode } ; mode absent = 'un' (au moins une valeur), 'tous' (toutes), 'aucun' (aucune) ; état des
@@ -173,6 +177,7 @@ function qCibleFiltre(hote, cle, ref) { return typeof ref === 'string' ? qFiltre
 function qNouveauFiltre(b, hote, cle, ref) {
   var f = { id: qIdFiltre(b), prop: typeof ref === 'string' ? ref : ref.prop, vals: [] };
   if (ref.mode === 'tous' || ref.mode === 'aucun') f.mode = ref.mode;
+  if (f.prop === 'valeur') f.colonne = String(ref.colonne || '');
   (hote[cle] || (hote[cle] = [])).push(f); return f;
 }
 // choix d'une valeur unique : '' (ou 'all' pour l'état des cases) retire le filtre ; 'p12' coche P1 et P2 ; rend le filtre (null : retiré)
@@ -191,12 +196,19 @@ function qBasculerValeur(b, hote, cle, ref, val) {
   return f;
 }
 function qModeFiltre(hote, cle, ref, mode) { var f = qCibleFiltre(hote, cle, ref); if (!f) return; if (mode === 'tous' || mode === 'aucun') f.mode = mode; else delete f.mode; }
+// « Valeur d'une colonne » : changer de colonne efface les valeurs cochées, donc retire un filtre posé ; rend la clé de la fenêtre
+// en attente sur la nouvelle colonne (Q_CLE_ATTENTE), même mode (« toutes » revient à « l'une de » si la colonne n'a pas de pastilles)
+function qChangerColonne(b, d, pi, cle, ref, colonne) {
+  var f = ref.id && qFiltreParId(b[cle], ref.id); if (f) qRetirerFiltre(b, cle, f);
+  var mode = ref.mode === 'tous' && !qValeursColonne(qRecsPortee(b, d, pi), colonne).pastilles ? 'un' : ref.mode || 'un';
+  return 'n:valeur:' + mode + ':' + colonne;
+}
 // retire un filtre ; une liste vide est supprimée
 function qRetirerFiltre(hote, cle, f) { var l = hote[cle] || [], at = l.indexOf(f); if (at >= 0) l.splice(at, 1); if (!l.length) delete hote[cle]; }
-// normalisation : filtres à propriété connue et valeurs non vides, identifiants présents et uniques dans le bloc, listes vides supprimées
+// normalisation : filtres à propriété connue et valeurs non vides (« Valeur d'une colonne » : avec sa colonne), identifiants présents et uniques dans le bloc, listes vides supprimées
 function qNormFiltres(b) {
   var pris = {}, net = function (o, cle) {
-    var l = Array.isArray(o[cle]) ? o[cle].filter(function (f) { return f && typeof f === 'object' && Q_PROPS[f.prop] && Array.isArray(f.vals) && f.vals.length; }) : [];
+    var l = Array.isArray(o[cle]) ? o[cle].filter(function (f) { return f && typeof f === 'object' && Q_PROPS[f.prop] && Array.isArray(f.vals) && f.vals.length && (f.prop !== 'valeur' || typeof f.colonne === 'string'); }) : [];
     l.forEach(function (f) { if (typeof f.id !== 'string' || !f.id || pris['$' + f.id]) { do f.id = uid(); while (pris['$' + f.id]); } pris['$' + f.id] = 1; });
     if (l.length) o[cle] = l; else delete o[cle];
   };
@@ -225,10 +237,17 @@ function qLibelleFiltre(f, noms) {
   if (f.prop === 'kbWho' && vals.length === 1 && vals[0] === '-') return txt[0];
   return titre + ' : ' + txt.join(m === 'tous' ? ' et ' : ' ou ');
 }
-// noms des valeurs pour les libellés : pastilles du registre, colonnes et responsables des kanbans de la portée
+// noms des valeurs pour les libellés : pastilles du registre, colonnes et responsables des kanbans de la portée, colonnes et valeurs des lignes
 function qNomsFiltres(b, d, pi) {
   var noms = { tags: qNomsTags(d), col: {}, kbWho: {} };
   if (b.src === 'kanban') { kbColumns(b, d, pi).forEach(function (x) { noms.col[x.key] = x.name; }); qKbWhos(b, d, pi).forEach(function (x) { noms.kbWho[x.key] = x.name; }); }
+  // « Valeur d'une colonne » : noms des colonnes et des valeurs de la portée (première apparition), seulement si un tel filtre est posé
+  var fv = qFiltresSource(b, b.filtres).filter(function (f) { return f.prop === 'valeur'; });
+  if (fv.length) {
+    var recs = qRecsPortee(b, d, pi); noms.colonnes = {}; noms.valeur = {};
+    qColonnesFiltre(recs).forEach(function (x) { noms.colonnes[x.key] = x.name; });
+    fv.forEach(function (f) { qValeursColonne(recs, f.colonne).items.forEach(function (x) { if (!(x.key in noms.valeur)) noms.valeur[x.key] = x.name; }); });
+  }
   return noms;
 }
 function qKbWhos(b, d, pi) {
@@ -574,6 +593,24 @@ function qValeursCellule(html) {
   ajout(tagKey(htmlText(h)), h.trim());
   return out;
 }
+// filtre « Valeur d'une colonne » : colonnes des résultats [{ key, name }] (fiches de faits : clés des faits), dans l'ordre d'apparition
+var Q_PASTILLE_SEULE = new RegExp('^' + PILL_RE.source + '$');   // une valeur de qValeursCellule qui est une pastille
+function qColonnesFiltre(recs) { return qColonnes(recs).cols.map(function (n) { return { key: qCleCol(n), name: n }; }); }
+// valeurs d'une colonne sur les résultats : « (vide) » (clé '') en tête, puis par qValeursCellule (nom de la première apparition) ;
+// pastilles : la colonne contient au moins une cellule faite de pastilles (mode « toutes » proposé)
+function qValeursColonne(recs, colonne) {
+  var items = [{ key: '', name: '(vide)' }], vu = { '': 1 }, pastilles = false;
+  recs.forEach(function (r) {
+    (r.cells || []).forEach(function (c) {
+      if (qCleCol(c.k) !== colonne) return;
+      qValeursCellule(c.v).forEach(function (x) {
+        if (Q_PASTILLE_SEULE.test(x.html)) pastilles = true;
+        if (!vu[x.cle]) { vu[x.cle] = 1; items.push({ key: x.cle, name: htmlText(x.html).replace(/\s+/g, ' ').trim() }); }
+      });
+    });
+  });
+  return { items: items, pastilles: pastilles };
+}
 function qRegrouper(recs, cleX, clesY) {
   // → [{ cle, valeur (HTML de la première apparition), vide, n, lignes, uniques: { cléY: [HTML] } }] dans l'ordre de première apparition
   var groupes = [], gi = {};
@@ -733,7 +770,8 @@ var Q_PRIO = { p1: 'P1', p2: 'P2', p3: 'P3', p12: 'P1 ou P2', '-': 'Sans priorit
 var Q_UNITE = { j: ['jour', 'jours'], s: ['semaine', 'semaines'], m: ['mois', 'mois'] };
 // filtres de chaque source, dans l'ordre de la ligne : [champ, nom dans « + Filtre »]
 var Q_FILTRE_TAGS = [['tags', 'Pastilles']];
-var Q_FILTRES = { facts: Q_FILTRE_TAGS, table: Q_FILTRE_TAGS, diamond: Q_FILTRE_TAGS, check: Q_FILTRE_TAGS.concat([['state', 'État des cases']]),
+var Q_FILTRE_VALEUR = Q_FILTRE_TAGS.concat([['valeur', 'Valeur d’une colonne']]);   // lignes de tableaux et fiches de faits (colonne = clé du fait)
+var Q_FILTRES = { facts: Q_FILTRE_VALEUR, table: Q_FILTRE_VALEUR, diamond: Q_FILTRE_TAGS, check: Q_FILTRE_TAGS.concat([['state', 'État des cases']]),
   kanban: Q_FILTRE_TAGS.concat([['col', 'Colonne du kanban'], ['kbWho', 'Responsable'], ['kbPrio', 'Priorité'], ['kbDue', 'Échéance'], ['bloquees', 'Bloquées']]) };
 // vue rendue : les vues propres aux lignes de tableaux retombent sur le tableau (queryResult)
 function qVue(b) { var v = b.view || 'table'; return !Q_VUES[v] || ((v === 'regroupee' || v === 'chaleur') && b.src !== 'table') ? 'table' : v; }
@@ -838,11 +876,13 @@ function qFenetre(b, d, pi, cle) {
   }
   return '';
 }
-// fenêtre d'un filtre : f:<id> (filtre posé) ou n:<prop>:<mode> (filtre en attente de sa première valeur, ouvert par « + Filtre »)
+// fenêtre d'un filtre : f:<id> (filtre posé) ou n:<prop>:<mode>[:<colonne>] (filtre en attente de sa première valeur, ouvert par
+// « + Filtre » ; colonne : celle d'un filtre « Valeur d'une colonne », la première de la portée par défaut)
 // plusieurs valeurs : segments du mode (data-qmode) au-dessus d'une case par valeur (data-qval) ; une valeur : choix data-qset avec data-fid
+var Q_CLE_ATTENTE = /^n:(\w+):(\w+)(?::([\s\S]*))?$/;
 var Q_MODES = [['un', 'l\'une de'], ['tous', 'toutes'], ['aucun', 'aucune de']];
 function qFenetreFiltre(b, d, pi, cle, h, choix, seg) {
-  var m = cle.match(/^n:(\w+):(\w+)$/), f = m ? { id: '', prop: m[1], vals: [], mode: m[2] } : qFiltreParId(qFiltresSource(b, b.filtres), cle.slice(2));
+  var m = cle.match(Q_CLE_ATTENTE), f = m ? { id: '', prop: m[1], vals: [], mode: m[2], colonne: m[3] } : qFiltreParId(qFiltresSource(b, b.filtres), cle.slice(2));
   if (!f || (m && !qFiltresProposes(b).some(function (x) { return x.prop === f.prop; }))) return '';
   var fid = f.id, v0 = f.vals[0] || '';
   if (f.prop === 'state') return h('État des cases') + choix('state', 'done', v0, 'Cochées', '', fid) + choix('state', 'todo', v0, 'Non cochées', '', fid);
@@ -853,13 +893,20 @@ function qFenetreFiltre(b, d, pi, cle, h, choix, seg) {
       (withN ? '<div class="q-fen-b"><input type="number" class="q-num" data-prop="kbDueN" data-fid="' + esc(fid) + '" min="1" max="999" value="' + qDueN(f.n) + '" aria-label="Nombre de jours, de semaines ou de mois">' +
         seg('kbDueU', f.u || 'j', [['j', 'jours'], ['s', 'semaines'], ['m', 'mois']], fid) + '</div>' : '');
   }
-  var titres = { tags: 'Pastilles', col: 'Colonne du kanban', kbWho: 'Responsable', kbPrio: 'Priorité' };
-  var items = f.prop === 'tags' ? scopeTags(b, d, pi) : f.prop === 'col' ? kbColumns(b, d, pi)
+  var titres = { tags: 'Pastilles', col: 'Colonne du kanban', kbWho: 'Responsable', kbPrio: 'Priorité', valeur: 'Valeur d’une colonne' }, tete = '', pastilles = f.prop === 'tags';
+  if (f.prop === 'valeur') {
+    // liste des colonnes de la portée en tête (une colonne disparue reste choisie), valeurs de la colonne sur toute la portée
+    var recs = qRecsPortee(b, d, pi), cols = qColonnesFiltre(recs), colonne = f.colonne != null ? f.colonne : cols.length ? cols[0].key : '';
+    if (!cols.some(function (x) { return x.key === colonne; })) cols.push({ key: colonne, name: colonne });
+    var vc = qValeursColonne(recs, colonne); pastilles = vc.pastilles;
+    tete = '<select data-qcolonne aria-label="Colonne">' + cols.map(function (x) { return '<option value="' + esc(x.key) + '"' + (x.key === colonne ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select>';
+  }
+  var items = f.prop === 'valeur' ? vc.items : f.prop === 'tags' ? scopeTags(b, d, pi) : f.prop === 'col' ? kbColumns(b, d, pi)
     : f.prop === 'kbWho' ? qKbWhos(b, d, pi).concat([{ key: '-', name: 'Sans responsable' }]) : ['p1', 'p2', 'p3', '-'].map(function (k) { return { key: k, name: Q_PRIO[k] }; });
   // une valeur cochée absente de la portée reste cochée et visible
   f.vals.forEach(function (k) { if (!items.some(function (x) { return x.key === k; })) items = items.concat([{ key: k, name: k, gone: true }]); });
   var mode = f.mode === 'tous' || f.mode === 'aucun' ? f.mode : 'un';
-  var modes = '<div class="seg q-modes" role="group" aria-label="Mode du filtre">' + Q_MODES.filter(function (x) { return x[0] !== 'tous' || f.prop === 'tags'; }).map(function (x) {
+  var modes = '<div class="seg q-modes" role="group" aria-label="Mode du filtre">' + Q_MODES.filter(function (x) { return x[0] !== 'tous' || pastilles; }).map(function (x) {
     return '<button type="button" data-qmode="' + x[0] + '" aria-pressed="' + (mode === x[0]) + '">' + x[1] + '</button>';
   }).join('') + '</div>';
   var cases = items.map(function (x) {
@@ -868,9 +915,9 @@ function qFenetreFiltre(b, d, pi, cle, h, choix, seg) {
     var gone = x.gone ? (f.prop === 'tags' && c == null ? 'Absente du document' : 'Absente de la portée choisie') : '';
     return '<label class="q-case' + (x.gone ? ' q-gone' : '') + '"' + (gone ? ' title="' + gone + '"' : '') + '><input type="checkbox" data-qval data-v="' + esc(x.key) + '"' + (f.vals.indexOf(x.key) >= 0 ? ' checked' : '') + '>' + nom + '</label>';
   }).join('');
-  // recherche : toujours pour les pastilles (comme avant), au-delà de 8 valeurs pour les autres
-  var recherche = f.prop === 'tags' || items.length > 8 ? '<input type="search" class="q-fen-q" placeholder="Rechercher…" aria-label="Rechercher une valeur">' : '';
-  return h(titres[f.prop]) + '<div class="q-fen-b">' + modes + recherche + '<div class="q-fen-cases">' + (cases || '<span class="muted q-hint">Aucune valeur ici.</span>') + '</div></div>';
+  // recherche : toujours pour les pastilles (comme avant) et les valeurs d'une colonne, au-delà de 8 valeurs pour les autres
+  var recherche = f.prop === 'tags' || f.prop === 'valeur' || items.length > 8 ? '<input type="search" class="q-fen-q" placeholder="Rechercher…" aria-label="Rechercher une valeur">' : '';
+  return h(titres[f.prop]) + '<div class="q-fen-b">' + tete + modes + recherche + '<div class="q-fen-cases">' + (cases || '<span class="muted q-hint">Aucune valeur ici.</span>') + '</div></div>';
 }
 function qFormulaireChamps(b) {
   // champs des cartes en vue kanban : le titre est fixe, puis une ligne par champ (poignée, case) ; gestes : 14-colonnes-requete.js

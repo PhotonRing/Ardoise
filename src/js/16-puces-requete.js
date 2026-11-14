@@ -2,22 +2,25 @@
    Une puce (qLignePuces, 07-requetes.js) ouvre son réglage dans un menu surgissant (pop, placePop) accroché dessous, de la largeur
    du bloc sous 480 px ; la fenêtre reste ouverte et se regarnit à chaque rendu (annulation, synchro). Tous ses changements forment
    une seule étape d'annulation nommée (session.ouvrirEtape) ; second clic, clic ailleurs ou Échap la ferment. */
-var fen = null;   // fenêtre ouverte : { b : id du bloc, cle : contenu (cle de qPuces, ou n:<prop>:<mode> pour un filtre en attente
-                  // de sa première valeur), ancre : cle de la puce d'accroche, p : élément }
+var fen = null;   // fenêtre ouverte : { b : id du bloc, cle : contenu (cle de qPuces, ou n:<prop>:<mode>[:<colonne>] pour un filtre en
+                  // attente de sa première valeur), ancre : cle de la puce d'accroche, p : élément ; prop, mode, colonne : dernier filtre visé }
 var FEN_NATURES = { src: 'source modifiée', scope: 'portée modifiée', plus: 'filtres modifiés', filtre: 'filtres modifiés', view: 'vue modifiée', cols: 'colonnes modifiées', sort: 'tri modifié' };
 function fenNature(b, cle) {
   if (cle === 'cols' && qVue(b) === 'kanban' && b.src === 'kanban') return 'champs des cartes modifiés';
   return FEN_NATURES[/^[fn]:/.test(cle) ? 'filtre' : cle];
 }
-// filtre visé par la fenêtre : { id, prop, mode } (posé) ou { prop, mode } (en attente) ; null si ce n'est pas une fenêtre de filtre
+// filtre visé par la fenêtre : { id, prop, mode, colonne } (posé) ou { prop, mode, colonne } (en attente) ; null si ce n'est pas
+// une fenêtre de filtre ; colonne : « Valeur d'une colonne » seulement
 function fenFiltre(b) {
-  var c = fen.cle, m = c.match(/^n:(\w+):(\w+)$/); if (m) return { prop: m[1], mode: m[2] };
+  var c = fen.cle, m = c.match(Q_CLE_ATTENTE); if (m) return m[1] === 'valeur' ? { prop: m[1], mode: m[2], colonne: m[3] || '' } : { prop: m[1], mode: m[2] };
   var f = c.indexOf('f:') === 0 && qFiltreParId(b.filtres, c.slice(2));
-  return f ? { id: f.id, prop: f.prop, mode: f.mode || 'un' } : null;
+  return f ? (f.prop === 'valeur' ? { id: f.id, prop: f.prop, mode: f.mode || 'un', colonne: f.colonne } : { id: f.id, prop: f.prop, mode: f.mode || 'un' }) : null;
 }
+// clé d'un filtre en attente (Q_CLE_ATTENTE, 07-requetes.js) : propriété, mode et, pour « Valeur d'une colonne », sa colonne
+function fenCleAttente(ref, mode) { return 'n:' + ref.prop + ':' + (mode || ref.mode || 'un') + (ref.prop === 'valeur' ? ':' + (ref.colonne || '') : ''); }
 // après un geste sur un filtre : la fenêtre suit le filtre créé (sous sa puce) ou retiré (en attente sous « + Filtre », même mode)
 function fenSuivre(f, ref) {
-  fen.cle = f ? 'f:' + f.id : 'n:' + ref.prop + ':' + (ref.mode || 'un'); fen.ancre = f ? fen.cle : 'plus';
+  fen.cle = f ? 'f:' + f.id : fenCleAttente(ref); fen.ancre = f ? fen.cle : 'plus';
   fenGarnir(); fenPlacer();
 }
 function fenModifier(b, fn) { var r = null; holdBar(b.id); session.modifier(function () { r = fn(); }); return r; }
@@ -37,7 +40,7 @@ function fenPlacer() {
 // repère d'un contrôle de la fenêtre (balise et attributs data-), pour lui rendre le focus après un garnissage
 function fenRepere(el) {
   var s = el.tagName.toLowerCase() + (el.classList.contains('q-fen-q') ? '.q-fen-q' : '');
-  ['qset', 'fid', 'qval', 'qmode', 'v', 'qfiltre', 'qcol', 'qchamp', 'qregy', 'tag', 'prop', 'qcolnouv', 'qsub'].forEach(function (k) {
+  ['qset', 'fid', 'qval', 'qmode', 'qcolonne', 'v', 'qfiltre', 'qcol', 'qchamp', 'qregy', 'tag', 'prop', 'qcolnouv', 'qsub'].forEach(function (k) {
     if (el.dataset[k] != null) s += '[data-' + k + (el.dataset[k] ? '="' + CSS.escape(el.dataset[k]) + '"' : '') + ']';
   });
   return s;
@@ -60,7 +63,7 @@ function fenOuvrir(bid, cle, clavier) {
   var p = document.createElement('div'); p.className = 'pop q-fen'; p.dataset.id = bid;
   p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', a.title);
   pop = p; fen = { b: bid, cle: cle, ancre: cle, p: p };
-  var fo = cle.indexOf('f:') === 0 && qFiltreParId(b.filtres, cle.slice(2)); if (fo) { fen.prop = fo.prop; fen.mode = fo.mode || 'un'; }   // si le filtre disparaît : en attente
+  var fo = cle.indexOf('f:') === 0 && qFiltreParId(b.filtres, cle.slice(2)); if (fo) { fen.prop = fo.prop; fen.mode = fo.mode || 'un'; fen.colonne = fo.colonne; }   // si le filtre disparaît : en attente
   brancherColonnes(p); fenBrancher(p);
   session.ouvrirEtape({ etape: libelleBloc(doc.pages[doc.cur], b) + ' : ' + fenNature(b, cle) });
   fenGarnir(); fenPlacer();
@@ -84,9 +87,9 @@ function fenApresRendu() {
   if (/^[fn]:/.test(fen.cle)) {
     // filtre retiré ailleurs (Ctrl+Z, autre copie) : la fenêtre passe en attente sous « + Filtre », avec le dernier mode connu
     var f = fen.cle.indexOf('f:') === 0 && qFiltreParId(qFiltresSource(b, b.filtres), fen.cle.slice(2));
-    if (f) { fen.prop = f.prop; fen.mode = f.mode || 'un'; fen.ancre = fen.cle; }
+    if (f) { fen.prop = f.prop; fen.mode = f.mode || 'un'; fen.colonne = f.colonne; fen.ancre = fen.cle; }
     else if (fen.cle.indexOf('n:') === 0) fen.ancre = 'plus';
-    else if (fen.prop) { fen.cle = 'n:' + fen.prop + ':' + fen.mode; fen.ancre = 'plus'; }
+    else if (fen.prop) { fen.cle = fenCleAttente({ prop: fen.prop, mode: fen.mode, colonne: fen.colonne }); fen.ancre = 'plus'; }
     else { closePop(); return; }
     var prop = f ? f.prop : fen.cle.split(':')[1];
     if (!qFiltresProposes(b).some(function (x) { return x.prop === prop; })) { closePop(); return; }
@@ -101,7 +104,7 @@ function fenBrancher(p) {
     var ref = fenFiltre(b), f;
     if (x.dataset.qmode) {
       // en attente : le mode est gardé pour la première valeur cochée
-      if (ref && !ref.id) { fen.cle = 'n:' + ref.prop + ':' + x.dataset.qmode; fenGarnir(); }
+      if (ref && !ref.id) { fen.cle = fenCleAttente(ref, x.dataset.qmode); fenGarnir(); }
       else if (ref) fenModifier(b, function () { qModeFiltre(b, 'filtres', ref, x.dataset.qmode); });
       return;
     }
@@ -115,7 +118,11 @@ function fenBrancher(p) {
     // « + Filtre » : un nouveau filtre, posé à sa première valeur ; « Bloquées » se pose aussitôt (réglable en « Non bloquées »)
     var prop = x.dataset.qfiltre;
     if (prop === 'bloquees') fenSuivre(fenModifier(b, function () { return qReglerFiltre(b, b, 'filtres', { prop: 'bloquees' }, 'oui'); }), { prop: prop });
-    else { fen.cle = 'n:' + prop + ':un'; fen.ancre = 'plus'; fenGarnir(); fenPlacer(); }
+    else {
+      // « Valeur d'une colonne » : en attente sur la première colonne de la portée
+      var c0 = prop === 'valeur' && qColonnesFiltre(qRecsPortee(b, doc, doc.cur))[0];
+      fen.cle = fenCleAttente({ prop: prop, colonne: c0 ? c0.key : '' }, 'un'); fen.ancre = 'plus'; fenGarnir(); fenPlacer();
+    }
     var premier = $('input, select, button', p); if (premier && e.detail === 0) premier.focus({ preventScroll: true });
   });
   p.addEventListener('change', function (e) {
@@ -123,6 +130,14 @@ function fenBrancher(p) {
     if (el.matches('input[data-qval]')) {
       var ref = fenFiltre(b), v = el.dataset.v; if (!ref) return;
       fenSuivre(fenModifier(b, function () { return qBasculerValeur(b, b, 'filtres', ref, v); }), ref);
+    }
+    else if (el.matches('select[data-qcolonne]')) {
+      // changer de colonne efface les valeurs cochées : un filtre posé est retiré (une étape avec le reste de la fenêtre) ;
+      // la fenêtre reste ouverte sous « + Filtre », en attente sur la nouvelle colonne, même mode
+      var rc = fenFiltre(b); if (!rc) return;
+      var go = function () { return qChangerColonne(b, doc, doc.cur, 'filtres', rc, el.value); };
+      fen.cle = rc.id ? fenModifier(b, go) : go(); fen.ancre = 'plus'; fen.colonne = el.value;
+      fenGarnir(); fenPlacer();
     }
     else if (el.matches('select[data-act=set]')) reglerBloc(b, el.dataset.prop, el.value, true);
     else if (el.matches('input.q-num[data-prop]')) reglerNombre(b, el.dataset.prop, el.value, el.dataset.fid);
