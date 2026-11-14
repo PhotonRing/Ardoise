@@ -395,7 +395,7 @@ function qColonnes(recs) {
   recs.forEach(function (r) { r.cells.forEach(function (c) { var k = c.k.toLowerCase(); if (!(k in ck)) { ck[k] = cols.length; cols.push(c.k); } }); });
   return { cols: cols, cellsOf: function (r) { var o = []; r.cells.forEach(function (c) { var k = ck[c.k.toLowerCase()]; if (o[k] == null) o[k] = c; }); return o; } };
 }
-// Choix des colonnes (champ colonnes : { mode : 'toutes' | 'sauf' | 'seulement', noms, ordre }) ; absent = toutes. Clé d'une colonne :
+// Choix des colonnes (champ colonnes : { mode : 'toutes' | 'sauf' | 'seulement', noms, ordre }) ; absent = toutes ; 'toutes' ne s'écrit plus. Clé d'une colonne :
 // son nom sans casse ni espaces superflus, « Source » a la clé réservée '#source' ; une clé inconnue est ignorée (colonne disparue ou renommée)
 var Q_SOURCE = '#source', Q_ATTEND = '#attend';
 function qCleCol(nom) { return tagKey(nom); }
@@ -445,9 +445,9 @@ function qColBasculer(b, dispo, cle) {
   return qColNeuf(dispo, ch.mode, ch.noms, ch.ordre);
 }
 function qColMode(b, dispo, mode) {
-  // « Seulement… » garde les colonnes visibles, « Toutes sauf… » masque les cachées : le résultat ne change pas au changement de mode
+  // « Afficher les nouvelles colonnes » : cochée, « sauf » masque les cachées ; décochée, « seulement » garde les visibles ; le résultat ne change pas
   var ch = qColActuel(b), rangees = qColonnesRangees(b, dispo);
-  var noms = mode === 'toutes' ? [] : rangees.filter(function (c) { return qColonneVisible(b, c.cle) === (mode === 'seulement'); }).map(function (c) { return c.cle; });
+  var noms = rangees.filter(function (c) { return qColonneVisible(b, c.cle) === (mode === 'seulement'); }).map(function (c) { return c.cle; });
   return qColNeuf(dispo, mode, noms, ch.ordre);
 }
 function qColDeplacer(b, dispo, cle, vers) {
@@ -796,11 +796,10 @@ function qChForm(b, ch) {
     '<label>couleur selon ' + sel('chN', 'Couleur des cases', ch.n, 'nombre de lignes', []) + '</label>';
 }
 function qColForm(b, recs) {
-  // choix des colonnes : mode, puis une ligne par colonne disponible dans l'ordre choisi (poignée, case) ; gestes : 14-colonnes-requete.js
-  var mode = qColReglage(b).mode || 'toutes', o = function (v, label) { return '<option value="' + v + '"' + (mode === v ? ' selected' : '') + '>' + label + '</option>'; };
-  return '<div class="q-colonnes"><label><span class="q-lbl">Colonnes</span> <select data-qcolmode title="Colonnes affichées">' + o('toutes', 'toutes') + o('sauf', 'toutes sauf…') + o('seulement', 'seulement…') + '</select></label>' +
-    '<ol class="q-cols">' + qColPlacees(b, qColonnesDispo(b, recs, b.view === 'list').dispo).map(function (c) {
+  // choix des colonnes : une ligne par colonne disponible dans l'ordre choisi (poignée, case cochée = affichée), puis « Afficher les
+  // nouvelles colonnes » (cochée : mode « sauf », décochée : « seulement ») ; gestes : 14-colonnes-requete.js
+  return '<div class="q-colonnes"><ol class="q-cols">' + qColPlacees(b, qColonnesDispo(b, recs, b.view === 'list').dispo).map(function (c) {
       return '<li class="q-col" data-qcolk="' + esc(c.cle) + '"><span class="q-grip" title="Glisser pour déplacer (ou Alt+↑, Alt+↓ sur la case)" aria-hidden="true">⋮⋮</span>' +
         '<label><input type="checkbox" data-qcol="' + esc(c.cle) + '"' + (qColonneVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
-    }).join('') + '</ol></div>';
+    }).join('') + '</ol><label class="q-tog q-nouv" title="Une colonne ajoutée plus tard au tableau source s\'affiche d\'office"><input type="checkbox" data-qcolnouv' + (qColReglage(b).mode === 'seulement' ? '' : ' checked') + '> Afficher les nouvelles colonnes</label></div>';
 }

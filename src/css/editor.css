@@ -426,6 +426,7 @@ button.tl-dot:hover{transform:scale(1.2)}
 .q-fen .q-col.q-drop-avant{box-shadow:0 -3px 0 var(--accent)}
 .q-fen .q-col.q-drop-apres{box-shadow:0 3px 0 var(--accent)}
 .q-fen .q-regy{padding:0}
+.q-fen .q-nouv{border-top:1px solid var(--line);padding:8px 4px 0;margin-top:2px}
 .q-lbl{margin-right:2px}
 .q-regy{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;flex-basis:100%}
 .q-colonnes{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 10px;flex-basis:100%}

@@ -1,5 +1,5 @@
 /* ---------- Choix des colonnes et des champs des cartes d'une requête, colonnes Y de la vue regroupée ----------
-   Dans la fenêtre d'une puce (16-puces-requete.js), branchée par brancherColonnes : mode, cases, poignée et Alt+↑ / Alt+↓ sur
+   Dans la fenêtre d'une puce (16-puces-requete.js), branchée par brancherColonnes : cases, « Afficher les nouvelles colonnes », poignée et Alt+↑ / Alt+↓ sur
    une case ; le nouveau champ colonnes (ou champs, liste data-qliste="champs") vient des fonctions pures de 07-requetes.js. */
 function colonnesBloc(el) { var x = el.closest('.blk, .q-fen'); return x ? byId(x.dataset.id) : null; }
 function ecrireColonnes(b, calcul, focus) {
@@ -34,7 +34,7 @@ function colFin(racine) { colMarque(racine, null); $$('.q-col[draggable]', racin
 function brancherColonnes(racine) {
   racine.addEventListener('change', function (e) {
     var el = e.target, b; if (mode !== 'edit') return;
-    if (el.matches('select[data-qcolmode]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColMode(b, dp, el.value); });
+    if (el.matches('input[data-qcolnouv]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColMode(b, dp, el.checked ? 'sauf' : 'seulement'); });
     else if (el.matches('input[data-qcol]') && (b = colonnesBloc(el))) ecrireColonnes(b, function (dp) { return qColBasculer(b, dp, el.dataset.qcol); }, el.dataset.qcol);
     else if (el.matches('input[data-qchamp]') && (b = colonnesBloc(el))) ecrireChamps(b, qChampBasculer(b, el.dataset.qchamp), el.dataset.qchamp);
     else if (el.matches('input[data-qregy]') && (b = colonnesBloc(el))) {

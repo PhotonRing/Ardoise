@@ -24,7 +24,7 @@ function fenPlacer() {
 // repère d'un contrôle de la fenêtre (balise et attributs data-), pour lui rendre le focus après un garnissage
 function fenRepere(el) {
   var s = el.tagName.toLowerCase() + (el.classList.contains('q-fen-q') ? '.q-fen-q' : '');
-  ['qset', 'v', 'qfiltre', 'qcol', 'qchamp', 'qregy', 'tag', 'prop', 'qcolmode', 'qsub'].forEach(function (k) {
+  ['qset', 'v', 'qfiltre', 'qcol', 'qchamp', 'qregy', 'tag', 'prop', 'qcolnouv', 'qsub'].forEach(function (k) {
     if (el.dataset[k] != null) s += '[data-' + k + (el.dataset[k] ? '="' + CSS.escape(el.dataset[k]) + '"' : '') + ']';
   });
   return s;

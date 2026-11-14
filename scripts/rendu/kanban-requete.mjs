@@ -55,6 +55,10 @@ test('requête kanban : colonne « Attend » proposée en tableau, masquée par 
   const tri = rendu({ view: 'table', sortBy: 'att', sortDir: 'asc', colonnes: { mode: 'seulement', noms: ['titre'], ordre: [] } });
   egal(textes(resultat(tri), /<tr><td>([^<]*)<\/td>/g), ['Écrire', 'Publier', 'Relire', 'Valider'], 'tri sur Attend masquée, vides à la fin');
   vrai(fenetre({ view: 'table' }, 'cols').includes('data-qcol="#attend">'), 'case Attend décochée par défaut');
+  // d7 : le premier choix de colonnes garde « Attend » masquée ; elle n'apparaît que cochée
+  const m = monter(doc({ view: 'table' })), bq = m.d.pages[0].blocks[1], dp = m.ctx.qColonnesDispo(bq, m.ctx.queryRecords(bq, m.d, 0)).dispo;
+  egal(JSON.parse(JSON.stringify(m.ctx.qColBasculer(bq, dp, 'priorité'))), { mode: 'sauf', noms: ['#attend', 'priorité'], ordre: [] }, 'décocher Priorité');
+  egal(JSON.parse(JSON.stringify(m.ctx.qColMode(bq, dp, 'seulement'))).noms.includes('#attend'), false, 'décocher « Afficher les nouvelles colonnes »');
 });
 
 const fenetre = (q, cle) => { const { ctx, d } = monter(doc(q)); return ctx.qFenetre(d.pages[0].blocks[1], d, 0, cle); };

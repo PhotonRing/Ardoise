@@ -1,5 +1,5 @@
 // Sujet : choix des colonnes d'une requête dans la fenêtre de la puce « colonnes » (spec requetes-avancees, tickets 01 et 03).
-// Cases, mode, ordre au clavier (Alt+↑ / Alt+↓) et à la poignée ; une étape « colonnes modifiées » par geste ; loupe sur la vue
+// Cases, « Afficher les nouvelles colonnes », ordre au clavier (Alt+↑ / Alt+↓) et à la poignée ; une étape « colonnes modifiées » par geste ; loupe sur la vue
 // tableau aux colonnes choisies ; aucun réglage en lecture ; formulaire sans débordement à 360 px.
 
 const DOC = { title: 'Colonnes', pages: [{ id: 'p1', title: 'Accueil', blocks: [
@@ -90,11 +90,19 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await evalue(GLISSER('#source', 'hôte')); await attendre(80);
   e = await etat(); attendu('poignée : Source en tête', e.th.join('|') === 'Source|Hôte|Risque' && e.cases[0] === '#source+', e);
 
-  // mode « Seulement… » : mêmes colonnes ; une case cochée ensuite s'ajoute
-  await evalue(`(() => { const s = document.querySelector('.q-fen[data-id="q1"] select[data-qcolmode]'); s.value = 'seulement'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await attendre(80);
-  e = await etat(); attendu('« Seulement… » : résultat inchangé', e.th.join('|') === 'Source|Hôte|Risque' && e.colonnes.mode === 'seulement', e);
+  // plus de sélecteur de mode : les cases, puis « Afficher les nouvelles colonnes », cochée, sous la dernière à l'écran
+  const nouv = await evalue(`(() => { const f = document.querySelector('.q-fen[data-id="q1"]'), c = f.querySelector('input[data-qcolnouv]'), l = c && c.closest('label');
+    const vis = (x) => !!x && x.getClientRects().length > 0, cs = [...f.querySelectorAll('input[data-qcol]')], der = cs[cs.length - 1].closest('label').getBoundingClientRect();
+    return { mode: [...f.querySelectorAll('select')].filter(vis).length, case: vis(c) && c.checked, texte: l ? l.textContent.trim() : '', dessous: !!l && l.getBoundingClientRect().top >= der.bottom - 1 }; })()`);
+  attendu('fenêtre des colonnes : cases et « Afficher les nouvelles colonnes » cochée en bas, sans sélecteur', nouv.mode === 0 && nouv.case && nouv.texte === 'Afficher les nouvelles colonnes' && nouv.dessous, nouv);
+  // la décocher : résultat inchangé, réglage « Seulement… »
+  const pt = await evalue(`(() => { const c = document.querySelector('.q-fen[data-id="q1"] input[data-qcolnouv]'), r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
+  await attendre(80);
+  e = await etat(); attendu('« Afficher les nouvelles colonnes » décochée : résultat inchangé', e.th.join('|') === 'Source|Hôte|Risque' && e.colonnes.mode === 'seulement', e);
+  attendu('case décochée à l\'écran, focus gardé', await evalue(`(() => { const c = document.querySelector('.q-fen[data-id="q1"] input[data-qcolnouv]'); return !!c && !c.checked && document.activeElement === c; })()`), 'case');
 
-  // un Ctrl+Z défait toute la fenêtre (poignée et mode) : retour au réglage de la première fenêtre
+  // un Ctrl+Z défait toute la fenêtre (poignée et case des nouvelles colonnes) : retour au réglage de la première fenêtre
   await fermer();
   await evalue(`document.querySelector('#ui [data-ui=undo]').click()`); await attendre(80);
   e = await etat(); attendu('Ctrl+Z : retour à « Toutes sauf… », Hôte en tête', e.colonnes && e.colonnes.mode === 'sauf' && e.th.join('|') === 'Hôte|Risque|Source', e);
@@ -109,6 +117,22 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const vis = await evalue(`[...document.querySelector('.filtre[data-filtre="q1"]').parentNode.querySelectorAll('.q-res tbody tr')].filter((tr) => !tr.hidden && getComputedStyle(tr).display !== 'none').map((tr) => tr.cells[0].textContent.trim())`);
   const th = await evalue(`[...document.querySelector('.filtre[data-filtre="q1"]').parentNode.querySelectorAll('.q-res thead th')].map((t) => t.textContent.trim())`);
   attendu('loupe : filtre la vue tableau aux colonnes choisies', vis.join('|') === 'srv1|srv2' && th.join('|') === 'Hôte|Risque', { vis, th });
+
+  // d7 : requête sur les cartes sans réglage ; décocher Priorité ne fait pas apparaître « Attend » à l'écran
+  const KB = { title: 'Cartes', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'kb', type: 'kanban', cols: [{ id: 'c1', title: 'À faire', cards: [{ id: 'k1', title: 'Écrire', prio: 'p1', dep: ['k2'] }, { id: 'k2', title: 'Relire' }] }] },
+    { id: 'q1', type: 'query', title: 'Cartes', src: 'kanban', scope: 'doc', view: 'table' },
+  ] }] };
+  await evalue(`window.ardoise.load(${JSON.stringify(KB)})`); await attendre(80);
+  if (!(await evalue(MODE))) { await evalue(basculer); await attendre(80); }
+  const entetes = `[...document.querySelectorAll('.blk[data-id="q1"] .q-res thead th')].filter((t) => t.getClientRects().length > 0).map((t) => t.textContent.replace(/ [↑↓]$/, '').trim()).join('|')`;
+  attendu('cartes : Attend masquée par défaut', !(await evalue(entetes)).includes('Attend'), await evalue(entetes));
+  await ouvrir('q1');
+  await evalue(`${caseDe('priorité')}.click()`); await attendre(80);
+  attendu('Priorité décochée : Attend toujours masquée', (await evalue(entetes)) === 'Titre|Colonne|Échéance|Responsable|Source', await evalue(entetes));
+  await evalue(`${caseDe('#attend')}.click()`); await attendre(80);
+  attendu('Attend cochée : affichée', (await evalue(entetes)).includes('Attend'), await evalue(entetes));
+  await fermer(); await evalue(basculer); await attendre(80);   // retour en lecture, comme avant cette partie
 
   // téléphone : ligne de puces et fenêtre sans défilement de côté
   await ecran(360, true); await evalue(basculer); await attendre(120); await ouvrir('q1');

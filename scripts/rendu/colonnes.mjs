@@ -73,7 +73,12 @@ test('colonnes : cases à cocher (✓, Élément, Source) et modèles diamant', 
 test('colonnes : réglage dans la fenêtre de la puce « colonnes », rien en lecture ni à l\'export', () => {
   const m = monter(doc({ colonnes: { mode: 'sauf', noms: ['état'], ordre: ['risque'] } })), bq = m.d.pages[0].blocks.find((x) => x.id === 'q');
   const ed = m.ctx.qFenetre(bq, m.d, 0, 'cols');
-  vrai(ed.includes('data-qcolmode'), 'mode des colonnes');
+  vrai(!ed.includes('data-qcolmode'), 'plus de sélecteur de mode');
+  vrai(/<input type="checkbox" data-qcolnouv checked> Afficher les nouvelles colonnes/.test(ed), '« Toutes sauf… » : « Afficher les nouvelles colonnes » cochée');
+  const seul = (ch) => { const m2 = monter(doc({ colonnes: ch })); return m2.ctx.qFenetre(m2.d.pages[0].blocks.find((x) => x.id === 'q'), m2.d, 0, 'cols'); };
+  vrai(/<input type="checkbox" data-qcolnouv> Afficher les nouvelles colonnes/.test(seul({ mode: 'seulement', noms: ['hôte'], ordre: [] })), '« Seulement… » : décochée');
+  vrai(/data-qcolnouv checked/.test(seul(undefined)), 'sans réglage : cochée');
+  vrai(ed.indexOf('data-qcolnouv') > ed.lastIndexOf('data-qcol="'), 'la case vient après les colonnes');
   egal([...ed.matchAll(/data-qcol="([^"]*)"( checked)?/g)].map((m) => m[1] + (m[2] ? '+' : '-')), ['risque+', 'hôte+', 'état-', '#source+'], 'cases dans l\'ordre choisi');
   vrai(!rendu({}).includes('data-qcol') && !rendu({}, null, 'export').includes('data-qcol'), 'lecture et export : aucun réglage');
 });
@@ -91,7 +96,6 @@ test('colonnes, gestes : décocher part de « Toutes sauf… », recocher, mode 
   b.colonnes = { mode: 'seulement', noms: ['hôte'], ordre: [] };
   egal(pur(ctx.qColMode(b, dp, 'sauf')), { mode: 'sauf', noms: ['état', 'risque', '#source'], ordre: [] }, 'sauf : les cachées');
   egal(pur(ctx.qColBasculer(b, dp, 'risque')), { mode: 'seulement', noms: ['hôte', 'risque'], ordre: [] }, 'seulement : cocher ajoute');
-  egal(pur(ctx.qColMode(b, dp, 'toutes')), { mode: 'toutes', noms: [], ordre: [] });
 });
 
 test('colonnes, gestes : déplacer une colonne range les clés ; Source n\'y entre que déplacée elle-même', () => {
