@@ -380,7 +380,7 @@ function qCarteKanban(b, d, r) {
     else {
       fin();
       if (c.cle === 'texte' && !isBlank(k.html)) parts.push('<div class="kb-tx">' + R(k.html) + '</div>');
-      else if (c.cle === 'attend') parts.push(kbAttendHtml(r.x.blk, r.attend, r.bloquee, true));
+      else if (c.cle === 'attend') parts.push(kbLigneAttend(r.x.blk, r.attend, r.bloquee, true));
       else if (c.cle === 'source') parts.push(qSource(d, r.x));
     }
     meta = meta.filter(Boolean);
@@ -544,7 +544,7 @@ function qRegroupee(b, d, ctx, recs) {
 var Q_CH_PALIERS = [6, 16, 28, 42, 100];   // part de la couleur d'accent de chaque palier, en % (page.css : .q-ch-p0 à .q-ch-p4)
 // nombre d'une cellule (lu comme pour le tri) ; une valeur non numérique compte 0
 function qNombre(html) { var n = qLireNombre(htmlText(String(html || ''))); return n == null ? 0 : n; }
-function qNombreFr(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
+function qNombreAffiche(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
 function qChReglage(b, recs) {
   // colonnes X, Y, Z (facultative) et N (facultative) retenues, clés connues seulement ; X absent : première colonne, Y absent : la suivante
   var dispo = qColonnesDispo(b, recs).dispo.filter(function (c) { return !c.source; }), la = function (k) { return dispo.some(function (c) { return c.cle === k; }); };
@@ -587,12 +587,12 @@ function qChaleurVue(b, d, ctx, recs) {
     return '<div class="q-ch-tip" hidden><ul class="q-ch-l">' + l + '</ul>' + (g.lignes.length > max ? '<p class="muted">et ' + (g.lignes.length - max) + ' autres</p>' : '') + '</div>';
   };
   var boite = function (g, cls) {
-    return '<div class="' + cls + ' q-ch-p' + qChPalier(g.total, m.min, m.max) + '" tabindex="0"><span class="q-ch-n">' + nomV(g) + '</span> <span class="q-ch-v">' + qNombreFr(g.total) + '</span>' + bulle(g);
+    return '<div class="' + cls + ' q-ch-p' + qChPalier(g.total, m.min, m.max) + '" tabindex="0"><span class="q-ch-n">' + nomV(g) + '</span> <span class="q-ch-v">' + qNombreAffiche(g.total) + '</span>' + bulle(g);
   };
-  var leg = '<div class="q-ch-leg"><span class="q-ch-lv">' + qNombreFr(m.min) + '</span>' + Q_CH_PALIERS.map(function (p, i) { return '<span class="q-ch-sw q-ch-p' + i + '"></span>'; }).join('') +
-    '<span class="q-ch-lv">' + qNombreFr(m.max) + '</span><span class="muted">' + (ch.n ? 'somme de ' + esc(ch.nom(ch.n)) : 'nombre de lignes') + '</span></div>';
+  var leg = '<div class="q-ch-leg"><span class="q-ch-lv">' + qNombreAffiche(m.min) + '</span>' + Q_CH_PALIERS.map(function (p, i) { return '<span class="q-ch-sw q-ch-p' + i + '"></span>'; }).join('') +
+    '<span class="q-ch-lv">' + qNombreAffiche(m.max) + '</span><span class="muted">' + (ch.n ? 'somme de ' + esc(ch.nom(ch.n)) : 'nombre de lignes') + '</span></div>';
   return '<div class="q-ch-wrap"><div class="q-ch">' + m.colonnes.map(function (col) {
-    return '<section class="q-ch-col"><h4 class="q-ch-t">' + nomV(col) + '<span class="kb-n">' + qNombreFr(col.total) + '</span></h4>' + col.cases.map(function (c) {
+    return '<section class="q-ch-col"><h4 class="q-ch-t">' + nomV(col) + '<span class="kb-n">' + qNombreAffiche(col.total) + '</span></h4>' + col.cases.map(function (c) {
       return boite(c, 'q-ch-c') + (c.sous.length ? '<div class="q-ch-sous">' + c.sous.map(function (s) { return boite(s, 'q-ch-s') + '</div>'; }).join('') + '</div>' : '') + '</div>';
     }).join('') + '</section>';
   }).join('') + '</div></div>' + leg;
@@ -751,13 +751,13 @@ function qFenetre(b, d, pi, cle) {
   if (cle === 'view') {
     var vues = [['table', '▦'], ['list', '≡'], ['kanban', '▥'], ['count', '#']].concat(src === 'table' ? [['regroupee', '⊞'], ['chaleur', '▩']] : []);
     var reg = v === 'regroupee' ? qRegReglage(b, queryRecords(b, d, pi)) : null, regl = '';
-    if (reg) regl += h('Regrouper') + '<div class="q-fen-b">' + qRegForm(b, reg) + '</div>';
-    if (v === 'chaleur') regl += h('Carte de chaleur') + '<div class="q-fen-b">' + qChForm(b, qChReglage(b, queryRecords(b, d, pi))) + '</div>';   // ni tri, ni limite, ni choix des colonnes
+    if (reg) regl += h('Regrouper') + '<div class="q-fen-b">' + qFormulaireRegroupement(b, reg) + '</div>';
+    if (v === 'chaleur') regl += h('Carte de chaleur') + '<div class="q-fen-b">' + qFormulaireChaleur(b, qChReglage(b, queryRecords(b, d, pi))) + '</div>';   // ni tri, ni limite, ni choix des colonnes
     if (v === 'kanban' && src !== 'check' && src !== 'kanban') regl += '<div class="q-fen-b"><label>regroupées par <select data-act="set" data-prop="groupBy">' + qSortOptions(b, queryRecords(b, d, pi)).filter(function (x) { return x[0] !== 'src'; }).map(function (x, n) { return o(x[0], b.groupBy || (n === 0 ? x[0] : ''), esc(x[1])); }).join('') + '</select></label></div>';
     if (v !== 'kanban' && v !== 'count' && v !== 'chaleur') regl += '<div class="q-fen-b"><label>limiter à <select data-act="set" data-prop="limit">' + [0, 3, 5, 10, 20, 50, 100].map(function (n) { return o(n, +b.limit || 0, n ? n + (reg ? ' groupes' : ' résultats') : 'tous'); }).join('') + '</select></label></div>';
     return h('Vue') + vues.map(function (x) { return choix('view', x[0], v, Q_VUES[x[0]], x[1]); }).join('') + regl;
   }
-  if (cle === 'cols') return v === 'kanban' && src === 'kanban' ? h('Champs des cartes') + qChampsForm(b) : h('Colonnes affichées') + qColForm(b, queryRecords(b, d, pi));
+  if (cle === 'cols') return v === 'kanban' && src === 'kanban' ? h('Champs des cartes') + qFormulaireChamps(b) : h('Colonnes affichées') + qFormulaireColonnes(b, queryRecords(b, d, pi));
   if (cle === 'sort') {
     var opts = v === 'regroupee' ? (function (rg) { return [['c:' + rg.nom(rg.x).toLowerCase(), rg.nom(rg.x)], ['#n', 'Nombre de lignes']]; })(qRegReglage(b, queryRecords(b, d, pi))) : qSortOptions(b, queryRecords(b, d, pi));
     var tri = qTriBloc(b, d, pi);
@@ -766,7 +766,7 @@ function qFenetre(b, d, pi, cle) {
   }
   return '';
 }
-function qChampsForm(b) {
+function qFormulaireChamps(b) {
   // champs des cartes en vue kanban : le titre est fixe, puis une ligne par champ (poignée, case) ; gestes : 14-colonnes-requete.js
   return '<div class="q-colonnes"><span class="q-lbl">Champs des cartes</span> <span class="muted q-hint">(titre toujours affiché)</span>' +
     '<ol class="q-cols" data-qliste="champs">' + qChampsRanges(b).map(function (c) {
@@ -774,7 +774,7 @@ function qChampsForm(b) {
         '<label><input type="checkbox" data-qchamp="' + esc(c.cle) + '"' + (qChampVisible(b, c.cle) ? ' checked' : '') + '> ' + esc(c.nom) + '</label></li>';
     }).join('') + '</ol></div>';
 }
-function qRegForm(b, rg) {
+function qFormulaireRegroupement(b, rg) {
   // vue regroupée : colonne X (select), colonnes Y (cases, gestes : 14-colonnes-requete.js), forme
   var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + label + '</option>'; };
   return '<label>par <select data-act="set" data-prop="regX" title="Colonne qui regroupe">' + rg.dispo.map(function (c) { return o(c.cle, rg.x, esc(c.nom)); }).join('') + '</select></label>' +
@@ -783,7 +783,7 @@ function qRegForm(b, rg) {
     }).join('') + '</div>' +
     '<select data-act="set" data-prop="regForme" title="Forme des groupes">' + o('fiches', b.regForme === 'tableau' ? '' : 'fiches', 'en fiches') + o('tableau', b.regForme, 'en tableau') + '</select>';
 }
-function qChForm(b, ch) {
+function qFormulaireChaleur(b, ch) {
   // carte de chaleur : colonne X des colonnes de la matrice, Y des cases, Z facultative des sous-cases, N facultative de la somme
   var o = function (v, cur, label) { return '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + label + '</option>'; };
   var sel = function (prop, titre, cur, vide, sauf) {
@@ -795,7 +795,7 @@ function qChForm(b, ch) {
     '<label>sous-cases ' + sel('chZ', 'Sous-niveau de chaque case', ch.z, 'aucun sous-niveau', [ch.x, ch.y]) + '</label>' +
     '<label>couleur selon ' + sel('chN', 'Couleur des cases', ch.n, 'nombre de lignes', []) + '</label>';
 }
-function qColForm(b, recs) {
+function qFormulaireColonnes(b, recs) {
   // choix des colonnes : une ligne par colonne disponible dans l'ordre choisi (poignée, case cochée = affichée), puis « Afficher les
   // nouvelles colonnes » (cochée : mode « sauf », décochée : « seulement ») ; gestes : 14-colonnes-requete.js
   return '<div class="q-colonnes"><ol class="q-cols">' + qColPlacees(b, qColonnesDispo(b, recs, b.view === 'list').dispo).map(function (c) {

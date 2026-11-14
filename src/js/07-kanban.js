@@ -61,10 +61,10 @@ function kbCardTitle(k) { return textOf(k.title) || 'Carte sans titre'; }
 // lignes « Attend » et « Bloque » ; titres cliquables hors export (défilement jusqu'à la carte)
 function kbDepNames(b, list, isStatic) { return list.map(function (other) { var n = esc(kbCardTitle(other)); return isStatic ? '<span class="kb-dref">' + n + '</span>' : '<button type="button" class="kb-dref" data-kbgo="' + b.id + '|' + other.id + '">' + n + '</button>'; }).join(', '); }
 // ligne « Attend » seule (partagée avec les cartes d'une requête, 07-requetes.js) ; rien sans carte attendue
-function kbAttendHtml(b, waits, blocked, isStatic) { return waits.length ? '<div class="kb-wait' + (blocked ? ' blocked' : '') + '">Attend : ' + kbDepNames(b, waits, isStatic) + '</div>' : ''; }
+function kbLigneAttend(b, waits, blocked, isStatic) { return waits.length ? '<div class="kb-wait' + (blocked ? ' blocked' : '') + '">Attend : ' + kbDepNames(b, waits, isStatic) + '</div>' : ''; }
 function kbDepLines(b, k, index, isStatic) {
   var r = kbDeps(b, k.id, index);
-  return { blocked: r.blocked, html: kbAttendHtml(b, r.waits, r.blocked, isStatic) + (r.blocks.length ? '<div class="kb-blocks">Bloque : ' + kbDepNames(b, r.blocks, isStatic) + '</div>' : '') };
+  return { blocked: r.blocked, html: kbLigneAttend(b, r.waits, r.blocked, isStatic) + (r.blocks.length ? '<div class="kb-blocks">Bloque : ' + kbDepNames(b, r.blocks, isStatic) + '</div>' : '') };
 }
 // colonne réduite : état pour soi ({ red, base }) tant que le fichier garde la valeur base, sinon le champ du fichier
 function kbCollapsed(c, ctx) { var v = (ctx.kbCols || {})[c.id], f = !!c.collapsed; return v && v.base === f ? !!v.red : f; }

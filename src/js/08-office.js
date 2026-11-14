@@ -250,17 +250,17 @@ function officeRequete(b, d, pi, S, txt, para) {
     var ch = qChReglage(b, recs), m = qChaleur(recs, ch.x, ch.y, ch.z, ch.n);
     var nomC = function (g) { return g.vide ? [txt('(vide)')] : S(g.valeur); };
     var pile = m.colonnes.map(function (col) { return col.cases.reduce(function (a, c) { return a.concat([{ g: c }], c.sous.map(function (x) { return { g: x, sous: true }; })); }, []); });
-    var rangs = pile.reduce(function (n, p) { return Math.max(n, p.length); }, 0), lignes = [m.colonnes.map(function (col) { return [para([txt(htmlText(col.vide ? '(vide)' : col.valeur).replace(/\s+/g, ' ').trim() + ' (' + qNombreFr(col.total) + ')')])]; })], fonds = [m.colonnes.map(function () { return null; })];
+    var rangs = pile.reduce(function (n, p) { return Math.max(n, p.length); }, 0), lignes = [m.colonnes.map(function (col) { return [para([txt(htmlText(col.vide ? '(vide)' : col.valeur).replace(/\s+/g, ' ').trim() + ' (' + qNombreAffiche(col.total) + ')')])]; })], fonds = [m.colonnes.map(function () { return null; })];
     for (var ri = 0; ri < rangs; ri++) {
       lignes.push(pile.map(function (p) {
         var x = p[ri]; if (!x) return [];
-        var pal = qChPalier(x.g.total, m.min, m.max), segs = (x.sous ? [txt('› ')] : []).concat(nomC(x.g), [txt('  ' + qNombreFr(x.g.total))]);
+        var pal = qChPalier(x.g.total, m.min, m.max), segs = (x.sous ? [txt('› ')] : []).concat(nomC(x.g), [txt('  ' + qNombreAffiche(x.g.total))]);
         return [para(officeMettreForme(segs, 'couleur', pal === 4 ? '#ffffff' : OFFICE_CLAIR.fg))];
       }));
       fonds.push(pile.map(function (p) { return p[ri] ? officeChaleurTeinte(d, qChPalier(p[ri].g.total, m.min, m.max)) : null; }));
     }
     out.push({ t: 'tableau', entete: true, lignes: lignes, fonds: fonds });
-    out.push(para([txt('Échelle : de ' + qNombreFr(m.min) + ' (clair) à ' + qNombreFr(m.max) + ' (foncé), ' + (ch.n ? 'somme de ' + ch.nom(ch.n) : 'nombre de lignes'), { couleur: OFFICE_CLAIR.muted })]));
+    out.push(para([txt('Échelle : de ' + qNombreAffiche(m.min) + ' (clair) à ' + qNombreAffiche(m.max) + ' (foncé), ' + (ch.n ? 'somme de ' + ch.nom(ch.n) : 'nombre de lignes'), { couleur: OFFICE_CLAIR.muted })]));
     return out;
   }
   recs = qSorted(b, d, ctx, recs);
