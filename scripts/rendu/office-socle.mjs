@@ -29,6 +29,8 @@ export function verifierSocle(html, nom, couleursEnPlus = []) {
   vrai(!/Plex|Archivo|Arial/.test(html), 'police d\'Ardoise ou Arial (' + ou + ')');
   // Writer prend la première valeur d'un raccourci margin pour la marge gauche (margin:12pt 0 6pt décale le bloc) : raccourci à 0 en tête, sinon margin-top
   for (const m of html.matchAll(/(?:^|[;"])margin:([^;"]*)/g)) vrai(/^0(pt|px)?(\s|$)/.test(m[1].trim()), 'marge en raccourci sans 0 en tête « ' + m[1] + ' » (' + nom + ')');
+  // Writer ignore tout ce qui suit un letter-spacing dans un style (bordures, couleur) : il est le dernier du style
+  for (const m of html.matchAll(/style="([^"]*)"/g)) vrai(!/letter-spacing:[^;]*;\s*\S/.test(m[1]), 'letter-spacing suivi d’autres propriétés « ' + m[1] + ' » (' + nom + ')');
   for (const m of html.matchAll(/#[0-9a-f]{6}\b/gi)) vrai(CLAIRES.has(m[0].toLowerCase()) || couleursEnPlus.includes(m[0].toLowerCase()), 'couleur hors page.css ' + m[0] + ' (' + nom + ')');
 }
 

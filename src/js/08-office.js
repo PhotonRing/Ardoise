@@ -320,7 +320,7 @@ function officeRequete(b, d, pi, S, txt, para) {
 var OFFICE_POLICES = { texte: "'Segoe UI',sans-serif", titre: "'Segoe UI Semibold','Segoe UI',sans-serif", mono: 'Consolas,monospace' };
 function officePt(px) { return Math.round(px * 75) / 100 + 'pt'; }   // 1 px = 0,75 pt
 // étiquette en petites capitales grises à espacement large (police mono d'Ardoise, 11 px, .06em) : clés, en-têtes, sommets, titre du sommaire
-var OFFICE_ETIQUETTE = 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';letter-spacing:.5pt;text-transform:uppercase;color:' + OFFICE_CLAIR.muted + ';';
+var OFFICE_ETIQUETTE = 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';text-transform:uppercase;color:' + OFFICE_CLAIR.muted + ';letter-spacing:.5pt;';   // letter-spacing en dernier : Writer ignore ce qui le suit
 // capitales écrites dans le texte (Writer ignore text-transform) ; copies : les segments reçus ne changent pas
 function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte) c.texte = c.texte.toUpperCase(); return c; }); }
 function officeTable(lignes, style) { return '<table width="100%" style="border-collapse:collapse;width:100%;' + (style || '') + '">' + lignes + '</table>'; }

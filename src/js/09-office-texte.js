@@ -9,7 +9,7 @@ function officeTxtTitre(tag, px, contenu, x) {
 function officeTxtFilet(x, avant, apres) { return '<p style="margin-top:' + avant + ';margin-bottom:' + apres + ';border-top:1px solid ' + x.C.line + ';font-size:1pt;line-height:1pt">&nbsp;</p>'; }
 OFFICE_RENDUS.header = function (b, x) {
   var h = '';
-  if (!b.noEyebrow && !officeVide(x.S(b.eyebrow))) h += '<p style="' + OFFICE_TXT_P + 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(12) + ';letter-spacing:.72pt;text-transform:uppercase;color:' + x.acc + '">' + x.segs(officeMajuscules(x.S(b.eyebrow))) + '</p>';
+  if (!b.noEyebrow && !officeVide(x.S(b.eyebrow))) h += '<p style="' + OFFICE_TXT_P + 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(12) + ';text-transform:uppercase;color:' + x.acc + ';letter-spacing:.72pt">' + x.segs(officeMajuscules(x.S(b.eyebrow))) + '</p>';
   // h1 d'Ardoise : 800, 40 px au bureau
   h += '<h1 style="margin:0 0 6pt;font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(40) + ';font-weight:bold;line-height:1.1;color:' + x.C.fg + '">' + x.segs(x.S(b.title)) + '</h1>';
   if (!b.noLede && !officeVide(x.S(b.lede))) h += '<p style="' + OFFICE_TXT_P + 'font-size:' + officePt(15) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.lede)) + '</p>';
