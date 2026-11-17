@@ -23,9 +23,8 @@ test('office (tableaux) : tableau à cadre et filets entre les lignes, en-tête 
   vrai(!/<th/.test(html), 'pas de <th> (Writer le centre en gras) : ' + html);
   const td = cellules(html);
   egal(td.length, 6, 'six cellules');
-  // en-tête : Consolas 8,25 pt gris, capitales écrites, police posée sur la cellule
-  // espacement des lettres sur un <span> : dans le style d'une cellule, Writer perd tout ce qui le suit (bordures, couleur)
-  for (const [i, t] of [[0, 'NOM'], [1, 'ÉTAT']]) vrai(new RegExp('^<td[^>]*style="[^"]*font-family:Consolas,monospace;font-size:8\\.25pt;[^"]*color:#566573[^"]*"><span style="letter-spacing:\\.5pt">' + t + '</span></td>$').test(td[i]), 'en-tête : ' + td[i]);
+  // en-tête : étiquette du socle (Consolas 8,25 pt gris, capitales écrites) ; espacement des lettres sur le <span>, jamais dans le style d'une cellule
+  for (const [i, t] of [[0, 'NOM'], [1, 'ÉTAT']]) vrai(new RegExp('^<td[^>]*style="[^"]*font-size:8\\.25pt;[^"]*"><span style="font-family:Consolas,monospace;font-size:8\\.25pt;color:#566573;letter-spacing:0\\.5pt">' + t + '</span></td>$').test(td[i]), 'en-tête : ' + td[i]);
   vrai(!/<td[^>]*letter-spacing/.test(html), 'pas d\'espacement des lettres dans le style d\'une cellule');
   // filets entre les lignes ; cadre : haut de la 1re ligne, bords gauche et droit, bas de la dernière (filet sous la dernière ligne)
   for (const i of [0, 1, 2, 3]) vrai(/border-bottom:1px solid #d9e0e5/.test(td[i]), 'filet sous la ligne : ' + td[i]);
@@ -58,8 +57,8 @@ test('office (code) : couleurs des jetons reprises de page.css (bloc sombre et t
 test('office (code) : « Sombre » dans une cellule code-bg, texte code-fg, coloration en ligne, nom de fichier', () => {
   const { html, texte } = office('k1');
   // bordure de la couleur du fond : sans bordure, Writer ignore le retrait intérieur de la cellule
-  vrai(/<table width="100%"[^>]*><tr><td width="100%" style="[^"]*background:#14202b;[^"]*border:1px solid #14202b[^"]*">/.test(html), 'cellule sombre : ' + html);
-  vrai(/<p style="[^"]*font-family:Consolas,monospace;font-size:8\.25pt;[^"]*color:#7f93a3;letter-spacing:\.5pt">A\.SH<\/p>/.test(html), 'nom en capitales : ' + html);
+  vrai(/<table width="100%"[^>]*><tr><td valign="top" width="100%" style="[^"]*background:#14202b;[^"]*border:1px solid #14202b[^"]*">/.test(html), 'cellule sombre : ' + html);
+  vrai(/<p style="[^"]*"><span style="font-family:Consolas,monospace;font-size:8\.25pt;color:#7f93a3;letter-spacing:0\.5pt">A\.SH<\/span><\/p>/.test(html), 'nom en capitales : ' + html);
   vrai(/<pre style="[^"]*font-family:Consolas,monospace;font-size:9\.38pt;[^"]*color:#e4ebf0[^"]*">/.test(html), 'code clair sur sombre : ' + html);
   vrai(html.includes('<span style="color:' + TK_SOMBRE.c + ';font-style:italic"># liste</span>'), 'commentaire');
   vrai(html.includes('<span style="color:' + TK_SOMBRE.f + '">echo</span>'), 'commande');

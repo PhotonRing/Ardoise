@@ -1,8 +1,6 @@
-/* ---------- Copier pour Office ----------
-   HTML au style d'Ardoise et marqué (08-office.js, 09-office-*.js, 05-presse-papier.js) et texte brut d'un bloc, sans image :
-   avec une image dans le même élément, Writer sous Linux ne colle plus que l'image. Une carte ou une chronologie part en image
-   PNG et texte brut, dessinée hors écran en thème clair à la largeur de la page imprimée, sans bibliothèque.
-   Hors historique : rien n'est modifié. */
+/* ---------- Copier pour Office : HTML au style d'Ardoise et marqué (08-office.js, 09-office-*.js) et texte brut, hors historique ----------
+   Sans image à côté (Writer sous Linux ne collerait que l'image) ; carte et chronologie partent en PNG et texte brut,
+   dessinées hors écran en thème clair à la largeur de la page imprimée. */
 function copierPourOffice(b) {
   var refus = function () { toast('Le presse-papier a refusé la copie'); };
   if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem !== 'function') { refus(); return Promise.resolve(false); }

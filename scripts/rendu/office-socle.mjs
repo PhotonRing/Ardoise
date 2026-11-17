@@ -31,6 +31,13 @@ export function verifierSocle(html, nom, couleursEnPlus = []) {
   for (const m of html.matchAll(/(?:^|[;"])margin:([^;"]*)/g)) vrai(/^0(pt|px)?(\s|$)/.test(m[1].trim()), 'marge en raccourci sans 0 en tête « ' + m[1] + ' » (' + nom + ')');
   // Writer ignore tout ce qui suit un letter-spacing dans un style (bordures, couleur) : il est le dernier du style
   for (const m of html.matchAll(/style="([^"]*)"/g)) vrai(!/letter-spacing:[^;]*;\s*\S/.test(m[1]), 'letter-spacing suivi d’autres propriétés « ' + m[1] + ' » (' + nom + ')');
+  // Writer remet l'espacement par défaut sur une marge sans unité (margin:0) et lit mal une valeur en .N : 0pt, 0.5pt
+  for (const m of html.matchAll(/(?:^|[;"])margin(?:-\w+)?:([^;"]*)/g)) vrai(/\d(pt|px|em|%)/.test(m[1]), 'marge sans unité « ' + m[0] + ' » (' + nom + ')');
+  for (const m of html.matchAll(/style="([^"]*)"/g)) vrai(!/(^|[\s:,(])\.\d/.test(m[1]), 'valeur commençant par un point « ' + m[1] + ' » (' + nom + ')');
+  // Writer ignore vertical-align dans le style : seul l'attribut valign cale une cellule
+  for (const m of html.matchAll(/<\w+[^>]*vertical-align[^>]*>/g)) vrai(/\svalign="/.test(m[0]), 'vertical-align sans valign ' + m[0] + ' (' + nom + ')');
+  // Word fusionne deux tableaux qui se suivent : un paragraphe les sépare
+  vrai(!/<\/table>\s*<table/.test(html), 'deux tableaux qui se suivent (' + ou + ')');
   for (const m of html.matchAll(/#[0-9a-f]{6}\b/gi)) vrai(CLAIRES.has(m[0].toLowerCase()) || couleursEnPlus.includes(m[0].toLowerCase()), 'couleur hors page.css ' + m[0] + ' (' + nom + ')');
 }
 

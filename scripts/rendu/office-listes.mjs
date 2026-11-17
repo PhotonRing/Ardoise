@@ -61,9 +61,9 @@ test('office (listes) : liste à cocher dans l\'ordre de l\'écran (cochées d\'
 
 test('office (listes) : sommaire dans un cadre bordé à trait d\'accent, titre en étiquette, numéros accent', () => {
   const { html, texte } = office('sm');
-  vrai(/^<div[^>]*><table width="100%" style="[^"]*"><tr><td width="100%" style="[^"]*background:#ffffff;[^"]*border:1px solid #d9e0e5;[^"]*border-left:3px solid #4848c0[^"]*">/.test(html), 'cadre : ' + html);
-  vrai(/<p style="[^"]*font-family:Consolas,monospace;[^"]*font-size:8\.25pt;[^"]*color:#566573;[^"]*">SOMMAIRE<\/p>/.test(html), 'titre en étiquette : ' + html);
-  const ps = [...html.matchAll(/<p style="([^"]*)">(?!SOMMAIRE)(.*?)<\/p>/g)];
+  vrai(/^<div[^>]*><table width="100%" style="[^"]*"><tr><td valign="top" width="100%" style="[^"]*background:#ffffff;[^"]*border:1px solid #d9e0e5;[^"]*border-left:3px solid #4848c0[^"]*">/.test(html), 'cadre : ' + html);
+  vrai(/<p style="[^"]*"><span style="font-family:Consolas,monospace;font-size:8\.25pt;color:#566573;[^"]*">SOMMAIRE<\/span><\/p>/.test(html), 'titre en étiquette : ' + html);
+  const ps = [...html.matchAll(/<p style="([^"]*)">(?!<span[^>]*>SOMMAIRE)(.*?)<\/p>/g)];
   egal(ps.length, 3, html);
   vrai(/^<span style="font-family:Consolas,monospace;font-size:9pt;font-weight:600;color:#4848c0">1<\/span>&nbsp;&nbsp;Isoler$/.test(ps[0][2]), 'numéro accent : ' + ps[0][2]);
   vrai(/margin-left:16\.5pt/.test(ps[1][1]) && /font-size:10\.5pt/.test(ps[1][1]) && ps[1][2] === 'Détail', 'sous-entrée en retrait, plus petite : ' + ps[1][0]);

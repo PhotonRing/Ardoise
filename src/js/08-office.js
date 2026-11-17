@@ -314,18 +314,31 @@ function officeRequete(b, d, pi, S, txt, para) {
   return out.concat(plus);
 }
 
-/* Socle du style d'Ardoise dans le HTML collé : polices présentes sous Windows avec remplaçant générique, tailles de page.css en points,
-   couleurs du thème clair et accent de la palette ; formes en fonds de cellules et bordures de tableaux pleine largeur (Writer : attribut width).
-   Writer lit la première valeur d'un raccourci margin comme marge gauche : raccourci à 0 en tête, sinon margin-top / margin-bottom. */
+/* Socle du style d'Ardoise dans le HTML collé : polices de Windows avec remplaçant, tailles de page.css en points, couleurs du thème clair et accent ;
+   formes en fonds de cellules et bordures de tableaux pleine largeur (Writer : attribut width). Pièges de Writer : marges avec unité (0pt),
+   raccourci margin à 0 en tête, pas de valeur en .N, valign en attribut, letter-spacing en dernier, un paragraphe entre deux tableaux. */
 var OFFICE_POLICES = { texte: "'Segoe UI',sans-serif", titre: "'Segoe UI Semibold','Segoe UI',sans-serif", mono: 'Consolas,monospace' };
+var OFFICE_P = 'margin:0pt 0pt 6pt;';   // paragraphe du corps
 function officePt(px) { return Math.round(px * 75) / 100 + 'pt'; }   // 1 px = 0,75 pt
-// étiquette en petites capitales grises à espacement large (police mono d'Ardoise, 11 px, .06em) : clés, en-têtes, sommets, titre du sommaire
-var OFFICE_ETIQUETTE = 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';text-transform:uppercase;color:' + OFFICE_CLAIR.muted + ';letter-spacing:.5pt;';   // letter-spacing en dernier : Writer ignore ce qui le suit
 // capitales écrites dans le texte (Writer ignore text-transform) ; copies : les segments reçus ne changent pas
 function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte) c.texte = c.texte.toUpperCase(); return c; }); }
+// étiquette (clés, en-têtes, sommets, titres de sommaire et de requête, surtitre) : capitales écrites en police mono d'Ardoise, grise, espacement large
+// en dernier (Writer ignore ce qui suit letter-spacing) ; o : { px (11), couleur, espace, marges : style du paragraphe qui l'entoure, sans : en ligne }
+function officeEtiquette(segs, x, o) {
+  o = o || {};
+  var t = officePt(o.px || 11), h = '<span style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + t + ';color:' + (o.couleur || x.C.muted) + ';letter-spacing:' + (o.espace || '0.5pt') + '">' + x.segs(officeMajuscules(segs)) + '</span>';
+  return o.marges ? '<p style="' + o.marges + ';font-size:' + t + '">' + h + '</p>' : h;
+}
+// segments d'un texte simple (libellé, nom) pour officeEtiquette
+function officeTexteSegs(texte) { return [{ texte: String(texte == null ? '' : texte) }]; }
+// image ramenée à une largeur : [largeur, hauteur]
+function officeEchelle(l, h, max) { return l > max && h ? [max, Math.round(h * max / l)] : [l, h]; }
 function officeTable(lignes, style) { return '<table width="100%" style="border-collapse:collapse;width:100%;' + (style || '') + '">' + lignes + '</table>'; }
-// cellule : police du texte posée sur elle (Writer ne fait pas hériter la police de l'enveloppe dans un tableau), style reçu ensuite
-function officeCellule(contenu, style, largeur) { return '<td' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';' + (style || '') + '">' + contenu + '</td>'; }
+// cellule : police du texte posée sur elle (Writer ne la fait pas hériter dans un tableau), calée en haut sauf valign reçu (attribut : Writer ignore le style)
+function officeCellule(contenu, style, largeur, valign) {
+  var v = valign || 'top';
+  return '<td valign="' + v + '"' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';vertical-align:' + v + ';' + (style || '') + '">' + contenu + '</td>';
+}
 // segments → HTML : formes, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte
 function officeSegmentsHtml(arr, d) {
   var C = OFFICE_CLAIR, acc = officeAccent(d);
@@ -346,7 +359,7 @@ function officeSegmentsHtml(arr, d) {
 function officeEnveloppe(h) { return '<div style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';line-height:1.6;color:' + OFFICE_CLAIR.fg + ';max-width:' + OFFICE_LARGEUR + 'px">' + h + '</div>'; }
 // rendu stylé par type de bloc : chaque famille (09-office-*.js) inscrit ses types, function (b, x) → HTML sans enveloppe
 var OFFICE_RENDUS = {};
-// point d'entrée du HTML de Copier pour Office ; un type sans rendu inscrit passe par ses éléments neutres
+// point d'entrée du HTML de Copier pour Office ; carte et chronologie (sans rendu inscrit) passent par leurs éléments neutres
 function officeHtmlBloc(b, d, opts) { return officeEnveloppe(officeHtmlContenu(b, d, opts)); }
 function officeHtmlContenu(b, d, opts) {
   opts = opts || {};
@@ -356,66 +369,18 @@ function officeHtmlContenu(b, d, opts) {
   return rendu(b, { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
     S: function (html) { return officeSegments(R(html), d); }, segs: function (arr) { return officeSegmentsHtml(arr, d); } });
 }
-
-/* Éléments neutres → HTML à styles en ligne (aucune classe), thème clair, polices du socle */
-function officeHtml(elts, d) { return officeEnveloppe(officeHtmlElements(elts, d)); }
+// éléments neutres de la carte et de la chronologie → HTML : paragraphe, liste à puces, image fournie
 function officeHtmlElements(elts, d) {
-  var C = OFFICE_CLAIR, acc = officeAccent(d)[0];
   var segs = function (arr) { return officeSegmentsHtml(arr, d); };
-  var P = 'margin:0 0 6pt;', PARA = {
-    surtitre: 'font-size:9pt;letter-spacing:1px;text-transform:uppercase;color:' + acc + ';', chapeau: 'font-size:12pt;color:' + C.muted + ';',
-    pied: 'font-size:9pt;color:' + C.muted + ';border-top:1px solid ' + C.line + ';padding-top:6pt;', legende: 'font-size:9pt;font-style:italic;color:' + C.muted + ';'
-  };
-  var TITRES = [['h1', officePt(40)], ['h1', officePt(21)], ['h2', officePt(15)], ['h3', officePt(15)]];
-  var cellule = 'border:1px solid ' + C.line + ';padding:4pt 6pt;vertical-align:top;text-align:left;';
-  var liste = function (e) {
-    // cases à cocher : des paragraphes en retrait (Writer reprend une liste sans puce comme une liste à puces)
-    if (e.items.some(function (it) { return it.coche != null; })) return e.items.map(function (it, i) {
-      var lv = Math.max(0, +it.niveau || 0);
-      return '<p style="margin:0 0 ' + (i === e.items.length - 1 ? '6pt' : '2pt') + (lv ? ';margin-left:' + 18 * lv + 'pt' : '') + '">' + (it.coche ? '☑ ' : '☐ ') + segs(it.segs) + '</p>';
-    }).join('');
-    var tg = e.ordonnee ? 'ol' : 'ul', cur = -1, h = '', st = ' style="margin:0 0 6pt"';
-    e.items.forEach(function (it) {
-      var lv = Math.max(0, Math.min(it.niveau, cur + 1));
-      if (cur < 0) { h += '<' + tg + st + '>'; cur = 0; }
-      else if (lv > cur) { h += '<' + tg + ' style="margin:0">'; cur = lv; }
-      else { h += '</li>'; while (cur > lv) { h += '</' + tg + '></li>'; cur--; } }
-      h += '<li>' + segs(it.segs);
-    });
-    if (cur < 0) return '';
-    h += '</li>'; while (cur > 0) { h += '</' + tg + '></li>'; cur--; }
-    return h + '</' + tg + '>';
-  };
-  var un = function (e) {
-    switch (e.t) {
-      case 'titre': var tt = TITRES[e.niveau] || TITRES[3]; return '<' + tt[0] + ' style="font-family:' + OFFICE_POLICES.titre + ';font-size:' + tt[1] + ';font-weight:bold;color:' + C.fg + ';margin-top:12pt;margin-bottom:6pt">' + segs(e.segs) + '</' + tt[0] + '>';
-      case 'para': return '<p style="' + P + (PARA[e.style] || '') + (e.retrait ? 'margin-left:' + 2 * e.retrait + 'em;' : '') + '">' + segs(e.segs) + '</p>';
-      case 'liste': return liste(e);
-      case 'tableau':
-        if (!e.lignes.length) return '';   // pas de tableau vide (fiche de faits ou tableau sans ligne)
-        return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt">' + e.lignes.map(function (l, i) {
-          var th = e.entete && i === 0;
-          var fd = e.fonds && e.fonds[i] || [];   // fonds : teinte facultative de chaque cellule (carte de chaleur)
-          return '<tr>' + l.map(function (c, j) { return th ? '<th style="' + cellule + 'font-weight:bold;background:' + C.bg + '">' + tous(c) + '</th>' : '<td style="' + cellule + (fd[j] ? 'background:' + fd[j] + ';' : '') + '">' + tous(c) + '</td>'; }).join('') + '</tr>';
-        }).join('') + '</table>';
-      case 'cadre':
-        return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + e.fond + ';padding:6pt 9pt;' +
-          (e.barre ? 'border-left:4px solid ' + e.barre : 'border:1px solid ' + C.line) + '">' + tous(e.contenu) + '</td></tr></table>';
-      case 'code':
-        return (e.nom ? '<p style="' + P + 'font-family:' + OFFICE_POLICES.mono + ';font-size:8pt;color:' + C.muted + '">' + esc(e.nom) + '</p>' : '') +
-          // fond sur une cellule pleine largeur (attribut width pour Writer) : Google Docs ne teinte un <pre> que sous le texte
-          '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
-          '<pre style="font-family:' + OFFICE_POLICES.mono + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
-      case 'image':
-        var l = e.l, h = e.h; if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
-        return '<p style="' + P + '"><img src="' + esc(e.src) + '" alt="' + esc(e.alt) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + '></p>' +
-          (officeVide(e.legende) ? '' : '<p style="' + P + PARA.legende + '">' + segs(e.legende) + '</p>');
-      case 'ligne': return '<hr style="border:0;border-top:1px solid ' + C.line + ';margin:6pt 0">';
+  return elts.map(function (e) {
+    if (e.t === 'para') return '<p style="' + OFFICE_P + '">' + segs(e.segs) + '</p>';
+    if (e.t === 'liste') return '<ul style="' + OFFICE_P + '">' + e.items.map(function (it) { return '<li>' + segs(it.segs) + '</li>'; }).join('') + '</ul>';
+    if (e.t === 'image') {
+      var t = officeEchelle(e.l, e.h, OFFICE_LARGEUR);
+      return '<p style="' + OFFICE_P + '"><img src="' + esc(e.src) + '" alt="' + esc(e.alt) + '"' + (t[0] && t[1] ? ' width="' + t[0] + '" height="' + t[1] + '"' : '') + '></p>';
     }
     return '';
-  };
-  var tous = function (arr) { return arr.map(un).join(''); };
-  return tous(elts);
+  }).join('');
 }
 /* Éléments neutres → texte brut : pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
 function officeTexte(elts) {

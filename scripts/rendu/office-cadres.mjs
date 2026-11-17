@@ -49,7 +49,7 @@ test('office (cadres) : fiche de faits sur trois colonnes comme la grille d\'Ard
   const { html, texte } = office('f5'), l = lignes(html);
   egal(l.map((r) => r.map((c) => c.texte)), [['HÔTEsrv-web', 'RISQUEélevé', 'IP10.0.0.4'], ['ÉTATOK', 'VUhier', '']], html);
   egal(l[0].map((c) => c.largeur), ['33%', '33%', '33%']);
-  vrai(/<p style="[^"]*font-family:Consolas,monospace;[^"]*text-transform:uppercase;[^"]*">HÔTE<\/p><p style="[^"]*font-family:'Segoe UI Semibold','Segoe UI',sans-serif;[^"]*font-weight:600[^"]*">srv-web<\/p>/.test(html), 'clé puis valeur : ' + html);
+  vrai(/<p style="[^"]*"><span style="font-family:Consolas,monospace;[^"]*">HÔTE<\/span><\/p><p style="[^"]*font-family:'Segoe UI Semibold','Segoe UI',sans-serif;[^"]*font-weight:600[^"]*">srv-web<\/p>/.test(html), 'clé puis valeur : ' + html);
   vrai(/<p style="[^"]*color:#b42318[^"]*">élevé<\/p>/.test(html), 'alerte en rouge : ' + html);
   vrai(html.includes('background:#e3f3ea;color:#1f7a4d'), 'pastille dans une valeur');
   // cadre blanc bordé : bordure line sur le pourtour, fond blanc
@@ -87,7 +87,7 @@ test('office (cadres) : groupe repliable collé ouvert, trait gris à gauche, se
   const { html, texte } = office('g', DOC, { page: 0, images });
   vrai(/<td valign="top" width="100%" style="[^"]*border-left:2px solid #d9e0e5[^"]*">/.test(html), 'trait gauche : ' + html);
   vrai(/font-weight:600[^"]*">(<span[^>]*>▾<\/span>&nbsp;)?Groupe<\/p>/.test(html), 'titre : ' + html);
-  vrai(/text-transform:uppercase[^"]*">HÔTE<\/p>/.test(html) && html.includes('border-left:3px solid #1f5f99'), 'fiche et encadré dans le style des Cadres : ' + html);
+  vrai(/letter-spacing:0\.5pt">HÔTE<\/span><\/p>/.test(html) && html.includes('border-left:3px solid #1f5f99'), 'fiche et encadré dans le style des Cadres : ' + html);
   // Word fusionne deux tableaux qui se suivent : un paragraphe les sépare
   vrai(!/<\/table><table/.test(html), 'deux tableaux voisins séparés : ' + html);
   vrai(/<img src="data:image\/png;base64,CCCC"[^>]* width="650" height="200"/.test(html), 'carte en image, ramenée à la largeur du groupe : ' + html);
@@ -113,7 +113,7 @@ test('office (cadres) : modèle diamant en losange 3 × 3, sommets bordés au no
 
 test('office (cadres) : un groupe rend ses tableaux, cases et code dans le style de leur famille', () => {
   const { html } = office('gx');
-  vrai(/<td [^>]*text-transform:uppercase[^>]*><span style="letter-spacing:.5pt">NOM<\/span>/.test(html) || /letter-spacing:\.5pt">NOM</.test(html), 'en-tête du tableau en étiquette (09-office-tableaux.js) : ' + html);
+  vrai(/letter-spacing:0\.5pt">NOM</.test(html), 'en-tête du tableau en étiquette (09-office-tableaux.js) : ' + html);
   vrai(/<span style="color:#4848c0">☑<\/span>/.test(html) && !/<li/.test(html), 'case en paragraphe (09-office-listes.js) : ' + html);
   vrai(html.includes('#14202b'), 'code sombre (09-office-tableaux.js) : ' + html);
   vrai(!/<\/table><table/.test(html), 'tableaux voisins séparés');

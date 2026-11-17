@@ -1,4 +1,4 @@
-// Export Office (src/js/08-office.js) : éléments neutres d'un bloc, HTML à styles en ligne en thème clair, texte brut.
+// Export Office (src/js/08-office.js) : éléments neutres d'un bloc et texte brut ; le HTML stylé est vérifié par famille (office-<famille>.mjs).
 import { readFileSync } from 'node:fs';
 import { monter, test, egal, vrai } from './commun.mjs';
 
@@ -39,7 +39,7 @@ const blocs = [
   { id: 'mp', type: 'map', markers: [{ lat: 48.38, lon: -4.47, label: 'Brest' }] },
 ];
 const DOC = { v: 6, title: 'Doc', tags: { ok: { c: 0 }, ko: { c: 1 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: blocs }, { id: 'p2', title: 'Suite', blocks: [] }] };
-const office = (id, doc = DOC, opts) => { const { ctx, d } = monter(doc); const b = d.pages[0].blocks.find((x) => x.id === id); const e = ctx.officeBloc(b, d, opts || { page: 0 }); return { e, html: ctx.officeHtml(e, d), texte: ctx.officeTexte(e), d, ctx }; };
+const office = (id, doc = DOC, opts) => { const { ctx, d } = monter(doc); const b = d.pages[0].blocks.find((x) => x.id === id); const e = ctx.officeBloc(b, d, opts || { page: 0 }); return { e, html: ctx.officeHtmlBloc(b, d, opts || { page: 0 }), texte: ctx.officeTexte(e), d, ctx }; };
 const pur = (x) => JSON.parse(JSON.stringify(x));
 
 test('office : le HTML de « Copier pour Office » porte la marque d\'Ardoise autour du rendu du bloc', () => {
@@ -77,60 +77,40 @@ test('office : HTML à styles en ligne, sans classe, lien interne sans adresse',
 test('office : titres de niveaux (en-tête, section, sous-section, sous-titre, étapes numérotées)', () => {
   const niveaux = ['hd', 's1', 's2', 's3', 'e1', 'e2'].map((id) => office(id).e.filter((x) => x.t === 'titre').map((x) => [x.niveau, office(id).ctx.officeTexte([x])]));
   egal(niveaux, [[[0, 'Incident 42']], [[1, 'Section']], [[2, 'Sous-section']], [[3, 'Petit titre']], [[1, '1 Isoler']], [[1, '2 Nettoyer']]]);
-  const { e, html } = office('hd');
+  const { e } = office('hd');
   egal(e.map((x) => x.style || x.t), ['surtitre', 'titre', 'chapeau']);
-  vrai(/^<div style="[^"]*"><p style="[^"]*text-transform:uppercase[^"]*">Rapport<\/p><h1 style="[^"]*font-size:30pt/.test(html), html);
-  vrai(/<h2 style="[^"]*">Sous-section<\/h2>/.test(office('s2').html) && /<h3 style="[^"]*">Petit titre<\/h3>/.test(office('s3').html), 'h2 et h3');
 });
 
 test('office : listes à niveaux et liste à cocher', () => {
   egal(office('l1').texte, '1. un\n  1. sous\n2. deux');
-  vrai(/^<div[^>]*><ol style="[^"]*"><li>un<ol style="[^"]*"><li>sous<\/li><\/ol><\/li><li>deux<\/li><\/ol><\/div>$/.test(office('l1').html), office('l1').html);
   const c = office('c1');
   egal(c.texte, '☑ fait\n☐ à faire');
-  // Writer reprend une liste <ul> sans puce comme une liste à puces après la première ligne : des paragraphes, sans liste
-  vrai(!/<[ou]l|<li/.test(c.html) && /<p style="[^"]*">☑ fait<\/p><p style="[^"]*">☐ à faire<\/p>/.test(c.html), c.html);
   const n = office('c2', { v: 6, title: 'D', pages: [{ id: 'p1', blocks: [{ id: 'c2', type: 'check', items: [{ html: 'haut' }, { html: 'dessous', lv: 1 }, { html: 'plus bas', lv: 2 }] }] }] });
-  const retraits = [...n.html.matchAll(/<p style="([^"]*)">☐ /g)].map((m) => (m[1].match(/margin-left:([\d.]+pt)/) || [])[1] || '0');
-  egal(retraits, ['0', '18pt', '36pt'], 'retrait par niveau : ' + n.html);
   egal(n.texte, '☐ haut\n  ☐ dessous\n    ☐ plus bas');
 });
 
-test('office : tableau à en-tête gras et bordures fines ; fiche de faits à deux colonnes, alerte en rouge', () => {
+test('office : tableau et fiche de faits en texte brut, cellules en tabulations', () => {
   const t = office('t1');
   egal(t.texte, 'Nom\tÉtat\nServeur\t#KO');
-  vrai(/<table width="100%" style="border-collapse:collapse[^"]*"><tr><th style="border:1px solid #d9e0e5;[^"]*font-weight:bold[^"]*">/.test(t.html), t.html);
-  vrai(t.html.includes('background:#fdecea;color:#b42318'), 'pastille rouge du registre');
   const f = office('f1');
   egal(f.texte, 'Hôte\tsrv1\nRisque\télevé');
-  vrai(!/<th/.test(f.html) && f.html.includes('<b>Hôte</b>') && f.html.includes('<span style="color:#b42318">élevé</span>'), f.html);
 });
 
-test('office : encadré teinté avec sa barre, code à chasse fixe sans coloration', () => {
-  const n = office('n1');
-  vrai(/<table width="100%" [^>]*><tr><td width="100%" style="background:#fdecea;[^"]*border-left:4px solid #b42318">/.test(n.html), n.html);
+test('office : code en texte brut, nom de fichier en tête', () => {
   const k = office('k1');
   egal(k.texte, 'a.sh\necho "<a>"\nls');
-  // fond sur une cellule pleine largeur : Google Docs ne teinte un <pre> que sous le texte
-  // LibreOffice Writer ignore la largeur en style : l'attribut width la donne
-  vrai(/<table width="100%" style="[^"]*width:100%[^"]*"><tr><td width="100%" style="background:#eef2f4;[^"]*"><pre style="font-family:Consolas[^"]*margin:0[^"]*white-space:pre-wrap">echo &quot;&lt;a&gt;&quot;\nls<\/pre><\/td><\/tr><\/table>/.test(k.html), k.html);
 });
 
-test('office : kanban en colonnes, cartes en paragraphes (titre gras, échéance, responsable, priorité)', () => {
+test('office : kanban en texte brut, une colonne par cellule (titre, échéance, responsable, priorité)', () => {
   const k = office('kb');
   egal(k.texte, 'À faire\tFait\nTâche Échéance : 12 mars 2026 · Responsable : Alice · Priorité P1 (haute)\t');
-  vrai(k.html.includes('<th') && k.html.includes('<b>Tâche</b>'), k.html);
 });
 
-test('office : dépliable ouvert, image avec légende, cartes en cadres, séparateur, pied de page', () => {
+test('office : dépliable ouvert, image avec légende, cartes, pied de page en éléments neutres', () => {
   egal(office('dt').texte, 'Plus\nCaché');
-  vrai(office('dt').html.includes('<b>Plus</b>'), 'titre du dépliable en gras');
   const im = office('im', DOC, { page: 0, images: { im: { src: 'data:image/png;base64,AAAA', mime: 'image/png', l: 1360, h: 400 } } });
   egal(pur(im.e[0]), { t: 'image', src: 'data:image/png;base64,AAAA', mime: 'image/png', l: 1360, h: 400, alt: 'Légende', legende: [{ texte: 'Légende' }] });
-  vrai(im.html.includes('width="680" height="200"') && /font-style:italic[^"]*">Légende<\/p>/.test(im.html), im.html);
   egal(office('cd').texte, 'Carte A\ntexte\n☑ case');
-  vrai(/<td width="100%" style="background:#ffffff;[^"]*border:1px solid #d9e0e5">/.test(office('cd').html), 'carte en cadre');
-  vrai(office('dv').html.includes('<hr style='), 'séparateur');
   egal(office('ft').e[0].style, 'pied');
 });
 
@@ -140,6 +120,9 @@ test('office : carte et chronologie en image fournie, sinon en texte', () => {
   const img = { src: 'data:image/png;base64,BBBB', mime: 'image/png', l: 1360, h: 800 };
   egal(pur(office('tl', DOC, { page: 0, images: { tl: img } }).e), [{ t: 'image', ...img, alt: 'Chronologie', legende: [] }]);
   egal(office('mp', DOC, { page: 0, images: { mp: img } }).e[0].t, 'image');
+  // HTML : image ramenée à 680 px, sinon liste à puces
+  vrai(office('mp', DOC, { page: 0, images: { mp: img } }).html.includes('width="680" height="400"'), office('mp', DOC, { page: 0, images: { mp: img } }).html);
+  vrai(/<ul style="[^"]*"><li><span style="color:#566573">2024 — <\/span><b>Début<\/b> : détail<\/li><\/ul>/.test(office('tl').html), office('tl').html);
 });
 
 test('office : requête figée comme affichée (tableau, liste, nombre « texte : X / total »)', () => {
@@ -187,20 +170,18 @@ const DOC6 = { v: 6, title: 'Doc', tags: { apt: { c: 1 } }, pages: [{ id: 'p1', 
 ] }] };
 
 test('office : groupe ouvert (même plié), titre en gras puis ses blocs', () => {
-  const { e, texte, html } = office('g1', DOC6);
+  const { e, texte } = office('g1', DOC6);
   egal(e.map((x) => x.t), ['para', 'para', 'tableau'], 'titre, paragraphe, diamant');
   egal(pur(e[0].segs), [{ texte: 'Détails ', gras: true }, { texte: 'repliés', italique: true, gras: true }]);
   vrai(texte.startsWith('Détails repliés\ndans le groupe\n'), texte);
-  vrai(/<p style="[^"]*"><b>Détails <\/b><i><b>repliés<\/b><\/i><\/p><p style="[^"]*">dans le groupe<\/p><table/.test(html), html);
   const vide = office('g1', { ...DOC6, pages: [{ id: 'p1', blocks: [{ id: 'g1', type: 'group', title: '', blocks: [{ id: 'x', type: 'p', html: 'seul' }] }] }] });
   egal(vide.texte, 'seul', 'titre vide : omis');
 });
 
 test('office : modèle diamant en tableau, titre puis les quatre sommets nommés dans l\'ordre de l\'écran', () => {
-  const { e, texte, html } = office('d1', DOC6);
+  const { e, texte } = office('d1', DOC6);
   egal(e.length, 1); egal(e[0].t, 'tableau'); egal(e[0].entete, false);
   egal(texte, 'Titre\tCampagne X\nAdversaire\tA\nCapacité\tC\nInfrastructure\tI\nVictime\tV');
-  vrai(html.includes('<b>Adversaire</b>') && html.includes('<b>Titre</b>'), html);
   // titre vide : ligne omise ; sommet vide : « — » en gris ; pastille d'un sommet en sa couleur
   const g = office('g1', DOC6).e[2];
   egal(office('g1', DOC6).ctx.officeTexte([g]), 'Adversaire\tGroupe #APT\nCapacité\tHameçonnage\nInfrastructure\t—\nVictime\tMairie');
@@ -220,7 +201,6 @@ test('office : vue regroupée en fiches (titre gras avec le nombre, tableau à d
   ] }] });
   const f = office('q', page({}));
   egal(f.texte, 'Synthèse\nAPT28 (2)\nTechnique\t#T1059, T1071\n(vide) (1)\nTechnique\tT1566');
-  vrai(/<b[^>]*>APT28 \(2\)<\/b>|font-weight:bold[^>]*>APT28 \(2\)/.test(f.html), 'titre en gras');
   egal(office('q', page({ regForme: 'tableau', sortBy: '#n', sortDir: 'asc' })).texte, 'Synthèse\nAdversaire\tTechnique\tLignes\n(vide)\tT1566\t1\nAPT28\t#T1059, T1071\t2');
 });
 

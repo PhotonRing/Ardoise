@@ -19,7 +19,7 @@ const office = (id, opts) => { const r = monterOffice(DOC, id, opts); verifierSo
 
 test('office (texte) : en-tête en surtitre Consolas capitales accent, titre de 30 pt, chapeau gris, même en thème sombre', () => {
   const { html } = office('hd');
-  vrai(/<p style="[^"]*font-family:Consolas,monospace;[^"]*font-size:9pt;[^"]*text-transform:uppercase;[^"]*color:#4848c0[^"]*">RAPPORT<\/p>/.test(html), 'surtitre : ' + html);
+  vrai(/<p style="[^"]*"><span style="font-family:Consolas,monospace;font-size:9pt;color:#4848c0;letter-spacing:0\.72pt">RAPPORT<\/span><\/p>/.test(html), 'surtitre : ' + html);
   // Writer ignore text-transform : les capitales sont écrites dans le texte
   vrai(/<h1 style="[^"]*font-family:'Segoe UI',sans-serif;[^"]*font-size:30pt;[^"]*font-weight:bold[^"]*">Incident <i>42<\/i><\/h1>/.test(html), 'titre : ' + html);
   vrai(/<p style="[^"]*font-size:11\.25pt;[^"]*color:#566573[^"]*">Résumé court<\/p>/.test(html), 'chapeau : ' + html);
@@ -36,8 +36,8 @@ test('office (texte) : titre de section, sous-section et sous-titre à la taille
 test('office (texte) : étape numérotée, numéro dans une cellule accent-soft au texte accent, sous un filet', () => {
   const { html } = office('e2');
   vrai(/^<div[^>]*><p style="[^"]*border-top:1px solid #d9e0e5[^"]*">&nbsp;<\/p><table/.test(html), 'filet au-dessus : ' + html);
-  vrai(/<td width="6%" style="[^"]*background:#ececfb;[^"]*color:#4848c0;[^"]*font-weight:bold[^"]*">2<\/td>/.test(html), 'numéro : ' + html);
-  vrai(/<td width="94%"[^>]*><h1 style="[^"]*font-size:15\.75pt[^"]*">Nettoyer<\/h1><\/td>/.test(html), 'titre : ' + html);
+  vrai(/<td valign="middle" width="6%" style="[^"]*background:#ececfb;[^"]*color:#4848c0;[^"]*font-weight:bold[^"]*">2<\/td>/.test(html), 'numéro : ' + html);
+  vrai(/<td valign="middle" width="94%"[^>]*><h1 style="[^"]*font-size:15\.75pt[^"]*">Nettoyer<\/h1><\/td>/.test(html), 'titre : ' + html);
   const sans = office('e3').html;
   vrai(!/<table|#ececfb/.test(sans) && /<h1 [^>]*>Sans numéro<\/h1>/.test(sans), 'sans numéro : ' + sans);
 });

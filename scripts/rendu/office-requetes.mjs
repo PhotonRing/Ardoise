@@ -30,7 +30,7 @@ test('office (requêtes) : kanban en colonnes de cellules côte à côte, titre 
 
 test('office (requêtes) : cartes du kanban en cellules bordées, titre, texte, méta grises, priorité en trait, échéance passée en rouge', () => {
   const { html } = office(DOC([KB]), 'kb');
-  const cartes = html.match(/<table width="100%" style="[^"]*"><tr><td width="100%"[^>]*>[\s\S]*?<\/td><\/tr><\/table>/g) || [];
+  const cartes = html.match(/<table width="100%" style="[^"]*"><tr><td valign="top" width="100%"[^>]*>[\s\S]*?<\/td><\/tr><\/table>/g) || [];
   egal(cartes.length, 4, 'une table par carte : ' + html);
   const [c1, c3, c2, c4] = cartes;   // ordre : colonne par colonne (x1, x3, puis x2, puis x4)
   vrai(/background:#ffffff/.test(c1) && /border-left:3px solid #b42318/.test(c1), 'P1 : trait rouge à gauche : ' + c1);
@@ -58,10 +58,10 @@ const Q = (q) => DOC([...FAITS, { id: 'q', type: 'query', title: 'Hôtes', src: 
 
 test('office (requêtes) : titre en étiquette, vue tableau sur le tableau d\'Ardoise (en-tête en étiquette, source grise, alerte rouge)', () => {
   const { html, texte } = office(Q({ view: 'table' }), 'q');
-  vrai(/^<div[^>]*><p style="margin:0 0 6pt;font-family:Consolas,monospace;[^"]*">HÔTES<\/p>/.test(html), 'titre en étiquette, en capitales écrites : ' + html);
+  vrai(/^<div[^>]*><p style="margin:0pt 0pt 6pt;font-size:8\.25pt"><span style="font-family:Consolas,monospace;[^"]*">HÔTES<\/span><\/p>/.test(html), 'titre en étiquette, en capitales écrites : ' + html);
   const td = cellules(html);
   egal(td.length, 12, 'en-tête et trois lignes de trois cellules');
-  vrai(/<span style="letter-spacing:\.5pt">HÔTE<\/span>/.test(td[0]) && /border-top:1px solid #d9e0e5/.test(td[0]), 'en-tête du tableau d\'Ardoise (officeTabTableau) : ' + td[0]);
+  vrai(/<span style="[^"]*letter-spacing:0\.5pt">HÔTE<\/span>/.test(td[0]) && /border-top:1px solid #d9e0e5/.test(td[0]), 'en-tête du tableau d\'Ardoise (officeTabTableau) : ' + td[0]);
   vrai(/font-size:10\.5pt;/.test(td[3]), 'corps à 14 px (.q-table) : ' + td[3]);
   vrai(/<span style="color:#b42318">haut<\/span>/.test(td[4]), 'alerte rouge : ' + td[4]);
   vrai(/<span style="color:#566573;font-size:9\.38pt">Accueil<\/span>/.test(td[5]), 'source grise, sans lien : ' + td[5]);
@@ -88,7 +88,7 @@ test('office (requêtes) : vue liste en lignes encadrées, clés en étiquette, 
   const td = cellules(html);
   egal(td.length, 3, 'une ligne encadrée par résultat : ' + html);
   vrai(td.every((c) => /background:#ffffff/.test(c) && /border:1px solid #d9e0e5/.test(c)), 'ligne encadrée : ' + td[0]);
-  vrai(/<span style="font-family:Consolas,monospace;font-size:8\.25pt;color:#566573;letter-spacing:\.5pt">HÔTE<\/span> srv1/.test(td[0]), 'clé en étiquette : ' + td[0]);
+  vrai(/<span style="font-family:Consolas,monospace;font-size:8\.25pt;color:#566573;letter-spacing:0\.5pt">HÔTE<\/span> srv1/.test(td[0]), 'clé en étiquette : ' + td[0]);
   vrai(/<span style="color:#b42318">haut<\/span>/.test(td[0]), 'alerte rouge');
   vrai(/>Accueil<\/span>/.test(td[0]), 'source');
   egal(texte, 'Hôtes\n- Accueil · Hôte srv1 #OK · Risque haut\n- Accueil · Hôte srv2\n- Accueil · Hôte srv3 · Risque bas', 'texte brut inchangé');
@@ -100,16 +100,16 @@ test('office (requêtes) : vue liste en lignes encadrées, clés en étiquette, 
 test('office (requêtes) : vue Nombre en cartes de nombre (grand chiffre, libellé en étiquette, trait accent, barre de proportion)', () => {
   const cards = [{ id: 'n1', label: 'Avec OK', filtres: [{ id: 'a', prop: 'tags', vals: ['ok'] }], total: 'all' }, { id: 'n2', label: '', total: 'none' }, { id: 'n3', label: 'Tous', total: 'all' }, { id: 'n4', label: 'Encore', total: 'none' }];
   const { html, texte } = office(Q({ view: 'count', cards }), 'q');
-  vrai(/^<div[^>]*><p[^>]*>HÔTES<\/p><table/.test(html), 'titre puis cartes');
+  vrai(/^<div[^>]*><p[^>]*><span[^>]*>HÔTES<\/span><\/p><table/.test(html), 'titre puis cartes');
   // trois cartes par ligne au plus (min 180 px sur 680), séparées par une cellule vide ; la 4e passe à la ligne
   egal((html.match(/<td valign="top" width="32%" style="[^"]*border-left:3px solid #4848c0/g) || []).length, 4, 'quatre cartes au tiers, trait accent : ' + html);
   egal((html.match(/<td width="2%"><\/td>/g) || []).length, 4, 'espaces entre cartes, sur deux lignes');
   vrai(/<span style="font-size:25\.5pt;font-weight:bold;color:#17212b">1<\/span><span style="font-size:13\.5pt;font-weight:600;color:#566573"> \/ 3<\/span>/.test(html), 'chiffre et total : ' + html);
-  vrai(/letter-spacing:\.45pt">AVEC OK<\/p>/.test(html) && /font-family:Consolas,monospace;font-size:9pt;color:#566573/.test(html), 'libellé en étiquette');
-  vrai(/">FICHES DE FAITS<\/p>/.test(html), 'libellé par défaut, comme à l\'écran');
+  vrai(/letter-spacing:0\.45pt">AVEC OK<\/span><\/p>/.test(html) && /font-family:Consolas,monospace;font-size:9pt;color:#566573/.test(html), 'libellé en étiquette');
+  vrai(/">FICHES DE FAITS<\/span><\/p>/.test(html), 'libellé par défaut, comme à l\'écran');
   // barre : 1 / 3 → 33 % accent et 67 % gris ; 3 / 3 → une seule cellule accent ; sans total, pas de barre
-  vrai(/<td width="33%" style="[^"]*background:#4848c0;font-size:1pt[^"]*">&nbsp;<\/td><td width="67%" style="[^"]*background:#d9e0e5;/.test(html), 'barre en deux cellules : ' + html);
-  vrai(/<td width="100%" style="[^"]*background:#4848c0;font-size:1pt/.test(html) && !/<td width="0%"/.test(html), 'barre pleine en une cellule');
+  vrai(/<td valign="top" width="33%" style="[^"]*background:#4848c0;font-size:1pt[^"]*">&nbsp;<\/td><td valign="top" width="67%" style="[^"]*background:#d9e0e5;/.test(html), 'barre en deux cellules : ' + html);
+  vrai(/<td valign="top" width="100%" style="[^"]*background:#4848c0;font-size:1pt/.test(html) && !/<td[^>]* width="0%"/.test(html), 'barre pleine en une cellule');
   egal((html.match(/font-size:1pt;line-height:4\.5pt/g) || []).length, 3, 'pas de barre sans total');
   egal(texte, 'Hôtes\nAvec OK : 1 / 3\nfiches de faits : 3\nTous : 3 / 3\nEncore : 3', 'texte brut inchangé');
 });
@@ -119,7 +119,7 @@ test('office (requêtes) : vue En colonnes d\'un kanban et des autres sources, c
   const { html } = office(doc, 'q');
   egal((html.match(/<td valign="top" width="25%"/g) || []).length, 4, 'une cellule par colonne du kanban, vides comprises : ' + html);
   vrai(/>Colonne 3<\/span>|>colonne 3<\/span>|>À faire<\/span>/.test(html), 'titres des colonnes');
-  const c1 = (html.match(/<table width="100%" style="[^"]*margin:0"><tr><td width="100%"[^>]*>(?:(?!<\/table>)[\s\S])*Corriger(?:(?!<\/table>)[\s\S])*<\/table>/) || [''])[0];
+  const c1 = (html.match(/<table width="100%" style="[^"]*margin:0pt"><tr><td valign="top" width="100%"[^>]*>(?:(?!<\/table>)[\s\S])*Corriger(?:(?!<\/table>)[\s\S])*<\/table>/) || [''])[0];
   vrai(/border-left:3px solid #b42318/.test(c1) && /border-top:1px dashed #b42318/.test(c1), 'carte P1 bloquée : ' + c1);
   vrai(/color:#b42318;background:#fdecea">1 janv\. 2000/.test(c1) && /color:#566573">Alice/.test(c1), 'méta : ' + c1);
   vrai(/color:#b42318">Attend : Préparer<\/p>/.test(c1) && /9\.38pt">Accueil<\/span><\/p>/.test(c1), 'champs Attend et Source : ' + c1);
@@ -137,12 +137,12 @@ const QT = (q, palette) => ({ ...DOC([...TAB, { id: 'q', type: 'query', title: '
 test('office (requêtes) : vue Regroupée en fiches (titre et compte, fiche de faits bordée) et en tableau d\'Ardoise', () => {
   const { html, texte } = office(QT({ view: 'regroupee', regX: 'tactique', regY: ['technique'] }), 'q');
   egal((html.match(/<td valign="top" width="49%"/g) || []).length, 2, 'deux fiches par ligne : ' + html);
-  vrai(/<p style="margin:0 0 6pt;font-weight:600">Exécution <span[^>]*background:#d9e0e5">&nbsp;2&nbsp;<\/span><\/p>/.test(html), 'titre et compte : ' + html);
-  vrai(/border:1px solid #d9e0e5[^"]*"><p style="margin:0"><span style="font-family:Consolas[^"]*">TECHNIQUE<\/span><\/p><p style="margin:0;font-weight:600">T1059, T1204<\/p>/.test(html), 'fiche de faits : ' + html);
+  vrai(/<p style="margin:0pt 0pt 6pt;font-weight:600">Exécution <span[^>]*background:#d9e0e5">&nbsp;2&nbsp;<\/span><\/p>/.test(html), 'titre et compte : ' + html);
+  vrai(/border:1px solid #d9e0e5[^"]*"><p style="margin-top:0pt;margin-bottom:0pt"><span style="font-family:Consolas[^"]*">TECHNIQUE<\/span><\/p><p style="margin:0pt;font-weight:600">T1059, T1204<\/p>/.test(html), 'fiche de faits : ' + html);
   vrai(/<span style="color:#566573">2 lignes<\/span>/.test(html) && /<span style="color:#566573">1 ligne<\/span>/.test(html), 'nombre de lignes');
   egal(texte, 'Matrice\nExécution (2)\nTechnique\tT1059, T1204\nPersistance (1)\nTechnique\tT1053', 'texte brut inchangé');
   const t = office(QT({ view: 'regroupee', regX: 'tactique', regY: ['technique'], regForme: 'tableau', limit: 1 }), 'q').html;
-  vrai(/<span style="letter-spacing:\.5pt">TACTIQUE<\/span>/.test(t) && /<span style="letter-spacing:\.5pt">LIGNES<\/span>/.test(t), 'en-tête en étiquette (officeTabTableau) : ' + t);
+  vrai(/letter-spacing:0\.5pt">TACTIQUE<\/span>/.test(t) && /letter-spacing:0\.5pt">LIGNES<\/span>/.test(t), 'en-tête en étiquette (officeTabTableau) : ' + t);
   vrai(/>1 premiers groupes sur 2<\/p>/.test(t), 'limite des groupes');
 });
 
@@ -152,12 +152,12 @@ test('office (requêtes) : carte de chaleur en colonnes aux cases teintées (tei
   const r = monterOffice(QT(q), 'q');
   verifierSocle(r.html, 'chaleur', teintes);
   const { html, texte } = r;
-  vrai(/^<div[^>]*><p[^>]*>MATRICE<\/p><table/.test(html), 'titre');
+  vrai(/^<div[^>]*><p[^>]*><span[^>]*>MATRICE<\/span><\/p><table/.test(html), 'titre');
   vrai(/font-size:10\.13pt">Exécution<\/span> <span[^>]*>&nbsp;4,5&nbsp;<\/span>/.test(html), 'titre de colonne et total : ' + html);
   vrai(/background:#b4540a;[^"]*"><span style="color:#ffffff">T1059&nbsp; <span style="font-family:Consolas[^"]*">3,5<\/span>/.test(html), 'palier foncé : texte blanc : ' + html);
   vrai(/background:#b4540a;[^"]*"><span style="color:#ffffff;font-size:9pt">› \.001/.test(html), 'sous-case : ' + html);
   vrai(/background:#fbf5f0;[^"]*"><span style="color:#17212b">T1053/.test(html), 'palier clair');
-  for (const c of [...teintes, '#b4540a']) vrai(new RegExp('<td width="4%" style="[^"]*background:' + c).test(html), 'légende : ' + c);
+  for (const c of [...teintes, '#b4540a']) vrai(new RegExp('<td valign="middle" width="4%" style="[^"]*background:' + c).test(html), 'légende : ' + c);
   vrai(/>1<\/td>/.test(html) && />3,5<\/td>/.test(html) && /">somme de Score<\/td>/.test(html), 'légende : bornes et mesure');
   egal(texte, 'Matrice\nExécution (4,5)\tPersistance (1)\nT1059  3,5\tT1053  1\n› .001  3,5\t\nT1204  1\t\nÉchelle : de 1 (clair) à 3,5 (foncé), somme de Score', 'texte brut inchangé');
   vrai(/background:#4848c0;[^"]*"><span style="color:#ffffff">T1059/.test(office(QT(q, 'indigo'), 'q', ['#f4f4fb', '#e2e2f5', '#cccced', '#b2b2e5']).html), 'accent de la palette du document');

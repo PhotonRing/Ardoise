@@ -8,7 +8,7 @@ var OFFICE_LISTE_PUCES = {
 // balise ouvrante d'une liste : attribut type (Writer, Word) et list-style-type (Google Docs) ; .list ul : 6 px au-dessus
 function officeListeOuvre(tag, profondeur) {
   var p = OFFICE_LISTE_PUCES[tag], s = p[Math.min(profondeur, p.length - 1)];
-  return '<' + tag + ' type="' + s[0] + '" style="' + (profondeur ? 'margin-top:' + officePt(6) + ';margin-bottom:0' : 'margin:0 0 6pt') + ';list-style-type:' + s[1] + '">';
+  return '<' + tag + ' type="' + s[0] + '" style="' + (profondeur ? 'margin-top:' + officePt(6) + ';margin-bottom:0pt' : 'margin:0pt 0pt 6pt') + ';list-style-type:' + s[1] + '">';
 }
 // éléments à plat avec un niveau, en listes imbriquées comme à l'écran (07-rendu.js) : un niveau ne descend que d'un cran à la fois
 OFFICE_RENDUS.list = function (b, x) {
@@ -19,7 +19,7 @@ OFFICE_RENDUS.list = function (b, x) {
     else if (lv > cur) { h += officeListeOuvre(tg, lv); cur = lv; }
     else { h += '</li>'; while (cur > lv) { h += '</' + tg + '></li>'; cur--; } }
     // écart entre éléments : 8 px au premier niveau, 6 px dessous (.list, .list ul)
-    h += '<li style="margin-top:0;margin-bottom:' + officePt(lv ? 6 : 8) + '">' + x.segs(x.S(it.html));
+    h += '<li style="margin-top:0pt;margin-bottom:' + officePt(lv ? 6 : 8) + '">' + x.segs(x.S(it.html));
   });
   if (cur < 0) return '';
   h += '</li>'; while (cur > 0) { h += '</' + tg + '></li>'; cur--; }
@@ -30,7 +30,7 @@ OFFICE_RENDUS.list = function (b, x) {
 function officeListeCases(arr, ordre, x) {
   return ordre.map(function (i) {
     var it = arr[i], lv = Math.min(6, Math.max(0, +it.lv || 0)), libelle = x.segs(x.S(it.html));
-    return '<p style="margin-top:0;margin-bottom:' + officePt(6) + (lv ? ';margin-left:' + officePt(26 * lv) : '') + '">' +
+    return '<p style="margin-top:0pt;margin-bottom:' + officePt(6) + (lv ? ';margin-left:' + officePt(26 * lv) : '') + '">' +
       (it.done ? '<span style="color:' + x.acc + '">☑</span> <span style="color:' + x.C.muted + '">' + libelle + '</span>' : '<span style="color:' + x.C.muted + '">☐</span> ' + libelle) + '</p>';
   }).join('');
 }
@@ -41,14 +41,14 @@ OFFICE_RENDUS.check = function (b, x) {
 // entrées en paragraphes (une liste sans puce redeviendrait une liste à puces dans Writer), numéro Consolas accent (.toc-n),
 // sous-niveaux en retrait de 22 px, à 14 px ; texte noir sans soulignement, comme à l'écran. Sans entrée : la phrase grise de l'édition
 OFFICE_RENDUS.summary = function (b, x) {
-  var h = b.title ? '<p style="margin:0 0 6pt;' + OFFICE_ETIQUETTE + '">' + esc(String(b.title).toUpperCase()) + '</p>' : '', entrees = [];
+  var h = b.title ? officeEtiquette(officeTexteSegs(b.title), x, { marges: 'margin:0pt 0pt 6pt' }) : '', entrees = [];
   (function parcours(arr, lv) {
     arr.forEach(function (it) {
-      entrees.push('<p style="margin-top:0;margin-bottom:' + officePt(2) + (lv ? ';margin-left:' + officePt(22 * lv) + ';font-size:' + officePt(14) : '') + '">' +
+      entrees.push('<p style="margin-top:0pt;margin-bottom:' + officePt(2) + (lv ? ';margin-left:' + officePt(22 * lv) + ';font-size:' + officePt(14) : '') + '">' +
         (it.n ? '<span style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(12) + ';font-weight:600;color:' + x.acc + '">' + esc(it.n) + '</span>&nbsp;&nbsp;' : '') + esc(it.t) + '</p>');
       parcours(it.kids, lv + 1);
     });
   })(summaryItems(b, x.d, x.pi), 0);
-  if (!entrees.length) h += '<p style="margin:0;font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + esc(htmlText(summaryEmpty(b).replace(/<[^>]*>/g, ''))) + '</p>';
+  if (!entrees.length) h += '<p style="margin:0pt;font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + esc(htmlText(summaryEmpty(b).replace(/<[^>]*>/g, ''))) + '</p>';
   return officeTable('<tr>' + officeCellule(h + entrees.join(''), 'background:' + x.C.surface + ';border:1px solid ' + x.C.line + ';border-left:3px solid ' + x.acc + ';padding:10.5pt 13.5pt', '100%') + '</tr>', 'margin:0 0 6pt');
 };

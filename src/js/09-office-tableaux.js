@@ -1,11 +1,8 @@
 /* ---------- Copier pour Office : famille Tableaux et code (socle et point d'entrée : 08-office.js) ----------
    Tableau (.tablewrap) et bloc de code par variante (.code, .codebox, pre.cmd), d'après page.css. */
 
-/* Tableau d'Ardoise : cadre, filets entre les lignes, en-tête en étiquette. Sert aussi aux vues en tableau du Bloc requête.
-   entetes : cellules d'en-tête en segments (null : sans en-tête) ; lignes : cellules en HTML déjà rendu ;
-   o : { taille (px du texte, 15 par défaut ; 14 pour .q-table), attenues: [indices de lignes en gris], fonds: [[teinte|null]] par ligne de corps }.
-   Bordures posées sur les cellules, chacune une fois (border-collapse) ; en-tête en <td> : Writer centre et graisse un <th>.
-   Writer ignore tout ce qui suit un letter-spacing dans un style : il va en dernier, ou sur un <span>. */
+/* Tableau d'Ardoise (aussi vues en tableau du Bloc requête) : entetes en segments (null : sans), lignes en HTML rendu ; bordures sur les cellules,
+   en-tête en <td> (Writer centre et graisse un <th>) ; o : { taille (px, 15 ; 14 pour .q-table), attenues: [lignes en gris], fonds: [[teinte|null]] } */
 function officeTabTableau(entetes, lignes, x, o) {
   o = o || {};
   var trait = '1px solid ' + x.C.line, toutes = (entetes ? [null] : []).concat(lignes), n = toutes.length;
@@ -16,13 +13,12 @@ function officeTabTableau(entetes, lignes, x, o) {
   };
   var html = toutes.map(function (l, i) {
     if (entetes && i === 0) return '<tr>' + entetes.map(function (segs, j) {
-      // étiquette (OFFICE_ETIQUETTE) sans letter-spacing dans le style de la cellule : Writer y perd tout ce qui le suit ; il passe sur un <span>
-      return officeCellule('<span style="letter-spacing:.5pt">' + x.segs(officeMajuscules(segs)) + '</span>', 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';color:' + x.C.muted +
-        ';background:' + x.C.surface + ';padding:6.75pt 9pt;vertical-align:top;text-align:left;' + bords(0, j, entetes.length));
+      // taille de l'étiquette aussi sur la cellule : la ligne d'en-tête garde sa hauteur
+      return officeCellule(officeEtiquette(segs, x), 'font-size:' + officePt(11) + ';background:' + x.C.surface + ';padding:6.75pt 9pt;text-align:left;' + bords(0, j, entetes.length));
     }).join('') + '</tr>';
     var k = i - (entetes ? 1 : 0), fd = fonds[k] || [];
     return '<tr>' + l.map(function (c, j) {
-      return officeCellule(c, 'font-size:' + taille + ';background:' + (fd[j] || x.C.surface) + ';padding:6.75pt 9pt;vertical-align:top;text-align:left;' +
+      return officeCellule(c, 'font-size:' + taille + ';background:' + (fd[j] || x.C.surface) + ';padding:6.75pt 9pt;text-align:left;' +
         (attenues.indexOf(k) >= 0 ? 'color:' + x.C.muted + ';' : '') + bords(i, j, l.length));
     }).join('') + '</tr>';
   }).join('');
@@ -49,7 +45,7 @@ function officeTabLignesCode(code, lang, tk) {
 }
 function officeTabPre(b, px, couleur, tk) {
   var code = String(b.code || '').replace(/\n$/, ''), lignes = officeTabLignesCode(code, HL.resolve(b.lang, code, b.name), tk);
-  return '<pre style="margin:0;font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(px) + ';line-height:1.55;color:' + couleur + ';white-space:pre-wrap">' + (lignes || '&nbsp;') + '</pre>';
+  return '<pre style="margin:0pt;font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(px) + ';line-height:1.55;color:' + couleur + ';white-space:pre-wrap">' + (lignes || '&nbsp;') + '</pre>';
 }
 OFFICE_RENDUS.code = function (b, x) {
   var trait = '1px solid ' + x.C.line, nom = String(b.name || '').trim();
@@ -64,6 +60,6 @@ OFFICE_RENDUS.code = function (b, x) {
     return officeTable('<tr>' + officeCellule(officeTabPre(b, 13.5, x.C.fg, OFFICE_TAB_TK_CLAIR), 'background:' + x.C['code-soft'] + ';padding:9pt 10.5pt;border:' + trait, '100%') + '</tr>', 'margin:0 0 6pt');
   // « Sombre » (.code) : nom en capitales mono grises (code-fg à 55 % d'opacité à l'écran : Writer ignore l'opacité), code clair coloré sur code-bg ;
   // bordure de la couleur du fond : sans bordure, Writer ignore le retrait intérieur de la cellule
-  var titre = nom ? '<p style="margin:0 0 6pt;font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';text-transform:uppercase;color:' + OFFICE_TAB_TK_SOMBRE.c + ';letter-spacing:.5pt">' + esc(nom.toUpperCase()) + '</p>' : '';
+  var titre = nom ? officeEtiquette(officeTexteSegs(nom), x, { couleur: OFFICE_TAB_TK_SOMBRE.c, marges: 'margin:0pt 0pt 6pt' }) : '';
   return officeTable('<tr>' + officeCellule(titre + officeTabPre(b, 12.5, x.C['code-fg'], OFFICE_TAB_TK_SOMBRE), 'background:' + x.C['code-bg'] + ';padding:10.5pt 12pt;border:1px solid ' + x.C['code-bg'], '100%') + '</tr>', 'margin:0 0 6pt');
 };
