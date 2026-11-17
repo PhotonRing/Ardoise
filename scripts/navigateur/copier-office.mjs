@@ -1,14 +1,20 @@
-// Sujet : « Copier pour Office » (menu ⋯ d'un bloc). Un texte ou un tableau part en HTML à styles en ligne, en thème clair
-// même sous le thème sombre, avec un texte brut ; une carte (fond hors ligne) ou une chronologie part en image PNG dessinée
-// à la largeur de la page imprimée, à dpr 2 ; un presse-papier qui refuse donne un message d'erreur.
-// Origine : spec groupe-office-diamant, ticket 04. Presse-papier, canvas et menu ne se voient que dans un vrai navigateur.
+// Sujet : « Copier pour Office » (menu ⋯ d'un bloc). Un texte ou un tableau part en HTML à styles en ligne marqué d'Ardoise,
+// en thème clair même sous le thème sombre, avec un texte brut, sans image (Writer ne collerait que l'image) ; une carte (fond
+// hors ligne) ou une chronologie part en image PNG dessinée à la largeur de la page imprimée, à dpr 2, avec son texte brut.
+// Recollé dans Ardoise, le bloc copié reste du texte ; une image venue d'ailleurs reste un bloc image. Un presse-papier qui
+// refuse donne un message d'erreur.
+// Origine : spec groupe-office-diamant, ticket 04 ; spec copie-office-style, tickets 02 et 09. Presse-papier, canvas et menu
+// ne se voient que dans un vrai navigateur.
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEklEQVR4nGP4z8AARwzEcQAAh5gP8Y7Dc3sAAAAASUVORK5CYII=';   // 4 × 4 px
 const P = (t) => '<span class="pill">' + t + '</span>';
 const DOC = { v: 6, id: 'doc-copier-office', title: 'Office', theme: 'dark', tags: { ok: { c: 0 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
-  { id: 'x1', type: 'p', html: 'Statut ' + P('OK') + ' et <a href="#pg-p1">lien interne</a>' },
+  { id: 'x1', type: 'p', indent: 1, html: 'Statut ' + P('OK') + ' et <a href="#pg-p1">lien interne</a>' },
+  { id: 'fa', type: 'facts', items: [{ k: 'Hôte', v: 'srv1', alert: false }, { k: 'Risque', v: 'élevé', alert: true }] },
+  { id: 'vd', type: 'p', html: '' },
   { id: 't1', type: 'table', rows: [['Nom', 'État'], ['Serveur', P('OK')]] },
   { id: 'tl', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }, { date: '2025', title: 'Fin', text: '', color: 'ok' }] },
   { id: 'mp', type: 'map', height: 300, bg: 'vector', view: { lat: 48, lon: 2, z: 4 }, markers: [{ lat: 48.85, lon: 2.35, label: 'Paris', color: 'bad' }], zones: [], routes: [], list: false },
@@ -57,22 +63,56 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
       }
       return null; })()`);
 
-    // paragraphe : HTML à styles en ligne en thème clair, lien interne sans adresse, texte brut à côté
+    const DEUX = 'text/html,text/plain';   // sans image/png
+    // paragraphe : HTML à styles en ligne en thème clair, marqué, lien interne sans adresse ; texte brut à côté
     mesure();
     const t1 = await copier('x1'), p1 = await presse();
     if (t1 !== 'Copié pour Office') echec('message après la copie : ' + t1);
-    if (Object.keys(p1).sort().join() !== 'text/html,text/plain') echec('types du presse-papier (paragraphe) : ' + Object.keys(p1));
+    if (Object.keys(p1).sort().join() !== DEUX) echec('types du presse-papier (paragraphe) : ' + Object.keys(p1));
     else {
+      if (!/<div data-ardoise-office="1">/.test(p1['text/html'])) echec('marque absente du HTML copié : ' + p1['text/html'].slice(0, 200));
       if (!p1['text/html'].includes('background:#e3f3ea;color:#1f7a4d')) echec('pastille hors du thème clair : ' + p1['text/html']);
       if (/class=/.test(p1['text/html'].replace(/<meta[^>]*>/, ''))) echec('classe dans le HTML copié : ' + p1['text/html']);
       if (p1['text/html'].includes('#pg-p1') || !p1['text/html'].includes('<u>lien interne</u>')) echec('lien interne : ' + p1['text/html']);
-      if (p1['text/plain'] !== 'Statut #OK et lien interne') echec('texte brut : ' + JSON.stringify(p1['text/plain']));
+      // style d'Ardoise (ticket 03 de copie-office-style) : Segoe UI, retrait de 2em de 15 px en points
+      if (!p1['text/html'].includes("font-family:'Segoe UI',sans-serif") || !/<p style="[^"]*margin-left:22\.5pt/.test(p1['text/html'])) echec('paragraphe hors du style d\'Ardoise : ' + p1['text/html']);
+      if (p1['text/plain'] !== '  Statut #OK et lien interne') echec('texte brut : ' + JSON.stringify(p1['text/plain']));
     }
 
-    // tableau : vrai tableau à en-tête
+    // recollé dans Ardoise (vrai Ctrl+V) : du texte, pas un bloc image
+    mesure();
+    const images = () => evalue('document.querySelectorAll("#app .blk figure.fig img").length');
+    const avant = await images();
+    await evalue(`(() => { const f = document.querySelector('.fld[data-b="vd"]'); f.focus(); const r = document.createRange(); r.selectNodeContents(f); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`);
+    for (const type of ['keyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, modifiers: 2, key: 'v', code: 'KeyV', windowsVirtualKeyCode: 86, commands: type === 'keyDown' ? ['paste'] : [] });
+    await attendre(300);
+    const recolle = await evalue('document.querySelector(\'.fld[data-b="vd"]\').textContent');
+    if (!/Statut OK et lien interne/.test(recolle)) echec('recollage dans Ardoise : « ' + recolle + ' » au lieu du texte du paragraphe');
+    if ((await images()) !== avant) echec('recollage dans Ardoise : un bloc image a été inséré');
+
+    // image copiée ailleurs, avec un HTML sans marque puis seule : un bloc image à chaque fois
+    for (const html of ['<p>Image d\'une page web</p>', '']) {
+      mesure();
+      const blocs0 = await evalue('document.querySelectorAll("#app .blk[data-id]").length');
+      await evalue(`(async () => { const png = await (await fetch('data:image/png;base64,${PNG}')).blob();
+        const dt = new DataTransfer(); dt.items.add(new File([png], 'image.png', { type: 'image/png' })); if (${JSON.stringify(html)}) dt.setData('text/html', ${JSON.stringify(html)});
+        const f = document.querySelector('.fld[data-b="x1"]'); f.focus(); f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
+      let blocs1 = blocs0;
+      for (let i = 0; i < 40 && (blocs1 = await evalue('document.querySelectorAll("#app .blk[data-id]").length')) === blocs0; i++) await attendre(50);
+      if (blocs1 !== blocs0 + 1 || !(await evalue('(() => { const b = document.querySelector(".blk[data-id=x1]").nextElementSibling; return !!b && !!b.querySelector("img[src^=\'data:image/png\']"); })()')))
+        echec('image collée ' + (html ? 'avec un HTML sans marque' : 'seule') + ' : pas de bloc image après le paragraphe');
+    }
+
+    // fiche de faits : HTML et texte, sans image
+    mesure();
+    await copier('fa'); const p7 = await presse();
+    if (Object.keys(p7).sort().join() !== DEUX) echec('types du presse-papier (fiche de faits) : ' + Object.keys(p7));
+    else if (!/data-ardoise-office/.test(p7['text/html']) || !/Hôte/.test(p7['text/plain'])) echec('fiche de faits copiée : ' + JSON.stringify(p7).slice(0, 300));
+
+    // tableau : vrai tableau, en-tête en étiquette (capitales écrites, <td> : Writer centre et graisse un <th>)
     mesure();
     await copier('t1'); const p2 = await presse();
-    if (!/<table[\s\S]*<th[\s\S]*Nom/.test(p2['text/html'] || '')) echec('tableau copié : ' + p2['text/html']);
+    if (!/<table[\s\S]*>NOM<\/span><\/td>/.test(p2['text/html'] || '') || /<th/.test(p2['text/html'] || '')) echec('tableau copié : ' + p2['text/html']);
     if (p2['text/plain'] !== 'Nom\tÉtat\nServeur\t#OK') echec('texte brut du tableau : ' + JSON.stringify(p2['text/plain']));
 
     // carte au fond hors ligne : image/png de 680 px utiles (+ 2 × 8 de marge) à dpr 2, mer et épingle en couleurs claires
@@ -90,10 +130,10 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     if (!i4 || i4.l !== 1392) echec('image de la chronologie : ' + JSON.stringify(i4));
     else if (i4.n['#1f7a4d'] < 100 || i4.n['#5fd09a'] > 0) echec('points de la chronologie hors du thème clair : ' + JSON.stringify(i4.n));
 
-    // groupe (ticket 05) : titre en gras, diamant en tableau, sa chronologie en image intégrée au HTML
+    // groupe (ticket 05) : titre semi-gras marqué, diamant en losange (noms en étiquette), sa chronologie en image intégrée au HTML
     mesure();
     await copier('g1'); const p6 = await presse(), h6 = p6['text/html'] || '';
-    if (!/<b>Événement<\/b>[\s\S]*<table[\s\S]*<b>Adversaire<\/b>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
+    if (!/font-weight:600">[\s\S]{0,80}Événement<\/p>[\s\S]*<table[\s\S]*>ADVERSAIRE<\/span><\/p>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
     if (!(p6['text/plain'] || '').startsWith('Événement\nTitre\tCampagne X\nAdversaire\tAPT')) echec('texte brut du groupe : ' + JSON.stringify(p6['text/plain']));
 
     // presse-papier qui refuse : message d'erreur, pas « Copié »

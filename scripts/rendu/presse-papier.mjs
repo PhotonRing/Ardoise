@@ -113,3 +113,15 @@ test('copie de plage : le tableau HTML se recolle à l\'identique, pastilles com
     ['C', '<span class="pill pc-5" data-ad="d1">Très urgent</span>', 'deux lignes']]);
   egal(ctx.grilleEnHtml(TABLE(), { r1: 1, c1: 0, r2: 3, c2: 0, sauf: [2] }, 'd1'), '<table><tbody><tr><td>A &amp; B</td></tr><tr><td>D</td></tr></tbody></table>', 'ligne masquée exclue');
 });
+
+test('collage : seul un HTML copié pour Office par Ardoise est reconnu (il se recolle en texte, pas en image)', () => {
+  const marque = '<div data-ardoise-office="1"><p>Statut</p></div>';
+  egal(ctx.copieOffice(marque), true, 'HTML de la copie');
+  // tel que Chromium le rend au collage (capture réelle d'Edge sous Linux : scripts/fixtures/presse-papier/ardoise/)
+  egal(ctx.copieOffice('<html><head></head><body>' + marque + '</body></html>'), true, 'enveloppé par Chromium');
+  egal(ctx.copieOffice('<meta charset="utf-8">' + marque.replace(/"/g, "'")), true, 'meta et guillemets simples');
+  egal(ctx.copieOffice(readFileSync(new URL('../fixtures/presse-papier/ardoise/presse.html', import.meta.url), 'utf8')), false, 'HTML sans marque (page de mesure)');
+  egal(ctx.copieOffice(readFileSync(new URL('../fixtures/presse-papier/calc/presse.html', import.meta.url), 'utf8')), false, 'plage de Calc');
+  egal(ctx.copieOffice('<p>data-ardoise-office="1"</p>'), false, 'texte qui cite la marque');
+  egal(ctx.copieOffice(''), false, 'pas de HTML');
+});

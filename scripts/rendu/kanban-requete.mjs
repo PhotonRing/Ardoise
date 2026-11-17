@@ -82,7 +82,7 @@ test('requête kanban, gestes : masquer ou afficher un champ, le déplacer (prem
   egal(pur(ctx.qChampBasculer(b, 'texte')), { masques: [], ordre: [] }, 'clé inconnue purgée');
 });
 
-const office = (q) => { const { ctx, d } = monter(doc(q)); const e = ctx.officeBloc(d.pages[0].blocks[1], d, { page: 0 }); return { texte: ctx.officeTexte(e), html: ctx.officeHtml(e, d) }; };
+const office = (q) => { const { ctx, d } = monter(doc(q)); const e = ctx.officeBloc(d.pages[0].blocks[1], d, { page: 0 }); return { texte: ctx.officeTexte(e), html: ctx.officeHtmlBloc(d.pages[0].blocks[1], d, { page: 0 }) }; };
 test('office : requête kanban, cartes aux champs choisis avec « Attend », colonne « Attend » en tableau', () => {
   egal(office({}).texte.split('\n')[0], 'À faire (3)\tFait (1)', 'en-têtes des colonnes');
   const t = office({ champs: { masques: ['source', 'echeance'], ordre: ['attend'] } }).texte;

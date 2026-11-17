@@ -23,6 +23,12 @@ function pastillesDuCollage(html, idDoc) {
     return '<span class="pill' + cls.replace(/\s*\bpc-\d+\b/g, '') + '"' + attrs + '>' + inner + '</span>';
   });
 }
+/* ---------- Copie pour Office recollée dans Ardoise ----------
+   La marque posée autour du HTML de « Copier pour Office » fait recoller ce bloc en texte (gestionnaire paste, 12-saisie.js),
+   même si une image l'accompagne ; une image copiée ailleurs, avec ou sans HTML, reste une image. */
+var OFFICE_MARQUE = 'data-ardoise-office';
+function htmlCopieOffice(html) { return '<div ' + OFFICE_MARQUE + '="1">' + html + '</div>'; }
+function copieOffice(html) { return new RegExp('<[a-z][^>]*\\s' + OFFICE_MARQUE + '\\s*=', 'i').test(String(html || '')); }
 /* ---------- Plage de cellules collée ----------
    Un tableur (Excel, Google Sheets, LibreOffice Calc), Word ou une page web mettent un <table> dans text/html et des
    tabulations dans text/plain. Le découpage est pur ; l'assainissement (sanitize, qui demande le DOM) se fait au collage. */
