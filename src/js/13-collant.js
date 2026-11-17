@@ -28,7 +28,14 @@ function decalageCurseur(curseur, barres, marge) {
   });
   return d;
 }
-// ligne du curseur sortie de sous la barre collante de son bloc quand le curseur bouge (selectionchange), jamais au simple défilement
+// Ancre .collant déplacée de sa place normale par le défilement. En flux, de hauteur nulle et en tête de son bloc (07-rendu.js),
+// elle est à sa place normale au haut du contenu du bloc ; un élément en flux placé avant elle fausserait cette mesure.
+function ancreCollee(a) {
+  var p = a.parentElement, r = p.getBoundingClientRect();
+  return a.getBoundingClientRect().top > r.top + p.clientTop + (parseFloat(getComputedStyle(p).paddingTop) || 0) + 0.5;
+}
+// ligne du curseur sortie de sous la barre collée de son bloc quand le curseur bouge (selectionchange), jamais au simple défilement ;
+// une barre à sa place normale, au-dessus du bloc, ne compte pas : avec la marge, elle ferait remonter la page à chaque frappe
 var collantAttente = 0;   // image d'animation demandée
 document.addEventListener('selectionchange', function () {
   if (mode !== 'edit' || collantAttente) return;
@@ -39,7 +46,7 @@ document.addEventListener('selectionchange', function () {
     var rg = document.createRange(); rg.setStart(s.focusNode, s.focusOffset);
     var c = rg.getBoundingClientRect(); if (!c.height) c = f.getBoundingClientRect();
     var barres = $$('.collant', blk).map(function (a) {
-      var b = a.firstElementChild; return b && getComputedStyle(b).visibility === 'visible' ? b.getBoundingClientRect() : null;
+      var b = a.firstElementChild; return b && getComputedStyle(b).visibility === 'visible' && ancreCollee(a) ? b.getBoundingClientRect() : null;
     }).filter(Boolean);
     var d = decalageCurseur(c, barres, 4); if (d) scrollBy(0, -d);
   });
