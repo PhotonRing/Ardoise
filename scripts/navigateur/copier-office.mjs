@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 const P = (t) => '<span class="pill">' + t + '</span>';
 const DOC = { v: 6, id: 'doc-copier-office', title: 'Office', theme: 'dark', tags: { ok: { c: 0 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
-  { id: 'x1', type: 'p', html: 'Statut ' + P('OK') + ' et <a href="#pg-p1">lien interne</a>' },
+  { id: 'x1', type: 'p', indent: 1, html: 'Statut ' + P('OK') + ' et <a href="#pg-p1">lien interne</a>' },
   { id: 't1', type: 'table', rows: [['Nom', 'État'], ['Serveur', P('OK')]] },
   { id: 'tl', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }, { date: '2025', title: 'Fin', text: '', color: 'ok' }] },
   { id: 'mp', type: 'map', height: 300, bg: 'vector', view: { lat: 48, lon: 2, z: 4 }, markers: [{ lat: 48.85, lon: 2.35, label: 'Paris', color: 'bad' }], zones: [], routes: [], list: false },
@@ -66,7 +66,9 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
       if (!p1['text/html'].includes('background:#e3f3ea;color:#1f7a4d')) echec('pastille hors du thème clair : ' + p1['text/html']);
       if (/class=/.test(p1['text/html'].replace(/<meta[^>]*>/, ''))) echec('classe dans le HTML copié : ' + p1['text/html']);
       if (p1['text/html'].includes('#pg-p1') || !p1['text/html'].includes('<u>lien interne</u>')) echec('lien interne : ' + p1['text/html']);
-      if (p1['text/plain'] !== 'Statut #OK et lien interne') echec('texte brut : ' + JSON.stringify(p1['text/plain']));
+      // style d'Ardoise (ticket 03 de copie-office-style) : Segoe UI, retrait de 2em de 15 px en points
+      if (!p1['text/html'].includes("font-family:'Segoe UI',sans-serif") || !/<p style="[^"]*margin-left:22\.5pt/.test(p1['text/html'])) echec('paragraphe hors du style d\'Ardoise : ' + p1['text/html']);
+      if (p1['text/plain'] !== '  Statut #OK et lien interne') echec('texte brut : ' + JSON.stringify(p1['text/plain']));
     }
 
     // tableau : vrai tableau à en-tête

@@ -314,30 +314,59 @@ function officeRequete(b, d, pi, S, txt, para) {
   return out.concat(plus);
 }
 
-/* Éléments neutres → HTML à styles en ligne (aucune classe), thème clair */
-var OFFICE_POLICE = 'Arial,Helvetica,sans-serif', OFFICE_MONO = 'Consolas,\'Courier New\',monospace';
-function officeHtml(elts, d) {
+/* Socle du style d'Ardoise dans le HTML collé : polices présentes sous Windows avec remplaçant générique, tailles de page.css en points,
+   couleurs du thème clair et accent de la palette ; formes en fonds de cellules et bordures de tableaux pleine largeur (Writer : attribut width).
+   Writer lit la première valeur d'un raccourci margin comme marge gauche : raccourci à 0 en tête, sinon margin-top / margin-bottom. */
+var OFFICE_POLICES = { texte: "'Segoe UI',sans-serif", titre: "'Segoe UI Semibold','Segoe UI',sans-serif", mono: 'Consolas,monospace' };
+function officePt(px) { return Math.round(px * 75) / 100 + 'pt'; }   // 1 px = 0,75 pt
+// étiquette en petites capitales grises à espacement large (police mono d'Ardoise, 11 px, .06em) : clés, en-têtes, sommets, titre du sommaire
+var OFFICE_ETIQUETTE = 'font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(11) + ';letter-spacing:.5pt;text-transform:uppercase;color:' + OFFICE_CLAIR.muted + ';';
+// capitales écrites dans le texte (Writer ignore text-transform) ; copies : les segments reçus ne changent pas
+function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte) c.texte = c.texte.toUpperCase(); return c; }); }
+function officeTable(lignes, style) { return '<table width="100%" style="border-collapse:collapse;width:100%;' + (style || '') + '">' + lignes + '</table>'; }
+// cellule : police du texte posée sur elle (Writer ne fait pas hériter la police de l'enveloppe dans un tableau), style reçu ensuite
+function officeCellule(contenu, style, largeur) { return '<td' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';' + (style || '') + '">' + contenu + '</td>'; }
+// segments → HTML : formes, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte
+function officeSegmentsHtml(arr, d) {
+  var C = OFFICE_CLAIR, acc = officeAccent(d);
+  return arr.map(function (g) {
+    if (g.saut) return '<br>';
+    var h = esc(g.texte);
+    if (g.pastille) return '<span style="background:' + g.pastille.fond + ';color:' + g.pastille.texte + ';font-family:' + OFFICE_POLICES.titre + ';font-weight:600;font-size:' + officePt(12) + ';padding:1px 6px">' + h + '</span>';
+    if (g.code) h = '<code style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(13) + ';background:' + acc[1] + ';color:' + C.fg + '">' + h + '</code>';
+    if (g.gras) h = '<b>' + h + '</b>';
+    if (g.italique) h = '<i>' + h + '</i>';
+    if (g.barre) h = '<s>' + h + '</s>';
+    if (g.couleur) h = '<span style="color:' + g.couleur + '">' + h + '</span>';
+    if (g.lien) return '<a href="' + esc(g.lien) + '" style="color:' + acc[0] + '">' + h + '</a>';
+    if (g.souligne) h = '<u>' + h + '</u>';
+    return h;
+  }).join('');
+}
+function officeEnveloppe(h) { return '<div style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';line-height:1.6;color:' + OFFICE_CLAIR.fg + ';max-width:' + OFFICE_LARGEUR + 'px">' + h + '</div>'; }
+// rendu stylé par type de bloc : chaque famille (09-office-*.js) inscrit ses types, function (b, x) → HTML sans enveloppe
+var OFFICE_RENDUS = {};
+// point d'entrée du HTML de Copier pour Office ; un type sans rendu inscrit passe par ses éléments neutres
+function officeHtmlBloc(b, d, opts) { return officeEnveloppe(officeHtmlContenu(b, d, opts)); }
+function officeHtmlContenu(b, d, opts) {
+  opts = opts || {};
+  var rendu = OFFICE_RENDUS[b.type];
+  if (!rendu) return officeHtmlElements(officeBloc(b, d, opts), d);
+  var acc = officeAccent(d);
+  return rendu(b, { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
+    S: function (html) { return officeSegments(R(html), d); }, segs: function (arr) { return officeSegmentsHtml(arr, d); } });
+}
+
+/* Éléments neutres → HTML à styles en ligne (aucune classe), thème clair, polices du socle */
+function officeHtml(elts, d) { return officeEnveloppe(officeHtmlElements(elts, d)); }
+function officeHtmlElements(elts, d) {
   var C = OFFICE_CLAIR, acc = officeAccent(d)[0];
-  var segs = function (arr) {
-    return arr.map(function (g) {
-      if (g.saut) return '<br>';
-      var h = esc(g.texte);
-      if (g.pastille) return '<span style="background:' + g.pastille.fond + ';color:' + g.pastille.texte + ';border-radius:999px;padding:1px 6px;font-weight:bold;font-size:9pt">' + h + '</span>';
-      if (g.code) h = '<code style="font-family:' + OFFICE_MONO + ';background:' + C['code-soft'] + '">' + h + '</code>';
-      if (g.gras) h = '<b>' + h + '</b>';
-      if (g.italique) h = '<i>' + h + '</i>';
-      if (g.barre) h = '<s>' + h + '</s>';
-      if (g.couleur) h = '<span style="color:' + g.couleur + '">' + h + '</span>';
-      if (g.lien) return '<a href="' + esc(g.lien) + '" style="color:' + acc + '">' + h + '</a>';
-      if (g.souligne) h = '<u>' + h + '</u>';
-      return h;
-    }).join('');
-  };
+  var segs = function (arr) { return officeSegmentsHtml(arr, d); };
   var P = 'margin:0 0 6pt;', PARA = {
     surtitre: 'font-size:9pt;letter-spacing:1px;text-transform:uppercase;color:' + acc + ';', chapeau: 'font-size:12pt;color:' + C.muted + ';',
     pied: 'font-size:9pt;color:' + C.muted + ';border-top:1px solid ' + C.line + ';padding-top:6pt;', legende: 'font-size:9pt;font-style:italic;color:' + C.muted + ';'
   };
-  var TITRES = [['h1', '24pt'], ['h1', '16pt'], ['h2', '13pt'], ['h3', '11pt']];
+  var TITRES = [['h1', officePt(40)], ['h1', officePt(21)], ['h2', officePt(15)], ['h3', officePt(15)]];
   var cellule = 'border:1px solid ' + C.line + ';padding:4pt 6pt;vertical-align:top;text-align:left;';
   var liste = function (e) {
     // cases à cocher : des paragraphes en retrait (Writer reprend une liste sans puce comme une liste à puces)
@@ -359,7 +388,7 @@ function officeHtml(elts, d) {
   };
   var un = function (e) {
     switch (e.t) {
-      case 'titre': var tt = TITRES[e.niveau] || TITRES[3]; return '<' + tt[0] + ' style="font-family:' + OFFICE_POLICE + ';font-size:' + tt[1] + ';font-weight:bold;color:' + C.fg + ';margin:12pt 0 6pt">' + segs(e.segs) + '</' + tt[0] + '>';
+      case 'titre': var tt = TITRES[e.niveau] || TITRES[3]; return '<' + tt[0] + ' style="font-family:' + OFFICE_POLICES.titre + ';font-size:' + tt[1] + ';font-weight:bold;color:' + C.fg + ';margin-top:12pt;margin-bottom:6pt">' + segs(e.segs) + '</' + tt[0] + '>';
       case 'para': return '<p style="' + P + (PARA[e.style] || '') + (e.retrait ? 'margin-left:' + 2 * e.retrait + 'em;' : '') + '">' + segs(e.segs) + '</p>';
       case 'liste': return liste(e);
       case 'tableau':
@@ -373,10 +402,10 @@ function officeHtml(elts, d) {
         return '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + e.fond + ';padding:6pt 9pt;' +
           (e.barre ? 'border-left:4px solid ' + e.barre : 'border:1px solid ' + C.line) + '">' + tous(e.contenu) + '</td></tr></table>';
       case 'code':
-        return (e.nom ? '<p style="' + P + 'font-family:' + OFFICE_MONO + ';font-size:8pt;color:' + C.muted + '">' + esc(e.nom) + '</p>' : '') +
+        return (e.nom ? '<p style="' + P + 'font-family:' + OFFICE_POLICES.mono + ';font-size:8pt;color:' + C.muted + '">' + esc(e.nom) + '</p>' : '') +
           // fond sur une cellule pleine largeur (attribut width pour Writer) : Google Docs ne teinte un <pre> que sous le texte
           '<table width="100%" style="border-collapse:collapse;width:100%;margin:0 0 6pt"><tr><td width="100%" style="background:' + C['code-soft'] + ';padding:6pt 8pt">' +
-          '<pre style="font-family:' + OFFICE_MONO + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
+          '<pre style="font-family:' + OFFICE_POLICES.mono + ';font-size:9.5pt;color:' + C.fg + ';margin:0;white-space:pre-wrap">' + esc(e.texte) + '</pre></td></tr></table>';
       case 'image':
         var l = e.l, h = e.h; if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
         return '<p style="' + P + '"><img src="' + esc(e.src) + '" alt="' + esc(e.alt) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + '></p>' +
@@ -386,7 +415,7 @@ function officeHtml(elts, d) {
     return '';
   };
   var tous = function (arr) { return arr.map(un).join(''); };
-  return '<div style="font-family:' + OFFICE_POLICE + ';font-size:11pt;color:' + C.fg + '">' + tous(elts) + '</div>';
+  return tous(elts);
 }
 /* Éléments neutres → texte brut : pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
 function officeTexte(elts) {

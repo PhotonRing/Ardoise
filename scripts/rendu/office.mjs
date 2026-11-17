@@ -61,7 +61,7 @@ test('office : HTML à styles en ligne, sans classe, lien interne sans adresse',
   vrai(!/class=/.test(html), 'aucune classe : ' + html);
   vrai(html.includes('<a href="https://ex.fr/a?b=1&amp;c=2"'), 'lien web gardé');
   vrai(html.includes('<u>interne</u>') && !html.includes('#pg-p2'), 'lien interne en texte souligné, sans adresse');
-  vrai(html.includes('<span style="background:#e3f3ea;color:#1f7a4d;border-radius:999px'), 'pastille du registre en thème clair');
+  vrai(html.includes('<span style="background:#e3f3ea;color:#1f7a4d;'), 'pastille du registre en thème clair');
   vrai(html.includes('<b>gras</b>') && html.includes('<i>it</i>') && html.includes('<s>bar</s>') && /<code style="[^"]*">x&lt;y<\/code>/.test(html), 'formes');
   vrai(html.includes('<br>ligne 2'), 'saut de ligne');
 });
@@ -71,7 +71,7 @@ test('office : titres de niveaux (en-tête, section, sous-section, sous-titre, �
   egal(niveaux, [[[0, 'Incident 42']], [[1, 'Section']], [[2, 'Sous-section']], [[3, 'Petit titre']], [[1, '1 Isoler']], [[1, '2 Nettoyer']]]);
   const { e, html } = office('hd');
   egal(e.map((x) => x.style || x.t), ['surtitre', 'titre', 'chapeau']);
-  vrai(/^<div style="[^"]*"><p style="[^"]*text-transform:uppercase[^"]*">Rapport<\/p><h1 style="[^"]*font-size:24pt/.test(html), html);
+  vrai(/^<div style="[^"]*"><p style="[^"]*text-transform:uppercase[^"]*">Rapport<\/p><h1 style="[^"]*font-size:30pt/.test(html), html);
   vrai(/<h2 style="[^"]*">Sous-section<\/h2>/.test(office('s2').html) && /<h3 style="[^"]*">Petit titre<\/h3>/.test(office('s3').html), 'h2 et h3');
 });
 

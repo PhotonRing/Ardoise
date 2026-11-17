@@ -1,5 +1,5 @@
 /* ---------- Copier pour Office ----------
-   HTML à styles en ligne et texte brut d'un bloc (08-office.js) ; une carte ou une chronologie part en image PNG, dessinée
+   HTML au style d'Ardoise et texte brut d'un bloc (08-office.js) ; une carte ou une chronologie part en image PNG, dessinée
    hors écran en thème clair à la largeur de la page imprimée, sans bibliothèque. Hors historique : rien n'est modifié. */
 function copierPourOffice(b) {
   var refus = function () { toast('Le presse-papier a refusé la copie'); };
@@ -11,8 +11,9 @@ function copierPourOffice(b) {
     item = { 'image/png': img.then(function (r) { horsLigne = r.horsLigne; return r.blob; }), 'text/plain': img.then(function () { return texte(officeTexte(officeBloc(b, doc, { page: doc.cur }))); }) };
   } else {
     // un groupe emporte en images les cartes et chronologies de ses blocs
-    var elts = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return officeBloc(b, doc, { page: doc.cur, images: r.images }); });
-    item = { 'text/html': elts.then(function (e) { return new Blob([officeHtml(e, doc)], { type: 'text/html' }); }), 'text/plain': elts.then(function (e) { return texte(officeTexte(e)); }) };
+    // HTML au style d'Ardoise (officeHtmlBloc), texte brut par les éléments neutres
+    var o = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return { page: doc.cur, images: r.images }; });
+    item = { 'text/html': o.then(function (x) { return new Blob([officeHtmlBloc(b, doc, x)], { type: 'text/html' }); }), 'text/plain': o.then(function (x) { return texte(officeTexte(officeBloc(b, doc, x))); }) };
   }
   return navigator.clipboard.write([new ClipboardItem(item)]).then(function () {
     toast(horsLigne ? 'Copié pour Office, sur le fond hors ligne : le fond en ligne de la carte ne peut pas être copié' : 'Copié pour Office', horsLigne ? 6000 : 0);
