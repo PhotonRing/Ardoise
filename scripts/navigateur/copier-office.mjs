@@ -129,10 +129,10 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     if (Object.keys(p8).sort().join() !== 'text/html,text/plain') echec('types du presse-papier (image d\'une autre origine) : ' + Object.keys(p8));
     else if (!/data-ardoise-office/.test(p8['text/html']) || !/autre origine/.test(p8['text/plain'])) echec('copie sans image : ' + JSON.stringify(p8).slice(0, 300));
 
-    // tableau : vrai tableau à en-tête
+    // tableau : vrai tableau, en-tête en étiquette (capitales écrites, <td> : Writer centre et graisse un <th>)
     mesure();
     await copier('t1'); const p2 = await presse();
-    if (!/<table[\s\S]*<th[\s\S]*Nom/.test(p2['text/html'] || '')) echec('tableau copié : ' + p2['text/html']);
+    if (!/<table[\s\S]*>NOM<\/span><\/td>/.test(p2['text/html'] || '') || /<th/.test(p2['text/html'] || '')) echec('tableau copié : ' + p2['text/html']);
     if (p2['text/plain'] !== 'Nom\tÉtat\nServeur\t#OK') echec('texte brut du tableau : ' + JSON.stringify(p2['text/plain']));
 
     // carte au fond hors ligne : image/png de 680 px utiles (+ 2 × 8 de marge) à dpr 2, mer et épingle en couleurs claires
