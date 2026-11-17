@@ -257,7 +257,7 @@ var BOUTONS_MF = [
   ['bold', 'Gras (Ctrl+B)', '<b>G</b>'], ['italic', 'Italique (Ctrl+I)', '<i>I</i>'], ['underline', 'Souligné (Ctrl+U)', '<u>S</u>'], ['strikeThrough', 'Barré', '<s>B</s>'], '|',
   ['code', 'Code (Ctrl+J)', '<span style="font-family:var(--f-mono)">&lt;/&gt;</span>'], ['link', 'Lien vers une adresse (Ctrl+K)', 'Lien'], ['pagelink', 'Lien vers une page ou une section du document', 'Page'], '|',
   ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille'],
-  ['alert', 'Texte rouge', '<span style="color:#ff8a80">A</span>'], '|',
+  ['couleur', 'Couleur du texte', '<span class="bmf-c">A</span>'], ['surlignage', 'Surlignage', '<span class="bmf-s">ab</span>'], '|',
   ['clear', 'Effacer la mise en forme', '⌫']
 ];
 var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
@@ -265,9 +265,68 @@ bmf.innerHTML = '<div class="bmf-b">' + BOUTONS_MF.map(function (x) {
   return x === '|' ? '<span class="vsep"></span>' : '<button type="button" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '">' + x[2] + '</button>';
 }).join('') + '</div>';
 // souris et toucher : la sélection et le focus restent dans le texte
-['mousedown', 'pointerdown'].forEach(function (t) { bmf.addEventListener(t, function (e) { e.preventDefault(); }); });
-bmf.addEventListener('click', function (e) { var b = e.target.closest('[data-mf]'); if (b) inlineAction(b.dataset.mf); });
+// paletteAvant : palette ouverte à l'appui (pointerdown empêché supprime le mousedown, le document ne la referme donc pas) ;
+// un second clic sur son bouton la ferme
+var paletteAvant = null;
+['mousedown', 'pointerdown'].forEach(function (t) { bmf.addEventListener(t, function (e) { e.preventDefault(); if (t === 'pointerdown') paletteAvant = pop && pop.bmfPal; }); });
+bmf.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-mf]'), avant = paletteAvant; paletteAvant = null; if (!b) return;
+  var k = b.dataset.mf;
+  if (FAMILLES_TEINTE[k]) { if (avant !== k) ouvrirPalette(k, b); else closePop(); }
+  else inlineAction(k);
+});
+/* Couleur du texte et surlignage : palettes fixes (COULEURS_TEXTE, SURLIGNAGES, 02-assainissement.js), ouvertes en fenêtre pop
+   qui ne prend pas le focus. Un texte porte au plus une couleur et au plus un surlignage, indépendants l'un de l'autre */
+var FAMILLES_TEINTE = { couleur: COULEURS_TEXTE, surlignage: SURLIGNAGES };
+function ouvrirPalette(famille, ancre) {
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop bmf-pal'; p.bmfPal = famille;
+  p.setAttribute('aria-label', famille === 'couleur' ? 'Couleur du texte' : 'Surlignage');
+  p.innerHTML = FAMILLES_TEINTE[famille].map(function (x) {
+    return '<button type="button" data-teinte="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '"><span class="' + x[0] + '">A</span></button>';
+  }).join('') + '<button type="button" class="bmf-sans" data-teinte="" title="Sans couleur" aria-label="Sans couleur"><span></span></button>';
+  ['mousedown', 'pointerdown'].forEach(function (t) { p.addEventListener(t, function (e) { e.preventDefault(); }); });
+  p.addEventListener('click', function (e) { var b = e.target.closest('[data-teinte]'); if (!b) return; closePop(); appliquerTeinte(famille, b.dataset.teinte); });
+  pop = p; placePop(p, ancre);
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop && pop.bmfPal) { e.preventDefault(); e.stopPropagation(); closePop(); } }, true);
+function deLaFamille(n, famille) { return n.nodeType === 1 && n.tagName === 'SPAN' && FAMILLES_TEINTE[famille].some(function (x) { return n.classList.contains(x[0]); }); }
+// retire les classes de la famille ; un span sans plus aucune classe est défait
+function retirerFamille(el, famille) {
+  FAMILLES_TEINTE[famille].forEach(function (x) { el.classList.remove(x[0]); });
+  if (!el.classList.length) unwrap(el);
+}
+// cls : classe de la palette, '' pour « Sans couleur ». Sans sélection, rien
+function appliquerTeinte(famille, cls) {
+  var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
+  var r = s.getRangeAt(0), fld = fieldOf(r.commonAncestorContainer); if (!fld || !fld.hasAttribute('data-rich')) return;
+  // ancêtre de la famille qui englobe la sélection : coupé en trois (avant, sélection, après), les deux bouts gardent leur teinte
+  var n = r.commonAncestorContainer, haut = null; if (n.nodeType !== 1) n = n.parentNode;
+  for (; n && n !== fld; n = n.parentNode) if (deLaFamille(n, famille)) haut = n;
+  if (haut) {
+    var deb = r.startContainer, debO = r.startOffset, fin = r.endContainer, finO = r.endOffset;
+    var bout = function (avant) {
+      var b = document.createRange();
+      if (avant) { b.setStart(haut, 0); b.setEnd(deb, debO); } else { b.setStart(fin, finO); b.setEnd(haut, haut.childNodes.length); }
+      var f = b.extractContents(); if (!f.textContent.replace(/​/g, '') && !f.querySelector('br, span.pill')) return;
+      // éléments vidés par la coupe (le reste d'un gras coupé à son bord) retirés
+      Array.prototype.slice.call(f.querySelectorAll('*')).reverse().forEach(function (x) { if (!x.textContent && !x.matches('br') && !x.querySelector('br')) x.remove(); });
+      var c = haut.cloneNode(false); c.appendChild(f); haut.parentNode.insertBefore(c, avant ? haut : haut.nextSibling);
+    };
+    bout(false); bout(true);   // la fin d'abord : le début de la sélection reste valable
+    r = document.createRange(); r.selectNode(haut);
+  }
+  // les teintes de la famille présentes dans la sélection sont retirées, puis la sélection est enveloppée
+  var f = r.extractContents();
+  Array.prototype.slice.call(f.querySelectorAll('span')).forEach(function (x) { if (deLaFamille(x, famille)) retirerFamille(x, famille); });
+  var nr = document.createRange();
+  if (cls) { var el = document.createElement('span'); el.className = cls; el.appendChild(f); r.insertNode(el); nr.selectNodeContents(el); }
+  else { var premier = f.firstChild, dernier = f.lastChild; if (!premier) return; r.insertNode(f); nr.setStartBefore(premier); nr.setEndAfter(dernier); }
+  s.removeAllRanges(); s.addRange(nr);
+  fire(fld);
+}
 function cacherBarreMiseEnForme() {
+  if (pop && pop.bmfPal) closePop();
   bmf.hidden = true;
   var a = bmf.parentNode; if (a && a.style) a.style.removeProperty('--recul');
 }
@@ -311,12 +370,10 @@ function inlineAction(kind) {
   var tag = 'span', cls = '';
   if (kind === 'code') tag = 'code';
   else if (kind === 'link' || kind === 'pagelink') tag = 'a';
-  else if (kind === 'alert') cls = 'alert';
   else cls = 'pill';
   var existing = ancestor(function (n) {
     if (tag === 'code') return n.tagName === 'CODE';
     if (tag === 'a') return n.tagName === 'A';
-    if (kind === 'alert') return n.tagName === 'SPAN' && n.classList.contains('alert');
     return n.tagName === 'SPAN' && n.classList.contains('pill');
   });
   if (existing && tag === 'a') {
@@ -491,7 +548,7 @@ function wrapInline(tag, cls, href, fld) {
   var r = s.getRangeAt(0);
   var el = document.createElement(tag); if (cls) el.className = cls; if (href) el.setAttribute('href', href);
   el.appendChild(r.extractContents());
-  $$(tag === 'span' ? 'span.pill,span.alert' : tag, el).forEach(unwrap);
+  $$(tag === 'span' ? 'span.pill' : tag, el).forEach(unwrap);   // même famille seulement : une couleur ou un surlignage enveloppé reste
   r.insertNode(el);
   s.removeAllRanges(); var nr2 = document.createRange(); nr2.selectNodeContents(el); s.addRange(nr2);
   fire(fld);
