@@ -23,8 +23,24 @@ const FOCUS = (ligne) => `(() => { const c = document.querySelector('.blk[data-i
 // défile pour que le haut du tableau soit à y px du haut de la fenêtre
 const DEFILER = (y) => `(() => { const b = document.querySelector('.blk[data-id="tab"]'); scrollBy(0, b.getBoundingClientRect().top - (${y})); return true; })()`;
 
+// numéro de la ligne du tableau cachée sous le menu collé, 0 s'il n'y en a pas
+const SOUS_MENU = `(() => { const m = document.querySelector('.blk[data-id="tab"] .blk-bar').getBoundingClientRect();
+  const tr = [...document.querySelectorAll('.blk[data-id="tab"] tbody tr')].find((t) => { const r = t.getBoundingClientRect(); return r.top < m.bottom - 2 && r.bottom > m.top + 2; });
+  return tr ? [...tr.parentNode.children].indexOf(tr) + 1 : 0; })()`;
+// document de blocs de texte entre des paragraphes de remplissage, pour les placer au milieu de l'écran
+const TEXTES = `(() => {
+  const d = JSON.parse(JSON.stringify(window.ardoise.doc)), rem = (i) => ({ id: 'r' + i, type: 'p', html: 'Remplissage ' + i + '. Texte courant pour donner de la hauteur à la page. '.repeat(6) });
+  d.pages[0].blocks = [rem(1), rem(2), rem(3), { id: 'st', type: 'subtitle', html: 'Un sous-titre' }, rem(4), rem(5),
+    { id: 'ss', type: 'h3', html: 'Une sous-section' }, rem(6), rem(7), { id: 'ts', type: 'h2', html: 'Un titre de section' }, rem(8), rem(9),
+    { id: 'pa', type: 'p', html: 'Un paragraphe' }, rem(10), rem(11), rem(12), rem(13)];
+  return window.ardoise.load(d); })()`;
+// bloc au milieu de l'écran, curseur en fin de texte dans son champ
+const MILIEU = (id) => `(() => { const b = document.querySelector('.blk[data-id="${id}"]'), f = b.querySelector('.fld:not(.num)');
+  scrollBy(0, b.getBoundingClientRect().top - innerHeight / 2); f.focus({ preventScroll: true });
+  const s = getSelection(), rg = document.createRange(); rg.selectNodeContents(f); rg.collapse(false); s.removeAllRanges(); s.addRange(rg); return true; })()`;
+
 export const nom = 'menu collant';
-export default async function ({ ecran, charger, evalue, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
   const pres = (a, b) => Math.abs(a - b) <= 1;
   for (const [w, mobile] of [[360, true], [1000, false]]) {
     const cas = `${w} px ${mobile ? 'mobile' : 'bureau'}`;
@@ -69,5 +85,33 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
     await attendre(150); await evalue(DEFILER(-600)); await attendre(100);
     o = await evalue(MESURE); mesure();
     if (!pres(o.tab.mHaut, o.haut)) echec(`${cas}, barre du haut de 80 px : menu à ${o.tab.mHaut.toFixed(1)} px, attendu ${o.haut.toFixed(1)} px`);
+  }
+
+  // frappe dans un bloc au milieu de l'écran : sa barre est à sa place normale, la page ne défile pas
+  // (origine : spec copie-office-style, ticket 1 ; la page remontait d'1 px par frappe dans un Sous-titre ou une Sous-section)
+  for (const [w, mobile] of [[360, true], [1000, false]]) {
+    const cas = `${w} px ${mobile ? 'mobile' : 'bureau'}`;
+    await ecran(w, mobile);
+    await charger(); await evalue(TEXTES); await attendre(100);
+    for (const [id, nomBloc] of [['st', 'un Sous-titre'], ['ss', 'une Sous-section'], ['ts', 'un Titre de section'], ['pa', 'un paragraphe']]) {
+      await evalue(MILIEU(id)); await attendre(100);
+      const avant = await evalue('scrollY');
+      for (const c of 'abcdef') { await cdp('Input.insertText', { text: c }); await attendre(40); }
+      await attendre(100);
+      const apres = await evalue('scrollY'); mesure();
+      if (apres !== avant) echec(`${cas} : taper dans ${nomBloc} fait défiler la page (scrollY ${avant} → ${apres})`);
+    }
+
+    // simple défilement : la ligne du curseur passe sous le menu collé du tableau, aucun dégagement sans mouvement du curseur
+    await evalue(CHARGER); await attendre(100);
+    await evalue(DEFILER(-600)); await attendre(100);
+    const sous = await evalue(SOUS_MENU);
+    if (!sous) { echec(`${cas} : aucune ligne sous le menu collant pour l'essai du simple défilement`); continue; }
+    await evalue(DEFILER(0)); await attendre(100);
+    await evalue(FOCUS(sous)); await attendre(150);
+    await evalue(DEFILER(-600)); await attendre(100);
+    const voulu = await evalue('scrollY'); await attendre(150);
+    const obtenu = await evalue('scrollY'); mesure();
+    if (obtenu !== voulu) echec(`${cas} : le simple défilement déplace la page pour dégager le curseur (scrollY ${voulu} → ${obtenu})`);
   }
 }
