@@ -42,6 +42,14 @@ const DOC = { v: 6, title: 'Doc', tags: { ok: { c: 0 }, ko: { c: 1 } }, pages: [
 const office = (id, doc = DOC, opts) => { const { ctx, d } = monter(doc); const b = d.pages[0].blocks.find((x) => x.id === id); const e = ctx.officeBloc(b, d, opts || { page: 0 }); return { e, html: ctx.officeHtml(e, d), texte: ctx.officeTexte(e), d, ctx }; };
 const pur = (x) => JSON.parse(JSON.stringify(x));
 
+test('office : le HTML de « Copier pour Office » porte la marque d\'Ardoise autour du rendu du bloc', () => {
+  const { ctx, html } = office('p1');
+  const copie = ctx.htmlCopieOffice(html);
+  vrai(copie.startsWith('<div data-ardoise-office="1">') && copie.endsWith('</div>'), 'marque en tête : ' + copie.slice(0, 80));
+  vrai(copie.includes(html), 'rendu du bloc gardé tel quel');
+  vrai(ctx.copieOffice(copie), 'marque reconnue');
+});
+
 test('office : segments d\'un texte enrichi (formes, liens, pastilles en thème clair, saut de ligne)', () => {
   const { e, d } = office('p1');
   egal(pur(e[0].segs), [
