@@ -250,32 +250,58 @@ function openFile(anchor) {
   placePop(p, anchor);
 }
 
-/* Barre de mise en forme du texte sélectionné */
-var itb = document.createElement('div'); itb.className = 'itb'; itb.style.display = 'none';
-itb.innerHTML = '<button data-i="bold" title="Gras (Ctrl+B)"><b>G</b></button><button data-i="italic" title="Italique (Ctrl+I)"><i>I</i></button>' +
-  '<button data-i="code" title="Code (Ctrl+J)" style="font-family:var(--f-mono)!important">&lt;/&gt;</button><button data-i="link" title="Lien vers une adresse (Ctrl+K)">Lien</button><button data-i="pagelink" title="Lien vers une page ou une section du document">Page</button><span class="vsep"></span>' +
-  '<button data-i="pill" title="Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)"><span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille</button>' +
-  '<button data-i="alert" title="Texte rouge" style="color:#ff8a80!important">A</button><span class="vsep"></span><button data-i="clear" title="Effacer la mise en forme">⌫</button>';
-ui.appendChild(itb);
-itb.addEventListener('mousedown', function (e) { e.preventDefault(); });
-itb.addEventListener('click', function (e) { var b = e.target.closest('[data-i]'); if (b) inlineAction(b.dataset.i); });
-document.addEventListener('selectionchange', function () {
-  if (mode !== 'edit') { itb.style.display = 'none'; return; }
-  var s = getSelection();
-  if (!s.rangeCount || s.isCollapsed) { itb.style.display = 'none'; return; }
-  var f = fieldOf(s.anchorNode);
-  if (!f || !f.hasAttribute('data-rich') || f !== fieldOf(s.focusNode)) { itb.style.display = 'none'; return; }
-  var r = s.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { itb.style.display = 'none'; return; }
-  itb.style.display = 'flex';
-  var w = itb.offsetWidth, top = r.top - 42; if (top < 58) top = r.bottom + 8;
-  itb.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px'; itb.style.top = top + 'px';
-});
+/* Barre de mise en forme : un seul élément, déplacé dans l'ancre .collant du bloc dont un texte riche a le curseur,
+   à gauche de la bande collée du menu du bloc (13-collant.js). Jamais dans le HTML rendu d'un bloc : replacée après un rendu. */
+// [data-mf, infobulle, contenu] ; '|' : séparateur
+var BOUTONS_MF = [
+  ['bold', 'Gras (Ctrl+B)', '<b>G</b>'], ['italic', 'Italique (Ctrl+I)', '<i>I</i>'], ['underline', 'Souligné (Ctrl+U)', '<u>S</u>'], ['strikeThrough', 'Barré', '<s>B</s>'], '|',
+  ['code', 'Code (Ctrl+J)', '<span style="font-family:var(--f-mono)">&lt;/&gt;</span>'], ['link', 'Lien vers une adresse (Ctrl+K)', 'Lien'], ['pagelink', 'Lien vers une page ou une section du document', 'Page'], '|',
+  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille'],
+  ['alert', 'Texte rouge', '<span style="color:#ff8a80">A</span>'], '|',
+  ['clear', 'Effacer la mise en forme', '⌫']
+];
+var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
+bmf.innerHTML = '<div class="bmf-b">' + BOUTONS_MF.map(function (x) {
+  return x === '|' ? '<span class="vsep"></span>' : '<button type="button" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '">' + x[2] + '</button>';
+}).join('') + '</div>';
+// souris et toucher : la sélection et le focus restent dans le texte
+['mousedown', 'pointerdown'].forEach(function (t) { bmf.addEventListener(t, function (e) { e.preventDefault(); }); });
+bmf.addEventListener('click', function (e) { var b = e.target.closest('[data-mf]'); if (b) inlineAction(b.dataset.mf); });
+function cacherBarreMiseEnForme() {
+  bmf.hidden = true;
+  var a = bmf.parentNode; if (a && a.style) a.style.removeProperty('--recul');
+}
+function placerBarreMiseEnForme() {
+  var f = mode === 'edit' ? fieldOf(document.activeElement) : null, blk = f && f.hasAttribute('data-rich') && f.closest('.blk');
+  var ancre = blk && $(':scope > .collant', blk);
+  if (!ancre) { cacherBarreMiseEnForme(); return; }
+  if (bmf.parentNode !== ancre) { cacherBarreMiseEnForme(); ancre.appendChild(bmf); }
+  bmf.hidden = false;
+  ajusterBande(ancre);
+}
+// barre à gauche, menu à droite, bas contre bas. Si la barre ne tient pas avant le menu (fenêtre étroite, menu large),
+// elle passe juste au-dessus du menu, jamais par-dessus ; le recul de l'ancre suit la hauteur de la bande pour qu'une fois
+// collée elle reste entière sous le haut d'écran
+function ajusterBande(ancre) {
+  var m = $(':scope > .blk-bar', ancre);
+  bmf.style.bottom = '';
+  if (!bmf.offsetWidth) { ancre.style.removeProperty('--recul'); return; }   // cachée par le CSS (fenêtre étroite)
+  var place = m ? m.getBoundingClientRect().left - bmf.getBoundingClientRect().left - 8 : Infinity, dessus = bmf.offsetWidth > place;
+  if (dessus) bmf.style.bottom = (m.offsetHeight + 6) + 'px';
+  var h = bmf.offsetHeight + (dessus ? m.offsetHeight + 3 : 0);
+  if (h > 30.5) ancre.style.setProperty('--recul', (h + 3) + 'px'); else ancre.style.removeProperty('--recul');
+}
+document.addEventListener('selectionchange', placerBarreMiseEnForme);   // synchrone : avant la mesure du dégagement (13-collant.js)
+document.addEventListener('focusin', placerBarreMiseEnForme);
+document.addEventListener('focusout', function () { requestAnimationFrame(placerBarreMiseEnForme); });
+window.addEventListener('resize', function () { if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
 function fieldOf(n) { while (n && n !== app) { if (n.nodeType === 1 && n.classList.contains('fld')) return n; n = n.parentNode; } return null; }
 function unwrap(el) { var p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
 function inlineAction(kind) {
   var s = getSelection(); if (!s.rangeCount) return;
   var r = s.getRangeAt(0), fld = fieldOf(r.commonAncestorContainer); if (!fld) return;
-  if (kind === 'bold' || kind === 'italic') { document.execCommand(kind); fire(fld); return; }
+  // sans sélection, la forme vaut pour la frappe suivante ; le barré de Chromium (<strike>) devient <s> à l'assainissement
+  if (kind === 'bold' || kind === 'italic' || kind === 'underline' || kind === 'strikeThrough') { document.execCommand(kind); fire(fld); return; }
   function ancestor(test) { var n = r.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentNode; while (n && n !== fld) { if (test(n)) return n; n = n.parentNode; } return null; }
   if (kind === 'clear') {
     var a; while ((a = ancestor(function (n) { return /^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(n.tagName); }))) unwrap(a);
@@ -414,7 +440,7 @@ function openLinkPop(kind, range, fld, a) {
     if (k === 'to-page' || k === 'to-url') { popClose = null; closePop(); openLinkPop(k === 'to-page' ? 'page' : 'url', range, fld, a); return; }
     if (k === 'unlink') { popClose = null; closePop(); if (a && fld.contains(a)) { unwrap(a); fld.focus({ preventScroll: true }); fire(fld); } return; }
   });
-  var anchor = a && fld.contains(a) ? a : (itb.style.display !== 'none' ? itb : fld);
+  var anchor = a && fld.contains(a) ? a : (!bmf.hidden && bmf.parentNode ? bmf : fld);
   placePop(p, anchor);
   popClose = restore;
   (url || q).focus();

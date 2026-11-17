@@ -1,4 +1,4 @@
-/* ---------- Barres collantes (menu de bloc, et toute barre posée dans une ancre .collant) ---------- */
+/* ---------- Barres collantes (menu de bloc, barre de mise en forme, et toute barre posée dans une ancre .collant) ---------- */
 // Haut d'écran : bas de la barre du haut ou des onglets de pages ; sa hauteur varie (largeur, onglets), d'où sa mesure dans --haut-ecran (editor.css).
 function barresDuHaut() { return [$('#ui .tb'), $('.pnav-tabs', app)]; }   // recréées au rendu : l'observateur est rebranché à chaque fois
 function mesurerHautEcran() {
@@ -45,9 +45,12 @@ document.addEventListener('selectionchange', function () {
     var f = fieldOf(s.focusNode), blk = f && f.closest('.blk'); if (!blk) return;
     var rg = document.createRange(); rg.setStart(s.focusNode, s.focusOffset);
     var c = rg.getBoundingClientRect(); if (!c.height) c = f.getBoundingClientRect();
-    var barres = $$('.collant', blk).map(function (a) {
-      var b = a.firstElementChild; return b && getComputedStyle(b).visibility === 'visible' && ancreCollee(a) ? b.getBoundingClientRect() : null;
-    }).filter(Boolean);
+    // toutes les barres affichées des ancres collées (menu du bloc, barre de mise en forme) ; display:none donne une hauteur nulle
+    var barres = [];
+    $$('.collant', blk).forEach(function (a) {
+      if (!ancreCollee(a)) return;
+      Array.prototype.forEach.call(a.children, function (b) { var r = b.getBoundingClientRect(); if (r.height && getComputedStyle(b).visibility === 'visible') barres.push(r); });
+    });
     var d = decalageCurseur(c, barres, 4); if (d) scrollBy(0, -d);
   });
 });

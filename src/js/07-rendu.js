@@ -635,6 +635,7 @@ function render(focus) {
   synPaintPeers();
   navReveal(keep);
   if (focus) focusField(focus.b, focus.k, focus.end !== false);
+  placerBarreMiseEnForme();   // barre détachée par le rendu : replacée si le curseur est encore dans un texte riche
 }
 // Données par pays (choroplèthe) : réglages et valeurs, dans le panneau « Éléments de la carte »
 var chPaste = null;   // bloc dont la zone « Coller un tableau » est ouverte

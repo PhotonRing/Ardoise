@@ -17,7 +17,7 @@ var TEMPLATES = {
         'La barre de l’en-tête, tout en haut, masque ou affiche le surtitre et le chapeau ; le texte masqué est conservé.',
         'Sur un téléphone, la barre ne garde que le nom du document et l’état de l’enregistrement ; le menu <b>☰</b> ouvre toutes les actions en plein écran.',
         'Dans un paragraphe vide, tapez <code>/</code> pour insérer un bloc.',
-        'Sélectionnez du texte pour le passer en <b>gras</b>, en <code>code</code>, en lien (vers une adresse, une page ou une section) ou en pastille ' + P('OK') + ' : la couleur d’une pastille suit son nom, et un clic dedans permet de la changer.',
+        'Quand le curseur est dans un texte, la barre de mise en forme s’affiche en haut du bloc, à gauche de son menu, et le suit sur un long bloc. Elle passe le texte sélectionné en <b>gras</b>, en <i>italique</i>, en <u>souligné</u>, en <s>barré</s>, en <code>code</code>, en lien (vers une adresse, une page ou une section) ou en pastille ' + P('OK') + ' : la couleur d’une pastille suit son nom, et un clic dedans permet de la changer. Sans sélection, gras, italique, souligné et barré valent pour ce que vous tapez ensuite.',
         '<b>Ctrl+S</b> enregistre. La première fois, choisissez l’emplacement du fichier ; ensuite chaque modification est enregistrée toute seule.',
         'Le sommaire à gauche range les pages en arborescence : <b>+</b> crée une sous-page, glissez une page pour la déplacer ou la ranger dans une autre. Sur petit écran, les pages passent en onglets.']) }),
       mk('step', { id: 'ecrire', title: 'Écrire' }),

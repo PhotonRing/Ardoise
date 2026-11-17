@@ -116,11 +116,6 @@ html.sheet-on{overflow:hidden}
 .sw{display:flex;gap:8px;padding:0 8px 10px;flex-wrap:wrap}
 .sw button{width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);cursor:pointer}
 .sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--fg)}
-.itb{position:fixed;z-index:70;display:flex;gap:1px;align-items:center;background:#17212b;border-radius:8px;padding:3px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
-.itb button{border:0;background:none;color:#e4ebf0!important;height:28px;min-width:28px;padding:0 7px;border-radius:5px;cursor:pointer;font:600 12px var(--f-body)!important}
-.itb button:hover{background:#2c3a46}
-.itb .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-.itb .vsep{background:#3a4955;height:18px}
 .banner{position:fixed;left:50%;transform:translateX(-50%);top:62px;z-index:55;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--warn);border-left-width:4px;border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-width:min(680px,calc(100vw - 24px))}
 .toast-b{font:inherit;font-weight:600;color:#9fd0ff;background:none;border:0;padding:6px 4px;margin:-6px -4px;min-height:32px;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#17212b;color:#e4ebf0;padding:9px 14px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 32px)}
@@ -134,16 +129,27 @@ html.sheet-on{overflow:hidden}
 .blk::after{content:"";position:absolute;inset:-6px -8px;border:1px dashed transparent;border-radius:8px;pointer-events:none}
 .blk:hover::after{border-color:var(--line)}
 .blk:focus-within::after{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-/* ancre .collant (hauteur nulle, en tête du bloc) collée sous --haut-ecran (13-collant.js) ; sa barre est posée --recul px au-dessus */
+/* ancre .collant (hauteur nulle, en tête du bloc) collée sous --haut-ecran (13-collant.js) ; ses barres (menu du bloc à droite, barre de mise en forme
+   à gauche, 16-interface.js) sont posées bas contre bas 3 px au-dessus d'elle ; --recul : hauteur de la bande, élargie par une barre sur deux lignes */
 .collant{position:sticky;top:calc(var(--haut-ecran,52px) + var(--recul,0px));height:0;z-index:6}
 .blk>.collant{--recul:33px}
 .blk:hover>.collant,.blk:focus-within>.collant,.blk.bar-on>.collant,.collant:hover{z-index:7}
-.blk-bar{position:absolute;top:calc(-1 * var(--recul));right:-6px;display:flex;opacity:0;visibility:hidden;transition:opacity .15s ease .6s,visibility 0s linear .75s;align-items:center;gap:1px;padding:2px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 3px 10px rgba(0,0,0,.1);font:500 12px/1 var(--f-body);color:var(--fg)}
+.blk-bar{position:absolute;bottom:3px;right:-6px;display:flex;opacity:0;visibility:hidden;transition:opacity .15s ease .6s,visibility 0s linear .75s;align-items:center;gap:1px;padding:2px;background:var(--surface);border:1px solid var(--line);border-radius:7px;box-shadow:0 3px 10px rgba(0,0,0,.1);font:500 12px/1 var(--f-body);color:var(--fg)}
 .blk.bar-on>.collant>.blk-bar{transition:none}
 .blk:hover>.collant>.blk-bar,.blk:focus-within>.collant>.blk-bar,.blk.bar-on>.collant>.blk-bar,.blk-bar:hover{opacity:1;visibility:visible;transition-delay:0s}
 .blk-bar::before{content:"";position:absolute;inset:-8px -14px -10px -14px;z-index:-1}
-/* sous 800 px, la barre d'outils du bloc et sa zone de survol restent dans le bloc */
-@media (max-width:800px){.blk-bar{right:0}.blk-bar::before{right:0}}
+.bmf{position:absolute;bottom:3px;left:-6px;z-index:1;display:flex;box-sizing:border-box;max-width:calc(100% + 12px);background:#17212b;border:1px solid #17212b;border-radius:7px;padding:2px;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.bmf[hidden],html:not(.is-edit) .bmf{display:none}
+.bmf-b{display:flex;flex-wrap:wrap;align-items:center;gap:1px}
+.bmf button{border:0;background:none;color:#e4ebf0;height:24px;min-width:24px;padding:0 6px;border-radius:5px;cursor:pointer;font:600 12px/1 var(--f-body)}
+.bmf button:hover{background:#2c3a46}
+.bmf button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bmf .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.bmf .vsep{width:1px;height:16px;background:#3a4955;margin:0 2px}
+/* sous 600 px, la barre est remplacée par le bouton « Aa » (ticket 04 du lot barre-mise-en-forme) */
+@media (max-width:599px){.bmf{display:none}}
+/* sous 800 px, les barres de l'ancre et la zone de survol du menu restent dans le bloc */
+@media (max-width:800px){.blk-bar{right:0}.blk-bar::before{right:0}.bmf{left:0;max-width:100%}}
 .blk-bar button,.blk-bar select{font:500 12px/1 var(--f-body);height:24px;min-width:24px;padding:0 6px;border:0;border-radius:5px;background:none;color:var(--fg);cursor:pointer}
 .blk-bar select{border:1px solid var(--line);background:var(--bg);padding:0 4px}
 .blk-bar button:hover{background:var(--accent-soft)}
