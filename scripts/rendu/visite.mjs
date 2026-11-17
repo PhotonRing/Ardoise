@@ -83,10 +83,10 @@ test('visite guidée : filtres à plusieurs valeurs, « sauf », « Valeur d\'un
   vrai(/Gravité : Majeure ou Critique/.test(ctx.renderPage(d, { page: i, view: 'edit' })), 'puce de la colonne Gravité');
 });
 
-test('visite guidée : « Copier pour Office » nomme PowerPoint et dit que le collage spécial donne le bloc en image', () => {
+test('visite guidée : « Copier pour Office » nomme PowerPoint, sans image au collage spécial (ticket 09)', () => {
   const { brut } = visite();
   const items = brut.pages.flatMap((pg) => tous(pg.blocks)).flatMap((b) => b.items || []).map((it) => it.html || '');
   const phrase = items.find((h) => /Copier pour Office/.test(h));
   vrai(phrase, 'élément sur Copier pour Office absent');
-  vrai(/PowerPoint/.test(phrase) && /collage spécial/.test(phrase) && /en image/.test(phrase), phrase);
+  vrai(/PowerPoint/.test(phrase) && !/collage spécial/.test(phrase) && !/en image/.test(phrase), phrase);
 });

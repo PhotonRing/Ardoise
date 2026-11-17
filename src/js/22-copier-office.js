@@ -1,12 +1,12 @@
 /* ---------- Copier pour Office ----------
-   Trois formats d'un bloc dans un seul élément du presse-papier, comme une copie de tableur : HTML au style d'Ardoise et marqué
-   (08-office.js, 09-office-*.js, 05-presse-papier.js), image PNG du bloc et texte brut. Une carte ou une chronologie part en image
-   et texte brut. Images dessinées hors écran en thème clair à la largeur de la page imprimée, sans bibliothèque.
+   HTML au style d'Ardoise et marqué (08-office.js, 09-office-*.js, 05-presse-papier.js) et texte brut d'un bloc, sans image :
+   avec une image dans le même élément, Writer sous Linux ne colle plus que l'image. Une carte ou une chronologie part en image
+   PNG et texte brut, dessinée hors écran en thème clair à la largeur de la page imprimée, sans bibliothèque.
    Hors historique : rien n'est modifié. */
 function copierPourOffice(b) {
   var refus = function () { toast('Le presse-papier a refusé la copie'); };
   if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem !== 'function') { refus(); return Promise.resolve(false); }
-  var texte = function (t) { return new Blob([t], { type: 'text/plain' }); }, item, horsLigne = false, sansImage = null;
+  var texte = function (t) { return new Blob([t], { type: 'text/plain' }); }, item, horsLigne = false;
   // l'élément du presse-papier est créé pendant le clic, avec des promesses : l'image se dessine après sans perdre le geste
   if (b.type === 'map' || b.type === 'timeline') {
     var img = imageDeBloc(b);
@@ -15,16 +15,9 @@ function copierPourOffice(b) {
     // un groupe emporte en images les cartes et chronologies de ses blocs
     // HTML au style d'Ardoise (officeHtmlBloc) marqué, texte brut par les éléments neutres
     var o = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return { page: doc.cur, images: r.images }; });
-    var html = o.then(function (x) { return new Blob([htmlCopieOffice(officeHtmlBloc(b, doc, x))], { type: 'text/html' }); }), brut = o.then(function (x) { return texte(officeTexte(officeBloc(b, doc, x))); });
-    // image du bloc dessinée après les images intégrées (un seul montage hors écran à la fois) ; si elle échoue (canvas sali
-    // par une image d'une autre origine), l'écriture entière est rejetée : deuxième écriture avec le HTML et le texte seuls
-    var png = o.then(function () { return imageDeBloc(b); }).then(function (r) { return r.blob; }, function (e) {
-      sansImage = function () { return navigator.clipboard.write([new ClipboardItem({ 'text/html': html, 'text/plain': brut })]); };
-      throw e;
-    });
-    item = { 'text/html': html, 'image/png': png, 'text/plain': brut };
+    item = { 'text/html': o.then(function (x) { return new Blob([htmlCopieOffice(officeHtmlBloc(b, doc, x))], { type: 'text/html' }); }), 'text/plain': o.then(function (x) { return texte(officeTexte(officeBloc(b, doc, x))); }) };
   }
-  return navigator.clipboard.write([new ClipboardItem(item)]).catch(function (e) { if (sansImage) return sansImage(); throw e; }).then(function () {
+  return navigator.clipboard.write([new ClipboardItem(item)]).then(function () {
     toast(horsLigne ? 'Copié pour Office, sur le fond hors ligne : le fond en ligne de la carte ne peut pas être copié' : 'Copié pour Office', horsLigne ? 6000 : 0);
     return true;
   }, function () { refus(); return false; });
@@ -71,8 +64,7 @@ function conteneurClair(b) {
 }
 // un canvas est-il lisible (pas sali par des tuiles d'une autre origine) ?
 function canvasLisible(cv) { try { cv.getContext('2d').getImageData(0, 0, 1, 1); return true; } catch (_) { return false; } }
-// image PNG d'un bloc : Promise de { blob, l, h (px CSS), horsLigne } ; chronologie recalée et carte redessinée avant,
-// les autres blocs peints tels quels une fois leurs images décodées. Rejetée si le dessin échoue (canvas sali, image vide).
+// image PNG d'une carte ou d'une chronologie : Promise de { blob, l, h (px CSS), horsLigne }
 function imageDeBloc(b) {
   var c = conteneurClair(b), inst = null, horsLigne = false;
   var deuxImages = function () { return new Promise(function (ok) { requestAnimationFrame(function () { requestAnimationFrame(ok); }); }); };
@@ -80,10 +72,6 @@ function imageDeBloc(b) {
   if (b.type === 'timeline') pret = pret.then(function () {
     Reader.tlFit(c);
     var hin = c.querySelector('.tl-h-in'); if (hin && hin.scrollWidth > c.clientWidth) { c.style.width = hin.scrollWidth + 'px'; Reader.tlFit(c); }   // frise large : rien de coupé
-  });
-  else if (b.type !== 'map') pret = pret.then(function () {
-    // une image pas encore décodée ne se peint pas : attendre celles du bloc (une image illisible est peinte vide)
-    return Promise.all(Array.prototype.map.call(c.querySelectorAll('img'), function (im) { return im.decode ? im.decode().catch(function () {}) : null; }));
   });
   else pret = pret.then(function () {
     // carte : redessinée à la largeur de la page avec l'étendue affichée ; fond en ligne illisible → fond hors ligne

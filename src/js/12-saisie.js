@@ -439,7 +439,7 @@ app.addEventListener('paste', function (e) {
   var html = cd.getData('text/html'), text = cd.getData('text/plain');
   // une plage de tableur (Calc, Excel) arrive aussi en image : la plage l'emporte
   var plage = el.classList && el.classList.contains('fld') && el.hasAttribute('data-rich') ? grilleDuPressePapier(html, text) : null;   // 05-presse-papier.js
-  // un bloc copié pour Office (05-presse-papier.js) porte aussi son image : il se recolle en texte, comme avant
+  // un bloc copié pour Office (05-presse-papier.js) se recolle en texte, même accompagné d'une image
   var files = plage || copieOffice(html) ? [] : Array.prototype.filter.call(cd.files || [], function (f) { return /^image\//.test(f.type); });
   if (files.length && !el.matches('textarea')) {
     e.preventDefault();

@@ -24,8 +24,8 @@ function pastillesDuCollage(html, idDoc) {
   });
 }
 /* ---------- Copie pour Office recollée dans Ardoise ----------
-   « Copier pour Office » dépose HTML, image et texte, comme un tableur : la marque posée autour du HTML fait recoller
-   ce bloc en texte (gestionnaire paste, 12-saisie.js) ; une image copiée ailleurs, avec ou sans HTML, reste une image. */
+   La marque posée autour du HTML de « Copier pour Office » fait recoller ce bloc en texte (gestionnaire paste, 12-saisie.js),
+   même si une image l'accompagne ; une image copiée ailleurs, avec ou sans HTML, reste une image. */
 var OFFICE_MARQUE = 'data-ardoise-office';
 function htmlCopieOffice(html) { return '<div ' + OFFICE_MARQUE + '="1">' + html + '</div>'; }
 function copieOffice(html) { return new RegExp('<[a-z][^>]*\\s' + OFFICE_MARQUE + '\\s*=', 'i').test(String(html || '')); }
