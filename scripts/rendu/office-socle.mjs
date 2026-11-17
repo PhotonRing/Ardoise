@@ -36,6 +36,11 @@ export function verifierSocle(html, nom, couleursEnPlus = []) {
   for (const m of html.matchAll(/style="([^"]*)"/g)) vrai(!/(^|[\s:,(])\.\d/.test(m[1]), 'valeur commençant par un point « ' + m[1] + ' » (' + nom + ')');
   // Writer ignore vertical-align dans le style : seul l'attribut valign cale une cellule
   for (const m of html.matchAll(/<\w+[^>]*vertical-align[^>]*>/g)) vrai(/\svalign="/.test(m[0]), 'vertical-align sans valign ' + m[0] + ' (' + nom + ')');
+  // Writer ignore text-transform (capitales par officeMajuscules) et dessine <hr> en trait noir épais (filet : paragraphe bordé en haut)
+  vrai(!/text-transform/.test(html), 'text-transform dans le HTML (' + ou + ')');
+  vrai(!/<hr[\s>/]/.test(html), '<hr> dans le HTML (' + ou + ')');
+  // la police ne s'hérite pas dans un tableau : officeCellule la pose sur chaque cellule qui porte du texte (une cellule d'espace est vide ou n'a que &nbsp;)
+  for (const m of html.matchAll(/<t[dh][^>]*>(?!(?:&nbsp;)?<\/t)/g)) vrai(/font-family:/.test(m[0]), 'cellule sans police ' + m[0] + ' (' + nom + ')');
   // Word fusionne deux tableaux qui se suivent : un paragraphe les sépare
   vrai(!/<\/table>\s*<table/.test(html), 'deux tableaux qui se suivent (' + ou + ')');
   for (const m of html.matchAll(/#[0-9a-f]{6}\b/gi)) vrai(CLAIRES.has(m[0].toLowerCase()) || couleursEnPlus.includes(m[0].toLowerCase()), 'couleur hors page.css ' + m[0] + ' (' + nom + ')');
