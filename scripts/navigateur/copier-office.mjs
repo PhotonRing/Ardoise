@@ -130,10 +130,10 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     if (!i4 || i4.l !== 1392) echec('image de la chronologie : ' + JSON.stringify(i4));
     else if (i4.n['#1f7a4d'] < 100 || i4.n['#5fd09a'] > 0) echec('points de la chronologie hors du thème clair : ' + JSON.stringify(i4.n));
 
-    // groupe (ticket 05) : titre en gras, diamant en tableau, sa chronologie en image intégrée au HTML
+    // groupe (ticket 05) : titre semi-gras marqué, diamant en losange (noms en étiquette), sa chronologie en image intégrée au HTML
     mesure();
     await copier('g1'); const p6 = await presse(), h6 = p6['text/html'] || '';
-    if (!/<b>Événement<\/b>[\s\S]*<table[\s\S]*<b>Adversaire<\/b>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
+    if (!/font-weight:600">[\s\S]{0,80}Événement<\/p>[\s\S]*<table[\s\S]*>ADVERSAIRE<\/p>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
     if (!(p6['text/plain'] || '').startsWith('Événement\nTitre\tCampagne X\nAdversaire\tAPT')) echec('texte brut du groupe : ' + JSON.stringify(p6['text/plain']));
 
     // presse-papier qui refuse : message d'erreur, pas « Copié »
