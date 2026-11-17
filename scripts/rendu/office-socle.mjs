@@ -7,6 +7,8 @@ const CSS = readFileSync(new URL('../../src/css/page.css', import.meta.url), 'ut
 // couleurs des règles :root sans condition (thème clair) et accent clair de chaque palette
 const CLAIRES = new Set(['#ffffff']);
 for (const m of CSS.matchAll(/^:root(?:\[data-palette="\w+"\])?\{([^}]*)\}/gm)) for (const d of m[1].matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) if (!/-d$/.test(d[1])) CLAIRES.add(d[2].toLowerCase());
+// jetons du bloc de code sombre (règle .code de page.css) : ce bloc reste sombre quel que soit le thème
+for (const d of CSS.match(/^\.code\{(--tk-[^}]*)\}/m)[1].matchAll(/--tk-\w:(#[0-9a-f]{6})/g)) CLAIRES.add(d[1].toLowerCase());
 export const POLICES = ["'Segoe UI',sans-serif", "'Segoe UI Semibold','Segoe UI',sans-serif", 'Consolas,monospace'];
 
 // HTML stylé d'un bloc (point d'entrée unique), texte brut et éléments neutres

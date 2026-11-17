@@ -158,6 +158,6 @@ var HL = (function () {
     return res;
   }
   function resolve(lang, code, name) { return (!lang || lang === 'auto') ? detect(String(code || ''), name) : lang; }
-  return { lines: lines, html: function (code, lang) { return lines(code, lang).join('\n'); }, detect: detect, resolve: resolve, names: NAMES };
+  return { tokens: tokens, lines: lines, html: function (code, lang) { return lines(code, lang).join('\n'); }, detect: detect, resolve: resolve, names: NAMES };
 })();
 
