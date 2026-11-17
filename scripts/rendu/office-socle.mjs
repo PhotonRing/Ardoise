@@ -62,3 +62,9 @@ test('office (socle) : le texte part en Segoe UI avec remplaçant, à la taille 
   const { html } = monterOffice(TOUS, 'p');
   vrai(/^<div style="[^"]*font-family:'Segoe UI',sans-serif;[^"]*font-size:11\.25pt/.test(html), html);
 });
+
+test('office (socle) : le rendu stylé garde la marque de Copier pour Office (ticket 02) et les règles du socle', () => {
+  const { html, ctx } = monterOffice(TOUS, 'hd'), copie = ctx.htmlCopieOffice(html);
+  vrai(ctx.copieOffice(copie) && copie.includes(html), copie.slice(0, 120));
+  verifierSocle(copie, 'header marqué');
+});
