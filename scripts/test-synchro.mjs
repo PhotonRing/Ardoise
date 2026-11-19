@@ -22,8 +22,9 @@ const WORDS = ['carte', 'été', 'Brest', '<b>gras</b>', '&amp;', 'café ☕', '
 const word = () => pick(WORDS);
 const text = () => Array.from({ length: ri(4) }, word).join(' ');
 const block = () => {
-  const t = pick(['p', 'check', 'table', 'map', 'kanban']), b = { id: uid(), type: t };
+  const t = pick(['p', 'texte', 'check', 'table', 'map', 'kanban']), b = { id: uid(), type: t };
   if (t === 'p') b.html = text();
+  if (t === 'texte') b.lignes = Array.from({ length: 1 + ri(3) }, () => (rnd() < 0.3 ? { html: text(), lv: 1 + ri(3) } : { html: text() }));
   if (t === 'check') b.items = Array.from({ length: 1 + ri(3) }, () => ({ html: text(), done: rnd() < 0.5 }));
   if (t === 'table') b.rows = [['A', 'B'], [text(), text()]];
   if (t === 'map') { b.markers = [{ lat: 1, lon: 2, label: word() }]; b.view = { lat: 1, lon: 2, z: 3 }; }
@@ -52,7 +53,14 @@ function mutate(d) {
   if (r === 7) { if (d.tags && rnd() < 0.5) delete d.tags; else d.tags = Object.assign(d.tags || {}, { [word().toLowerCase()]: { c: ri(16) } }); return; }
   const b = pick(bl);
   if (b.type === 'p') { if (rnd() < 0.9) b.html = editText(b.html); else b.html = text(); }
-  else if (b.type === 'check') {
+  else if (b.type === 'texte') {
+    // lignes coupées, jointes, retirées, déplacées de niveau ou modifiées (comme au clavier)
+    const ls = b.lignes, q = ri(5), i = ri(ls.length);
+    if (q === 0) { const h = ls[i].html, c = ri(h.length + 1), n = { html: h.slice(c) }; if (ls[i].lv) n.lv = ls[i].lv; ls[i].html = h.slice(0, c); ls.splice(i + 1, 0, n); }
+    else if (q === 1 && i > 0) { ls[i - 1].html += ls[i].html; ls.splice(i, 1); }
+    else if (q === 2) { const lv = ri(4); if (lv) ls[i].lv = lv; else delete ls[i].lv; }
+    else ls[i].html = editText(ls[i].html);
+  } else if (b.type === 'check') {
     const it = b.items, q = ri(5);
     if (q === 0) it.splice(ri(it.length + 1), 0, { html: text(), done: false });
     else if (q === 1 && it.length > 1) it.splice(ri(it.length), 1);
@@ -142,6 +150,14 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const nb = clone(x.db); nb.pages[0].blocks[0].html = 'Bonjour tout le monde !';
   const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
   expect(r.pages[0].blocks[0].html === 'Bonjour tout le <b>vaste</b> monde !', 'fusion du texte : ' + r.pages[0].blocks[0].html);
+}
+{ // bloc texte : deux personnes changent deux lignes différentes (texte d'une ligne, niveau d'une autre, ligne ajoutée) : rien n'est perdu
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 't', type: 'texte', lignes: [{ html: 'Serveurs' }, { html: 'Sauvegardes', lv: 1 }, { html: 'Restauration' }] }] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].lignes[0].html = 'Serveurs de prod';
+  const nb = clone(x.db); nb.pages[0].blocks[0].lignes[2].lv = 2; nb.pages[0].blocks[0].lignes.push({ html: 'Supervision' });
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(JSON.stringify(r.pages[0].blocks[0].lignes) === JSON.stringify([{ html: 'Serveurs de prod' }, { html: 'Sauvegardes', lv: 1 }, { html: 'Restauration', lv: 2 }, { html: 'Supervision' }]),
+    'bloc texte, deux lignes : ' + JSON.stringify(r.pages[0].blocks[0].lignes));
 }
 { // l'un supprime un mot pendant que l'autre en ajoute un ailleurs
   const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'un deux trois' }] }] });

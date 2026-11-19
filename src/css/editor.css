@@ -202,6 +202,10 @@ html.sheet-on{overflow:hidden}
 .fld:focus{background:transparent;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
 .fld:empty::before{content:attr(data-ph);color:var(--muted);opacity:.55;pointer-events:none}
 .fld.soft:empty:not(:focus)::before{opacity:.3}
+/* bloc texte vide : sa ligne vide (<div><br></div>) empêche :empty ; texte indicatif posé par-dessus */
+.texte.fld{position:relative}
+.texte.fld[data-vide]::before{content:attr(data-ph);position:absolute;left:0;top:0;color:var(--muted);opacity:.55;pointer-events:none}
+.texte.fld[data-vide]:not(:focus)::before{opacity:.3}
 .num.fld:empty::before{color:var(--accent);opacity:1}
 span.fld,.facts .fld,.eyebrow.fld{display:inline-block}
 .list li>.fld{display:block}

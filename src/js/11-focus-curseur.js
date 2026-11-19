@@ -10,6 +10,7 @@ function focusField(bid, k, atEnd) {
   if (r.top < 60 || r.bottom > innerHeight - 20) el.scrollIntoView({ block: 'center' });
 }
 function caretTo(el, atEnd) {
+  if (el.hasAttribute && el.hasAttribute('data-texte')) { var ls = lignesDe(el); if (ls.length) el = ls[atEnd ? ls.length - 1 : 0]; }   // dans une ligne, pas entre deux
   var r = document.createRange(); r.selectNodeContents(el); r.collapse(!atEnd);
   var s = getSelection(); s.removeAllRanges(); s.addRange(r);
 }
@@ -75,6 +76,7 @@ function extractTail(el) {
   return sanitize(d.innerHTML);
 }
 function fieldValue(el) {
+  if (el.hasAttribute('data-texte')) return lignesDuChamp(el);   // bloc texte (12-bloc-texte.js)
   if (el.hasAttribute('data-rich')) return sanitize(el.innerHTML);
   return el.textContent.replace(/\s*\n\s*/g, ' ');
 }

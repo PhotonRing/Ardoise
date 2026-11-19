@@ -17,7 +17,7 @@ app.addEventListener('input', function (e) {
   if (el.matches('.st-in')) { var bs = byId(el.dataset.b), rr = bs.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(bs.id); if (ms) ms.setRoutes(bs.routes); session.saisir(); return; }
   if (el.matches('.zn-in')) { var bz = byId(el.dataset.b); bz.zones[+el.dataset.zn].label = el.value; var mz = mapOf(bz.id); if (mz) mz.setZones(bz.zones); session.saisir(); return; }
   if (!el.classList || !el.classList.contains('fld')) return;
-  if (el.textContent === '' && !el.querySelector('img')) el.innerHTML = '';
+  if (el.textContent === '' && !el.querySelector('img') && !el.hasAttribute('data-texte')) el.innerHTML = '';   // bloc texte : reparerLignes garde une ligne
   if (el.querySelector('span.tab, span.ln')) {
     // enveloppes des lignes en retrait recalculées ; le curseur est gardé par un repère (les sauts de ligne ne comptent pas comme des caractères)
     var sl = getSelection(), mk = null;
@@ -35,11 +35,12 @@ app.addEventListener('input', function (e) {
     if (extra) { var tn = document.createTextNode(extra); t.after(tn); var r = document.createRange(); r.setStart(tn, extra.length); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); }
   });
   var bl = byId(el.dataset.b); if (!bl) return;
-  if (bl.type === 'p' && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
+  if ((bl.type === 'p' || (bl.type === 'texte' && lignesDe(el).length === 1 && !el.querySelector('[data-lv]'))) && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
     // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
-    slashMenu(el, bl); el.innerHTML = ''; return;
+    slashMenu(el, bl); el.innerHTML = bl.type === 'texte' ? '<div class="lg"><br></div>' : ''; return;
   }
   setPath(bl, el.dataset.k, fieldValue(el));
+  if (bl.type === 'texte') el.toggleAttribute('data-vide', texteVide(bl.lignes));
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
     var ct = curTitle(); document.title = ct;
@@ -205,6 +206,7 @@ app.addEventListener('keydown', function (e) {
   var b = byId(el.dataset.b), k = el.dataset.k;
   if (!b) return;
   if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moveBlock(b, e.key === 'ArrowUp' ? -1 : 1); focusField(b.id, k); return; }
+  if (el.hasAttribute('data-texte') && toucheTexte(e, el, b)) return;   // 12-bloc-texte.js
   if (e.key === 'Enter') {
     if (e.isComposing) return;
     var rich = el.hasAttribute('data-rich');
@@ -455,13 +457,13 @@ app.addEventListener('paste', function (e) {
   if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
-    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
+    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && !multiLigne(el)) clean = clean.replace(/<br>/g, ' ');
     // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
-    if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
+    if (!el.hasAttribute('data-ml') && !multiLigne(el)) clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
     $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
   } else {
-    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterTexte(text);
+    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && !multiLigne(el))) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
   }
 });
@@ -496,5 +498,6 @@ function copierPastilles(e) {
 }
 app.addEventListener('copy', copierPastilles);
 app.addEventListener('cut', copierPastilles);
+function multiLigne(el) { var t = b0type(el); return t === 'p' || t === 'texte'; }   // les sauts de ligne collés restent
 function b0type(el) { var b = byId(el.dataset.b); return b ? b.type : ''; }
 
