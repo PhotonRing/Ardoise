@@ -64,5 +64,6 @@ function blocAssaini(b) {
   if (b.type === 'facts') o.items = o.items.map(function (it) { return { k: it.k, v: assainirMd(it.v) }; });   // clé en texte simple
   else if (o.items) o.items = o.items.map(function (it) { var c = {}; for (var j in it) c[j] = it[j]; c.html = assainirMd(it.html); return c; });
   if (o.rows) o.rows = o.rows.map(function (l) { return l.map(assainirMd); });
+  if (o.lignes) o.lignes = o.lignes.map(function (l) { var c = {}; for (var j in l) c[j] = l[j]; c.html = assainirMd(l.html); return c; });   // bloc texte : genre, niveau et coche gardés
   return o;
 }

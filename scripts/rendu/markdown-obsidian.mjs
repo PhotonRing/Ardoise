@@ -36,7 +36,7 @@ test('obsidian : #tag en début de mot devient une pastille, dans un paragraphe,
   egal(H(blocs('#projet en cours, voir #2024-bilan et #client/acme\n(#entre) **#gras**')[0]),
     P('projet') + ' en cours, voir ' + P('2024-bilan') + ' et ' + P('client/acme') + '<br>(' + P('entre') + ') <b>' + P('gras') + '</b>');
   egal(H(blocs('## Suivi #urgent')[0]), 'Suivi ' + P('urgent'));
-  egal(blocs('- [ ] appeler #Léa')[0].items[0].html, 'appeler ' + P('Léa'));
+  egal(blocs('- [ ] appeler #Léa')[0].lignes[0], { html: 'appeler ' + P('Léa'), genre: 'case' });
   egal(blocs('| a |\n|---|\n| #x |')[0].rows[1][0], P('x'));
 });
 
@@ -88,7 +88,7 @@ test('obsidian : une image au milieu d\'un paragraphe sort en bloc Image juste a
 test('obsidian : une image dans un élément de liste ou une cellule de tableau sort en bloc Image juste après la liste ou le tableau', () => {
   const r = md('- un ![Logo](https://ex.fr/logo.png) deux\n- ![[plan.png]]\n\n| A | B |\n|---|---|\n| ![](photo.jpg) x | y |\n\nFin', [], 0);
   egal(r.blocs, [
-    { type: 'list', ordered: false, items: [{ html: 'un deux' }, { html: '' }] },
+    { type: 'texte', lignes: [{ html: 'un deux', genre: 'puce' }, { html: '', genre: 'puce' }] },
     { type: 'image', src: '', caption: 'Logo', alt: 'Logo' },
     { type: 'image', src: '', caption: 'plan.png', alt: '' },
     { type: 'table', rows: [['A', 'B'], ['x', 'y']] },
@@ -96,16 +96,16 @@ test('obsidian : une image dans un élément de liste ou une cellule de tableau 
     TX('Fin')]);
   egal(r.images, [{ bloc: 1, url: 'https://ex.fr/logo.png', nom: 'logo.png' }]);
   egal(r.imagesManquantes, 2);
-  egal(blocs('- [x] fait ![](a.png)')[0], { type: 'check', items: [{ html: 'fait', done: true }] }, 'case cochée');
+  egal(blocs('- [x] fait ![](a.png)')[0], { type: 'texte', lignes: [{ html: 'fait', genre: 'case', done: true }] }, 'case cochée');
 });
 
 test('obsidian : note de référence avec propriétés (syntaxe documentée d\'Obsidian, fixtures/markdown/note-obsidian-proprietes.md)', () => {
   const r = md(readFileSync(new URL('../fixtures/markdown/note-obsidian-proprietes.md', import.meta.url), 'utf8'), PAGES, 0);
   egal(r.entete, { title: 'Point d\'étape' });
-  egal(r.blocs.map((b) => b.type), ['facts', 'texte', 'h2', 'check', 'image', 'texte', 'image', 'code']);
+  egal(r.blocs.map((b) => b.type), ['facts', 'texte', 'h2', 'texte', 'image', 'texte', 'image', 'code']);
   egal(r.blocs[0].items, [{ k: 'date', v: '2026-11-13' }, { k: 'participants', v: 'Ana, Léo' }, { k: 'tags', v: P('projet') + ' ' + P('réunion') }]);
   egal(H(r.blocs[1]), 'Suite de ' + P('projet') + ', voir <a href="#pg-p2/s1">le planning</a>. Le langage C# n\'est pas une pastille, ni #42.');
-  egal(r.blocs[3].items, [{ html: 'relire <a href="#pg-p2">Suivi de projet</a>', done: true }, { html: 'chiffrer ' + P('budget'), done: false }]);
+  egal(r.blocs[3].lignes, [{ html: 'relire <a href="#pg-p2">Suivi de projet</a>', genre: 'case', done: true }, { html: 'chiffrer ' + P('budget'), genre: 'case' }]);
   egal(H(r.blocs[5]), 'Lien sans page : Inconnue.');
   egal(r.blocs[7].code, '# pas un titre\n#pas-une-pastille');
   egal([r.images.length, r.imagesManquantes], [1, 1]);
