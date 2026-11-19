@@ -12,6 +12,8 @@ const DOC = { v: 6, title: 'Doc', theme: 'dark', palette: 'indigo', tags: { ok: 
   { id: 'e1', type: 'step', num: '', title: 'Isoler' }, { id: 'e2', type: 'step', num: '', title: 'Nettoyer' }, { id: 'e3', type: 'step', nonum: true, title: 'Sans numéro' },
   { id: 'p1', type: 'p', html: 'A <b>gras</b> <i>it</i> <u>sou</u> <s>bar</s> <code>x&lt;y</code> <a href="https://ex.fr/a">web</a> <a href="#pg-p2">interne</a> ' + P('OK') + ' ' + P('Inconnue') },
   { id: 'p2', type: 'p', indent: 2, html: 'retrait' },
+  { id: 'pc', type: 'p', html: 'a <span class="c-vert">vert</span> <span class="s-jaune">jaune</span> <span class="c-violet s-rose">les deux <code>x</code> ' + P('OK') + '</span> <span class="alert">rouge</span>' },
+  { id: 'pn', type: 'p', html: 'a vert jaune les deux <code>x</code> ' + P('OK') + ' rouge' },
   { id: 'ft', type: 'footer', html: 'Sources' }, { id: 'dv', type: 'divider' },
   { id: 'im', type: 'image', src: 'data:image/png;base64,AAAA', caption: 'Légende', alt: '' },
 ] }, { id: 'p2', title: 'Suite', blocks: [] }] };
@@ -65,4 +67,15 @@ test('office (texte) : pied de page gris sous un filet, séparateur fin, image a
   const im = office('im', { page: 0, images: { im: { src: 'data:image/png;base64,AAAA', mime: 'image/png', l: 1360, h: 400 } } }).html;
   vrai(/<img src="data:image\/png;base64,AAAA" alt="Légende" width="680" height="200" style="border:1px solid #d9e0e5[^"]*">/.test(im), 'image : ' + im);
   vrai(/<p style="[^"]*text-align:center;[^"]*font-size:9\.75pt;[^"]*color:#566573[^"]*">Légende<\/p>/.test(im), 'légende : ' + im);
+});
+
+test('office (texte) : couleur du texte et surlignage en styles en ligne aux teintes claires, pastille et code gardent leur fond, texte brut inchangé', () => {
+  const { html, texte } = office('pc');
+  vrai(html.includes('<span style="color:#18794e">vert</span>'), 'couleur seule : ' + html);
+  vrai(html.includes('<span style="background:#fff0a6">jaune</span>'), 'surlignage seul : ' + html);
+  vrai(html.includes('<span style="color:#6d3fc0;background:#fadbe8">les deux </span>'), 'couleur et surlignage : ' + html);
+  vrai(/<span style="color:#6d3fc0;background:#fadbe8"><code style="[^"]*background:#ececfb[^"]*">x<\/code><\/span>/.test(html), 'code sur son propre fond : ' + html);
+  vrai(/<span style="background:#e3f3ea;color:#1f7a4d;[^"]*">OK<\/span>/.test(html), 'pastille à ses couleurs : ' + html);
+  vrai(html.includes('<span style="color:#b42318">rouge</span>'), 'alert toujours rouge : ' + html);
+  egal(texte, office('pn').texte, 'texte brut');
 });

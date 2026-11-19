@@ -12,7 +12,7 @@ test('office : les couleurs du thème clair sont celles de page.css', () => {
   const { ctx } = monter({ title: 'Doc', pages: [{ id: 'p1', blocks: [] }] });
   const t = ctx.OFFICE_CLAIR;
   for (const k of Object.keys(t)) egal(t[k], clair[k], 'variable --' + k);
-  for (const k of ['bg', 'surface', 'fg', 'muted', 'line', 'code-soft', 'ok', 'ok-soft', 'bad', 'bad-soft', 'warn', 'warn-soft', 'info', 'info-soft', 't4f', 't15b', 'map-sea']) vrai(t[k], 'variable absente : --' + k);
+  for (const k of ['c-orange', 's-jaune', 'bg', 'surface', 'fg', 'muted', 'line', 'code-soft', 'ok', 'ok-soft', 'bad', 'bad-soft', 'warn', 'warn-soft', 'info', 'info-soft', 't4f', 't15b', 'map-sea']) vrai(t[k], 'variable absente : --' + k);
   egal(ctx.OFFICE_PALETTES.ambre, [clair['acc-l'], clair['accs-l']], 'palette par défaut');
   for (const p of ['petrole', 'indigo', 'rubis', 'foret', 'graphite']) egal(ctx.OFFICE_PALETTES[p], palette(p), 'palette ' + p);
 });
@@ -217,4 +217,24 @@ test('office : carte de chaleur en tableau aux cases teintées (couleurs du thè
   vrai(/background:#b4540a[^>]*>[\s\S]*?color:#ffffff[^>]*>T1059/.test(f.html), 'palier foncé : texte blanc');
   vrai(/background:#fbf5f0/.test(f.html), 'palier clair');
   egal(office('q', page({}, 'indigo')).e.find((x) => x.t === 'tableau').fonds[1][0], '#4848c0', 'accent de la palette du document');
+});
+
+// palettes de la barre (02-assainissement.js, non chargé par le banc) : lues dans le source pour rester alignées
+const ASSAIN = readFileSync(new URL('../../src/js/02-assainissement.js', import.meta.url), 'utf8');
+const liste = (nom) => [...ASSAIN.match(new RegExp('var ' + nom + ' = (\\[.*\\]);'))[1].matchAll(/\['([\w-]+)'/g)].map((m) => m[1]);
+const COULEURS_TEXTE = liste('COULEURS_TEXTE'), SURLIGNAGES = liste('SURLIGNAGES');
+const segsDe = (html) => { const doc = { v: 6, title: 'Doc', tags: { ok: { c: 0 } }, pages: [{ id: 'p1', blocks: [{ id: 'p', type: 'p', html }] }] }; return pur(office('p', doc).e[0].segs); };
+
+test('office : couleur du texte et surlignage de chaque nom de la palette, en teintes claires de page.css', () => {
+  egal(COULEURS_TEXTE.length, 6, 'six couleurs lues'); egal(SURLIGNAGES.length, 5, 'cinq surlignages lus');
+  for (const c of COULEURS_TEXTE) egal(segsDe('<span class="' + c + '">x</span>'), [{ texte: 'x', couleur: c === 'alert' ? '#b42318' : clair[c] }], 'couleur ' + c);
+  for (const s of SURLIGNAGES) egal(segsDe('<span class="' + s + '">x</span>'), [{ texte: 'x', surlignage: clair[s] }], 'surlignage ' + s);
+  egal(segsDe('<span class="c-violet s-rose">x</span>'), [{ texte: 'x', couleur: '#6d3fc0', surlignage: '#fadbe8' }], 'les deux sur un span');
+  egal(segsDe('<span class="inconnue">x</span>'), [{ texte: 'x' }], 'classe inconnue sans effet');
+});
+
+test('office : une pastille ne prend ni la couleur ni le surlignage du texte qui l\'entoure ; surlignages différents non fusionnés', () => {
+  egal(segsDe('<span class="c-bleu s-jaune">a ' + P('OK') + '</span>'), [
+    { texte: 'a ', couleur: '#1d5fb4', surlignage: '#fff0a6' }, { texte: 'OK', pastille: { fond: '#e3f3ea', texte: '#1f7a4d' } }]);
+  egal(segsDe('<span class="s-jaune">a</span><span class="s-vert">b</span>'), [{ texte: 'a', surlignage: '#fff0a6' }, { texte: 'b', surlignage: '#d4f2dd' }]);
 });

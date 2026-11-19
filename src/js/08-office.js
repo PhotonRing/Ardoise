@@ -8,6 +8,9 @@ var OFFICE_CLAIR = {
   t4f: '#52257e', t4b: '#ede1fa', t5f: '#832152', t5b: '#fbe0ed', t6f: '#1d877e', t6b: '#dffbf9', t7f: '#252c7e', t7b: '#e1e3fa', t8f: '#617e25', t8b: '#f1fae1',
   t9f: '#186e8b', t9b: '#def5fc', t10f: '#7e4a25', t10b: '#faebe1', t11f: '#762d76', t11b: '#f8e2f8', t12f: '#297a52', t12b: '#e2f9ed', t13f: '#405264', t13b: '#e7edf4',
   t14f: '#937910', t14b: '#fdf7dd', t15f: '#8b2818', t15b: '#fce2de',
+  // couleurs du texte (Rouge = bad) et surlignages de la barre de mise en forme : même nom que leur classe
+  'c-orange': '#b54708', 'c-vert': '#18794e', 'c-bleu': '#1d5fb4', 'c-violet': '#6d3fc0', 'c-gris': '#5f6b76',
+  's-jaune': '#fff0a6', 's-vert': '#d4f2dd', 's-bleu': '#d7e8fa', 's-rose': '#fadbe8', 's-gris': '#e3e8ec',
   'map-sea': '#d9e5ec', 'map-land': '#f8fafb', 'map-border': '#b4c2cc', 'map-label': '#566573'
 };
 var OFFICE_LARGEUR = 680;   // largeur utile d'une page A4 imprimée en px, comme PRINT_W du moteur de carte (images, .docx)
@@ -27,7 +30,7 @@ function officeVariables(d) {
   return v;
 }
 
-/* Texte enrichi assaini → segments { texte, gras, italique, souligne, barre, code, lien, interne, couleur, pastille } ou { saut } */
+/* Texte enrichi assaini → segments { texte, gras, italique, souligne, barre, code, lien, interne, couleur, surlignage, pastille } ou { saut } */
 var OFFICE_BALISE = /<(\/?)([a-z0-9]+)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/gi;
 function officeSegments(html, d) {
   var s = String(html == null ? '' : html), out = [], pile = [], m;
@@ -45,7 +48,7 @@ function officeSegments(html, d) {
       var nom = htmlText(s.slice(OFFICE_BALISE.lastIndex, fin).replace(/<[^>]*>/g, '')), own = cls.match(/\bpc-(\d+)\b/);
       var c = own ? +own[1] : knownTagColor(d || {}, tagKey(nom)), p = etat(nom);
       p.pastille = c == null ? { fond: OFFICE_CLAIR.line, texte: OFFICE_CLAIR.fg } : officePastille(c);
-      delete p.couleur; if (nom) out.push(p);
+      delete p.couleur; delete p.surlignage; if (nom) out.push(p);
       OFFICE_BALISE.lastIndex = fin + 7; continue;
     }
     var f = {};
@@ -57,7 +60,12 @@ function officeSegments(html, d) {
     else if (tag === 'a') {
       var href = htmlText((attrs.match(/href="([^"]*)"/) || [])[1] || '');
       if (/^(https?:|mailto:)/i.test(href)) f.lien = href; else if (href.charAt(0) === '#') { f.interne = true; f.souligne = true; }
-    } else if (tag === 'span' && /(^|\s)alert(\s|$)/.test(cls)) f.couleur = OFFICE_CLAIR.bad;
+    } else if (tag === 'span') cls.split(/\s+/).forEach(function (c) {
+      // classes de la palette (COULEURS_TEXTE, SURLIGNAGES) : Rouge = alert, les autres portent le nom de leur teinte claire
+      if (c === 'alert') f.couleur = OFFICE_CLAIR.bad;
+      else if (/^c-/.test(c) && OFFICE_CLAIR[c]) f.couleur = OFFICE_CLAIR[c];
+      else if (/^s-/.test(c) && OFFICE_CLAIR[c]) f.surlignage = OFFICE_CLAIR[c];
+    });
     pile.push({ tag: tag, f: f });
   }
   while (out.length && out[out.length - 1].saut) out.pop();
@@ -74,7 +82,7 @@ function officeFusion(segs) {
   });
   return out;
 }
-var OFFICE_FORMES = ['gras', 'italique', 'souligne', 'barre', 'code', 'lien', 'interne', 'couleur'];
+var OFFICE_FORMES = ['gras', 'italique', 'souligne', 'barre', 'code', 'lien', 'interne', 'couleur', 'surlignage'];
 function memeForme(a, b) { return OFFICE_FORMES.every(function (k) { return (a[k] || null) === (b[k] || null); }); }
 function officeTexteDe(segs) { return segs.map(function (g) { return g.saut ? '\n' : g.texte; }).join(''); }
 function officeVide(segs) { return !officeTexteDe(segs).trim(); }
@@ -339,7 +347,7 @@ function officeCellule(contenu, style, largeur, valign) {
   var v = valign || 'top';
   return '<td valign="' + v + '"' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';vertical-align:' + v + ';' + (style || '') + '">' + contenu + '</td>';
 }
-// segments → HTML : formes, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte
+// segments → HTML : formes, couleur et surlignage, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte
 function officeSegmentsHtml(arr, d) {
   var C = OFFICE_CLAIR, acc = officeAccent(d);
   return arr.map(function (g) {
@@ -350,7 +358,8 @@ function officeSegmentsHtml(arr, d) {
     if (g.gras) h = '<b>' + h + '</b>';
     if (g.italique) h = '<i>' + h + '</i>';
     if (g.barre) h = '<s>' + h + '</s>';
-    if (g.couleur) h = '<span style="color:' + g.couleur + '">' + h + '</span>';
+    // couleur du texte et surlignage dans un même span (fond en ligne, comme une pastille)
+    if (g.couleur || g.surlignage) h = '<span style="' + [g.couleur && 'color:' + g.couleur, g.surlignage && 'background:' + g.surlignage].filter(Boolean).join(';') + '">' + h + '</span>';
     if (g.lien) return '<a href="' + esc(g.lien) + '" style="color:' + acc[0] + '">' + h + '</a>';
     if (g.souligne) h = '<u>' + h + '</u>';
     return h;
