@@ -3,3 +3,4 @@ node_modules/
 scripts/geo/ne/
 *.log
 .DS_Store
+package-lock.json
