@@ -124,4 +124,25 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   mesure();
   if (lu.texte !== 'un\n  deux' || !/<p data-lv="1" style="margin-left:2em">deux<\/p>/.test(lu.html)) echec('copie en lecture : ' + JSON.stringify(lu));
   await ctrl('e');
+
+  // vrai presse-papier (Ctrl+C, Ctrl+V au clavier) : le collage part de la ligne du curseur (cible de l'événement : la div.lg,
+  // pas le champ). Vérification c32 du propriétaire : niveaux perdus et pastille grise, puis tout à gauche après Entrée.
+  await cdp('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  const raccourci = async (k, commande) => {
+    for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, modifiers: 2, key: k, code: 'Key' + k.toUpperCase(), windowsVirtualKeyCode: k.toUpperCase().charCodeAt(0), commands: type === 'rawKeyDown' ? [commande] : [] });
+    await attendre(200);
+  };
+  await charge([{ id: 't1', type: 'texte', lignes: [L('Serveurs <span class="pill">OK</span>'), L('Sauvegardes', 1), L('Restauration <b>testée</b>', 2)] }, { id: 't3', type: 'texte', lignes: [L('')] }]);
+  await evalue(choisir('t1', 0, 0, 2, 19));
+  await raccourci('c', 'copy');
+  await evalue(curseur('t3', 0, 0));
+  await raccourci('v', 'paste');
+  const colle = [L('Serveurs <span class="pill">OK</span>'), L('Sauvegardes', 1), L('Restauration <b>testée</b>', 2)];
+  await verifie('Ctrl+C puis Ctrl+V dans un bloc texte vide', 't3', colle);
+  mesure();
+  if (!(await evalue(`(() => { const p = document.querySelector('.texte[data-b="t3"] span.pill'); return !!p && getComputedStyle(p).backgroundColor === getComputedStyle(document.querySelector('.texte[data-b="t1"] span.pill')).backgroundColor; })()`))) echec('Ctrl+V : pastille sans la couleur du registre');
+  await evalue(curseur('t3', 2, 19));
+  for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+  await attendre(150);
+  await verifie('Entrée après Ctrl+V', 't3', colle.concat([L('', 2)]));
 }
