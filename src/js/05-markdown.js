@@ -156,18 +156,19 @@ function blocDuGroupe(g) {
   if (g.sorte === 'liste') return listeMd(g.elements);
   return citationMd(g.lignes);
 }
-// éléments de liste → Liste (à puces ou numérotée, selon le premier) ou Liste à cocher dès qu'un élément est une case ;
+// éléments de liste → bloc texte, une ligne par élément (05-lignes.js) : [ ] ou [x] en tête → case (quelle que soit la marque,
+// comme Obsidian), sinon - * + → puce, 1. ou 1) → numéro (numéro de départ ignoré : numerosDesLignes le recalcule) ;
 // niveau : pile des retraits (2 espaces ou une tabulation par niveau, 4 espaces tolérés), plafonné à 6
 function listeMd(elements) {
-  var pile = [], cases = false, items = elements.map(function (e) {
+  var pile = [];
+  return { type: 'texte', lignes: elements.map(function (e) {
     while (pile.length && e.retrait < pile[pile.length - 1]) pile.pop();
     if (!pile.length || e.retrait > pile[pile.length - 1]) pile.push(e.retrait);
-    var lv = Math.min(6, pile.length - 1), m = e.texte.match(/^\[([ xX])\](?:[ \t]+([\s\S]*))?$/);
-    if (m) cases = true;
-    return { lv: lv, done: !!m && m[1] !== ' ', html: enLigneMd(m ? m[2] || '' : e.texte) };
-  });
-  return cases ? { type: 'check', items: items.map(function (it) { var o = { html: it.html, done: it.done }; if (it.lv) o.lv = it.lv; return o; }) }
-    : { type: 'list', ordered: /\d/.test(elements[0].marque), items: items.map(function (it) { var o = { html: it.html }; if (it.lv) o.lv = it.lv; return o; }) };
+    var m = e.texte.match(/^\[([ xX])\](?:[ \t]+([\s\S]*))?$/), l = ligne(enLigneMd(m ? m[2] || '' : e.texte), pile.length - 1);
+    l.genre = m ? 'case' : /\d/.test(e.marque) ? 'numero' : 'puce';
+    if (m && m[1] !== ' ') l.done = true;
+    return l;
+  }) };
 }
 // citation → Encadré ; « [!type] Titre » d'Obsidian : variante selon le type, titre en gras ; replié (-) ou dépliable (+) → Bloc dépliable
 function citationMd(lignes) {

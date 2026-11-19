@@ -17,7 +17,7 @@ const NOTE = readFileSync(new URL('../fixtures/markdown/note-obsidian.md', impor
   '\nPiège <b onclick="window.piege=1">gras</b><script>window.piege=2<\/script> <img src=x onerror="window.piege=3">\n';
 
 export const nom = 'importer du Markdown';
-export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure, echec }) {
+export default async function ({ ecran, cdp, evalue, attendre, dialogues, visibles, mesure, echec }) {
   const dir = mkdtempSync(join(tmpdir(), 'ardoise-md-'));
   try {
     const source = readFileSync(new URL('../../dist/ardoise.html', import.meta.url), 'utf8');
@@ -77,13 +77,15 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure
     const vu = await evalue(`(() => { const a = document.querySelector('#app'); return {
       titre: a.querySelector('.b-header [data-k="title"]').textContent, surtitre: a.querySelector('.b-header [data-k="eyebrow"]').textContent,
       h2: [...a.querySelectorAll('h2')].map((e) => e.textContent), h3: [...a.querySelectorAll('h3')].map((e) => e.textContent),
-      ol: a.querySelectorAll('ol.list li').length, cases: [...a.querySelectorAll('input[type=checkbox]')].map((c) => c.checked),
+      lignes: [...a.querySelectorAll('.texte > .lg[data-g]')].map((e) => e.dataset.g + (e.dataset.n || '') + ':' + (e.dataset.lv || 0)),
+      cases: [...a.querySelectorAll('.texte > .lg[data-g=case]')].map((e) => e.hasAttribute('data-done')), listes: a.querySelectorAll('.list, ul.check, input[type=checkbox]').length,
       warn: (a.querySelector('.note.n-warn') || {}).innerHTML, info: a.querySelectorAll('.note.n-info').length, plie: !!a.querySelector('.fold-edit'),
       table: [...a.querySelectorAll('table th')].map((e) => e.textContent), lien: !!a.querySelector('table a[href="https://exemple.fr/devis"]'),
       code: (a.querySelector('.code textarea') || {}).value, sep: a.querySelectorAll('hr').length, pied: a.textContent.includes('Pied gardé'), ancien: a.textContent.includes('Texte existant'),
-      piege: window.piege || 0, onclick: !!a.querySelector('[onclick], img, script') }; })()`);
-    const attendu = { titre: 'Réunion de lancement', surtitre: 'Surtitre', h2: ['Ordre du jour'], h3: ['Tâches'], ol: 4, cases: [true, false, false, false],
-      info: 1, plie: true, table: ['Poste', 'Montant'], lien: true, code: '# installation\nnpm install', sep: 1, pied: true, ancien: false, piege: 0, onclick: false };
+      piege: window.piege || 0, onclick: !!a.querySelector('[onclick], img, script'),
+      enregistre: /onclick|<script|<img/.test(JSON.stringify(window.ardoise.doc.pages[0].blocks)) }; })()`);
+    const attendu = { titre: 'Réunion de lancement', surtitre: 'Surtitre', h2: ['Ordre du jour'], h3: ['Tâches'], lignes: ['numero1:0', 'numero2:0', 'puce:1', 'puce:1', 'case:0', 'case:0', 'case:1', 'puce:0'], cases: [true, false, false], listes: 0,
+      info: 1, plie: true, table: ['Poste', 'Montant'], lien: true, code: '# installation\nnpm install', sep: 1, pied: true, ancien: false, piege: 0, onclick: false, enregistre: false };
     for (const k in attendu) if (JSON.stringify(vu[k]) !== JSON.stringify(attendu[k])) echec(`import : ${k} = ${JSON.stringify(vu[k])} au lieu de ${JSON.stringify(attendu[k])}`);
     if (!/<b>Budget serré<\/b>/.test(vu.warn || '')) echec('import : titre de l\'encadré perdu : ' + vu.warn);
 
@@ -99,12 +101,17 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure
     mesure();
     await touche('PageDown', 1, 'PageDown', 34);
     await ouvrir();
-    await evalue(`document.querySelector('${fenetre} textarea').value = '## Section\\n\\n- a\\n- b'`);
+    // liste mêlée (puces, numéro, case cochée avec pastille) : un seul bloc texte, une ligne par élément, assainie et colorée
+    await evalue(`document.querySelector('${fenetre} textarea').value = '## Section\\n\\n- a\\n  1. b\\n- [x] c #projet'`);
     const nv = dialogues.length;
     await clic(fenetre + ' [data-m="2"]');
     if (dialogues.length !== nv) echec('page vide : avertissement inutile');
-    const p2 = await evalue('[document.querySelector("#app .b-header [data-k=title]").textContent, [...document.querySelectorAll("#app h2")].map((e) => e.textContent), document.querySelectorAll("#app ul.list li").length]');
-    if (JSON.stringify(p2) !== JSON.stringify(['Vide', ['Section'], 2])) echec('page vide : ' + JSON.stringify(p2));
+    const p2 = await evalue('[document.querySelector("#app .b-header [data-k=title]").textContent, [...document.querySelectorAll("#app h2")].map((e) => e.textContent), window.ardoise.doc.pages[1].blocks.map((b) => b.type)]');
+    if (JSON.stringify(p2) !== JSON.stringify(['Vide', ['Section'], ['header', 'h2', 'texte']])) echec('page vide : ' + JSON.stringify(p2));
+    const mele = await visibles('#app .texte > .lg', 'return (x.dataset.g || "") + (x.dataset.n || "") + ":" + (x.dataset.lv || 0) + (x.hasAttribute("data-done") ? "✓" : "") + ":" + x.textContent.trim()');
+    if (JSON.stringify(mele) !== JSON.stringify(['puce:0:a', 'numero1:1:b', 'case:0✓:c projet'])) echec('liste mêlée à l\'écran : ' + JSON.stringify(mele));
+    const ligneCase = await evalue('window.ardoise.doc.pages[1].blocks[2].lignes[2]');
+    if (!/class="pill pa-3"/.test((ligneCase || {}).html) || ligneCase.genre !== 'case' || ligneCase.done !== true) echec('liste mêlée enregistrée : ' + JSON.stringify(ligneCase));
     await touche('PageUp', 1, 'PageUp', 33);
     if (!(await evalue('document.querySelector("#app").textContent.includes("Texte existant")'))) echec('l\'import a touché une autre page que la page courante');
 
@@ -132,7 +139,7 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure
     await touche('PageUp', 1, 'PageUp', 33);
     await touche('z');
     const avant = await evalue('window.ardoise.doc.pages[1].blocks.map((b) => b.type).join(",")');
-    if (avant !== 'header,h2,list') echec('Obsidian : un Ctrl+Z ne défait pas tout l\'import : ' + avant);
+    if (avant !== 'header,h2,texte') echec('Obsidian : un Ctrl+Z ne défait pas tout l\'import : ' + avant);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
