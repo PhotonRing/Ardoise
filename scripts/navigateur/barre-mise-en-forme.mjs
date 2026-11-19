@@ -10,6 +10,7 @@ const DOC = {
     { id: 'co', type: 'code', code: 'echo bonjour' },
     { id: 'gr', type: 'group', title: 'Un groupe', blocks: [{ id: 'gp', type: 'p', html: 'Dans le groupe' }] },
     { id: 'pb', type: 'p', html: 'Un second paragraphe' },
+    { id: 'pv', type: 'p', html: '' },
   ] }],
 };
 const CHARGE = `window.ardoise.load(${JSON.stringify(DOC)})`;
@@ -70,6 +71,23 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   if (n[0] !== 1) echec(`${n[0]} barres dans la page, attendu 1`);
   if (n[1]) echec('.itb existe encore');
   if (b.length !== 1 || b[0].bloc !== 'pb') echec('la barre ne suit pas le curseur vers le second paragraphe');
+
+  // une fenêtre de dialogue ou un menu prend le focus : la barre n'est plus affichée
+  await evalue(CURSEUR('.fld[data-b="pb"]')); await attendre(60);
+  await evalue(`(() => { document.querySelector('[data-ui="file"]').click(); document.querySelector('[data-f="md-import"]').click();
+    document.querySelector('.modal-bg [role=dialog] textarea').focus(); return true; })()`); await attendre(120);
+  const dlg = await barres(); mesure();
+  if (dlg.length) echec(`fenêtre de dialogue au focus : barre affichée dans le bloc ${dlg[0].bloc}`);
+  await evalue(`(() => { document.querySelector('.modal-bg').remove(); return true; })()`);
+  await evalue(CURSEUR('.fld[data-b="pv"]')); await attendre(60);
+  if (!(await barres()).length) echec('paragraphe vide : barre absente avant le menu');
+  for (const type of ['keyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: '/', code: 'Slash', text: type === 'keyDown' ? '/' : undefined, windowsVirtualKeyCode: 191 });
+  await attendre(120);
+  const menu = await evalue(`!!(document.activeElement && document.activeElement.matches('.menu-q'))`), mnu = await barres(); mesure();
+  if (!menu) echec('« / » dans un paragraphe vide : le menu des blocs ne prend pas le focus');
+  if (mnu.length) echec(`menu des blocs au focus : barre affichée dans le bloc ${mnu[0].bloc}`);
+  for (const type of ['keyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await attendre(60);
 
   // la barre prend les couleurs du thème (comme le menu du bloc) : claire en thème clair, sombre en thème sombre, palette comprise
   for (const [theme, palette] of [['light', ''], ['dark', ''], ['light', 'rubis'], ['dark', 'foret']]) {

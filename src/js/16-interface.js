@@ -330,21 +330,26 @@ function appliquerTeinte(famille, cls) {
 }
 // barre ouverte sous « Aa » (fenêtre étroite) ; fermée, une palette ouverte se ferme avec elle
 function ouvrirBarre(oui) {
-  if (!oui && pop && pop.bmfPal) closePop();
-  bmf.classList.toggle('ouverte', oui); $('.bmf-aa', bmf).setAttribute('aria-expanded', String(oui));
+  if (oui) { bmf.classList.add('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'true'); } else fermerBarre();
   if (bmf.parentNode && bmf.parentNode.style) ajusterBande(bmf.parentNode);
 }
-function cacherBarreMiseEnForme() {
+function fermerBarre() {
   if (pop && pop.bmfPal) closePop();
   bmf.classList.remove('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'false');
+}
+function cacherBarreMiseEnForme() {
+  fermerBarre();
   bmf.hidden = true;
   var a = bmf.parentNode; if (a && a.style) a.style.removeProperty('--recul');
 }
+// blocBarre : id du bloc qui porte la barre. Un nouveau rendu du même bloc (ligne ajoutée à un tableau…) remplace son ancre
+// sans fermer la barre ouverte ; seul le départ du curseur vers un autre bloc la referme
+var blocBarre = null;
 function placerBarreMiseEnForme() {
   var f = mode === 'edit' ? fieldOf(document.activeElement) : null, blk = f && f.hasAttribute('data-rich') && f.closest('.blk');
   var ancre = blk && $(':scope > .collant', blk);
   if (!ancre) { cacherBarreMiseEnForme(); return; }
-  if (bmf.parentNode !== ancre) { cacherBarreMiseEnForme(); ancre.appendChild(bmf); }
+  if (bmf.parentNode !== ancre) { if (blk.dataset.id !== blocBarre) cacherBarreMiseEnForme(); ancre.appendChild(bmf); blocBarre = blk.dataset.id; }
   bmf.hidden = false;
   ajusterBande(ancre);
 }
@@ -369,7 +374,7 @@ function ajusterBande(ancre) {
 }
 // largeur suivie sans rechargement : la barre ouverte se referme en passant 600 px dans un sens ou dans l'autre
 var etroite = matchMedia('(max-width:599px)');
-etroite.addEventListener('change', function () { bmf.classList.remove('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'false'); if (pop && pop.bmfPal) closePop(); if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
+etroite.addEventListener('change', function () { fermerBarre(); if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
 // appui hors de la barre ouverte (et hors d'une palette ou de la fenêtre du lien ouvertes depuis elle) : elle se referme
 document.addEventListener('pointerdown', function (e) { if (bmf.classList.contains('ouverte') && !bmf.contains(e.target) && !(pop && pop.contains(e.target))) ouvrirBarre(false); }, true);
 document.addEventListener('selectionchange', placerBarreMiseEnForme);   // synchrone : avant la mesure du dégagement (13-collant.js)

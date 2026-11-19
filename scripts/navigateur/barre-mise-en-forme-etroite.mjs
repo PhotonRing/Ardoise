@@ -7,6 +7,7 @@ const DOC = {
   title: 'Étroite', pages: [{ id: 'p1', title: 'Accueil', blocks: [
     { id: 'pa', type: 'p', html: LONG },
     { id: 'pb', type: 'p', html: 'Un second paragraphe' },
+    { id: 't1', type: 'table', rows: [['Nom', 'Note'], ['Alpha', 'Beta']] },
   ] }],
 };
 // sélection du texte de pa de l'index a à b (texte sans balises)
@@ -111,6 +112,19 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   v = await visibles(BOUTONS); mesure();
   const bloc = await evalue(`(() => { const x = document.querySelector('.bmf'); const k = x && x.closest('.blk'); return k && k.dataset.id; })()`);
   if (JSON.stringify(v) !== '["Aa"]' || bloc !== 'pb') echec(`curseur dans un autre bloc : ${JSON.stringify(v)} dans le bloc ${bloc}, attendu « Aa » seul dans pb`);
+
+  // rendu du même bloc (ligne ajoutée par Tab dans la dernière cellule) : la barre ouverte reste ouverte, dans ce bloc
+  await evalue(`(() => { const el = document.querySelector('.fld[data-b="t1"][data-k="rows.1.1"]'); el.focus({ preventScroll: true });
+    const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`); await attendre(150);
+  await appuyer('.bmf-aa');
+  if (!(await ouverte())) echec('tableau : l\'appui sur « Aa » n\'ouvre pas la barre');
+  for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await attendre(200);
+  const lignes = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 't1').rows.length`); mesure();
+  if (lignes !== 3) echec(`Tab dans la dernière cellule : ${lignes} lignes, attendu 3`);
+  const blocT = await evalue(`(() => { const x = document.querySelector('.bmf'); const k = x && x.closest('.blk'); return k && k.dataset.id; })()`); mesure();
+  if (!(await ouverte()) || blocT !== 't1') echec(`ligne ajoutée au tableau : barre ${(await ouverte()) ? 'ouverte' : 'fermée'} dans le bloc ${blocT}, attendu ouverte dans t1`);
+  await appuyer('.bmf-aa');
 
   // redimensionnement sans recharger : au-delà de 600 px la barre complète, en deçà « Aa » seul et fermé
   await appuyer('.bmf-aa');
