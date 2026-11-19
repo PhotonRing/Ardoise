@@ -150,9 +150,10 @@ html.sheet-on{overflow:hidden}
 .bmf.bmf-texte .bmf-tx{display:inline-flex}
 .bmf .bmf-choix{font-weight:500}
 .bmf .bmf-choix::after{content:"▾";margin-left:4px;font-size:9px;opacity:.7}
-.pop.bmf-choix-pop{flex-direction:column;gap:2px;padding:4px}
-.bmf-choix-pop button{width:auto;height:28px;padding:0 12px;justify-content:start;place-items:center start;border-color:transparent;font:500 13px/1 var(--f-body)}
-.bmf-choix-pop button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+/* fenêtre d'un sélecteur : une colonne de libellés entiers (plus précis que .bmf-pal button, qui fait des cases de 30 px) */
+.pop.bmf-choix-pop{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:4px}
+.pop.bmf-choix-pop button{width:auto;height:28px;padding:0 12px;place-items:center start;white-space:nowrap;border-color:transparent;font:500 13px/1 var(--f-body)}
+.pop.bmf-choix-pop button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 /* barre aux couleurs du thème, comme le menu du bloc ; boutons Couleur du texte et Surlignage et leurs palettes aux teintes du thème */
 .bmf .bmf-c{display:inline-block;padding-bottom:1px;border-bottom:3px solid var(--bad);line-height:1}
 .bmf .bmf-s{display:inline-block;padding:2px 3px;border-radius:3px;background:var(--s-jaune);color:var(--fg);line-height:1}

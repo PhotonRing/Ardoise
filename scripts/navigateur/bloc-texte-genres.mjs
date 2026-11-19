@@ -15,6 +15,10 @@ const centre = (sel) => `(() => { const b = document.querySelector(${JSON.string
 // point dans la marge (marque) de la ligne i d'un bloc texte
 const marque = (sel, i) => `(() => { const lg = document.querySelectorAll(${JSON.stringify(sel)} + ' > .lg')[${i}]; if (!lg) return null; const r = lg.getBoundingClientRect(); return { x: r.left + 6, y: r.top + Math.min(10, r.height / 2) }; })()`;
 
+// pour visibles() : '' si le libellé du bouton tient dans le bouton, sinon le libellé et les deux largeurs
+export const LIBELLE_ENTIER = `const r = document.createRange(); r.selectNodeContents(x); const t = r.getBoundingClientRect(), b = x.getBoundingClientRect();
+  return t.left >= b.left - 0.5 && t.right <= b.right + 0.5 ? '' : x.textContent.trim() + ' (' + t.width.toFixed(0) + ' dans ' + b.width.toFixed(0) + ')'`;
+
 export const nom = 'genres de ligne';
 export default async function ({ ecran, charger, evalue, cdp, attendre, visibles, mesure, echec }) {
   const touche = async (key, code, vk, modifiers = 0) => {
@@ -46,6 +50,15 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     mesure();
     const l = await lignes('t1');
     if (!(l && l.length === 2 && !l[1].genre && l[1].html.replace(/&nbsp;/g, ' ') === tape)) echec('raccourci « ' + tape + '» puis Ctrl+Z : ' + JSON.stringify(l));
+  }
+  // raccourci dans un bloc texte vide : le texte grisé (data-vide) disparaît dès que la ligne prend un genre (vérification c51)
+  for (const tape of ['- ', '1. ', '[ ] ']) {
+    await charge([{ id: 't1', type: 'texte', lignes: [{ html: '' }] }]);
+    await evalue(curseur('t1', 0, 0));
+    for (const c of tape) { await cdp('Input.insertText', { text: c }); await attendre(30); }
+    await attendre(80);
+    mesure();
+    if (await evalue(`document.querySelector('.fld[data-b="t1"]').hasAttribute('data-vide')`)) echec('raccourci « ' + tape + '» dans un bloc vide : texte grisé encore affiché');
   }
   // dans une puce, « 1. » reste du texte
   await charge([{ id: 't1', type: 'texte', lignes: [{ html: '', genre: 'puce' }] }]);
@@ -94,6 +107,9 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     await clic(bg);
     mesure();
     if ((await visibles('.pop [data-choix]')).join() !== 'Texte,Puce,Numéro,Case,Sous-titre') echec('fenêtre du sélecteur : ' + JSON.stringify(await visibles('.pop [data-choix]')));
+    // libellés en entier dans la fenêtre (vérification c51 : fenêtre « ratatinée »)
+    const coupes = (await visibles('.pop [data-choix]', LIBELLE_ENTIER)).filter((x) => x);
+    if (coupes.length) echec('fenêtre du sélecteur : libellés coupés ' + JSON.stringify(coupes));
     const bc = await evalue(centre('.pop [data-choix="case"]'));
     await clic(bc); await attendre(150);
     await verifie('sélecteur : cinq puces en cases', 't1', [{ html: 'titre', genre: 'soustitre' }].concat(cinq.map((l) => ({ html: l.html, genre: 'case' }))));

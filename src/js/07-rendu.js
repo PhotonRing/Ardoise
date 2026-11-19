@@ -79,7 +79,8 @@ function lignesHTML(lignes) {
       (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (g === 'case' && l.done ? ' data-done' : '') + '>' + (h || '<br>') + '</div>';
   }).join('');
 }
-function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && isBlank(lignes[0].html); }
+// bloc vide : une seule ligne de texte (sans genre), vide et sans retrait
+function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && !lignes[0].genre && isBlank(lignes[0].html); }
 function texteHTML(b, e) {
   var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
   if (!e) return '<div data-tx="' + b.id + '" class="texte">' + lignesHTML(ls) + '</div>';   // data-tx : cases cochées de l'export statique (01-lecture.js)
