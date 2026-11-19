@@ -36,7 +36,7 @@ function renderPage(d, ctx) {
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
-      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond') at += ' id="b-' + b.id + '"';   // diamant : cible du lien d'une requête
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond' || b.type === 'texte') at += ' id="b-' + b.id + '"';   // diamant, bloc texte : cible du lien d'une requête
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
@@ -192,8 +192,8 @@ function renderBlock(b, d, ctx, num) {
           '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
       return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
         var ci = renderBlock(c, d, ctx, null);
-        // ancrage de la bascule (19-mode-lecture-edition.js) ; un modèle diamant garde sa cible de lien (id b-<id>), même dans l'export
-        var at = (c.type === 'diamond' ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
+        // ancrage de la bascule (19-mode-lecture-edition.js) ; un modèle diamant ou un bloc texte garde sa cible de lien (id b-<id>), même dans l'export
+        var at = (c.type === 'diamond' || c.type === 'texte' ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
         return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
       }).join('') + '</div></details>';
     case 'details':
