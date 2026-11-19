@@ -399,8 +399,8 @@ function sansForme(n) {
   Array.prototype.slice.call(n.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });
   if (n.nodeType === 1 && deForme(n)) { if (n.tagName === 'SPAN') { retirerFamille(n, 'couleur'); if (n.parentNode) retirerFamille(n, 'surlignage'); } else unwrap(n); }
 }
-function effacerForme(s, r, fld) {
-  if (s.isCollapsed) return;
+// plage r d'une seule borne (le champ, ou une ligne d'un bloc texte) : rend le premier et le dernier nœud effacés, ou null
+function effacerPlage(r, fld) {
   // un bord dans une pastille ou un taquet est repoussé hors de lui (jamais coupé) ; une sélection dans une pastille reste dedans
   var garde = function (n) { for (; n && n !== fld; n = n.parentNode) if (intact(n)) return n; return null; };
   var g1 = garde(r.startContainer), g2 = garde(r.endContainer);
@@ -408,15 +408,28 @@ function effacerForme(s, r, fld) {
   // forme la plus haute qui englobe la sélection, sans franchir une pastille : coupée en trois
   var n = r.commonAncestorContainer, haut = null; if (n.nodeType !== 1) n = n.parentNode;
   for (; n && n !== fld && !intact(n); n = n.parentNode) if (deForme(n)) haut = n;
-  session.valider();   // la frappe en attente est une étape, Effacer en est une autre
   if (haut) r = couperAutour(haut, r);
   var f = r.extractContents();
   Array.prototype.slice.call(f.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });
-  var premier = f.firstChild, dernier = f.lastChild; if (!premier) return;
+  var premier = f.firstChild, dernier = f.lastChild; if (!premier) return null;
   r.insertNode(f);
   // formes vidées aux bords de la sélection (extractContents y laisse des éléments vides) retirées
   Array.prototype.slice.call(fld.querySelectorAll('*')).reverse().forEach(function (x) { if (deForme(x) && !x.textContent.replace(/​/g, '') && !x.querySelector('br, span.pill, span.tab')) x.remove(); });
-  var nr = document.createRange(); nr.setStartBefore(premier); nr.setEndAfter(dernier);
+  return [premier, dernier];
+}
+function effacerForme(s, r, fld) {
+  if (s.isCollapsed) return;
+  session.valider();   // la frappe en attente est une étape, Effacer en est une autre
+  // bloc texte : ligne par ligne, pour que les lignes, leurs niveaux et leurs réglages restent (12-bloc-texte.js)
+  var ls = fld.hasAttribute('data-texte') ? lignesDe(fld).filter(function (lg) { return r.intersectsNode(lg); }) : [];
+  var bornes = ls.length > 1 ? ls : [fld], a = null, z = null;
+  bornes.forEach(function (b, i) {
+    var p = r;
+    if (bornes.length > 1) { p = document.createRange(); p.selectNodeContents(b); if (i === 0) p.setStart(r.startContainer, r.startOffset); if (i === bornes.length - 1) p.setEnd(r.endContainer, r.endOffset); }
+    var x = effacerPlage(p, b); if (x) { if (!a) a = x[0]; z = x[1]; }
+  });
+  if (!a) return;
+  var nr = document.createRange(); nr.setStartBefore(a); nr.setEndAfter(z);
   s.removeAllRanges(); s.addRange(nr); fire(fld);
 }
 function inlineAction(kind) {

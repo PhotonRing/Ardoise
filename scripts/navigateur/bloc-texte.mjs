@@ -157,6 +157,17 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   mesure();
   if (!(await evalue(`(() => { const el = document.querySelector('.fld[data-b="t1"]'); return [...el.childNodes].every((n) => n.nodeType === 1 && n.classList.contains('lg')); })()`))) echec('tout supprimé : nœuds hors des lignes');
 
+  // Effacer (ticket 01) sur une sélection de deux lignes : le gras part de la sélection seule, les lignes et leurs niveaux restent
+  await charge([{ id: 't1', type: 'texte', lignes: [L('<b>abc</b>'), L('<b>def</b>', 1)] }]);
+  await evalue(choisir('t1', 0, 1, 1, 2)); await attendre(250);
+  const bouton = await evalue(`(() => { const b = document.querySelector('.bmf [data-mf="clear"]'); if (!b || !b.getClientRects().length) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  if (!bouton) echec('Effacer : bouton absent de l\'écran');
+  else {
+    for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x: bouton.x, y: bouton.y, button: 'left', clickCount: 1 });
+    await attendre(300);
+    await verifie('Effacer sur deux lignes', 't1', [L('<b>a</b>bc'), L('de<b>f</b>', 1)]);
+  }
+
   // lecture : retrait visible, aucune commande d'édition
   await charge([{ id: 't1', type: 'texte', lignes: [L('zéro'), L('deux', 2)] }]);
   await evalue(`document.querySelector('#ui [data-ui="mode"]').click()`); await attendre(150);
