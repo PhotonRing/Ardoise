@@ -256,7 +256,7 @@ function openFile(anchor) {
 var BOUTONS_MF = [
   ['bold', 'Gras (Ctrl+B)', '<b>G</b>'], ['italic', 'Italique (Ctrl+I)', '<i>I</i>'], ['underline', 'Souligné (Ctrl+U)', '<u>S</u>'], ['strikeThrough', 'Barré', '<s>B</s>'], '|',
   ['code', 'Code (Ctrl+J)', '<span style="font-family:var(--f-mono)">&lt;/&gt;</span>'], ['link', 'Lien vers une adresse (Ctrl+K)', 'Lien'], ['pagelink', 'Lien vers une page ou une section du document', 'Page'], '|',
-  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille'],
+  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(var(--ok) 0 25%,var(--bad) 0 50%,var(--warn) 0 75%,var(--info) 0)"></span> Pastille'],
   ['couleur', 'Couleur du texte', '<span class="bmf-c">A</span>'], ['surlignage', 'Surlignage', '<span class="bmf-s">ab</span>'], '|',
   ['clear', 'Effacer la mise en forme', '⌫']
 ];
@@ -363,8 +363,11 @@ function inlineAction(kind) {
   if (kind === 'bold' || kind === 'italic' || kind === 'underline' || kind === 'strikeThrough') { document.execCommand(kind); fire(fld); return; }
   function ancestor(test) { var n = r.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentNode; while (n && n !== fld) { if (test(n)) return n; n = n.parentNode; } return null; }
   if (kind === 'clear') {
-    var a; while ((a = ancestor(function (n) { return /^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(n.tagName); }))) unwrap(a);
-    var txt = r.toString(); r.deleteContents(); var tn = document.createTextNode(txt); r.insertNode(tn);
+    // la sélection devient son seul texte, puis les formes qui l'englobent sont défaites. Dans cet ordre : défaire d'abord
+    // l'ancêtre qui contient exactement la sélection (couleur, surlignage posés par la palette) l'effondrait, et le gras
+    // intérieur restait jusqu'au clic suivant
+    var tn = document.createTextNode(r.toString()); r.deleteContents(); r.insertNode(tn);
+    for (var a = tn.parentNode; a && a !== fld; ) { var haut = a.parentNode; if (/^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(a.tagName)) unwrap(a); a = haut; }
     s.removeAllRanges(); var nr = document.createRange(); nr.selectNode(tn); s.addRange(nr); fire(fld); return;
   }
   var tag = 'span', cls = '';

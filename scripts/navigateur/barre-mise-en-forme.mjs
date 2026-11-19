@@ -71,6 +71,19 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   if (n[1]) echec('.itb existe encore');
   if (b.length !== 1 || b[0].bloc !== 'pb') echec('la barre ne suit pas le curseur vers le second paragraphe');
 
+  // la barre prend les couleurs du thème (comme le menu du bloc) : claire en thème clair, sombre en thème sombre, palette comprise
+  for (const [theme, palette] of [['light', ''], ['dark', ''], ['light', 'rubis'], ['dark', 'foret']]) {
+    const c = await evalue(`(() => { const h = document.documentElement; h.dataset.theme = ${JSON.stringify(theme)}; if (${JSON.stringify(palette)}) h.dataset.palette = ${JSON.stringify(palette)}; else delete h.dataset.palette;
+      const t = document.createElement('div'); document.body.appendChild(t); const v = (x) => { t.style.color = 'var(' + x + ')'; return getComputedStyle(t).color; };
+      const bmf = document.querySelector('.bmf'), bt = bmf.querySelector('[data-mf="bold"]'), m = document.querySelector('.blk[data-id="pb"] .blk-bar');
+      const r = { fond: getComputedStyle(bmf).backgroundColor, bord: getComputedStyle(bmf).borderTopColor, texte: getComputedStyle(bt).color,
+        surface: v('--surface'), line: v('--line'), fg: v('--fg'), menu: getComputedStyle(m).backgroundColor }; t.remove(); return r; })()`); mesure();
+    if (c.fond !== c.surface || c.fond !== c.menu) echec(`thème ${theme} ${palette} : fond de la barre ${c.fond}, attendu --surface ${c.surface} (menu ${c.menu})`);
+    if (c.bord !== c.line) echec(`thème ${theme} ${palette} : bord de la barre ${c.bord}, attendu --line ${c.line}`);
+    if (c.texte !== c.fg) echec(`thème ${theme} ${palette} : texte des boutons ${c.texte}, attendu --fg ${c.fg}`);
+  }
+  await evalue(`(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.palette; return true; })()`);
+
   // re-rendu : ajouter une ligne au tableau re-rend la page, la barre revient dans le bloc du curseur
   await evalue(CURSEUR('.blk[data-id="tab"] td')); await attendre(60);
   await evalue(`(() => { document.querySelector('.blk[data-id="tab"] [data-act="row-add"]').click(); return true; })()`); await attendre(150);

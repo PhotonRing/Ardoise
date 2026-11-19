@@ -67,6 +67,9 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     ['Un <span class="alert">mot</span>', 3, 6, [['couleur', 'Rouge']], 'Un <span class="alert">mot</span>', 'ancien texte rouge : Rouge de la palette, un seul span'],
     ['Un <span class="alert">mot</span>', 3, 6, [['couleur', 'Vert']], 'Un <span class="c-vert">mot</span>', 'ancien texte rouge recoloré en vert'],
     ['Un <b><span class="c-vert"><span class="s-jaune">mot</span></span></b>', 3, 6, [['mf', 'clear']], 'Un mot', 'Effacer retire tout'],
+    // gras dans une sélection colorée puis surlignée depuis la palette : un seul clic sur Effacer retire tout (gras compris)
+    ['Un texte avec du <b>gras</b> au milieu', 9, 24, [['couleur', 'Orange'], ['surlignage', 'Rose'], ['mf', 'clear']], 'Un texte avec du gras au milieu', 'Effacer après couleur et surlignage : gras compris, en un clic'],
+    ['Un texte avec du <b>gras</b> au milieu', 9, 24, [['couleur', 'Violet'], ['couleur', 'Sans couleur'], ['couleur', 'Orange'], ['surlignage', 'Rose'], ['mf', 'clear']], 'Un texte avec du gras au milieu', 'Effacer après Sans couleur, couleur et surlignage : tout en un clic'],
     ['Un mot', 6, 6, [['couleur', 'Vert'], ['surlignage', 'Jaune']], 'Un mot', 'sans sélection : rien'],
   ];
   for (const [depart, a, b, gestes, attendu, quoi] of cas) {
