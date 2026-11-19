@@ -139,9 +139,13 @@ function collerLignes(el, ls) {
   var r = s.getRangeAt(0), lg = ligneDuNoeud(el, r.startContainer);
   if (!lg) { lg = lignesDe(el)[lignesDe(el).length - 1]; r = document.createRange(); r.selectNodeContents(lg); r.collapse(false); }
   if (ls.length === 1) {
-    s.removeAllRanges(); s.addRange(r);
-    document.execCommand('insertHTML', false, ls[0].html);
-    $$('span.pill', el).forEach(paintPill); return;
+    // inséré à la main : insertHTML de Chrome change une pastille collée seule en span à styles calculés
+    var t = document.createElement('template'); t.innerHTML = ls[0].html;
+    var der1 = t.content.lastChild; if (!der1) return;
+    r.insertNode(t.content);
+    var c1 = document.createRange(); c1.setStartAfter(der1); c1.collapse(true); s.removeAllRanges(); s.addRange(c1);
+    $$('span.pill', el).forEach(paintPill);
+    fire(el); return;
   }
   var fin = document.createRange(); fin.selectNodeContents(lg); fin.setStart(r.startContainer, r.startOffset);
   var queue = document.createElement('div'); queue.appendChild(fin.extractContents());

@@ -8,7 +8,7 @@ const BLOCS = {
   table: (html) => ({ id: 'ba', type: 'table', rows: [['Titre', 'Autre'], [html, 'x']] }),
 };
 const CHAMP = { p: `.fld[data-b="ba"]`, note: `.fld[data-b="ba"]`, table: `.blk[data-id="ba"] [data-k="rows.1.0"]` };
-const LIRE = { p: 'b.html', note: 'b.html', table: 'b.rows[1][0]' };
+const LIRE = { p: 'b.lignes.map((l) => l.html).join("<br>")', note: 'b.html', table: 'b.rows[1][0]' };
 // bloc remis à html, puis sélection de son texte de l'index a à b (texte sans balises, sauts de ligne non comptés)
 const PREPARER = (genre, html, a, b) => `(async () => {
   const d = JSON.parse(JSON.stringify(window.ardoise.doc)); d.pages[0].blocks = [${JSON.stringify(BLOCS[genre](html))}, { id: 'bb', type: 'p', html: 'Autre' }];

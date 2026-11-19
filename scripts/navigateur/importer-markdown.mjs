@@ -120,10 +120,10 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, mesure
     const ob = await evalue(`(() => { const a = document.querySelector('#app'), bl = window.ardoise.doc.pages[1].blocks; return {
       types: bl.map((b) => b.type), faits: [...a.querySelectorAll('dl.facts dt')].map((e) => e.textContent),
       fiche: [...a.querySelectorAll('dl.facts dd .pill')].map((e) => e.textContent + ':' + /\\bpa-3\\b/.test(e.className)),
-      pastille: [...a.querySelectorAll('p .pill')].map((e) => e.textContent + ':' + /\\bpa-3\\b/.test(e.className)),
+      pastille: [...a.querySelectorAll('.texte .pill')].map((e) => e.textContent + ':' + /\\bpa-3\\b/.test(e.className)),
       lien: (a.querySelector('a[href="#pg-p3/s9"]') || {}).textContent, legende: (a.querySelector('.img-new figcaption') || {}).textContent,
       integree: /^data:image\\//.test(bl[4].src), message: (document.querySelector('#ui .toast') || {}).textContent }; })()`);
-    const vuOb = { types: ['header', 'facts', 'p', 'image', 'image'], faits: ['tags', 'auteur'], fiche: ['projet:true', 'nouveau:false'], pastille: ['Projet:true'],
+    const vuOb = { types: ['header', 'facts', 'texte', 'image', 'image'], faits: ['tags', 'auteur'], fiche: ['projet:true', 'nouveau:false'], pastille: ['Projet:true'],
       lien: 'suivi de projet › etapes cles', legende: 'capture.png', integree: true, message: '4 blocs importés · 1 image à remettre' };
     for (const k in vuOb) if (JSON.stringify(ob[k]) !== JSON.stringify(vuOb[k])) echec(`Obsidian : ${k} = ${JSON.stringify(ob[k])} au lieu de ${JSON.stringify(vuOb[k])}`);
     await evalue(`document.querySelector('#app a[href="#pg-p3/s9"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))`);

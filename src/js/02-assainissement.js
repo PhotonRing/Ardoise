@@ -2,7 +2,7 @@
 // palettes de la barre de mise en forme : [classe, nom] ; Rouge garde la classe alert de l'ancien bouton « A » (aucune migration)
 var COULEURS_TEXTE = [['alert', 'Rouge'], ['c-orange', 'Orange'], ['c-vert', 'Vert'], ['c-bleu', 'Bleu'], ['c-violet', 'Violet'], ['c-gris', 'Gris']];
 var SURLIGNAGES = [['s-jaune', 'Jaune'], ['s-vert', 'Vert'], ['s-bleu', 'Bleu'], ['s-rose', 'Rose'], ['s-gris', 'Gris']];
-// tab : retrait d'une ligne de paragraphe ; et pc-N : couleur d'exception d'une pastille
+// pastille, couleurs et surlignages, et pc-N : couleur d'exception d'une pastille ; un ancien taquet (span.tab) est défait
 var SPAN_CLASSES = ['pill'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return x[0]; }));
 var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg|math|noscript|input|button|select|textarea|img|video|audio|canvas|form)$/;
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;

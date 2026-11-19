@@ -110,10 +110,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await cdp('Input.insertText', { text: ' ajouté' }); await attendre(30);
   await evalue(`(() => { const m = document.querySelector('[data-pgm]'); if (m) m.click(); return true; })()`); await attendre(50);
   const s1 = await retour('back');
-  const s2 = await evalue(`({ texte: window.ardoise.doc.pages[0].blocks[1].html, pop: !!document.querySelector('.pop') })`);
+  const s2 = await evalue(`({ texte: window.ardoise.doc.pages[0].blocks[1].lignes[0].html, pop: !!document.querySelector('.pop') })`);
   attendu('Précédent pendant la saisie : page 2, saisie gardée, menu fermé', s1.pg === 'p2' && /ajouté/.test(s2.texte) && !s2.pop, { s1, s2 });
   await evalue(touche('z', 'ctrlKey: true')); await attendre(100);
-  const s3 = await evalue(`window.ardoise.doc.pages[0].blocks[1].html`);
+  const s3 = await evalue(`window.ardoise.doc.pages[0].blocks[1].lignes[0].html`);
   attendu('la saisie validée par Précédent s\'annule d\'un Ctrl+Z', !/ajouté/.test(s3), s3);
 
   // ouverture d'un fichier sur une adresse : #p2, #pg-<page>/<bloc>, page supprimée ; dans une iframe, aucune entrée

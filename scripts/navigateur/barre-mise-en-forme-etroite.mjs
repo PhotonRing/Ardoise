@@ -15,7 +15,7 @@ const SELECTIONNER = (a, b) => `(() => { const el = document.querySelector('.fld
   const pos = (n) => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) { if (n <= t.nodeValue.length) return [t, n]; n -= t.nodeValue.length; } };
   const [t1, o1] = pos(${a}), [t2, o2] = pos(${b}), r = document.createRange(); r.setStart(t1, o1); r.setEnd(t2, o2);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`;
-const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).html.replace(/​/g, '')`;
+const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).lignes.map((l) => l.html).join('<br>').replace(/​/g, '')`;
 const RECT = (sel) => `(() => { const x = document.querySelector(${JSON.stringify(sel)}); if (!x || !x.getClientRects().length) return null;
   const r = x.getBoundingClientRect(); return { haut: r.top, bas: r.bottom, gauche: r.left, droite: r.right }; })()`;
 // boutons de la barre affichés à l'écran

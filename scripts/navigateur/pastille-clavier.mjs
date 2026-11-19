@@ -16,7 +16,7 @@ const CHARGE = `window.ardoise.load(${JSON.stringify(DOC)})`;
 const vider = (sel) => `(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.focus(); el.innerHTML = ''; el.dispatchEvent(new Event('input', { bubbles: true }));
   const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`;
 const LISTE = `(() => { const p = document.querySelector('#ui .diese-pop'); return p ? [...p.querySelectorAll('.mi')].map((m) => m.textContent.trim()) : null; })()`;
-const HTML = (bid) => `(window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}) || {}).html`;
+const HTML = (bid) => `((window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}) || {}).lignes || []).map((l) => l.html).join('<br>')`;
 const PARA = '.fld[data-b="a2"]';
 
 export const nom = 'pastille au clavier';

@@ -15,7 +15,7 @@ const PREPARER = (html, a, b) => `(async () => {
   const fin = ${b === undefined ? 'el.textContent.length' : b};
   const r = document.createRange(), [t1, o1] = pos(${a}), [t2, o2] = pos(fin); r.setStart(t1, o1); r.setEnd(t2, o2);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`;
-const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).html`;
+const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).lignes.map((l) => l.html).join('<br>')`;
 const COULEURS = [['alert', 'Rouge'], ['c-orange', 'Orange'], ['c-vert', 'Vert'], ['c-bleu', 'Bleu'], ['c-violet', 'Violet'], ['c-gris', 'Gris']];
 const SURLIGNAGES = [['s-jaune', 'Jaune'], ['s-vert', 'Vert'], ['s-bleu', 'Bleu'], ['s-rose', 'Rose'], ['s-gris', 'Gris']];
 

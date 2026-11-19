@@ -26,7 +26,7 @@ const BARRES = `[...document.querySelectorAll('.bmf')].filter((x) => x.getClient
   return { bloc: blk && blk.dataset.id, dansAncre: !!a && a.classList.contains('collant') && a.parentElement === blk,
     haut: r.top, bas: r.bottom, gauche: r.left, droite: r.right, mGauche: rm && rm.left, mHaut: rm && rm.top, mBas: rm && rm.bottom }; })`;
 const HTML = (bid) => `(() => { const t = (bs) => { for (const b of bs) { if (b.id === ${JSON.stringify(bid)}) return b; const c = t(b.blocks || []); if (c) return c; } };
-  return t(window.ardoise.doc.pages[0].blocks).html; })()`;
+  const b = t(window.ardoise.doc.pages[0].blocks); return b.lignes ? b.lignes.map((l) => l.html).join('<br>') : b.html; })()`;   // bloc texte : lignes jointes
 
 export const nom = 'barre de mise en forme';
 export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {

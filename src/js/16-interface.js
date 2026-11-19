@@ -422,10 +422,11 @@ function effacerForme(s, r, fld) {
   session.valider();   // la frappe en attente est une étape, Effacer en est une autre
   // bloc texte : ligne par ligne, pour que les lignes, leurs niveaux et leurs réglages restent (12-bloc-texte.js)
   var ls = fld.hasAttribute('data-texte') ? lignesDe(fld).filter(function (lg) { return r.intersectsNode(lg); }) : [];
-  var bornes = ls.length > 1 ? ls : [fld], a = null, z = null;
-  bornes.forEach(function (b, i) {
+  // chaque ligne bornée à elle-même : une sélection qui finit hors de la ligne (fin du champ) n'en coupe pas l'élément
+  var bornes = ls.length ? ls : [fld], a = null, z = null;
+  bornes.forEach(function (b) {
     var p = r;
-    if (bornes.length > 1) { p = document.createRange(); p.selectNodeContents(b); if (i === 0) p.setStart(r.startContainer, r.startOffset); if (i === bornes.length - 1) p.setEnd(r.endContainer, r.endOffset); }
+    if (ls.length) { p = document.createRange(); p.selectNodeContents(b); if (b.contains(r.startContainer)) p.setStart(r.startContainer, r.startOffset); if (b.contains(r.endContainer)) p.setEnd(r.endContainer, r.endOffset); }
     var x = effacerPlage(p, b); if (x) { if (!a) a = x[0]; z = x[1]; }
   });
   if (!a) return;
