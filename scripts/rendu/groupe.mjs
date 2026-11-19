@@ -25,7 +25,7 @@ test('groupe : normBlocks garde le groupe et ses blocs, complétés depuis leur 
   egal(g.type, 'group'); egal(g.title, 'Pour aller plus loin'); egal(g.folded, false, 'pli par défaut');
   egal(ids(g.blocks), ['c1', 'c2']);
   egal(g.blocks[1].items[0].alert, undefined, 'fiche gardée telle quelle');
-  egal(g.blocks[0].type, 'p');
+  egal(g.blocks[0].type, 'texte', 'ancien paragraphe du groupe');
 });
 
 test('groupe : un bloc refusé dans un groupe (titre, étape, en-tête, pied, groupe) est remis dans la page juste après le groupe', () => {
@@ -66,7 +66,7 @@ test('groupe : copieBloc donne un identifiant neuf au groupe et à chacun de ses
   const { ctx, d } = monter(DOC());
   const g = d.pages[0].blocks[1], c = ctx.copieBloc(g);
   vrai(c.id !== 'g1' && c.blocks.every((x, i) => x.id !== g.blocks[i].id), 'identifiants neufs');
-  egal(c.blocks.map((x) => x.type), ['p', 'facts']); egal(c.blocks[0].html, 'premier enfant');
+  egal(c.blocks.map((x) => x.type), ['texte', 'facts']); egal(c.blocks[0].lignes[0].html, 'premier enfant');
   egal(g.blocks.map((x) => x.id), ['c1', 'c2'], 'original intact');
 });
 

@@ -12,7 +12,6 @@ const PURS = `
 function R(h) { return String(h == null ? '' : h); }
 function textOf(h) { return htmlText(h).replace(/\\s+/g, ' ').trim(); }
 function isBlank(h) { return !textOf(h); }
-function linesHTML(h) { return h; }
 function paintPills(h) { return h; }
 `;
 const SOURCE = entete.slice(OUVERTURE.length) + PURS +

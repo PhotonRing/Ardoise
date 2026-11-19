@@ -16,7 +16,7 @@ function goPage(i, keepScroll, sansEntree) {
   if (!sansEntree) naviguer(adressePage(doc.pages, i));
 }
 function insertPage(at, lv) {
-  var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('p', {})] }; if (lv) pg.lv = lv;
+  var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('texte', {})] }; if (lv) pg.lv = lv;
   session.modifier(function () { doc.pages.splice(at, 0, pg); doc.cur = at; });
   scrollTo(0, 0); pageHash(at); renamePage(at);
 }

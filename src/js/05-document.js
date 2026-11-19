@@ -10,6 +10,7 @@ function normBlocks(arr, newer) {
   var out = [];
   (arr || []).forEach(function (b) {
     if (!b || typeof b !== 'object') return;
+    if (b.type === 'p' && !newer) { b = JSON.parse(JSON.stringify(b)); paragrapheEnTexte(b); }   // ancien paragraphe (JSON écrit à la main, collé, reçu) : 05-lignes.js
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
@@ -84,7 +85,7 @@ function normalize(d) {
   }
   return out;
 }
-var TEMPLATES_V = 7;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
+var TEMPLATES_V = 8;   // format dans lequel les modèles (04-modeles.js) sont écrits : s'il change, ils passent par les migrations
 function template(kind) { var t = TEMPLATES[kind](); t.v = TEMPLATES_V; return t; }
 var sealed = null, origStored = '';   // fichier chiffré en attente du mot de passe
 function loadInitial() {

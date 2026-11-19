@@ -21,8 +21,8 @@
         },
         {
           "id": "p1",
-          "type": "p",
-          "html": "Texte & <b>gras</b>"
+          "type": "texte",
+          "lignes": [{ "html": "Texte & <b>gras</b>" }]
         },
         {
           "id": "t1",
@@ -41,5 +41,5 @@
       ]
     }
   ],
-  "v": 7
+  "v": 8
 }

@@ -393,9 +393,9 @@ function deForme(n) {
   if (/^(B|I|U|S|STRIKE|CODE|A|STRONG|EM)$/.test(n.tagName)) return true;
   return n.tagName === 'SPAN' && (deLaFamille(n, 'couleur') || deLaFamille(n, 'surlignage'));
 }
-function intact(n) { return n.nodeType === 1 && n.tagName === 'SPAN' && (n.classList.contains('pill') || n.classList.contains('tab')); }
+function intact(n) { return n.nodeType === 1 && n.tagName === 'SPAN' && n.classList.contains('pill'); }
 function sansForme(n) {
-  if (intact(n)) return;   // pastille, taquet : intacts, contenu compris
+  if (intact(n)) return;   // pastille : intacte, contenu compris
   Array.prototype.slice.call(n.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });
   if (n.nodeType === 1 && deForme(n)) { if (n.tagName === 'SPAN') { retirerFamille(n, 'couleur'); if (n.parentNode) retirerFamille(n, 'surlignage'); } else unwrap(n); }
 }
@@ -600,14 +600,6 @@ ltip.addEventListener('click', function (e) {
 window.addEventListener('scroll', hideLinkTip, { passive: true });
 document.addEventListener('selectionchange', function () {
   var s = getSelection(), a = null;
-  if (mode === 'edit' && s.rangeCount && s.isCollapsed && s.anchorNode) {
-    var tb = (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode).closest('span.tab');
-    if (tb && fieldOf(tb)) { tabExit(tb); return; }   // le curseur ne reste pas dans un taquet
-    var an = s.anchorNode, nx = an.nodeType === 1 ? an.childNodes[s.anchorOffset] : (s.anchorOffset === an.nodeValue.length || an.nodeValue.slice(s.anchorOffset).replace(/\u200B/g, '') === '' ? an.nextSibling : null);
-    if (nx && nx.nodeType === 1 && nx.classList.contains('ln')) nx = nx.firstChild;
-    while (nx && nx.nodeType === 3 && nx.nodeValue.replace(/\u200B/g, '') === '') nx = nx.nextSibling;
-    if (nx && nx.nodeType === 1 && nx.classList.contains('tab') && fieldOf(nx)) { tabExit(nx); return; }   // juste avant un taquet (touche Début…)
-  }
   if (mode === 'edit' && !pop && s.rangeCount && s.isCollapsed) {
     var f = fieldOf(s.anchorNode), n = s.anchorNode;
     if (f && f.hasAttribute('data-rich')) { a = (n.nodeType === 1 ? n : n.parentNode).closest('a, span.pill'); if (a && !f.contains(a)) a = null; }

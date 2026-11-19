@@ -116,7 +116,6 @@ function officeBloc(b, d, opts) {
     case 'step':
       var num = stepNums(d.pages[pi].blocks)[b.id];
       out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
-    case 'p': out.push(para(S(b.html), b.indent > 0 ? { retrait: Math.min(6, +b.indent) } : {})); break;
     case 'texte':
       // une ligne → un paragraphe à son retrait ; serre : pas d'espace après (toutes sauf la dernière, comme .texte .lg) ; ligne : gardée vide dans le texte brut
       normLignes(b.lignes).forEach(function (l, i, ls) {

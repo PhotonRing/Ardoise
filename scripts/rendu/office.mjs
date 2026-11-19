@@ -23,7 +23,7 @@ const blocs = [
   { id: 'hd', type: 'header', eyebrow: 'Rapport', title: 'Incident <i>42</i>', lede: 'Résumé court' },
   { id: 's1', type: 'h2', html: 'Section' }, { id: 's2', type: 'h3', html: 'Sous-section' }, { id: 's3', type: 'subtitle', html: 'Petit titre' },
   { id: 'e1', type: 'step', num: '', title: 'Isoler' }, { id: 'e2', type: 'step', num: '', title: 'Nettoyer' },
-  { id: 'p1', type: 'p', html: 'A <b>gras</b> <i>it</i> <u>sou</u> <s>bar</s> <code>x&lt;y</code> <a href="https://ex.fr/a?b=1&amp;c=2" target="_blank" rel="noopener">web</a> <a href="#pg-p2">interne</a> ' + P('OK') + ' ' + P('ok', 'pc-3') + ' ' + P('Inconnue') + '<br>ligne 2' },
+  { id: 'p1', type: 'texte', lignes: [{ html: 'A <b>gras</b> <i>it</i> <u>sou</u> <s>bar</s> <code>x&lt;y</code> <a href="https://ex.fr/a?b=1&amp;c=2" target="_blank" rel="noopener">web</a> <a href="#pg-p2">interne</a> ' + P('OK') + ' ' + P('ok', 'pc-3') + ' ' + P('Inconnue') + '<br>ligne 2' }] },   // saut de ligne dans une ligne (Maj+Entrée)
   { id: 'l1', type: 'list', ordered: true, items: [{ html: 'un' }, { html: 'sous', lv: 1 }, { html: 'deux' }] },
   { id: 'c1', type: 'check', items: [{ html: 'fait', done: true }, { html: 'à faire', done: false }] },
   { id: 't1', type: 'table', rows: [['Nom', 'État'], ['Serveur', P('KO')]] },

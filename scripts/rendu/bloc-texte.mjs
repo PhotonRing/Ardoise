@@ -27,6 +27,24 @@ test('paragraphe → lignes : taquet au milieu → espace ; paragraphe vide → 
   egal(lignes('a<br><br>b'), [{ html: 'a' }, { html: '' }, { html: 'b' }], 'ligne vide au milieu');
 });
 
+test('ancien paragraphe → bloc texte : même identifiant, html et indent retirés, autres clés gardées, déterministe', () => {
+  const ctx = contexte(), b = () => ({ id: 'x1', type: 'p', html: 'un<br>' + TAB + '<b>deux<br>trois</b>', indent: 1, folded: true });
+  const a = b(); ctx.paragrapheEnTexte(a);
+  egal(JSON.parse(JSON.stringify(a)), { id: 'x1', type: 'texte', folded: true, lignes: [{ html: 'un', lv: 1 }, { html: '<b>deux</b>', lv: 2 }, { html: '<b>trois</b>', lv: 1 }] });
+  const c = b(); ctx.paragrapheEnTexte(c);
+  egal(JSON.stringify(c), JSON.stringify(a), 'deux conversions du même JSON');
+  const v = { id: 'v', type: 'p' }; ctx.paragrapheEnTexte(v);
+  egal(JSON.parse(JSON.stringify(v)), { id: 'v', type: 'texte', lignes: [{ html: '' }] }, 'paragraphe sans html');
+  egal(JSON.parse(JSON.stringify(ctx.texteDuHtml('a<br>b'))), { type: 'texte', lignes: [{ html: 'a' }, { html: 'b' }] });
+});
+
+test('JSON au format courant qui contient encore un paragraphe : lu comme un bloc texte, dans un groupe aussi', () => {
+  const d = contexte().normalize({ v: 8, id: 'd', pages: [{ id: 'a', blocks: [{ id: 'x', type: 'p', html: 'a<br>b' }, { id: 'g', type: 'group', blocks: [{ id: 'y', type: 'p', html: 'c' }] }] }] });
+  const [x, g] = d.pages[0].blocks;
+  egal([x.id, x.type, JSON.parse(JSON.stringify(x.lignes)), 'html' in x], ['x', 'texte', [{ html: 'a' }, { html: 'b' }], false]);
+  egal([g.blocks[0].id, g.blocks[0].type, g.blocks[0].lignes[0].html], ['y', 'texte', 'c']);
+});
+
 test('normLignes : au moins une ligne, niveau borné, valeurs par défaut omises', () => {
   const n = (x) => JSON.parse(JSON.stringify(contexte().normLignes(x)));
   egal(n([]), [{ html: '' }]);

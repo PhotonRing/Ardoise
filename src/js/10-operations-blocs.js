@@ -56,7 +56,7 @@ function dupBlock(b) {
   session.modifier(function () { o.liste.splice(o.i + 1, 0, c); revealBlock(c.id); });
 }
 function replaceBlock(b, type) {
-  if (type === 'p') { focusField(b.id); return; }
+  if (type === 'texte' && b.type === 'texte') { focusField(b.id); return; }
   var o = position(b); if (!o) return;
   if (o.parent && HORS_GROUPE[type]) { focusField(b.id); return; }   // le menu d'un bloc d'un groupe ne le propose pas
   var nb = mk(type, {});

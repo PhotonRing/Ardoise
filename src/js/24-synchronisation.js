@@ -50,6 +50,9 @@ function synStart() {
     ws: null, status: 'connexion', err: '', peers: {}, queue: [], tries: 0, timer: 0, sendT: 0, presT: 0, presLast: '', msgId: 0, inflight: {}, patches: [], patchBase: 0, alive: true, fresh: !cfg.state, adopt: false };
   // le fichier a pu changer sans passer par la synchronisation (ancien éditeur, JSON modifié à la main) : écart → modifications locales
   synLocal();
+  // saisies faites dans un paragraphe quand cette copie était en 1.26, pas encore envoyées : converties avec le document, mais
+  // une autre copie a pu convertir ce paragraphe avant elle (la dernière conversion l'emporte)
+  if (synSaisiesParagraphes(st, cfg.pending)) toast('Des saisies faites dans d’anciens paragraphes avant la mise à jour d’Ardoise partent vers les autres copies : vérifiez ces blocs une fois la synchronisation faite.', 10000);
   // configuration seule dans le document ; l'état vit dans la session jusqu'au prochain enregistrement
   synSetCfg(doc, { relay: cfg.relay, key: cfg.key });
   synCrypto(cfg).then(function (c) { if (!syn || syn.cfg !== cfg) return; syn.c = c; synConnect(); }, function () { synFail('Chiffrement indisponible dans ce navigateur'); });

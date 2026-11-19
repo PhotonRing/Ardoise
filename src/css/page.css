@@ -52,7 +52,6 @@ h3,.subtitle{font:600 15px/1.3 var(--f-body);margin:0}
 /* bloc texte : une ligne par élément, retrait par niveau (même pas que l'ancien retrait du paragraphe) */
 .texte .lg{margin:0}
 .lg[data-lv="1"]{margin-left:2em} .lg[data-lv="2"]{margin-left:4em} .lg[data-lv="3"]{margin-left:6em} .lg[data-lv="4"]{margin-left:8em} .lg[data-lv="5"]{margin-left:10em} .lg[data-lv="6"]{margin-left:12em}
-p.ind-1{margin-left:2em} p.ind-2{margin-left:4em} p.ind-3{margin-left:6em} p.ind-4{margin-left:8em} p.ind-5{margin-left:10em} p.ind-6{margin-left:12em}
 :root[data-typo="sobre"] .eyebrow{color:var(--muted);letter-spacing:.06em}
 :root[data-typo="sobre"] h1{font:500 28px/1.2 var(--f-mono)}
 :root[data-typo="sobre"] h2{font:600 17px/1.3 var(--f-body)}
@@ -506,13 +505,6 @@ a.q-count{text-decoration:none;color:inherit}
 .q-linked:hover{border-color:var(--accent)}
 .q-go{position:absolute;top:6px;right:32px;width:22px;height:22px;display:grid;place-items:center;border-radius:5px;color:var(--muted);text-decoration:none}
 .q-go:hover{background:var(--accent-soft);color:var(--accent)}
-
-/* retrait d'une ligne de paragraphe (Tab) */
-span.tab{white-space:pre;tab-size:2em;-moz-tab-size:2em}
-/* ligne en retrait : retrait suspendu, la suite de la ligne reste alignée sur son texte */
-span.ln{display:block;padding-left:calc(var(--n,1) * 2em)}
-span.ln>span.tab{display:none}
-span.ln+br{display:none}
 
 /* kanban (bloc et vue en colonnes du bloc requête) */
 .kb-cols{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 40%,transparent) transparent}

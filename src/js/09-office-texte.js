@@ -27,8 +27,6 @@ OFFICE_RENDUS.step = function (b, x) {
     // retrait du titre : Writer ne l'applique qu'à une cellule bordée (bordure de la couleur du fond)
     officeCellule(titre, 'border:1px solid ' + x.C.surface + ';padding:0pt 0pt 0pt 9pt', '94%', 'middle') + '</tr>', 'margin:0 0 6pt');
 };
-// retrait : 2em de 15 px par niveau (p.ind-N)
-OFFICE_RENDUS.p = function (b, x) { return '<p style="' + OFFICE_P + (b.indent > 0 ? 'margin-left:' + officePt(30 * Math.min(6, +b.indent)) + ';' : '') + '">' + x.segs(x.S(b.html)) + '</p>'; };
 // bloc texte : un <p> par ligne, retrait de 2em par niveau ; lignes sans espace entre elles (.texte .lg) ; ligne vide en &nbsp; (Writer réduit un <p> vide)
 OFFICE_RENDUS.texte = function (b, x) {
   var ls = normLignes(b.lignes);

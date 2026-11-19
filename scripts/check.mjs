@@ -22,7 +22,7 @@ const VERSION = +(js('00-entete.js').match(/var VERSION = (\d+);/) || [])[1];
 const escSrc = (js('00-entete.js').match(/var esc = [^\n]+/) || [])[0];
 if (!VERSION || !escSrc) throw new Error('migrations : VERSION ou esc introuvable dans 00-entete.js');
 const ctx = vm.createContext({});
-vm.runInContext(`var VERSION = ${VERSION};\n${escSrc}\n${js('05-migrations.js')}\nthis.migrate = migrate; this.MIGRATIONS = MIGRATIONS; this.miroirFiltres = miroirFiltres;`, ctx, { filename: '05-migrations.js' });
+vm.runInContext(`var VERSION = ${VERSION};\n${escSrc}\n${js('05-lignes.js')}\n${js('05-migrations.js')}\nthis.migrate = migrate; this.MIGRATIONS = MIGRATIONS; this.miroirFiltres = miroirFiltres;`, ctx, { filename: '05-migrations.js' });
 for (let v = 1; v < VERSION; v++) {
   const n = ctx.MIGRATIONS.filter((m) => m.from === v).length;
   if (n !== 1) throw new Error(`migrations : ${n} étape(s) pour le format ${v} → ${v + 1} (une seule attendue)`);

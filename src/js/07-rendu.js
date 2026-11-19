@@ -85,7 +85,6 @@ function renderBlock(b, d, ctx, num) {
   function f(tag, cls, k, val, o) {
     o = o || {};
     var rich = o.rich !== false, body = rich ? R(val) : esc(val);
-    if (o.lines) body = linesHTML(body);   // paragraphe : retrait suspendu des lignes en retrait
     if (!e) return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + body + '</' + tag + '>';
     return '<' + tag + ' class="' + (cls ? cls + ' ' : '') + 'fld' + (o.soft ? ' soft' : '') + '" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="' + k + '"' +
       (rich ? ' data-rich' : '') + (o.li ? ' data-li' : '') + (o.cell ? ' data-cell' : '') + (o.ml ? ' data-ml' : '') + (o.nl ? ' data-nl' : '') +
@@ -116,7 +115,6 @@ function renderBlock(b, d, ctx, num) {
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
     case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
     case 'texte': return texteHTML(b, e);
-    case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1, lines: 1 });
     case 'step':
       var badge = '';
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';

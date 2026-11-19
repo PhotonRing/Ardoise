@@ -38,7 +38,7 @@ function blocsDuMarkdownLu(lignes) {
       else r.blocs.push({ type: g.niveau <= 2 ? 'h2' : g.niveau === 3 ? 'h3' : 'subtitle', html: html });
     } else if (g.sorte === 'paragraphe') {
       var x = imagesDuParagrapheMd(g.lignes.join('\n'));
-      if (x.texte) r.blocs.push({ type: 'p', html: enLigneMd(x.texte) });
+      if (x.texte) r.blocs.push(texteDuHtml(enLigneMd(x.texte)));   // 05-lignes.js : une ligne par retour à la ligne
       poserImages(x.images);
     } else {
       // images d'un élément de liste ou d'une ligne de tableau : sorties comme celles d'un paragraphe, après le bloc entier
@@ -142,7 +142,7 @@ function decouperMarkdown(lignes) {
 }
 function blocDuGroupe(g) {
   if (g.sorte === 'separateur') return { type: 'divider' };
-  if (g.sorte === 'paragraphe') return { type: 'p', html: enLigneMd(g.lignes.join('\n')) };
+  if (g.sorte === 'paragraphe') return texteDuHtml(enLigneMd(g.lignes.join('\n')));
   if (g.sorte === 'code') {
     var c = { type: 'code', variant: 'dark', name: g.langue, code: g.code, tall: false }, lg = LANGUES_MD[g.langue.toLowerCase()];
     if (lg) c.lang = lg;
@@ -242,7 +242,8 @@ function lienWikiMd(cible) {
 function pageAContenu(blocs) {
   return blocs.some(function (b) {
     if (b.type === 'header' || b.type === 'footer' || b.type === 'divider') return false;
-    if (b.type === 'p' || b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle') return !!htmlText(b.html).trim();
+    if (b.type === 'texte') return b.lignes.some(function (l) { return !!htmlText(l.html).trim(); });
+    if (b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle') return !!htmlText(b.html).trim();
     return true;
   });
 }

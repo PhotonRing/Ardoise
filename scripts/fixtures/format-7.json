@@ -1,0 +1,25 @@
+{
+  "v": 7,
+  "title": "Document 1.26",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Notes",
+      "blocks": [
+        { "id": "t", "type": "h2", "html": "Section" },
+        { "id": "p1", "type": "p", "html": "Première ligne<br><span class=\"tab\">\t</span>en retrait<br><span class=\"tab\">\t</span><span class=\"tab\">\t</span>deux niveaux" },
+        { "id": "p2", "type": "p", "indent": 2, "html": "Paragraphe en retrait<br><span class=\"tab\">\t</span>et un taquet de plus" },
+        { "id": "p3", "type": "p", "html": "Avant <b>gras<br>sur deux lignes</b> après" },
+        { "id": "p4", "type": "p", "html": "un<span class=\"tab\">\t</span>taquet au milieu, <span class=\"pill\">prod</span>" },
+        { "id": "p5", "type": "p", "html": "" },
+        { "id": "g", "type": "group", "title": "Repli", "blocks": [
+          { "id": "p6", "type": "p", "html": "Dans le groupe<br>seconde ligne" },
+          { "id": "l", "type": "list", "items": [{ "html": "puce" }] }
+        ] },
+        { "id": "s", "type": "subtitle", "html": "Sous-titre gardé" },
+        { "id": "q", "type": "query", "title": "Prod", "src": "facts", "scope": "doc", "view": "table", "filtres": [{ "id": "f1", "prop": "tags", "vals": ["prod"] }] }
+      ]
+    }
+  ],
+  "tags": { "prod": { "c": 4 } }
+}

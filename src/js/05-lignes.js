@@ -58,6 +58,15 @@ function lignesDuParagraphe(html, indent) {
   fin();
   return out;
 }
+// ancien Paragraphe (format 7) → bloc texte, sur place : même identifiant, sans uid tiré (migration, normalisation et
+// synchronisation : deux copies qui convertissent le même JSON obtiennent le même bloc)
+function paragrapheEnTexte(b) {
+  b.type = 'texte'; b.lignes = lignesDuParagraphe(b.html, b.indent);
+  delete b.html; delete b.indent;
+  return b;
+}
+// bloc texte d'un HTML à sauts de ligne (import Markdown, modèles) : un <br> par ligne
+function texteDuHtml(html) { return { type: 'texte', lignes: lignesDuParagraphe(html) }; }
 /* ---------- Collage et copie ---------- */
 var LIGNE_BLOC = /^(p|div|li|h[1-6]|tr|blockquote|pre|dt|dd|ul|ol|dl|table|section|article|header|footer|hr)$/;
 var LIGNE_VIDE_EL = /^(img|wbr|input|meta|link|col|source|area|base|embed|param|track)$/;
