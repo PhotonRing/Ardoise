@@ -299,6 +299,21 @@ function retirerFamille(el, famille) {
   FAMILLES_TEINTE[famille].forEach(function (x) { el.classList.remove(x[0]); });
   if (!el.classList.length) unwrap(el);
 }
+// haut, qui englobe la plage r, coupé en trois (avant, plage, après) : les deux bouts sont des copies de haut, qui ne garde
+// que la plage ; rend la plage qui sélectionne haut
+function couperAutour(haut, r) {
+  var deb = r.startContainer, debO = r.startOffset, fin = r.endContainer, finO = r.endOffset;
+  var bout = function (avant) {
+    var b = document.createRange();
+    if (avant) { b.setStart(haut, 0); b.setEnd(deb, debO); } else { b.setStart(fin, finO); b.setEnd(haut, haut.childNodes.length); }
+    var f = b.extractContents(); if (!f.textContent.replace(/​/g, '') && !f.querySelector('br, span.pill')) return;
+    // éléments vidés par la coupe (le reste d'un gras coupé à son bord) retirés
+    Array.prototype.slice.call(f.querySelectorAll('*')).reverse().forEach(function (x) { if (!x.textContent && !x.matches('br') && !x.querySelector('br')) x.remove(); });
+    var c = haut.cloneNode(false); c.appendChild(f); haut.parentNode.insertBefore(c, avant ? haut : haut.nextSibling);
+  };
+  bout(false); bout(true);   // la fin d'abord : le début de la plage reste valable
+  var nr = document.createRange(); nr.selectNode(haut); return nr;
+}
 // cls : classe de la palette, '' pour « Sans couleur ». Sans sélection, rien
 function appliquerTeinte(famille, cls) {
   var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
@@ -306,19 +321,7 @@ function appliquerTeinte(famille, cls) {
   // ancêtre de la famille qui englobe la sélection : coupé en trois (avant, sélection, après), les deux bouts gardent leur teinte
   var n = r.commonAncestorContainer, haut = null; if (n.nodeType !== 1) n = n.parentNode;
   for (; n && n !== fld; n = n.parentNode) if (deLaFamille(n, famille)) haut = n;
-  if (haut) {
-    var deb = r.startContainer, debO = r.startOffset, fin = r.endContainer, finO = r.endOffset;
-    var bout = function (avant) {
-      var b = document.createRange();
-      if (avant) { b.setStart(haut, 0); b.setEnd(deb, debO); } else { b.setStart(fin, finO); b.setEnd(haut, haut.childNodes.length); }
-      var f = b.extractContents(); if (!f.textContent.replace(/​/g, '') && !f.querySelector('br, span.pill')) return;
-      // éléments vidés par la coupe (le reste d'un gras coupé à son bord) retirés
-      Array.prototype.slice.call(f.querySelectorAll('*')).reverse().forEach(function (x) { if (!x.textContent && !x.matches('br') && !x.querySelector('br')) x.remove(); });
-      var c = haut.cloneNode(false); c.appendChild(f); haut.parentNode.insertBefore(c, avant ? haut : haut.nextSibling);
-    };
-    bout(false); bout(true);   // la fin d'abord : le début de la sélection reste valable
-    r = document.createRange(); r.selectNode(haut);
-  }
+  if (haut) r = couperAutour(haut, r);
   // les teintes de la famille présentes dans la sélection sont retirées, puis la sélection est enveloppée
   var f = r.extractContents();
   Array.prototype.slice.call(f.querySelectorAll('span')).forEach(function (x) { if (deLaFamille(x, famille)) retirerFamille(x, famille); });
@@ -383,20 +386,46 @@ document.addEventListener('focusout', function () { requestAnimationFrame(placer
 window.addEventListener('resize', function () { if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
 function fieldOf(n) { while (n && n !== app) { if (n.nodeType === 1 && n.classList.contains('fld')) return n; n = n.parentNode; } return null; }
 function unwrap(el) { var p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
+/* Effacer : la forme (gras, italique, souligné, barré, code, lien, couleur, surlignage) n'est retirée que du texte sélectionné.
+   Une forme qui englobe la sélection est coupée en trois ; pastilles, taquets et sauts de ligne restent. Sans sélection, rien */
+function deForme(n) {
+  if (n.nodeType !== 1) return false;
+  if (/^(B|I|U|S|STRIKE|CODE|A|STRONG|EM)$/.test(n.tagName)) return true;
+  return n.tagName === 'SPAN' && (deLaFamille(n, 'couleur') || deLaFamille(n, 'surlignage'));
+}
+function intact(n) { return n.nodeType === 1 && n.tagName === 'SPAN' && (n.classList.contains('pill') || n.classList.contains('tab')); }
+function sansForme(n) {
+  if (intact(n)) return;   // pastille, taquet : intacts, contenu compris
+  Array.prototype.slice.call(n.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });
+  if (n.nodeType === 1 && deForme(n)) { if (n.tagName === 'SPAN') { retirerFamille(n, 'couleur'); if (n.parentNode) retirerFamille(n, 'surlignage'); } else unwrap(n); }
+}
+function effacerForme(s, r, fld) {
+  if (s.isCollapsed) return;
+  // un bord dans une pastille ou un taquet est repoussé hors de lui (jamais coupé) ; une sélection dans une pastille reste dedans
+  var garde = function (n) { for (; n && n !== fld; n = n.parentNode) if (intact(n)) return n; return null; };
+  var g1 = garde(r.startContainer), g2 = garde(r.endContainer);
+  if (g1 !== g2) { if (g1) r.setStartBefore(g1); if (g2) r.setEndAfter(g2); }
+  // forme la plus haute qui englobe la sélection, sans franchir une pastille : coupée en trois
+  var n = r.commonAncestorContainer, haut = null; if (n.nodeType !== 1) n = n.parentNode;
+  for (; n && n !== fld && !intact(n); n = n.parentNode) if (deForme(n)) haut = n;
+  session.valider();   // la frappe en attente est une étape, Effacer en est une autre
+  if (haut) r = couperAutour(haut, r);
+  var f = r.extractContents();
+  Array.prototype.slice.call(f.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });
+  var premier = f.firstChild, dernier = f.lastChild; if (!premier) return;
+  r.insertNode(f);
+  // formes vidées aux bords de la sélection (extractContents y laisse des éléments vides) retirées
+  Array.prototype.slice.call(fld.querySelectorAll('*')).reverse().forEach(function (x) { if (deForme(x) && !x.textContent.replace(/​/g, '') && !x.querySelector('br, span.pill, span.tab')) x.remove(); });
+  var nr = document.createRange(); nr.setStartBefore(premier); nr.setEndAfter(dernier);
+  s.removeAllRanges(); s.addRange(nr); fire(fld);
+}
 function inlineAction(kind) {
   var s = getSelection(); if (!s.rangeCount) return;
   var r = s.getRangeAt(0), fld = fieldOf(r.commonAncestorContainer); if (!fld) return;
   // sans sélection, la forme vaut pour la frappe suivante ; le barré de Chromium (<strike>) devient <s> à l'assainissement
   if (kind === 'bold' || kind === 'italic' || kind === 'underline' || kind === 'strikeThrough') { document.execCommand(kind); fire(fld); return; }
   function ancestor(test) { var n = r.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentNode; while (n && n !== fld) { if (test(n)) return n; n = n.parentNode; } return null; }
-  if (kind === 'clear') {
-    // la sélection devient son seul texte, puis les formes qui l'englobent sont défaites. Dans cet ordre : défaire d'abord
-    // l'ancêtre qui contient exactement la sélection (couleur, surlignage posés par la palette) l'effondrait, et le gras
-    // intérieur restait jusqu'au clic suivant
-    var tn = document.createTextNode(r.toString()); r.deleteContents(); r.insertNode(tn);
-    for (var a = tn.parentNode; a && a !== fld; ) { var haut = a.parentNode; if (/^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(a.tagName)) unwrap(a); a = haut; }
-    s.removeAllRanges(); var nr = document.createRange(); nr.selectNode(tn); s.addRange(nr); fire(fld); return;
-  }
+  if (kind === 'clear') { effacerForme(s, r, fld); return; }
   var tag = 'span', cls = '';
   if (kind === 'code') tag = 'code';
   else if (kind === 'link' || kind === 'pagelink') tag = 'a';
