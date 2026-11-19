@@ -24,7 +24,11 @@ const text = () => Array.from({ length: ri(4) }, word).join(' ');
 const block = () => {
   const t = pick(['p', 'texte', 'check', 'table', 'map', 'kanban']), b = { id: uid(), type: t };
   if (t === 'p') b.html = text();
-  if (t === 'texte') b.lignes = Array.from({ length: 1 + ri(3) }, () => (rnd() < 0.3 ? { html: text(), lv: 1 + ri(3) } : { html: text() }));
+  if (t === 'texte') b.lignes = Array.from({ length: 1 + ri(3) }, () => {
+    const l = rnd() < 0.3 ? { html: text(), lv: 1 + ri(3) } : { html: text() }, g = pick(['', '', 'puce', 'numero', 'case', 'soustitre']);
+    if (g) l.genre = g; if (g === 'case' && rnd() < 0.5) l.done = true;
+    return l;
+  });
   if (t === 'check') b.items = Array.from({ length: 1 + ri(3) }, () => ({ html: text(), done: rnd() < 0.5 }));
   if (t === 'table') b.rows = [['A', 'B'], [text(), text()]];
   if (t === 'map') { b.markers = [{ lat: 1, lon: 2, label: word() }]; b.view = { lat: 1, lon: 2, z: 3 }; }
@@ -59,6 +63,11 @@ function mutate(d) {
     if (q === 0) { const h = ls[i].html, c = ri(h.length + 1), n = { html: h.slice(c) }; if (ls[i].lv) n.lv = ls[i].lv; ls[i].html = h.slice(0, c); ls.splice(i + 1, 0, n); }
     else if (q === 1 && i > 0) { ls[i - 1].html += ls[i].html; ls.splice(i, 1); }
     else if (q === 2) { const lv = ri(4); if (lv) ls[i].lv = lv; else delete ls[i].lv; }
+    else if (q === 3 && rnd() < 0.5) {
+      // genre changé (sélecteur, raccourci) ou case cochée d'un clic
+      if (ls[i].genre === 'case' && rnd() < 0.5) { if (ls[i].done) delete ls[i].done; else ls[i].done = true; }
+      else { const g = pick(['', 'puce', 'numero', 'case', 'soustitre']); delete ls[i].done; if (g) ls[i].genre = g; else delete ls[i].genre; }
+    }
     else ls[i].html = editText(ls[i].html);
   } else if (b.type === 'check') {
     const it = b.items, q = ri(5);
@@ -158,6 +167,14 @@ function expect(cond, msg) { checks++; if (!cond) throw new Error('scénario : '
   const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
   expect(JSON.stringify(r.pages[0].blocks[0].lignes) === JSON.stringify([{ html: 'Serveurs de prod' }, { html: 'Sauvegardes', lv: 1 }, { html: 'Restauration', lv: 2 }, { html: 'Supervision' }]),
     'bloc texte, deux lignes : ' + JSON.stringify(r.pages[0].blocks[0].lignes));
+}
+{ // bloc texte : l'un change le genre d'une ligne, l'autre tape dans une autre et coche une case : tout converge, rien n'est perdu
+  const x = pair({ pages: [{ id: 'p', blocks: [{ id: 't', type: 'texte', lignes: [{ html: 'Lait' }, { html: 'Pain' }, { html: 'Œufs', genre: 'case' }] }] }] });
+  const na = clone(x.da); na.pages[0].blocks[0].lignes[0].genre = 'puce';
+  const nb = clone(x.db); nb.pages[0].blocks[0].lignes[1].html = 'Pain complet'; nb.pages[0].blocks[0].lignes[2].done = true;
+  const r = swap(x, synDiff(x.a, x.da, na), synDiff(x.b, x.db, nb));
+  expect(JSON.stringify(r.pages[0].blocks[0].lignes) === JSON.stringify([{ genre: 'puce', html: 'Lait' }, { html: 'Pain complet' }, { done: true, genre: 'case', html: 'Œufs' }]),
+    'bloc texte, genre et saisie : ' + JSON.stringify(r.pages[0].blocks[0].lignes));
 }
 { // l'un supprime un mot pendant que l'autre en ajoute un ailleurs
   const x = pair({ pages: [{ id: 'p', blocks: [{ id: 'b', type: 'p', html: 'un deux trois' }] }] });

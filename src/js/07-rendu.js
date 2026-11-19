@@ -69,14 +69,20 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
-// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>)
+// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé et
+// coche en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
 function lignesHTML(lignes) {
-  return lignes.map(function (l) { var h = R(l.html); return '<div class="lg"' + (l.lv > 0 ? ' data-lv="' + Math.min(6, +l.lv) + '"' : '') + '>' + (h || '<br>') + '</div>'; }).join('');
+  var nums = numerosDesLignes(lignes);
+  return lignes.map(function (l, i) {
+    var h = R(l.html), g = LIGNE_GENRES.indexOf(l.genre) >= 0 ? l.genre : '';
+    return '<div class="lg"' + (l.lv > 0 ? ' data-lv="' + Math.min(6, +l.lv) + '"' : '') + (g ? ' data-g="' + g + '"' : '') +
+      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (g === 'case' && l.done ? ' data-done' : '') + '>' + (h || '<br>') + '</div>';
+  }).join('');
 }
 function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && isBlank(lignes[0].html); }
 function texteHTML(b, e) {
   var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
-  if (!e) return '<div class="texte">' + lignesHTML(ls) + '</div>';
+  if (!e) return '<div data-tx="' + b.id + '" class="texte">' + lignesHTML(ls) + '</div>';   // data-tx : cases cochées de l'export statique (01-lecture.js)
   return '<div class="texte fld soft" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="lignes" data-rich data-texte' + (texteVide(ls) ? ' data-vide' : '') +
     ' data-ph="Écrire, ou taper / pour insérer un bloc">' + lignesHTML(ls) + '</div>';
 }

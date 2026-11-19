@@ -125,3 +125,50 @@ test('copie puis collage d\'Ardoise à Ardoise : mêmes lignes et mêmes niveaux
   const ls = [{ html: 'un <b>gras</b>' }, { html: 'deux', lv: 1 }, { html: '' }, { html: 'trois', lv: 3 }];
   egal(brut('lignesDuCollage', contexte().lignesEnHtml(ls, 'd1')), ls);
 });
+
+// Genres de ligne (ticket 05) : numérotation, raccourcis, normalisation
+const N = (lv) => (lv ? { html: 'n', genre: 'numero', lv } : { html: 'n', genre: 'numero' });
+const numeros = (ls) => brut('numerosDesLignes', ls);
+
+test('numérotation : la suite continue malgré des lignes plus profondes intercalées', () => {
+  egal(numeros([N(), { html: 'p', genre: 'puce', lv: 1 }, { html: 't', lv: 1 }, N(), N()]), [1, null, null, 2, 3]);
+  egal(numeros([N(), N(1), N(1), N(), N(1)]), [1, 1, 2, 2, 1], 'chaque niveau a sa suite ; un numéro moins profond fait repartir la suite plus profonde');
+});
+
+test('numérotation : reprise à 1 après une ligne d\'un autre genre au même niveau, ou moins profonde', () => {
+  egal(numeros([N(), N(), { html: 't' }, N()]), [1, 2, null, 1], 'ligne de texte');
+  egal(numeros([N(), { html: 'p', genre: 'puce' }, N()]), [1, null, 1], 'puce');
+  egal(numeros([N(1), N(1), { html: 't' }, N(1)]), [1, 2, null, 1], 'ligne moins profonde, quel que soit son genre');
+  egal(numeros([N(1), N(1), { html: 's', genre: 'soustitre' }, N(1)]), [1, 2, null, 1]);
+});
+
+test('raccourcis : genre et texte restant', () => {
+  const r = (h) => brut('raccourciDeLigne', h);
+  egal(r('- '), { genre: 'puce', html: '' });
+  egal(r('* suite'), { genre: 'puce', html: 'suite' });
+  egal(r('1.&nbsp;un'), { genre: 'numero', html: 'un' });
+  egal(r('42. <b>gras</b>'), { genre: 'numero', html: '<b>gras</b>' });
+  egal(r('[] x'), { genre: 'case', html: 'x' });
+  egal(r('[ ] x'), { genre: 'case', html: 'x' });
+  egal(r('## Titre'), { genre: 'soustitre', html: 'Titre' });
+  for (const h of ['-x', ' - x', '<b>- </b>', '3 x', '[x] x', '# x', '', '--']) egal(r(h), null, h);
+});
+
+test('lignes enregistrées : genre et coche gardés seulement s\'ils ont un sens', () => {
+  const n = (a) => brut('normLignes', a);
+  egal(n([{ html: 'a', genre: 'puce' }, { html: 'b', genre: 'case', done: true }, { html: 'c', genre: 'numero', lv: 2 }, { html: 'd', genre: 'soustitre' }]),
+    [{ html: 'a', genre: 'puce' }, { html: 'b', genre: 'case', done: true }, { html: 'c', genre: 'numero', lv: 2 }, { html: 'd', genre: 'soustitre' }]);
+  egal(n([{ html: 'a', genre: 'titre' }, { html: 'b', genre: 'puce', done: true }, { html: 'c', genre: 'case', done: false }, { html: 'd', genre: 'soustitre', taille: 'grand' }]),
+    [{ html: 'a' }, { html: 'b', genre: 'puce' }, { html: 'c', genre: 'case' }, { html: 'd', genre: 'soustitre' }]);
+});
+
+test('bloc texte en lecture : genre, numéro calculé et coche sur chaque ligne', () => {
+  const { ctx, d } = monter({ title: 'Doc', pages: [{ id: 'p1', blocks: [{ id: 't1', type: 'texte', lignes: [
+    { html: 'a', genre: 'numero' }, { html: 'b', genre: 'puce', lv: 1 }, { html: 'c', genre: 'numero' }, { html: 'd', genre: 'case', done: true }, { html: 'e', genre: 'case' }, { html: 'f', genre: 'soustitre' }] }] }] });
+  for (const view of ['read', 'export', 'edit']) {
+    const h = ctx.renderPage(d, { page: 0, view });
+    egal([...h.matchAll(/<div class="lg"([^>]*)>([^<]*)<\/div>/g)].map((x) => x[1].trim() + '|' + x[2]),
+      ['data-g="numero" data-n="1"|a', 'data-lv="1" data-g="puce"|b', 'data-g="numero" data-n="2"|c', 'data-g="case" data-done|d', 'data-g="case"|e', 'data-g="soustitre"|f'], view);
+  }
+  vrai(/data-tx="t1"/.test(ctx.renderPage(d, { page: 0, view: 'export' })), 'repère des cases de l\'export statique');
+});

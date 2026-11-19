@@ -24,7 +24,7 @@ app.addEventListener('input', function (e) {
     slashMenu(el, bl); el.innerHTML = '<div class="lg"><br></div>'; return;
   }
   setPath(bl, el.dataset.k, fieldValue(el));
-  if (bl.type === 'texte') el.toggleAttribute('data-vide', texteVide(bl.lignes));
+  if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
     var ct = curTitle(); document.title = ct;
@@ -35,6 +35,7 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
+  if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
 // d'Ardoise, sinon les deux mécanismes se mélangent et le texte se défait lettre par lettre ou se duplique

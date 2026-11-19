@@ -5,6 +5,20 @@ function lignesDe(el) { return Array.prototype.filter.call(el.children, function
 function ligneVideEl(lg) { return lg.textContent.replace(/​/g, '') === '' && !lg.querySelector('img'); }
 function poserNiveau(lg, n) { n = Math.max(0, Math.min(LIGNE_LV_MAX, n)); if (n) lg.dataset.lv = n; else lg.removeAttribute('data-lv'); }
 function niveauEl(lg) { return +lg.dataset.lv || 0; }
+// genre d'une ligne (data-g, absent pour une ligne de texte) ; une case qui change de genre ou qui naît perd sa coche
+function genreEl(lg) { return lg.dataset.g || ''; }
+function poserGenre(lg, g) {
+  if (g) lg.dataset.g = g; else lg.removeAttribute('data-g');
+  lg.removeAttribute('data-done'); lg.removeAttribute('data-n');
+  if (g === 'soustitre') lg.removeAttribute('data-taille');   // le sous-titre a sa propre taille
+}
+var GENRES_LISTE = ['puce', 'numero', 'case'];   // genres dont la ligne vide sort par Entrée et Retour arrière
+function ligneDeEl(lg, html) { var o = ligne(html, niveauEl(lg)); if (lg.dataset.g) o.genre = lg.dataset.g; if (lg.hasAttribute('data-done')) o.done = true; return o; }
+// numéros affichés (data-n), recalculés par le module pur après chaque saisie
+function numeroterChamp(el, lignes) {
+  var nums = numerosDesLignes(lignes);
+  lignesDe(el).forEach(function (lg, i) { if (nums[i]) lg.dataset.n = nums[i]; else lg.removeAttribute('data-n'); });
+}
 // tout nœud du champ rangé dans une ligne (une suppression ou un collage natifs en laissent hors des lignes) ; curseur gardé par un repère
 function reparerLignes(el) {
   var egares = Array.prototype.some.call(el.childNodes, function (n) { return !(n.nodeType === 1 && n.nodeName === 'DIV' && n.classList.contains('lg')); });
@@ -30,7 +44,7 @@ function reparerLignes(el) {
 // DOM → lignes (valeur du champ à chaque saisie)
 function lignesDuChamp(el) {
   reparerLignes(el);
-  return normLignes(lignesDe(el).map(function (lg) { return ligne(sanitize(lg.innerHTML), niveauEl(lg)); }));
+  return normLignes(lignesDe(el).map(function (lg) { return ligneDeEl(lg, sanitize(lg.innerHTML)); }));
 }
 function ligneDuNoeud(el, n) { while (n && n.parentNode !== el) n = n.parentNode; return n && n.nodeType === 1 && n.classList.contains('lg') ? n : null; }
 // curseur au début (dir < 0) ou à la fin (dir > 0) de sa ligne
@@ -88,6 +102,11 @@ function toucheTexte(e, el, b) {
     e.preventDefault();
     if (!s.isCollapsed) { r.deleteContents(); reparerLignes(el); lignes = lignesDe(el); r = s.getRangeAt(0); lg = ligneDuNoeud(el, r.startContainer); i = lignes.indexOf(lg); }
     if (!lg) return true;
+    if (ligneVideEl(lg) && GENRES_LISTE.indexOf(genreEl(lg)) >= 0) {
+      // puce, numéro ou case vide : un niveau de moins, puis au niveau 0 une ligne de texte
+      if (niveauEl(lg) > 0) poserNiveau(lg, niveauEl(lg) - 1); else poserGenre(lg, '');
+      fire(el); return true;
+    }
     if (ligneVideEl(lg) && i === lignes.length - 1) {
       // ligne vide en dernière ligne : elle remonte d'un niveau, puis au niveau 0 laisse la place à un bloc texte neuf
       if (niveauEl(lg) > 0) { poserNiveau(lg, niveauEl(lg) - 1); fire(el); return true; }
@@ -95,7 +114,8 @@ function toucheTexte(e, el, b) {
       b.lignes = lignesDuChamp(el); insertAfter(b, 'texte', {}); return true;
     }
     var fin = document.createRange(); fin.selectNodeContents(lg); fin.setStart(r.startContainer, r.startOffset);
-    var nl = document.createElement('div'); nl.className = 'lg'; poserNiveau(nl, niveauEl(lg)); nl.appendChild(fin.extractContents());
+    // la nouvelle ligne garde niveau et genre ; une case naît non cochée, un sous-titre est suivi d'une ligne de texte
+    var nl = document.createElement('div'); nl.className = 'lg'; poserNiveau(nl, niveauEl(lg)); poserGenre(nl, genreEl(lg) === 'soustitre' ? '' : genreEl(lg)); nl.appendChild(fin.extractContents());
     if (ligneVideEl(nl) && !nl.querySelector('br:not(:last-child)')) nl.innerHTML = '<br>';
     if (ligneVideEl(lg) && !lg.querySelector('br')) lg.innerHTML = '<br>';
     lg.after(nl); caretTo(nl, false); fire(el); return true;
@@ -111,6 +131,7 @@ function toucheTexte(e, el, b) {
   if (!lg) return false;
   if (e.key === 'Backspace' && s.isCollapsed && auBordDeLigne(lg, r, -1)) {
     e.preventDefault();
+    if (GENRES_LISTE.indexOf(genreEl(lg)) >= 0) { poserGenre(lg, ''); fire(el); return true; }   // puce, numéro, case : ligne de texte, niveau gardé
     if (niveauEl(lg) > 0) { poserNiveau(lg, niveauEl(lg) - 1); fire(el); return true; }
     if (i > 0) { joindreLignes(el, lignes[i - 1], lg); return true; }
     retourAuBloc(el, b); return true;
@@ -122,6 +143,43 @@ function toucheTexte(e, el, b) {
   if (e.key === 'ArrowDown' && i < lignes.length - 1) return true;
   return false;
 }
+/* ---------- Genres de ligne : raccourcis et cases ---------- */
+// raccourci complété par l'espace tapée au début d'une ligne de texte (« - », « 1. », « [ ] », « ## ») : la frappe forme une
+// étape, la transformation une autre, pour que Ctrl+Z rende les caractères
+function raccourciTexte(el, e) {
+  if (!/^insert(Text|CompositionText)$/.test(e.inputType || '') || !/[ \u00a0]$/.test(e.data || '')) return;
+  var s = getSelection(); if (!s.rangeCount || !s.isCollapsed) return;
+  var r = s.getRangeAt(0), lg = ligneDuNoeud(el, r.startContainer); if (!lg || genreEl(lg)) return;
+  var avant = document.createRange(); avant.selectNodeContents(lg); avant.setEnd(r.startContainer, r.startOffset);
+  var t = avant.toString(), rc = raccourciDeLigne(t);
+  if (!rc || rc.html !== '' || avant.cloneContents().querySelector('*')) return;
+  session.valider();
+  avant.deleteContents(); poserGenre(lg, rc.genre);
+  if (ligneVideEl(lg) && !lg.querySelector('br')) lg.innerHTML = '<br>';   // un nœud de texte vide ne tient pas la ligne
+  var c = document.createRange(); c.setStart(lg, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c);
+  fire(el); session.valider();
+}
+// clic dans la marge d'une case (là où ::before la dessine) : le curseur ne bouge pas, la case est cochée ou décochée
+function caseSousPointeur(e) {
+  var lg = e.target.closest && e.target.closest('.texte > .lg[data-g="case"]'); if (!lg) return null;
+  var g = lg.getBoundingClientRect(), pad = parseFloat(getComputedStyle(lg).paddingLeft) || 0;
+  return e.clientX - g.left < pad ? lg : null;
+}
+// une étape d'historique, synchronisée (lignes.i.done), en édition comme en lecture (comme une Liste à cocher)
+function basculerCase(lg) {
+  var tx = lg.parentNode, bid = tx.dataset.b || tx.dataset.tx, b = byId(bid), i = lignesDe(tx).indexOf(lg);
+  if (!b || !b.lignes || !b.lignes[i] || b.lignes[i].genre !== 'case') return;
+  var oui = !lg.hasAttribute('data-done');
+  session.valider();
+  session.saisir(function () { if (oui) b.lignes[i].done = true; else delete b.lignes[i].done; }); session.valider();
+  lg.toggleAttribute('data-done', oui);
+  if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+}
+app.addEventListener('mousedown', function (e) {
+  if (e.button !== 0) return;
+  var lg = caseSousPointeur(e); if (!lg) return;
+  e.preventDefault(); basculerCase(lg);
+});
 /* ---------- Collage et copie (règles : 05-lignes.js) ---------- */
 // couper dans un bloc texte : la sélection part et ses deux lignes de bord se joignent (sans commande d'édition : un couper lancé
 // par execCommand('cut') refuse une seconde commande pendant son événement)

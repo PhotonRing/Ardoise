@@ -87,6 +87,17 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     if (h.indexOf(`class="${cls}"`) < 0) echec(`${famille} ${nomCase} au toucher : ${h.slice(0, 80)}`);
     if (!(await ouverte())) echec(`${famille} : la barre se ferme après la palette`);
   }
+  // sélecteur de genre du bloc texte (ticket 05 du lot bloc-texte) : dans la barre ouverte et dans l'écran, sa fenêtre aussi
+  await evalue(SELECTIONNER(3, 6)); await attendre(100);
+  if (!(await ouverte())) await appuyer('.bmf-aa');
+  await dedans('sélecteur de genre', '.bmf [data-mf="genre"]');
+  await appuyer('.bmf [data-mf="genre"]');
+  await dedans('fenêtre du sélecteur de genre', '.bmf-choix-pop, .bmf-choix-pop button');
+  await appuyer('.bmf-choix-pop [data-choix="puce"]'); await attendre(300);
+  const g = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 'pa').lignes[0].genre`); mesure();
+  if (g !== 'puce') echec(`sélecteur de genre au toucher : ${g}`);
+  if ((await evalue('getSelection().toString()')) !== 'mot') echec('sélecteur de genre au toucher : sélection perdue');
+  await dedans('barre ouverte avec le sélecteur', '.bmf-b, .bmf-b button');
   const large = await evalue('document.documentElement.scrollWidth'); mesure();
   if (large > 400) echec(`défilement horizontal à 400 px (${large})`);
 

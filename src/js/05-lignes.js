@@ -1,7 +1,9 @@
 /* ---------- Lignes d'un bloc texte : module pur ---------- */
-// Règles du bloc texte, sans DOM (testées par scripts/rendu/bloc-texte.mjs). Une ligne : { html, lv },
-// valeurs par défaut omises (lv absent au niveau 0, de 1 à 6 sinon). Un bloc texte a toujours au moins une ligne.
+// Règles du bloc texte, sans DOM (testées par scripts/rendu/bloc-texte.mjs). Une ligne : { html, lv, genre, done },
+// valeurs par défaut omises (lv absent au niveau 0, de 1 à 6 sinon ; genre absent pour une ligne de texte ; done seulement
+// sur une case cochée). Un bloc texte a toujours au moins une ligne.
 var LIGNE_LV_MAX = 6;
+var LIGNE_GENRES = ['puce', 'numero', 'case', 'soustitre'];
 function ligne(html, lv) {
   var o = { html: String(html == null ? '' : html) }, n = Math.max(0, Math.min(LIGNE_LV_MAX, Math.floor(+lv) || 0));
   if (n) o.lv = n;
@@ -13,6 +15,9 @@ function normLignes(arr) {
     if (typeof x === 'string') return ligne(x);
     var o = {}, k; for (k in x) o[k] = x[k];
     var l = ligne(o.html, o.lv); o.html = l.html; if (l.lv) o.lv = l.lv; else delete o.lv;
+    if (LIGNE_GENRES.indexOf(o.genre) < 0) delete o.genre;
+    if (!(o.genre === 'case' && o.done === true)) delete o.done;
+    if (o.genre === 'soustitre') delete o.taille;   // le sous-titre a sa propre taille
     return o;
   });
   return out.length ? out : [ligne('')];
@@ -67,6 +72,23 @@ function paragrapheEnTexte(b) {
 }
 // bloc texte d'un HTML à sauts de ligne (import Markdown, modèles) : un <br> par ligne
 function texteDuHtml(html) { return { type: 'texte', lignes: lignesDuParagraphe(html) }; }
+// numéro affiché de chaque ligne (null hors numéro) : une suite par niveau, qui continue malgré des lignes plus profondes
+// et repart à 1 après une ligne d'un autre genre au même niveau, ou après une ligne moins profonde. Pas de compteurs CSS :
+// l'écran, Office et Word lisent ces numéros
+function numerosDesLignes(lignes) {
+  var cpt = [];
+  return lignes.map(function (l) {
+    var n = +l.lv || 0; cpt.length = Math.min(cpt.length, n + 1);
+    if (l.genre !== 'numero') { cpt[n] = 0; return null; }
+    cpt[n] = (cpt[n] || 0) + 1; return cpt[n];
+  });
+}
+// raccourci tapé au début d'une ligne (« - », « * », « 1. », « [] », « [ ] », « ## » suivis d'une espace) : { genre, html restant }, ou null
+var LIGNE_RACCOURCI = /^(?:([-*])|(\d+\.)|(\[ ?\])|(##))(?: |&nbsp;|\u00a0)/;
+function raccourciDeLigne(html) {
+  var m = String(html == null ? '' : html).match(LIGNE_RACCOURCI); if (!m) return null;
+  return { genre: m[1] ? 'puce' : m[2] ? 'numero' : m[3] ? 'case' : 'soustitre', html: html.slice(m[0].length) };
+}
 /* ---------- Collage et copie ---------- */
 var LIGNE_BLOC = /^(p|div|li|h[1-6]|tr|blockquote|pre|dt|dd|ul|ol|dl|table|section|article|header|footer|hr)$/;
 var LIGNE_VIDE_EL = /^(img|wbr|input|meta|link|col|source|area|base|embed|param|track)$/;

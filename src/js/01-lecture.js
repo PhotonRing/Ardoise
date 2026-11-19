@@ -178,6 +178,18 @@ function ardoiseReader() {
       try { var v = localStorage.getItem(K + c.id); if (v !== null) c.checked = v === '1'; } catch (_) {}
       c.addEventListener('change', function () { try { localStorage.setItem(K + c.id, c.checked ? '1' : '0'); } catch (_) {} });
     });
+    // cases d'un bloc texte : cochées d'un clic dans leur marge (dessinée par ::before), gardées comme celles d'une liste à cocher
+    var cleCase = function (lg) { var t = lg.parentNode; return K + 'tx-' + t.getAttribute('data-tx') + '-' + Array.prototype.indexOf.call(t.children, lg); };
+    Array.prototype.forEach.call(document.querySelectorAll('.texte[data-tx] > .lg[data-g="case"]'), function (lg) {
+      try { var v = localStorage.getItem(cleCase(lg)); if (v !== null) { if (v === '1') lg.setAttribute('data-done', ''); else lg.removeAttribute('data-done'); } } catch (_) {}
+    });
+    document.addEventListener('mousedown', function (e) {
+      var lg = e.button === 0 && e.target.closest && e.target.closest('.texte[data-tx] > .lg[data-g="case"]'); if (!lg) return;
+      if (e.clientX - lg.getBoundingClientRect().left >= (parseFloat(getComputedStyle(lg).paddingLeft) || 0)) return;
+      e.preventDefault();
+      var oui = !lg.hasAttribute('data-done'); if (oui) lg.setAttribute('data-done', ''); else lg.removeAttribute('data-done');
+      try { localStorage.setItem(cleCase(lg), oui ? '1' : '0'); } catch (_) {}
+    });
   }
   function lireAdresse(hash, pages) {
     // copie autonome de lireAdresse (09-adresse.js) : #pg-<page>[/<bloc>], ancienne forme #p<N>, #edit ; la section déplacée

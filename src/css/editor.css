@@ -146,6 +146,13 @@ html.sheet-on{overflow:hidden}
 .bmf button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .bmf .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .bmf .vsep{width:1px;height:16px;background:var(--line);margin:0 2px}
+.bmf .bmf-tx{display:none;align-items:center;gap:1px}
+.bmf.bmf-texte .bmf-tx{display:inline-flex}
+.bmf .bmf-choix{font-weight:500}
+.bmf .bmf-choix::after{content:"▾";margin-left:4px;font-size:9px;opacity:.7}
+.pop.bmf-choix-pop{flex-direction:column;gap:2px;padding:4px}
+.bmf-choix-pop button{width:auto;height:28px;padding:0 12px;justify-content:start;place-items:center start;border-color:transparent;font:500 13px/1 var(--f-body)}
+.bmf-choix-pop button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 /* barre aux couleurs du thème, comme le menu du bloc ; boutons Couleur du texte et Surlignage et leurs palettes aux teintes du thème */
 .bmf .bmf-c{display:inline-block;padding-bottom:1px;border-bottom:3px solid var(--bad);line-height:1}
 .bmf .bmf-s{display:inline-block;padding:2px 3px;border-radius:3px;background:var(--s-jaune);color:var(--fg);line-height:1}
