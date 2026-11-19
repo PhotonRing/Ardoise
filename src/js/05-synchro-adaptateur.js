@@ -27,7 +27,8 @@ function synLocal() {
   clearTimeout(syn.sendT); syn.sendT = setTimeout(function () { synFlush(false); }, 120);
 }
 
-// réception : intègre les modifications reçues et les passe à la session ; vrai si le document a changé
+// réception : intègre les modifications reçues et les passe à la session ; vrai si le document a changé. Chaque lot
+// { o, v } porte ses opérations et le format du document de la copie qui l'a envoyé (24-synchronisation.js)
 function synIntegrer(s, batches, reload) {
   if (!batches.length && !reload) return false;
   // la frappe en attente devient une étape d'annulation, et ce qui a été saisi ici part d'abord (sinon la
@@ -35,8 +36,11 @@ function synIntegrer(s, batches, reload) {
   session.valider();
   synLocal();
   var changed = reload, perdues = 0;
-  batches.forEach(function (ops) { perdues += synSaisiesParagraphes(s.st, ops); if (synApply(s.st, ops)) changed = true; });
-  if (perdues) toast('Une copie restée en Ardoise 1.26 a écrit dans un ancien paragraphe, déjà converti en bloc texte : cette saisie n’a pas été reprise ici. Mettez cette copie à jour et vérifiez le bloc.', 10000);
+  batches.forEach(function (lot) {
+    if (!(+lot.v >= FORMAT_BLOC_TEXTE)) perdues += synSaisiesParagraphes(s.st, lot.o);
+    if (synApply(s.st, lot.o)) changed = true;
+  });
+  if (perdues) toast('Une copie restée en Ardoise 1.26 a écrit dans un bloc déjà converti en bloc texte ici : cette saisie n’a pas été reprise. Mettez cette copie à jour et vérifiez le bloc.', 10000);
   if (!changed) return false;
   synParagraphes(s);
   var before = s.base, after = synJSON(s.st.root);
@@ -57,8 +61,11 @@ function synParagraphes(s) {
   s.pending = s.pending.concat(synDiff(s.st, brut, conv));
   clearTimeout(s.sendT); s.sendT = setTimeout(function () { synFlush(false); }, 120);
 }
-// saisies d'une copie 1.26 dans le html d'un paragraphe déjà converti ici : le moteur les écarte (registre html retiré),
-// on les compte pour avertir
+// saisies d'une copie 1.26 dans le html d'un bloc déjà converti ici (paragraphe, ou Sous-titre converti par « Convertir en
+// texte ») : le moteur les écarte (registre html retiré), on les compte pour avertir. Seuls les envois d'avant le format du
+// bloc texte sont comptés : une copie à jour qui tape dans un Sous-titre pendant qu'une autre le convertit perd sa frappe
+// comme dans un bloc supprimé par l'autre copie, sans avertissement
+var FORMAT_BLOC_TEXTE = 8;
 function synSaisiesParagraphes(st, ops) {
   var n = 0;
   (ops || []).forEach(function (op) {

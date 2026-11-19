@@ -115,10 +115,10 @@ function synHandle(s, m) {
       var lam = s.st.lamport; s.st = synLoad(state, s.st.actor); if (s.st.lamport < lam) s.st.lamport = lam;
       synApply(s.st, s.pending); s.seq = m.snap.s; s.snapSeq = m.snap.s; remote.push(1);
     });
-    frames.forEach(function (f) { chain = chain.then(function () { if (s.newer) return; return synOpen(f.d).then(function (b) { if (synNewer(s, b.v)) return; remote.push(b.o); s.seq = f.s; }, function () { s.seq = f.s; }); }); });
+    frames.forEach(function (f) { chain = chain.then(function () { if (s.newer) return; return synOpen(f.d).then(function (b) { if (synNewer(s, b.v)) return; remote.push({ o: b.o, v: b.v }); s.seq = f.s; }, function () { s.seq = f.s; }); }); });
     return chain.then(function () {
-      if (s.newer) { synRemote(s, remote.filter(function (x) { return Array.isArray(x); }), false); synBlock(s); return; }
-      synRemote(s, remote.filter(function (x) { return Array.isArray(x); }), remote.indexOf(1) >= 0);
+      if (s.newer) { synRemote(s, remote.filter(function (x) { return x !== 1; }), false); synBlock(s); return; }
+      synRemote(s, remote.filter(function (x) { return x !== 1; }), remote.indexOf(1) >= 0);
       // relais vide ou plus en retard que ce fichier (nouvelle clé, relais neuf, réinstallé ou changé) : on lui
       // envoie tout l'état, qui contient aussi les modifications en attente
       if (!m.snap && (m.seq === 0 || m.seq < s.seq)) { s.seq = m.seq; synFull(s); }
@@ -128,7 +128,7 @@ function synHandle(s, m) {
       synMaybeSnap(s);
     });
   }
-  if (m.t === 'trame') return synOpen(m.d).then(function (b) { if (synNewer(s, b.v)) { synBlock(s); return; } s.seq = m.s; synRemote(s, [b.o], false); synMaybeSnap(s); }, function () { s.seq = m.s; });
+  if (m.t === 'trame') return synOpen(m.d).then(function (b) { if (synNewer(s, b.v)) { synBlock(s); return; } s.seq = m.s; synRemote(s, [{ o: b.o, v: b.v }], false); synMaybeSnap(s); }, function () { s.seq = m.s; });
   if (m.t === 'recu') {
     var sent = s.inflight[m.id]; delete s.inflight[m.id];
     if (sent) s.pending = s.pending.slice(sent);   // les envois partent dans l'ordre : les plus anciennes en attente

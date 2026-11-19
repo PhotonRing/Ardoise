@@ -312,7 +312,7 @@ function echanger(a, b) {
     let rien = true;
     for (const [de, vers] of [[a, b], [b, a]]) {
       const ops = de.ctx.syn.pending; de.ctx.syn.pending = [];
-      if (ops.length) { rien = false; vers.ctx.synIntegrer(vers.ctx.syn, [JSON.parse(JSON.stringify(ops))], false); }
+      if (ops.length) { rien = false; vers.ctx.synIntegrer(vers.ctx.syn, [{ o: JSON.parse(JSON.stringify(ops)), v: vers.ctx.VERSION }], false); }
     }
     if (rien) return;
   }
@@ -332,8 +332,8 @@ const ANCIEN = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', bloc
 function nouvelleCopie(acteur, v) {
   const c = copie(acteur, true), toasts = [];
   c.ctx.toast = (m) => { if (/1\.26/.test(m)) toasts.push(m); };   // avertissements de la copie 1.26 seulement
-  c.ctx.synIntegrer(c.ctx.syn, [JSON.parse(JSON.stringify(v.ops))], false);
-  return { ...c, toasts, integrer: (ops) => c.ctx.synIntegrer(c.ctx.syn, [JSON.parse(JSON.stringify(ops))], false), envoi: () => { const o = c.ctx.syn.pending; c.ctx.syn.pending = []; return o; } };
+  c.ctx.synIntegrer(c.ctx.syn, [{ o: JSON.parse(JSON.stringify(v.ops)), v: 7 }], false);
+  return { ...c, toasts, integrer: (ops, v = 7) => c.ctx.synIntegrer(c.ctx.syn, [{ o: JSON.parse(JSON.stringify(ops)), v }], false), envoi: () => { const o = c.ctx.syn.pending; c.ctx.syn.pending = []; return o; } };
 }
 const pur = (x) => JSON.parse(JSON.stringify(x));
 
@@ -352,7 +352,7 @@ test('copie 1.26 : un paragraphe reçu est lu comme un bloc texte, même identif
 test('copie 1.26 : deux copies à jour qui convertissent le même paragraphe reçu convergent sans ligne dédoublée', () => {
   const v = ancienneCopie(ANCIEN()), a = nouvelleCopie('A', v), b = nouvelleCopie('B', v);
   const ea = a.envoi(), eb = b.envoi();
-  a.integrer(eb); b.integrer(ea);
+  a.integrer(eb, 8); b.integrer(ea, 8);
   const la = pur(a.ctx.doc.pages[0].blocks[1].lignes), lb = pur(b.ctx.doc.pages[0].blocks[1].lignes);
   egal(la, [{ html: 'un' }, { html: 'deux', lv: 1 }]); egal(lb, la);
 });
@@ -375,6 +375,20 @@ test('copie 1.26 : un paragraphe ajouté plus tard par la copie 1.26 est convert
   const y = n.ctx.doc.pages[0].blocks[2];
   egal([y.id, y.type, pur(y.lignes)], ['y', 'texte', [{ html: 'neuf' }]]);
   egal(n.toasts, []);
+});
+
+test('deux copies : une frappe dans un Sous-titre converti en texte par l\'autre copie n\'avertit pas d\'une copie 1.26', () => {
+  const depart = () => ({ title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'st', type: 'subtitle', html: 'Titre' }, { id: 'b2', type: 'texte', lignes: [{ html: 'b' }] }] }] });
+  const { a, b } = relier(depart), toasts = [];
+  b.ctx.toast = (m) => toasts.push(m); a.ctx.toast = (m) => toasts.push(m);
+  a.s.modifier(() => { const l = a.ctx.doc.pages[0].blocks; l.splice(0, 1, a.ctx.blocEnTexte(l[0])); });
+  b.s.saisir(() => { b.ctx.doc.pages[0].blocks[0].html = 'Titre long'; });
+  echanger(a, b);
+  egal(toasts.filter((m) => /1\.26/.test(m)), [], 'pas d\'avertissement 1.26');
+  const ja = pur(a.ctx.doc.pages[0].blocks[0]), jb = pur(b.ctx.doc.pages[0].blocks[0]);
+  egal([ja.id, ja.type, ja.lignes], ['st', 'texte', [{ html: 'Titre', genre: 'soustitre' }]]);
+  const trie = (x) => Array.isArray(x) ? x.map(trie) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, trie(x[k])])) : x;
+  egal(trie(jb), trie(ja), 'les deux copies convergent (ordre des clés libre)');
 });
 
 test('deux copies : annuler ses propres modifications garde celles reçues entre-temps', () => {
@@ -1064,6 +1078,15 @@ test('libellé : cellule modifiée, case cochée ou décochée, autre changement
   egal(libelles(m)[0], 'Accueil · Liste à cocher « Pain complet Lait » : texte modifié', 'texte d\'un élément');
   m.s.modifier(() => { blocsDe(m)[0].type = 'h2'; });
   egal(libelles(m)[0], 'Accueil · Titre de section « a » : bloc modifié', 'type de bloc changé');
+});
+
+test('libellé : converti en texte, lignes réordonnées', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'c', type: 'check', items: [{ html: 'Pain', done: true }, { html: 'Lait', done: false }] }); });
+  m.s.modifier(() => { const l = blocsDe(m); l.splice(1, 1, m.ctx.blocEnTexte(l[1])); });
+  egal(libelles(m)[0], 'Accueil · Texte « Pain Lait » : converti en texte');
+  m.s.modifier(() => { const b = blocsDe(m)[1]; b.lignes = m.ctx.casesALaFin(b.lignes, 0); });
+  egal(libelles(m)[0], 'Accueil · Texte « Lait Pain » : lignes réordonnées');
 });
 
 test('libellé : page ajoutée, renommée, déplacée, changée de niveau, supprimée', () => {

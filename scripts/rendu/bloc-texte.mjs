@@ -190,3 +190,51 @@ test('bloc texte en lecture : alignement et taille sur chaque ligne', () => {
       ['data-align="centre" data-taille="grand"|a', 'data-g="puce" data-align="droite" data-taille="petit"|b', 'data-align="justifie"|c', '|d'], view);
   }
 });
+
+// ---------- Cochées à la fin (menu contextuel d'une case) ----------
+const C = (html, done, lv) => { const o = { html, genre: 'case' }; if (done) o.done = true; if (lv) o.lv = lv; return o; };
+const ranger = (ls, i) => JSON.parse(JSON.stringify(contexte().casesALaFin(ls, i))).map((l) => l.html);
+
+test('cochées à la fin : cochées après les non cochées, ordre relatif gardé', () => {
+  egal(ranger([C('a', true), C('b'), C('c', true), C('d')], 0), ['b', 'd', 'a', 'c']);
+  egal(ranger([C('a', true), C('b'), C('c', true), C('d')], 3), ['b', 'd', 'a', 'c'], 'depuis n\'importe quelle case de la suite');
+});
+
+test('cochées à la fin : les lignes plus profondes suivent leur case et ne sont pas rangées', () => {
+  const ls = [C('a', true), { html: 'a1', lv: 1 }, C('a2', false, 1), C('a3', true, 1), C('b'), { html: 'b1', genre: 'puce', lv: 2 }];
+  egal(ranger(ls, 4), ['b', 'b1', 'a', 'a1', 'a2', 'a3']);
+});
+
+test('cochées à la fin : les lignes hors de la suite ne bougent pas', () => {
+  const ls = [{ html: 't' }, { html: 't1', lv: 1 }, C('a', true), C('b'), { html: 'milieu' }, C('c', true), C('d'), C('x', true, 1), C('y', false, 1)];
+  egal(ranger(ls, 3), ['t', 't1', 'b', 'a', 'milieu', 'c', 'd', 'x', 'y'], 'suite bornée par une ligne de texte du même niveau');
+  egal(ranger(ls, 7), ['t', 't1', 'a', 'b', 'milieu', 'c', 'd', 'y', 'x'], 'suite plus profonde, bornée par sa case parente');
+  egal(ranger([C('a', true), { html: 'p', genre: 'puce' }, C('b', true), C('c')], 2), ['a', 'p', 'c', 'b'], 'une puce du même niveau borne aussi');
+});
+
+test('cochées à la fin : suite déjà rangée ou ligne qui n\'est pas une case → même ordre, mêmes objets', () => {
+  const ctx = contexte(), ls = [C('a'), C('b', true), { html: 't' }];
+  const r = ctx.casesALaFin(ls, 0);
+  vrai(r !== ls && r.every((l, k) => l === ls[k]), 'nouveau tableau des mêmes lignes');
+  egal(ctx.casesALaFin(ls, 2).map((l) => l.html), ['a', 'b', 't']);
+});
+
+// ---------- Convertir en texte (menu ⋯ d'une Liste, d'une Liste à cocher ou d'un Sous-titre) ----------
+const convertir = (b) => JSON.parse(JSON.stringify(contexte().blocEnTexte(b)));
+
+test('convertir en texte : liste à puces → puces, liste numérotée → numéros, niveaux gardés', () => {
+  egal(convertir({ id: 'l1', type: 'list', ordered: false, items: [{ html: 'a' }, { html: '<b>b</b>', lv: 1 }] }),
+    { id: 'l1', type: 'texte', lignes: [{ html: 'a', genre: 'puce' }, { html: '<b>b</b>', lv: 1, genre: 'puce' }] });
+  egal(convertir({ id: 'l2', type: 'list', ordered: true, items: [{ html: 'un' }, { html: 'deux', lv: 2 }] }).lignes,
+    [{ html: 'un', genre: 'numero' }, { html: 'deux', lv: 2, genre: 'numero' }]);
+});
+
+test('convertir en texte : liste à cocher → cases avec coches, ordre saisi gardé même réglée « cochées à la fin »', () => {
+  const b = { id: 'c1', type: 'check', order: 'doneLast', items: [{ html: 'fait', done: true }, { html: 'sous', done: false, lv: 1 }, { html: 'à faire', done: false }] };
+  egal(convertir(b), { id: 'c1', type: 'texte', lignes: [{ html: 'fait', genre: 'case', done: true }, { html: 'sous', lv: 1, genre: 'case' }, { html: 'à faire', genre: 'case' }] });
+  egal(convertir({ id: 'c2', type: 'check', items: [] }).lignes, [{ html: '' }], 'liste vide : une ligne vide');
+});
+
+test('convertir en texte : sous-titre → une ligne de sous-titre', () => {
+  egal(convertir({ id: 's1', type: 'subtitle', html: 'Mon <i>titre</i>' }), { id: 's1', type: 'texte', lignes: [{ html: 'Mon <i>titre</i>', genre: 'soustitre' }] });
+});

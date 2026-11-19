@@ -5,6 +5,7 @@ var ENTREES_BLOC = [
   { ic: 'W', label: 'Exporter en Word (.docx)', fn: function (b) { exporterBlocWord(b); } },
   { ic: '⊟', label: 'Mettre dans un groupe', quand: function (b) { var o = position(b); return !!o && !o.parent && !HORS_GROUPE[b.type]; }, fn: function (b) { gesteMettreDansGroupe(b); } },
   { ic: '⇱', label: 'Sortir du groupe', quand: function (b) { var o = position(b); return !!o && !!o.parent; }, fn: function (b) { gesteSortirDuGroupe(b); } },
+  { ic: '≡', label: 'Convertir en texte', quand: function (b) { return b.type === 'list' || b.type === 'check' || b.type === 'subtitle'; }, fn: function (b) { convertirEnTexte(b); } },
   { ic: '⊞', label: 'Dégrouper', quand: function (b) { return b.type === 'group'; }, fn: function (b) { gesteDegrouper(b); } }
 ];
 function ouvrirMenuBloc(ancre, b) {

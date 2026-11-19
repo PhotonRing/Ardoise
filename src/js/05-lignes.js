@@ -168,3 +168,35 @@ function caseParente(lignes, i) {
   for (var j = i - 1; lv > 0 && j >= 0; j--) if ((+lignes[j].lv || 0) < lv) return lignes[j].html;
   return '';
 }
+// Cochées à la fin (menu contextuel d'une case) : la suite de cases de même niveau autour de la ligne i, chacune suivie de
+// ses lignes plus profondes, est rangée cochées après non cochées (tri stable) ; seul ce niveau est rangé. Nouveau tableau
+// des mêmes objets ligne ; les lignes hors de la suite restent à leur place. Ligne i qui n'est pas une case : même ordre.
+function casesALaFin(lignes, i) {
+  var out = lignes.slice(), l = lignes[i]; if (!l || l.genre !== 'case') return out;
+  var lv = +l.lv || 0, nv = function (j) { return +lignes[j].lv || 0; }, estCase = function (j) { return lignes[j].genre === 'case' && nv(j) === lv; };
+  var debut = i;
+  for (var j = i - 1; j >= 0 && nv(j) >= lv; j--) { if (nv(j) > lv) continue; if (!estCase(j)) break; debut = j; }
+  var unites = [], k = debut;
+  while (k < lignes.length && estCase(k)) {
+    var u = [lignes[k]]; k++;
+    while (k < lignes.length && nv(k) > lv) u.push(lignes[k++]);
+    unites.push(u);
+  }
+  var range = unites.filter(function (u) { return !u[0].done; }).concat(unites.filter(function (u) { return u[0].done; }));
+  Array.prototype.splice.apply(out, [debut, k - debut].concat([].concat.apply([], range)));
+  return out;
+}
+// Convertir en texte : Liste → puces ou numéros, Liste à cocher → cases avec leurs coches, niveaux gardés, dans l'ordre saisi
+// (jamais l'ordre affiché « cochées à la fin ») ; Sous-titre → une ligne de sous-titre. Même identifiant, pour que liens,
+// requêtes et synchronisation suivent le bloc.
+function blocEnTexte(b) {
+  var ls;
+  if (b.type === 'subtitle') ls = [{ html: b.html, genre: 'soustitre' }];
+  else ls = (Array.isArray(b.items) ? b.items : []).map(function (it) {
+    var o = ligne(it && it.html, it && it.lv);
+    o.genre = b.type === 'check' ? 'case' : b.ordered ? 'numero' : 'puce';
+    if (b.type === 'check' && it.done) o.done = true;
+    return o;
+  });
+  return { id: b.id, type: 'texte', lignes: normLignes(ls) };
+}
