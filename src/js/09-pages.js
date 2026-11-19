@@ -117,7 +117,7 @@ app.addEventListener('click', function (e) {
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
     var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qo = qpi >= 0 && ouEst(doc.pages[qpi].blocks, qp[1]), qb = qo && qo.b;   // liste d'un groupe comprise
-    if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
+    if (qb) { var sy = scrollY; session.modifier(function () { basculerCaseRequete(qb, qp[2]); }); scrollTo(0, sy); }   // 07-requetes.js
     return;
   }
   var qs = t.closest('[data-qsort]');

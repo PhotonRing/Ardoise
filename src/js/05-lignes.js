@@ -161,3 +161,10 @@ function lignesEnHtml(lignes, idDoc) {
     return '<p' + (n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : '') + '>' + (pastillesSansCouleur(l.html, idDoc) || '<br>') + '</p>';
   }).join('');
 }
+// case parente (requêtes « cases à cocher ») : html de la ligne la plus proche au-dessus de niveau strictement inférieur,
+// quel que soit son genre, cochée ou non ; '' au niveau 0. Ne lit que html et lv : vaut aussi pour une Liste à cocher
+function caseParente(lignes, i) {
+  var lv = +lignes[i].lv || 0;
+  for (var j = i - 1; lv > 0 && j >= 0; j--) if ((+lignes[j].lv || 0) < lv) return lignes[j].html;
+  return '';
+}

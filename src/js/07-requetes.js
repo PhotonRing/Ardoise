@@ -86,14 +86,12 @@ function qRecsPortee(b, d, pi) {
     if (b.src === 'table' && bl.type === 'table' && bl.rows.length > 1) {
       var head = bl.rows[0].map(function (h, j) { return htmlText(h).replace(/\s+/g, ' ').trim() || 'Colonne ' + (j + 1); });
       bl.rows.slice(1).forEach(function (r) { recs.push({ x: x, cells: r.map(function (c, j) { return { k: head[j], v: c }; }), tags: pillKeys(r.join(' ')) }); });
-    } else if (b.src === 'check' && (bl.type === 'check' || bl.type === 'cards')) {
+    } else if (b.src === 'check' && (bl.type === 'check' || bl.type === 'cards' || bl.type === 'texte')) {
       var add = function (it, path, par) { recs.push({ x: x, html: it.html, done: !!it.done, tags: pillKeys(it.html), path: path, par: par }); };
-      if (bl.type === 'check') bl.items.forEach(function (it, i) {
-        // sous-case : texte de la case parente (la plus proche au-dessus, d'un niveau inférieur)
-        var lv = +it.lv || 0, par = '';
-        for (var j = i - 1; lv > 0 && j >= 0; j--) if ((+bl.items[j].lv || 0) < lv) { par = htmlText(bl.items[j].html).replace(/\s+/g, ' ').trim(); break; }
-        add(it, 'items.' + i + '.done', par);
-      });
+      // sous-case : texte de la case parente (caseParente : 05-lignes.js) ; bloc texte : ses seules lignes de case
+      var parent = function (l, i) { return htmlText(caseParente(l, i)).replace(/\s+/g, ' ').trim(); };
+      if (bl.type === 'check') bl.items.forEach(function (it, i) { add(it, 'items.' + i + '.done', parent(bl.items, i)); });
+      else if (bl.type === 'texte') bl.lignes.forEach(function (l, i) { if (l.genre === 'case') add(l, 'lignes.' + i + '.done', parent(bl.lignes, i)); });
       else bl.cards.forEach(function (c, ci) { var t = textOf(c.title); (c.checks || []).forEach(function (it, j) { add(it, 'cards.' + ci + '.checks.' + j + '.done', t); }); });
     } else if (b.src === 'kanban' && bl.type === 'kanban') {
       var index = kbCards(bl);   // dépendances : index des cartes calculé une fois par kanban (07-kanban.js)
@@ -113,6 +111,14 @@ function qRecsPortee(b, d, pi) {
     }
   });
   return recs;
+}
+// coche ou décoche la case d'un résultat dans son bloc d'origine (chemin r.path) ; rend faux si la case n'existe plus.
+// Ligne d'un bloc texte : done posé ou retiré (jamais done: false, comme au clic sur la case : 12-bloc-texte.js)
+function basculerCaseRequete(bl, path) {
+  var cle = path.replace(/\.done$/, ''), o = getPath(bl, cle);
+  if (!o || typeof o !== 'object' || cle === path) return false;
+  if (/^lignes\./.test(cle)) { if (o.genre !== 'case') return false; if (o.done) delete o.done; else o.done = true; return true; }
+  o.done = !o.done; return true;
 }
 function queryRecords(b, d, pi, noTags) {
   // filtres de la source (ET) ; sans les pastilles pour lister celles de la portée (scopeTags)
@@ -368,9 +374,9 @@ function qCards(b, d, ctx, recs) {
   }).join('') + (e ? '<button type="button" class="q-cadd" data-act="q-card-add" title="Ajouter une carte de nombre">+ Carte</button>' : '') + '</div>';
 }
 function qSource(d, x) {
-  // lien vers la section du résultat ; un modèle diamant, ancré (id b-<id>, 07-rendu.js), est visé lui-même
+  // lien vers la section du résultat ; un modèle diamant ou un bloc texte, ancrés (id b-<id>, 07-rendu.js), sont visés eux-mêmes
   var pg = d.pages[x.pi], t = pageTitle(pg, x.pi), st = x.sec ? textOf(x.sec.type === 'step' ? x.sec.title : x.sec.html) : '';
-  var cible = x.blk && x.blk.type === 'diamond' ? x.blk.id : x.sec ? x.sec.id : '';
+  var cible = x.blk && (x.blk.type === 'diamond' || x.blk.type === 'texte') ? x.blk.id : x.sec ? x.sec.id : '';
   return '<a class="q-src" href="#pg-' + esc(pg.id) + (cible ? '/' + esc(cible) : '') + '">' + esc(t) + (st ? ' › ' + esc(st) : '') + '</a>';
 }
 var viewSort = {};   // tri choisi en lecture d'un clic sur un en-tête (id du bloc → { by, dir }) : jamais enregistré
