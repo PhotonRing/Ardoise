@@ -55,3 +55,55 @@ test('bloc texte en édition : un seul champ, une ligne par élément', () => {
   egal((h.match(/data-k="lignes"/g) || []).length, 1, 'un champ');
   vrai(/<div class="lg">un<\/div><div class="lg" data-lv="1">deux<\/div>/.test(h), 'lignes du champ');
 });
+
+// Collage et copie (ticket 03) : HTML et texte brut → lignes de texte ; lignes → texte brut et HTML de copie
+const brut = (fn, ...a) => JSON.parse(JSON.stringify(contexte()[fn](...a)));
+
+test('collage HTML → lignes : <p>, <div> et <br> donnent des lignes de texte', () => {
+  egal(brut('lignesDuCollage', '<p>un</p><p>deux</p>'), [{ html: 'un' }, { html: 'deux' }]);
+  egal(brut('lignesDuCollage', '<div>un</div><div><div>deux</div></div>trois'), [{ html: 'un' }, { html: 'deux' }, { html: 'trois' }]);
+  egal(brut('lignesDuCollage', 'un<br>deux<br><br>quatre'), [{ html: 'un' }, { html: 'deux' }, { html: '' }, { html: 'quatre' }]);
+  egal(brut('lignesDuCollage', '<p>a<br>b</p><p>c</p>'), [{ html: 'a' }, { html: 'b' }, { html: 'c' }]);
+  egal(brut('lignesDuCollage', 'seul <b>mot</b>'), [{ html: 'seul <b>mot</b>' }], 'une ligne');
+});
+
+test('collage HTML → lignes : paragraphe vide explicite gardé, blancs de mise en page ignorés', () => {
+  egal(brut('lignesDuCollage', '<p>a</p>\n<p></p>\n<p>&nbsp;</p>\n<p>b</p>'), [{ html: 'a' }, { html: '' }, { html: '' }, { html: 'b' }]);
+  egal(brut('lignesDuCollage', '<ul>\n  <li>\n    un\n    deux\n  </li>\n  <li>trois</li>\n</ul>'), [{ html: 'un deux' }, { html: 'trois' }]);
+  egal(brut('lignesDuCollage', '<p>a<br></p><p>b</p>'), [{ html: 'a' }, { html: 'b' }], '<br> final d\'un paragraphe');
+});
+
+test('collage HTML → lignes : une forme sur deux paragraphes est refermée puis rouverte', () => {
+  egal(brut('lignesDuCollage', '<b><p>un</p><p>deux</p></b>'), [{ html: '<b>un</b>' }, { html: '<b>deux</b>' }]);
+  egal(brut('lignesDuCollage', '<p>a <i>b<br>c</i> d</p>'), [{ html: 'a <i>b</i>' }, { html: '<i>c</i> d' }]);
+});
+
+test('collage HTML → lignes : enveloppe du presse-papier, commentaires, styles et balises vides ignorés', () => {
+  egal(brut('lignesDuCollage', '<html><head><style>p{color:red}</style><title>t</title></head><body><!--StartFragment--><p>a</p><img src="x.png"><p>b</p><!--EndFragment--></body></html>'),
+    [{ html: 'a' }, { html: '<img src="x.png">' }, { html: 'b' }]);
+  egal(brut('lignesDuCollage', '<meta charset="utf-8"><p>a<wbr>b</p>'), [{ html: 'a<wbr>b' }]);
+});
+
+test('collage HTML → lignes : le niveau d\'une ligne copiée d\'Ardoise (data-lv) est repris', () => {
+  egal(brut('lignesDuCollage', '<p>a</p><p data-lv="2" style="margin-left:4em">b</p><div class="lg" data-lv="9">c</div>'), [{ html: 'a' }, { html: 'b', lv: 2 }, { html: 'c', lv: 6 }]);
+});
+
+test('collage de texte brut : une ligne de texte par saut de ligne, jamais de genre ni de niveau', () => {
+  egal(brut('lignesDuTexteBrut', 'un\r\n- deux\n    trois <x> & co\n'), [{ html: 'un' }, { html: '- deux' }, { html: '    trois &lt;x&gt; &amp; co' }]);
+  egal(brut('lignesDuTexteBrut', 'seul'), [{ html: 'seul' }]);
+  egal(brut('lignesDuTexteBrut', 'a\r\rb'), [{ html: 'a' }, { html: '' }, { html: 'b' }]);
+});
+
+test('copie : texte brut à deux espaces par niveau, pastilles en #nom, ligne vide gardée', () => {
+  egal(contexte().lignesEnTexte([{ html: 'a <b>gras</b>' }, { html: 'b <span class="pill">OK</span>', lv: 2 }, { html: '' }, { html: 'c &amp; d', lv: 1 }]), 'a gras\n    b #OK\n\n  c & d');
+});
+
+test('copie : HTML en un <p> par ligne, niveau en data-lv et en marge, pastilles marquées du document', () => {
+  egal(contexte().lignesEnHtml([{ html: 'a' }, { html: '<span class="pill pa-2">OK</span>', lv: 2 }, { html: '' }], 'd1'),
+    '<p>a</p><p data-lv="2" style="margin-left:4em"><span class="pill" data-ad="d1">OK</span></p><p><br></p>');
+});
+
+test('copie puis collage d\'Ardoise à Ardoise : mêmes lignes et mêmes niveaux', () => {
+  const ls = [{ html: 'un <b>gras</b>' }, { html: 'deux', lv: 1 }, { html: '' }, { html: 'trois', lv: 3 }];
+  egal(brut('lignesDuCollage', contexte().lignesEnHtml(ls, 'd1')), ls);
+});

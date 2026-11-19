@@ -62,6 +62,7 @@ const PAGE = { v: 6, title: 'Doc', tags: { ko: { c: 1 } }, pages: [{ id: 'p1', t
   { id: 'im', type: 'image', src: 'data:image/png;base64,' + PNG, caption: 'Légende' },
   { id: 'g1', type: 'group', title: 'Groupe plié', folded: true, blocks: [{ id: 'gd', type: 'diamond', title: 'Campagne', adversaire: 'A', capacite: '', infrastructure: 'I', victime: 'V' }] },
   { id: 'dv', type: 'divider' },
+  { id: 'tx', type: 'texte', lignes: [{ html: 'Ligne un' }, { html: 'Ligne deux', lv: 2 }, { html: 'Ligne trois', lv: 1 }] },
   { id: 'ex', type: 'image', src: 'https://ex.fr/i.png', caption: 'Externe' },
 ] }] };
 function produire(doc = PAGE, images = { im: { src: 'data:image/png;base64,' + PNG, mime: 'image/png', l: 1360, h: 680 } }) {
@@ -213,4 +214,13 @@ test('docx : souligné, barré, couleur du texte (w:color) et surlignage (w:shd 
   vrai(run('KO').includes('w:fill="FDECEA"') && run('KO').includes('<w:color w:val="B42318"/>'), 'pastille à ses couleurs : ' + run('KO'));
   vrai(run('rouge').includes('<w:color w:val="B42318"/>'), 'alert rouge : ' + run('rouge'));
   vrai(!x.includes('w:highlight'), 'aucun w:highlight');
+});
+
+test('docx : bloc texte, un paragraphe par ligne, retrait par niveau, sans espace entre les lignes', () => {
+  const { doc } = produire();
+  const un = para(doc, 'Ligne un'), deux = para(doc, 'Ligne deux'), trois = para(doc, 'Ligne trois');
+  vrai(un && deux && trois && un !== deux, 'trois paragraphes');
+  vrai(!/<w:ind/.test(un) && /<w:ind w:left="960"\/>/.test(deux) && /<w:ind w:left="480"\/>/.test(trois), 'retraits : ' + deux + trois);
+  vrai(/<w:spacing w:after="0"\/>/.test(un) && /<w:spacing w:after="0"\/>/.test(deux) && !/<w:spacing/.test(trois), 'espacement : ' + un + trois);
+  vrai(/<w:spacing w:after="0"\/><w:ind/.test(deux), 'w:spacing avant w:ind (ordre du schéma) : ' + deux);
 });

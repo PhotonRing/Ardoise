@@ -29,6 +29,14 @@ OFFICE_RENDUS.step = function (b, x) {
 };
 // retrait : 2em de 15 px par niveau (p.ind-N)
 OFFICE_RENDUS.p = function (b, x) { return '<p style="' + OFFICE_P + (b.indent > 0 ? 'margin-left:' + officePt(30 * Math.min(6, +b.indent)) + ';' : '') + '">' + x.segs(x.S(b.html)) + '</p>'; };
+// bloc texte : un <p> par ligne, retrait de 2em par niveau ; lignes sans espace entre elles (.texte .lg) ; ligne vide en &nbsp; (Writer réduit un <p> vide)
+OFFICE_RENDUS.texte = function (b, x) {
+  var ls = normLignes(b.lignes);
+  return ls.map(function (l, i) {
+    var h = x.segs(x.S(l.html));
+    return '<p style="' + (i < ls.length - 1 ? 'margin:0pt 0pt 0pt;' : OFFICE_P) + (l.lv > 0 ? 'margin-left:' + officePt(30 * Math.min(LIGNE_LV_MAX, +l.lv)) + ';' : '') + '">' + (h || '&nbsp;') + '</p>';
+  }).join('');
+};
 OFFICE_RENDUS.footer = function (b, x) { return '<p style="margin-top:12pt;margin-bottom:6pt;padding-top:12pt;border-top:1px solid ' + x.C.line + ';font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.html)) + '</p>'; };
 OFFICE_RENDUS.divider = function (b, x) { return officeTxtFilet(x, '6pt', '6pt'); };
 OFFICE_RENDUS.image = function (b, x) {

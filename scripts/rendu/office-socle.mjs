@@ -67,6 +67,7 @@ const TOUS = { v: 6, title: 'Doc', theme: 'dark', palette: 'indigo', tags: { ok:
   { id: 'g', type: 'group', title: 'Groupe', blocks: [{ id: 'gp', type: 'p', html: 'dedans' }] },
   { id: 'dm', type: 'diamond', title: 'C', adversaire: 'A', capacite: '', infrastructure: 'I', victime: 'V' },
   { id: 'dv', type: 'divider' }, { id: 'ft', type: 'footer', html: 'Sources' },
+  { id: 'tx', type: 'texte', lignes: [{ html: 'un' }, { html: 'deux', lv: 2 }, { html: '' }, { html: 'fin <b>gras</b>', lv: 1 }] },
 ] }] };
 
 test('office (socle) : chaque type de bloc suit le socle (sans classe, tableaux pleine largeur, polices d\'Office, couleurs claires)', () => {

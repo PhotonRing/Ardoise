@@ -146,6 +146,7 @@ function docxDepuisElements(elts, d) {
       case 'titre': return P('<w:pStyle w:val="' + (e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title') + '"/>', runs(e.segs));
       case 'para':
         var st = STYLE[e.style] || {}, pp = e.style === 'pied' ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="' + docxCouleur(C.line) + '"/></w:pBdr>' : '';
+        if (e.serre) pp += '<w:spacing w:after="0"/>';   // ligne d'un bloc texte suivie d'une autre (avant w:ind : ordre du schéma)
         if (e.retrait) pp += '<w:ind w:left="' + 480 * e.retrait + '"/>';
         return P(pp, runs(e.segs, st));
       case 'liste': return liste(e);

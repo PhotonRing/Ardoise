@@ -58,3 +58,71 @@ function lignesDuParagraphe(html, indent) {
   fin();
   return out;
 }
+/* ---------- Collage et copie ---------- */
+var LIGNE_BLOC = /^(p|div|li|h[1-6]|tr|blockquote|pre|dt|dd|ul|ol|dl|table|section|article|header|footer|hr)$/;
+var LIGNE_VIDE_EL = /^(img|wbr|input|meta|link|col|source|area|base|embed|param|track)$/;
+var LIGNE_IGNOREE = /^(head|style|script|title|template|noscript)$/;
+// HTML collé → lignes de texte : <br> coupe la ligne ; un bloc (p, div, li…) la coupe s'il a du contenu, ou s'il est vide
+// (<p></p> : ligne vide) ; les formes ouvertes sont refermées et rouvertes à chaque coupe ; data-lv d'un bloc (copie d'Ardoise)
+// donne le niveau. Le html des lignes n'est pas assaini (l'appelant le fait, ligne par ligne).
+function lignesDuCollage(html) {
+  var s = String(html == null ? '' : html).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, '');
+  var out = [], pile = [], cur = null, ignore = 0, vu = false;
+  var debut = function () { cur = { h: pile.map(function (x) { return x.o; }).join(''), lv: 0, plein: false }; };
+  var fin = function () {
+    var h = cur.h;
+    for (var i = pile.length - 1; i >= 0; i--) h += '</' + pile[i].n + '>';
+    h = sansFormesVides(h).replace(/\s+((?:<\/[a-z0-9]+>)*)$/i, '$1');
+    if (!/<(img|wbr)\b/i.test(h) && htmlText(h).replace(/[\s ​]/g, '') === '') h = '';
+    out.push(ligne(h, cur.lv)); vu = false; debut();
+  };
+  debut();
+  s.split(/(<(?:[^>"']|"[^"]*"|'[^']*')*>)/).forEach(function (m, i) {
+    if (!m) return;
+    if (i % 2 === 0) {
+      if (ignore) return;
+      var t = m.replace(/\s*[\r\n]+\s*/g, ' ');
+      if (!cur.plein) t = t.replace(/^\s+/, '');
+      if (!t) return;
+      cur.plein = true; cur.h += t; return;
+    }
+    var ferme = /^<\//.test(m), nom = ((m.match(/^<\/?([a-z0-9:]+)/i) || [])[1] || '').toLowerCase();
+    if (LIGNE_IGNOREE.test(nom)) { ignore = Math.max(0, ignore + (ferme ? -1 : 1)); return; }
+    if (ignore || !nom || /^<!/.test(m)) return;
+    if (nom === 'br') { fin(); return; }
+    if (LIGNE_BLOC.test(nom)) {
+      if (cur.plein) fin();
+      else if (ferme && vu) fin();
+      if (!ferme) {
+        vu = nom !== 'hr';
+        var lv = m.match(/\sdata-lv="(\d+)"/);
+        if (lv) cur.lv = +lv[1];
+      }
+      return;
+    }
+    if (LIGNE_VIDE_EL.test(nom)) { if (nom !== 'meta' && nom !== 'link' && nom !== 'base') { cur.h += m; cur.plein = true; } return; }
+    if (!ferme) { pile.push({ n: nom, o: m }); cur.h += m; return; }
+    var j = pile.length - 1; while (j >= 0 && pile[j].n !== nom) j--;
+    if (j < 0) return;
+    pile.splice(j, 1); cur.h += m;
+  });
+  if (cur.plein) fin();
+  return out;
+}
+// texte brut collé : une ligne de texte par saut de ligne (un saut final ne fait pas de ligne), rien n'est converti
+function lignesDuTexteBrut(texte) {
+  var t = String(texte == null ? '' : texte).split(/\r\n|\r|\n/);
+  if (t.length > 1 && t[t.length - 1] === '') t.pop();
+  return t.map(function (x) { return ligne(esc(x)); });
+}
+// copie hors d'Ardoise : texte brut à deux espaces par niveau, pastilles en #nom (texteBrutDePresse : 05-presse-papier.js)
+function lignesEnTexte(lignes) {
+  return lignes.map(function (l) { return new Array((+l.lv || 0) + 1).join('  ') + texteBrutDePresse(l.html); }).join('\n');
+}
+// copie : un <p> par ligne ; data-lv pour un collage dans Ardoise, marge pour les autres applications
+function lignesEnHtml(lignes, idDoc) {
+  return lignes.map(function (l) {
+    var n = +l.lv || 0;
+    return '<p' + (n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : '') + '>' + (pastillesSansCouleur(l.html, idDoc) || '<br>') + '</p>';
+  }).join('');
+}

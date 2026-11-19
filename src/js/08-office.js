@@ -117,6 +117,13 @@ function officeBloc(b, d, opts) {
       var num = stepNums(d.pages[pi].blocks)[b.id];
       out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
     case 'p': out.push(para(S(b.html), b.indent > 0 ? { retrait: Math.min(6, +b.indent) } : {})); break;
+    case 'texte':
+      // une ligne → un paragraphe à son retrait ; serre : pas d'espace après (toutes sauf la dernière, comme .texte .lg) ; ligne : gardée vide dans le texte brut
+      normLignes(b.lignes).forEach(function (l, i, ls) {
+        var o = { ligne: true }; if (l.lv > 0) o.retrait = Math.min(LIGNE_LV_MAX, +l.lv); if (i < ls.length - 1) o.serre = true;
+        out.push(para(S(l.html), o));
+      });
+      break;
     case 'summary':
       if (b.title) out.push(para([txt(b.title, { gras: true })]));
       var entrees = [], parcours = function (arr, lv) { arr.forEach(function (it) { entrees.push({ niveau: lv, segs: [txt((it.n ? it.n + ' ' : '') + it.t, { interne: true, souligne: true })] }); parcours(it.kids, lv + 1); }); };
@@ -410,6 +417,6 @@ function officeTexte(elts) {
     }
     return '';
   };
-  var tous = function (arr) { return arr.map(un).filter(function (t) { return t !== ''; }).join('\n'); };
+  var tous = function (arr) { return arr.filter(function (e) { return e.ligne || un(e) !== ''; }).map(un).join('\n'); };
   return tous(elts);
 }
