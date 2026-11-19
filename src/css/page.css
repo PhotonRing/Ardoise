@@ -69,10 +69,11 @@ h3,.subtitle{font:600 15px/1.3 var(--f-body);margin:0}
 :root{--t-petit:13px;--t-grand:18px}
 .lg[data-taille="petit"]{font-size:var(--t-petit)} .lg[data-taille="grand"]{font-size:var(--t-grand)}
 .lg[data-align="centre"]{text-align:center} .lg[data-align="droite"]{text-align:right} .lg[data-align="justifie"]{text-align:justify}
-/* centrée ou à droite, la marque suit le texte : dessinée dans la ligne (::before en ligne), la case garde 1.6em avec sa marge */
+/* centrée ou à droite, la marque suit le texte : dessinée dans la ligne (::before en ligne) ; la case (police propre de 11px) garde
+   l'écart de la case alignée à gauche */
 .lg[data-g][data-align="centre"],.lg[data-g][data-align="droite"]{padding-left:0}
 .lg[data-g][data-align="centre"]::before,.lg[data-g][data-align="droite"]::before{position:static;display:inline-block;text-indent:0}
-.lg[data-g="case"][data-align="centre"]::before,.lg[data-g="case"][data-align="droite"]::before{margin-right:calc(1.6em - 15px);vertical-align:-2px}
+.lg[data-g="case"][data-align="centre"]::before,.lg[data-g="case"][data-align="droite"]::before{margin-right:8px;vertical-align:-2px}
 :root[data-typo="sobre"] .eyebrow{color:var(--muted);letter-spacing:.06em}
 :root[data-typo="sobre"] h1{font:500 28px/1.2 var(--f-mono)}
 :root[data-typo="sobre"] h2{font:600 17px/1.3 var(--f-body)}
