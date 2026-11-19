@@ -1,14 +1,14 @@
 /* ---------- Menus contextuels : cellules d'un tableau, cases d'un bloc texte ---------- */
 // Clic droit, touche Menu, Maj+F10 ou appui long (contextmenu sous Android) en édition ; Ctrl+clic droit, la lecture et le
 // reste du document gardent le menu natif.
-// Menu d'Ardoise : entrées { label, fn }, flèches, Début et Fin ; Échap ou Tab rendent le curseur à sa place dans le champ
+// Menu d'Ardoise : entrées { label, fn, op facultatif (data-op, repère des bancs) }, flèches, Début et Fin ; Échap ou Tab rendent le curseur à sa place dans le champ
 // (pas au clic extérieur, qui place le sien). cible : élément visé (garde contre le contextmenu qui suit la touche Menu,
 // fermeture au défilement) ; champ : élément qui reprend le focus ; point absent (clavier) : au bord de la cible.
 function ouvrirMenuContextuel(cible, champ, point, entrees) {
   var s = getSelection(), plage = s.rangeCount && champ.contains(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
   closePop();
   var p = document.createElement('div'); p.className = 'pop'; p.setAttribute('role', 'menu'); pop = p; p.cible = cible;
-  p.innerHTML = entrees.map(function (o, i) { return '<button class="mi" type="button" role="menuitem" data-mc="' + i + '">' + esc(o.label) + '</button>'; }).join('');
+  p.innerHTML = entrees.map(function (o, i) { return '<button class="mi" type="button" role="menuitem" data-mc="' + i + '"' + (o.op ? ' data-op="' + o.op + '"' : '') + '>' + esc(o.label) + '</button>'; }).join('');
   var boutons = $$('.mi', p);
   function aller(i) { boutons[(i + boutons.length) % boutons.length].focus({ preventScroll: true }); }
   p.addEventListener('keydown', function (e) {
@@ -40,7 +40,7 @@ function posCellule(el) { var m = el.dataset.k.split('.'); return { b: el.datase
 function ouvrirMenuCellules(cellule, point) {
   var x = posCellule(cellule), b = byId(x.b); if (!b) return;
   ouvrirMenuContextuel(cellule, cellule, point, OPS_TABLEAU.filter(function (o) { return opTableau(b.rows, o[0], x.r, x.c); }).map(function (o) {
-    return { label: o[1], fn: function () { var bb = byId(x.b); if (bb) tableOp(bb, o[0], x.r, x.c); } };   // tableOp : 13-actions-blocs.js
+    return { label: o[1], op: o[0], fn: function () { var bb = byId(x.b); if (bb) tableOp(bb, o[0], x.r, x.c); } };   // tableOp : 13-actions-blocs.js
   }));
 }
 
