@@ -172,3 +172,21 @@ test('bloc texte en lecture : genre, numéro calculé et coche sur chaque ligne'
   }
   vrai(/data-tx="t1"/.test(ctx.renderPage(d, { page: 0, view: 'export' })), 'repère des cases de l\'export statique');
 });
+
+test('lignes enregistrées : alignement et taille gardés seulement hors valeurs par défaut', () => {
+  const n = (a) => brut('normLignes', a);
+  egal(n([{ html: 'a', align: 'centre' }, { html: 'b', align: 'droite', taille: 'petit' }, { html: 'c', align: 'justifie', taille: 'grand', genre: 'puce' }]),
+    [{ html: 'a', align: 'centre' }, { html: 'b', align: 'droite', taille: 'petit' }, { html: 'c', align: 'justifie', taille: 'grand', genre: 'puce' }]);
+  egal(n([{ html: 'a', align: 'gauche', taille: 'normal' }, { html: 'b', align: 'center', taille: 3 }, { html: 'c', align: 'centre', taille: 'grand', genre: 'soustitre' }]),
+    [{ html: 'a' }, { html: 'b' }, { html: 'c', align: 'centre', genre: 'soustitre' }]);
+});
+
+test('bloc texte en lecture : alignement et taille sur chaque ligne', () => {
+  const { ctx, d } = monter({ title: 'Doc', pages: [{ id: 'p1', blocks: [{ id: 't1', type: 'texte', lignes: [
+    { html: 'a', align: 'centre', taille: 'grand' }, { html: 'b', genre: 'puce', align: 'droite', taille: 'petit' }, { html: 'c', align: 'justifie' }, { html: 'd' }] }] }] });
+  for (const view of ['read', 'export', 'edit']) {
+    const h = ctx.renderPage(d, { page: 0, view });
+    egal([...h.matchAll(/<div class="lg"([^>]*)>([^<]*)<\/div>/g)].map((x) => x[1].trim() + '|' + x[2]),
+      ['data-align="centre" data-taille="grand"|a', 'data-g="puce" data-align="droite" data-taille="petit"|b', 'data-align="justifie"|c', '|d'], view);
+  }
+});

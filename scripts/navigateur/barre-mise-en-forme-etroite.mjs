@@ -1,6 +1,7 @@
 // Sujet : barre de mise en forme en fenêtre étroite (moins de 600 px). Un bouton « Aa » remplace la barre dans l'ancre du bloc ;
 // un appui l'ouvre juste sous lui, la sélection est gardée au toucher. Origine : spec barre-mise-en-forme, ticket 04.
 
+import { LIBELLE_ENTIER } from './bloc-texte-genres.mjs';
 const LONG = 'Un mot ici, puis une phrase assez longue pour remplir plusieurs lignes à quatre cents pixels de large, '
   + 'encore une autre pour descendre sous la barre ouverte, et une dernière pour finir le paragraphe tout en bas.';
 const DOC = {
@@ -98,6 +99,22 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   if (g !== 'puce') echec(`sélecteur de genre au toucher : ${g}`);
   if ((await evalue('getSelection().toString()')) !== 'mot') echec('sélecteur de genre au toucher : sélection perdue');
   await dedans('barre ouverte avec le sélecteur', '.bmf-b, .bmf-b button');
+  // alignement et taille (ticket 06) : les trois sélecteurs dans la barre ouverte, fenêtres à libellés entiers dans l'écran
+  if (!(await ouverte())) await appuyer('.bmf-aa');
+  if ((await visibles('.bmf [data-mf="genre"], .bmf [data-mf="align"], .bmf [data-mf="taille"]')).length !== 3) echec('les trois sélecteurs ne sont pas tous visibles');
+  await dedans('sélecteurs d\'alignement et de taille', '.bmf [data-mf="align"], .bmf [data-mf="taille"]');
+  for (const [k, v, attendu] of [['genre', '', ''], ['align', 'centre', 'centre'], ['taille', 'grand', 'grand']]) {
+    if (!(await ouverte())) await appuyer('.bmf-aa');
+    await appuyer(`.bmf [data-mf="${k}"]`);
+    await dedans(`fenêtre ${k}`, '.bmf-choix-pop, .bmf-choix-pop button');
+    const coupes = (await visibles('.bmf-choix-pop button', LIBELLE_ENTIER)).filter((x) => x); mesure();
+    if (coupes.length) echec(`fenêtre ${k} à 400 px : libellés coupés ` + JSON.stringify(coupes));
+    await appuyer(`.bmf-choix-pop [data-choix="${v}"]`); await attendre(300);
+    if (k === 'genre') continue;
+    const l = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 'pa').lignes[0][${JSON.stringify(k)}]`); mesure();
+    if (l !== attendu) echec(`sélecteur ${k} au toucher : ${l}`);
+  }
+  await dedans('barre ouverte avec les trois sélecteurs', '.bmf-b, .bmf-b button');
   const large = await evalue('document.documentElement.scrollWidth'); mesure();
   if (large > 400) echec(`défilement horizontal à 400 px (${large})`);
 

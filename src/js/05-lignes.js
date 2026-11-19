@@ -1,9 +1,12 @@
 /* ---------- Lignes d'un bloc texte : module pur ---------- */
-// Règles du bloc texte, sans DOM (testées par scripts/rendu/bloc-texte.mjs). Une ligne : { html, lv, genre, done },
-// valeurs par défaut omises (lv absent au niveau 0, de 1 à 6 sinon ; genre absent pour une ligne de texte ; done seulement
-// sur une case cochée). Un bloc texte a toujours au moins une ligne.
+// Règles du bloc texte, sans DOM (testées par scripts/rendu/bloc-texte.mjs). Une ligne : { html, lv, genre, align, taille, done },
+// valeurs par défaut omises (lv absent au niveau 0, de 1 à 6 sinon ; genre absent pour une ligne de texte ; align absent pour
+// gauche ; taille absente pour Normal, jamais sur un sous-titre ; done seulement sur une case cochée). Un bloc texte a
+// toujours au moins une ligne.
 var LIGNE_LV_MAX = 6;
 var LIGNE_GENRES = ['puce', 'numero', 'case', 'soustitre'];
+var LIGNE_ALIGNS = ['centre', 'droite', 'justifie'];
+var LIGNE_TAILLES = ['petit', 'grand'];
 function ligne(html, lv) {
   var o = { html: String(html == null ? '' : html) }, n = Math.max(0, Math.min(LIGNE_LV_MAX, Math.floor(+lv) || 0));
   if (n) o.lv = n;
@@ -17,7 +20,8 @@ function normLignes(arr) {
     var l = ligne(o.html, o.lv); o.html = l.html; if (l.lv) o.lv = l.lv; else delete o.lv;
     if (LIGNE_GENRES.indexOf(o.genre) < 0) delete o.genre;
     if (!(o.genre === 'case' && o.done === true)) delete o.done;
-    if (o.genre === 'soustitre') delete o.taille;   // le sous-titre a sa propre taille
+    if (LIGNE_ALIGNS.indexOf(o.align) < 0) delete o.align;
+    if (LIGNE_TAILLES.indexOf(o.taille) < 0 || o.genre === 'soustitre') delete o.taille;   // le sous-titre a sa propre taille
     return o;
   });
   return out.length ? out : [ligne('')];

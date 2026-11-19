@@ -69,14 +69,16 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
-// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé et
-// coche en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
+// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé,
+// coche, alignement et taille en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
 function lignesHTML(lignes) {
   var nums = numerosDesLignes(lignes);
   return lignes.map(function (l, i) {
     var h = R(l.html), g = LIGNE_GENRES.indexOf(l.genre) >= 0 ? l.genre : '';
+    var al = LIGNE_ALIGNS.indexOf(l.align) >= 0 ? l.align : '', ta = g !== 'soustitre' && LIGNE_TAILLES.indexOf(l.taille) >= 0 ? l.taille : '';
     return '<div class="lg"' + (l.lv > 0 ? ' data-lv="' + Math.min(6, +l.lv) + '"' : '') + (g ? ' data-g="' + g + '"' : '') +
-      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (g === 'case' && l.done ? ' data-done' : '') + '>' + (h || '<br>') + '</div>';
+      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (g === 'case' && l.done ? ' data-done' : '') +
+      (al ? ' data-align="' + al + '"' : '') + (ta ? ' data-taille="' + ta + '"' : '') + '>' + (h || '<br>') + '</div>';
   }).join('');
 }
 // bloc vide : une seule ligne de texte (sans genre), vide et sans retrait

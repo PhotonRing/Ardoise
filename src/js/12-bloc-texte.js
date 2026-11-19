@@ -12,8 +12,20 @@ function poserGenre(lg, g) {
   lg.removeAttribute('data-done'); lg.removeAttribute('data-n');
   if (g === 'soustitre') lg.removeAttribute('data-taille');   // le sous-titre a sa propre taille
 }
+// alignement (data-align, absent pour gauche) et taille (data-taille, absente pour Normal ; jamais sur un sous-titre)
+function alignEl(lg) { return lg.dataset.align || ''; }
+function poserAlign(lg, v) { if (v) lg.dataset.align = v; else lg.removeAttribute('data-align'); }
+function tailleEl(lg) { return lg.dataset.taille || ''; }
+function poserTaille(lg, v) { if (v && genreEl(lg) !== 'soustitre') lg.dataset.taille = v; else lg.removeAttribute('data-taille'); }
 var GENRES_LISTE = ['puce', 'numero', 'case'];   // genres dont la ligne vide sort par Entrée et Retour arrière
-function ligneDeEl(lg, html) { var o = ligne(html, niveauEl(lg)); if (lg.dataset.g) o.genre = lg.dataset.g; if (lg.hasAttribute('data-done')) o.done = true; return o; }
+function ligneDeEl(lg, html) {
+  var o = ligne(html, niveauEl(lg));
+  if (lg.dataset.g) o.genre = lg.dataset.g;
+  if (lg.dataset.align) o.align = lg.dataset.align;
+  if (lg.dataset.taille) o.taille = lg.dataset.taille;
+  if (lg.hasAttribute('data-done')) o.done = true;
+  return o;
+}
 // numéros affichés (data-n), recalculés par le module pur après chaque saisie
 function numeroterChamp(el, lignes) {
   var nums = numerosDesLignes(lignes);
@@ -114,8 +126,9 @@ function toucheTexte(e, el, b) {
       b.lignes = lignesDuChamp(el); insertAfter(b, 'texte', {}); return true;
     }
     var fin = document.createRange(); fin.selectNodeContents(lg); fin.setStart(r.startContainer, r.startOffset);
-    // la nouvelle ligne garde niveau et genre ; une case naît non cochée, un sous-titre est suivi d'une ligne de texte
-    var nl = document.createElement('div'); nl.className = 'lg'; poserNiveau(nl, niveauEl(lg)); poserGenre(nl, genreEl(lg) === 'soustitre' ? '' : genreEl(lg)); nl.appendChild(fin.extractContents());
+    // la nouvelle ligne garde niveau, genre, alignement et taille ; une case naît non cochée, un sous-titre est suivi d'une ligne de texte
+    var nl = document.createElement('div'); nl.className = 'lg'; poserNiveau(nl, niveauEl(lg)); poserGenre(nl, genreEl(lg) === 'soustitre' ? '' : genreEl(lg));
+    poserAlign(nl, alignEl(lg)); poserTaille(nl, tailleEl(lg)); nl.appendChild(fin.extractContents());
     if (ligneVideEl(nl) && !nl.querySelector('br:not(:last-child)')) nl.innerHTML = '<br>';
     if (ligneVideEl(lg) && !lg.querySelector('br')) lg.innerHTML = '<br>';
     lg.after(nl); caretTo(nl, false); fire(el); return true;
@@ -159,11 +172,18 @@ function raccourciTexte(el, e) {
   var c = document.createRange(); c.setStart(lg, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c);
   fire(el); session.valider();
 }
-// clic dans la marge d'une case (là où ::before la dessine) : le curseur ne bouge pas, la case est cochée ou décochée
+// clic sur la marque d'une case (là où ::before la dessine) : le curseur ne bouge pas, la case est cochée ou décochée.
+// Alignée à gauche ou justifiée, la marque occupe la marge de la ligne ; centrée ou à droite, les 1.6em devant le texte
 function caseSousPointeur(e) {
   var lg = e.target.closest && e.target.closest('.texte > .lg[data-g="case"]'); if (!lg) return null;
-  var g = lg.getBoundingClientRect(), pad = parseFloat(getComputedStyle(lg).paddingLeft) || 0;
-  return e.clientX - g.left < pad ? lg : null;
+  var g = lg.getBoundingClientRect(), cs = getComputedStyle(lg), pad = parseFloat(cs.paddingLeft) || 0;
+  if (getComputedStyle(lg, '::before').position !== 'static') return e.clientX - g.left < pad ? lg : null;
+  var w = 1.6 * (parseFloat(cs.fontSize) || 15), r = document.createRange(); r.selectNodeContents(lg);
+  var t = Array.prototype.filter.call(r.getClientRects(), function (x) { return x.width > 0; })[0], x0;
+  if (t) x0 = t.left;
+  else x0 = alignEl(lg) === 'droite' ? g.right - parseFloat(cs.paddingRight || 0) : g.left + g.width / 2 + w / 2;   // ligne vide : marque seule
+  var y0 = t ? t.top : g.top, y1 = t ? t.bottom : g.top + parseFloat(cs.lineHeight || 24);
+  return e.clientX >= x0 - w && e.clientX < x0 && e.clientY >= y0 && e.clientY <= y1 ? lg : null;
 }
 // une étape d'historique, synchronisée (lignes.i.done), en édition comme en lecture (comme une Liste à cocher)
 function basculerCase(lg) {

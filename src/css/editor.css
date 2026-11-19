@@ -149,6 +149,7 @@ html.sheet-on{overflow:hidden}
 .bmf .bmf-tx{display:none;align-items:center;gap:1px}
 .bmf.bmf-texte .bmf-tx{display:inline-flex}
 .bmf .bmf-choix{font-weight:500}
+.bmf .bmf-choix:disabled{opacity:.4;cursor:default;background:none}
 .bmf .bmf-choix::after{content:"▾";margin-left:4px;font-size:9px;opacity:.7}
 /* fenêtre d'un sélecteur : une colonne de libellés entiers (plus précis que .bmf-pal button, qui fait des cases de 30 px) */
 .pop.bmf-choix-pop{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:4px}

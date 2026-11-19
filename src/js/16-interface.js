@@ -263,7 +263,9 @@ var BOUTONS_MF = [
 var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
 // fenêtre étroite (moins de 600 px, editor.css) : le bouton « Aa » remplace la barre, et l'ouvre juste sous lui
 bmf.innerHTML = '<button type="button" class="bmf-aa" data-mf="ouvrir" title="Mise en forme" aria-label="Mise en forme" aria-expanded="false">Aa</button>' +
-  '<div class="bmf-b"><span class="bmf-tx"><button type="button" class="bmf-choix" data-mf="genre" title="Genre de la ligne" aria-label="Genre de la ligne" aria-haspopup="true">Texte</button><span class="vsep"></span></span>' +
+  '<div class="bmf-b"><span class="bmf-tx">' + [['genre', 'Genre de la ligne', 'Texte'], ['align', 'Alignement de la ligne', 'Gauche'], ['taille', 'Taille du texte', 'Normal']].map(function (x) {
+    return '<button type="button" class="bmf-choix" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '" aria-haspopup="true">' + x[2] + '</button>';
+  }).join('') + '<span class="vsep"></span></span>' +
   BOUTONS_MF.map(function (x) {
   return x === '|' ? '<span class="vsep"></span>' : '<button type="button" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '">' + x[2] + '</button>';
 }).join('') + '</div>';
@@ -297,9 +299,15 @@ function ouvrirPalette(famille, ancre) {
 /* Réglages des lignes d'un bloc texte (seulement là) : bouton qui montre la valeur de la ligne du curseur et ouvre une fenêtre
    sans focus ; le choix vaut pour toutes les lignes touchées par la sélection, en une étape. [valeur ('' : défaut), libellé] */
 var CHOIX_MF = {
-  genre: { nom: 'Genre de la ligne', vals: [['', 'Texte'], ['puce', 'Puce'], ['numero', 'Numéro'], ['case', 'Case'], ['soustitre', 'Sous-titre']], lire: genreEl, poser: poserGenre }
+  genre: { nom: 'Genre de la ligne', vals: [['', 'Texte'], ['puce', 'Puce'], ['numero', 'Numéro'], ['case', 'Case'], ['soustitre', 'Sous-titre']], lire: genreEl, poser: poserGenre },
+  align: { nom: 'Alignement de la ligne', vals: [['', 'Gauche'], ['centre', 'Centré'], ['droite', 'Droite'], ['justifie', 'Justifié']], lire: alignEl, poser: poserAlign },
+  taille: { nom: 'Taille du texte', vals: [['petit', 'Petit'], ['', 'Normal'], ['grand', 'Grand']], lire: tailleEl, poser: poserTaille }   // sans effet sur un sous-titre
 };
-function libelleChoix(k, v) { var x = CHOIX_MF[k].vals.filter(function (y) { return y[0] === v; })[0]; return x ? x[1] : CHOIX_MF[k].vals[0][1]; }
+// libellé d'une valeur ; une valeur inconnue montre celui de la valeur par défaut ('')
+function libelleChoix(k, v) {
+  var t = function (w) { return CHOIX_MF[k].vals.filter(function (y) { return y[0] === w; })[0]; };
+  return (t(v) || t(''))[1];
+}
 // lignes du bloc texte touchées par la sélection, ou []
 function lignesTouchees(fld) {
   var s = getSelection(); if (!s.rangeCount || !fld || !fld.hasAttribute('data-texte')) return [];
@@ -327,9 +335,12 @@ function appliquerChoix(k, v) {
   majChoix(fld);
 }
 // libellés des réglages : valeur de la ligne du curseur
+// taille désactivée quand toutes les lignes touchées sont des sous-titres
 function majChoix(fld) {
-  var lg = lignesTouchees(fld)[0];
+  var ls = lignesTouchees(fld), lg = ls[0];
   Object.keys(CHOIX_MF).forEach(function (k) { var b = $('[data-mf="' + k + '"]', bmf); if (b) b.textContent = libelleChoix(k, lg ? CHOIX_MF[k].lire(lg) : ''); });
+  var bt = $('[data-mf="taille"]', bmf);
+  if (bt) bt.disabled = ls.length > 0 && ls.every(function (x) { return genreEl(x) === 'soustitre'; });
 }
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop && pop.bmfPal) { e.preventDefault(); e.stopPropagation(); closePop(); } }, true);
 function deLaFamille(n, famille) { return n.nodeType === 1 && n.tagName === 'SPAN' && FAMILLES_TEINTE[famille].some(function (x) { return n.classList.contains(x[0]); }); }
