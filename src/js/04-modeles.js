@@ -2,7 +2,7 @@
 var TEMPLATES = {
   tour: function () {
     // visite guidée : écrite au format TEMPLATES_V (05-document.js), sur plusieurs pages
-    var P = function (t) { return '<span class="pill">' + t + '</span>'; }, TAB = '<span class="tab">\t</span>';
+    var P = function (t) { return '<span class="pill">' + t + '</span>'; };
     var IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABaCAIAAAAJsExNAAADb0lEQVR42u3SxZIUURCF4fM4vAEb1jwET3K2uA3O4O5uY4y74O7uDoPLBhYdMdHRTVvVre7KrBPxbftWZ+aPPxMUcQO/xyniBn6NUcQN/ByliBv4MUIRN/B9mCJu4NsQRdzA10GKuIEvAxRxA5/7KeIGJvso4gY+9VLEDXzsoYgb+NBNETfwvosibuBdJ0XcwNvTFHEDbzoo4gZet1PEDbxqo4gbeNlKETfwooWSHX8nJ8qzPiCen6JkQcWU89kdE89OUtyrqeYco5Pi6QmKYxFSzmduXjw5TvEqZs05tkbG42MUr4IEbWtkPDpKcSlIzTmGpsbDIxR/AtacY2VwPDhM8Sd40FYGx/1DFGeC15xjYnbcO0hxJqGgTcyOuwcoziQUtInZcWc/xZmEgjYxO27voziTUNAmZsetvRRnEgraxOy4uYfiTEJBm5gdN3ZTnEkoaBOz4/ouijMJBW1idlzbSXEmoaBNzI6rOyjOJBS0idlxZTvFn+A1Wxkcl7dR/AketJXBcWkrxaWANRuaGhe3ULwKUrOtkXFhM8WrIEHbGhnnN1Eci1mzuXlxbiPFvQgpG50UZzdQsqCmmu2OiTPrKfXBWTPii/kfKqZsfcmYWEdJSJCCy9OSC2C8mRJQHSIuRcsfbybG1lLia2DHxbJ8CIyuoUSWqo6LZfAiGFlNqVXKOy6WndNgeBWlSuY6LpCFG2FoJaUi6ykXcHwpDK6glOEs5Xwu74WB5ZRijjsu5ulw6F9GyZeplPP5OB/6mih9TdntuID1O2Jqkt6lzCZF/F9Gr4mCMXqWMDtUbUXmbopSk3QvplfKNAIrx0X5MboW0RN1GVP6T4wqJ+lcyAaaOX1arfJ/rhAjLDC1MZSHmvZyegHrJsINItxGEcdZYD17qBKiLatjPhMS8AzZLLshC0yuh1oh5vra5zGURC+RhazTsMCAPUSDUNtsm8to6nYGr2Wnc4GRe4gJSay4dQ6r0cBL+MjaygKr7CGOqW+hDntvmc0CKbmE3axNL7C4hwhKPQ5dwlbWWmB50CWsZK0FpiVoQ5dIYdnaXlqCtnuJlGStBaYlaDeXaNRVtMBUBO3yDPU8jBYYf4HQGRp+GC0w4AIR+enMniHUYbS3OAss9RS0TfFEQYuCFlHQIgpaREGLghZR0CIKWkRBi1TpH6CTzu9yeVEmAAAAAElFTkSuQmCC';
     var cours = uid();   // cartes reliées par « Dépend de… » (page Suivi de projet)
     return { title: 'Ardoise', palette: 'ambre', typo: 'display', width: 820, theme: 'auto',
@@ -23,7 +23,7 @@ var TEMPLATES = {
         '<b>Ctrl+S</b> enregistre. La première fois, choisissez l’emplacement du fichier ; ensuite chaque modification est enregistrée toute seule.',
         'Le sommaire à gauche range les pages en arborescence : <b>+</b> crée une sous-page, glissez une page pour la déplacer ou la ranger dans une autre. Sur petit écran, les pages passent en onglets.']) }),
       mk('step', { id: 'ecrire', title: 'Écrire' }),
-      mk('p', { html: '<b>Entrée</b> passe à la ligne ; une seconde fois sur une ligne vide, elle crée un nouveau bloc. <b>Tab</b> met la ligne en retrait :<br>' + TAB + 'comme celle-ci,<br>' + TAB + TAB + 'ou celle-ci, sur deux niveaux, dont la suite reste alignée sur son retrait quand elle est trop longue pour tenir sur une seule ligne.' }),
+      mk('texte', { lignes: [{ html: '<b>Entrée</b> passe à la ligne ; une seconde fois sur une ligne vide, elle crée un nouveau bloc. <b>Tab</b> met la ligne en retrait :' }, { html: 'comme celle-ci,', lv: 1 }, { html: 'ou celle-ci, sur deux niveaux, dont la suite reste alignée sur son retrait quand elle est trop longue pour tenir sur une seule ligne.', lv: 2 }] }),
       mk('h3', { html: 'Une sous-section' }),
       mk('p', { html: 'Elle apparaît dans le sommaire, contrairement au sous-titre ci-dessous.' }),
       mk('subtitle', { html: 'Un sous-titre' }),

@@ -23,6 +23,7 @@ function normBlocks(arr, newer) {
       return o;
     });
     if (nb.type === 'kanban') kbCleanDeps(nb);
+    if (nb.type === 'texte') nb.lignes = normLignes(nb.lignes);   // au moins une ligne (05-lignes.js)
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
     if (nb.type === 'group') {

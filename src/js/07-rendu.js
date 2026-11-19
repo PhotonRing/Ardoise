@@ -69,6 +69,17 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
+// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>)
+function lignesHTML(lignes) {
+  return lignes.map(function (l) { var h = R(l.html); return '<div class="lg"' + (l.lv > 0 ? ' data-lv="' + Math.min(6, +l.lv) + '"' : '') + '>' + (h || '<br>') + '</div>'; }).join('');
+}
+function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && isBlank(lignes[0].html); }
+function texteHTML(b, e) {
+  var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
+  if (!e) return '<div class="texte">' + lignesHTML(ls) + '</div>';
+  return '<div class="texte fld soft" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="lignes" data-rich data-texte' + (texteVide(ls) ? ' data-vide' : '') +
+    ' data-ph="Écrire, ou taper / pour insérer un bloc">' + lignesHTML(ls) + '</div>';
+}
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
@@ -104,6 +115,7 @@ function renderBlock(b, d, ctx, num) {
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
     case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
+    case 'texte': return texteHTML(b, e);
     case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1, lines: 1 });
     case 'step':
       var badge = '';
