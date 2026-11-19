@@ -197,3 +197,20 @@ test('docx : carte de chaleur, cases teintées (fond de cellule) et texte blanc 
   vrai(/<w:shd w:val="clear" w:color="auto" w:fill="B4540A"\/><\/w:tcPr>(?:(?!<\/w:tc>)[\s\S])*?<w:color w:val="FFFFFF"\/>(?:(?!<\/w:tc>)[\s\S])*?T1059/.test(doc), 'T1059 : accent pur, texte blanc');
   vrai(/<w:shd w:val="clear" w:color="auto" w:fill="FBF5F0"\/><\/w:tcPr>(?:(?!<\/w:tc>)[\s\S])*?T1486/.test(doc), 'T1486 : palier le plus clair');
 });
+
+test('docx : souligné, barré, couleur du texte (w:color) et surlignage (w:shd w:fill, pas w:highlight) ; code et pastille gardent leur fond', () => {
+  const doc = { v: 6, title: 'Doc', tags: { ko: { c: 1 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [{ id: 'p', type: 'p',
+    html: '<u>sou</u> <s>bar</s> <span class="c-vert">vert</span> <span class="s-jaune">jaune</span> <span class="c-violet s-rose">deux <code>cx</code> ' + P('KO') + '</span> <span class="alert">rouge</span>' }] }] };
+  const { doc: x } = produire(doc, {});
+  bienForme(x, 'document');
+  const run = (mot) => (x.match(new RegExp('<w:r>(?:(?!<w:r>)[\\s\\S])*?>' + mot + '</w:t></w:r>')) || [''])[0];
+  vrai(run('sou').includes('<w:u w:val="single"/>'), 'souligné : ' + run('sou'));
+  vrai(run('bar').includes('<w:strike/>'), 'barré : ' + run('bar'));
+  vrai(run('vert').includes('<w:color w:val="18794E"/>') && !run('vert').includes('w:shd'), 'couleur : ' + run('vert'));
+  vrai(run('jaune').includes('<w:shd w:val="clear" w:color="auto" w:fill="FFF0A6"/>'), 'surlignage : ' + run('jaune'));
+  vrai(run('deux ').includes('<w:color w:val="6D3FC0"/>') && run('deux ').includes('w:fill="FADBE8"'), 'couleur et surlignage : ' + run('deux '));
+  vrai(run('cx').includes('w:fill="EEF2F4"') && !run('cx').includes('FADBE8'), 'code sur son fond : ' + run('cx'));
+  vrai(run('KO').includes('w:fill="FDECEA"') && run('KO').includes('<w:color w:val="B42318"/>'), 'pastille à ses couleurs : ' + run('KO'));
+  vrai(run('rouge').includes('<w:color w:val="B42318"/>'), 'alert rouge : ' + run('rouge'));
+  vrai(!x.includes('w:highlight'), 'aucun w:highlight');
+});

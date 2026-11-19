@@ -28,7 +28,7 @@ function toggleMode() {
   mode = mode === 'edit' ? 'view' : 'edit';
   // les colonnes réduites pour soi ne passent pas d'un mode à l'autre : l'édition montre le fichier
   viewCol = {};
-  closePop(); itb.style.display = 'none';
+  closePop(); cacherBarreMiseEnForme();
   render();
   var el = top && blockEl(anchorBlock(doc, viewCtx(), top.id));
   if (!el) { anchorHold = null; scrollTo(0, y); return; }

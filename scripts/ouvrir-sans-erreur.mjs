@@ -1,5 +1,5 @@
 // Ouvre des fichiers Ardoise dans Chromium sans affichage et échoue sur toute erreur de la page (exception, console.error)
-// ou si l'éditeur ne s'affiche pas : à passer sur chaque fichier d'une vérification manuelle avant de la poser au propriétaire.
+// ou si l'éditeur ne s'affiche pas (barre d'édition, ou boutons de lecture pour un document qui s'ouvre en lecture) : à passer sur chaque fichier d'une vérification manuelle avant de la poser au propriétaire.
 //   node scripts/ouvrir-sans-erreur.mjs <fichier.html>…
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
@@ -39,9 +39,9 @@ let ko = 0;
 for (const f of fichiers) {
   erreurs = [];
   await cdp('Page.navigate', { url: pathToFileURL(resolve(f)).href });
-  let pret = false; for (let i = 0; i < 100 && !pret; i++) { await attendre(50); pret = await evalue('!!document.querySelector(".tb .doc-name") && document.readyState === "complete"'); }
+  let pret = false; for (let i = 0; i < 100 && !pret; i++) { await attendre(50); pret = await evalue('!!document.querySelector(".tb .doc-name, .fab [data-ui=mode]") && document.readyState === "complete"'); }
   await attendre(1000);   // erreurs différées (rendu des blocs, minuteries du chargement)
-  if (!pret) erreurs.push('l\'éditeur ne s\'affiche pas (barre du haut absente)');
+  if (!pret) erreurs.push('l\'éditeur ne s\'affiche pas (ni barre du haut ni boutons de lecture)');
   if (erreurs.length) { ko++; console.error('ÉCHEC ' + f + '\n  ' + erreurs.join('\n  ')); } else console.log('ok ' + f);
 }
 ws.close();

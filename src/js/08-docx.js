@@ -88,7 +88,9 @@ function docxDepuisElements(elts, d) {
     if (coul) p += '<w:color w:val="' + docxCouleur(coul) + '"/>';
     if (o.sz) p += '<w:sz w:val="' + o.sz + '"/><w:szCs w:val="' + o.sz + '"/>';
     if (g.souligne || g.lien) p += '<w:u w:val="single"/>';
-    if (g.pastille || g.code) p += '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(g.pastille ? g.pastille.fond : C['code-soft']) + '"/>';
+    // un seul fond par run : pastille, sinon code, sinon surlignage (w:shd : w:highlight n'a que les couleurs fixes de Word)
+    var fond = g.pastille ? g.pastille.fond : g.code ? C['code-soft'] : g.surlignage;
+    if (fond) p += '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(fond) + '"/>';
     return p ? '<w:rPr>' + p + '</w:rPr>' : '';
   };
   var t = function (s) { return String(s).split('\t').map(function (x, i) { return (i ? '<w:tab/>' : '') + (x ? '<w:t xml:space="preserve">' + xmlTexte(x) + '</w:t>' : ''); }).join(''); };

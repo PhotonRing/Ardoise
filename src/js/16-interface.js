@@ -250,47 +250,160 @@ function openFile(anchor) {
   placePop(p, anchor);
 }
 
-/* Barre de mise en forme du texte sélectionné */
-var itb = document.createElement('div'); itb.className = 'itb'; itb.style.display = 'none';
-itb.innerHTML = '<button data-i="bold" title="Gras (Ctrl+B)"><b>G</b></button><button data-i="italic" title="Italique (Ctrl+I)"><i>I</i></button>' +
-  '<button data-i="code" title="Code (Ctrl+J)" style="font-family:var(--f-mono)!important">&lt;/&gt;</button><button data-i="link" title="Lien vers une adresse (Ctrl+K)">Lien</button><button data-i="pagelink" title="Lien vers une page ou une section du document">Page</button><span class="vsep"></span>' +
-  '<button data-i="pill" title="Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)"><span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille</button>' +
-  '<button data-i="alert" title="Texte rouge" style="color:#ff8a80!important">A</button><span class="vsep"></span><button data-i="clear" title="Effacer la mise en forme">⌫</button>';
-ui.appendChild(itb);
-itb.addEventListener('mousedown', function (e) { e.preventDefault(); });
-itb.addEventListener('click', function (e) { var b = e.target.closest('[data-i]'); if (b) inlineAction(b.dataset.i); });
-document.addEventListener('selectionchange', function () {
-  if (mode !== 'edit') { itb.style.display = 'none'; return; }
-  var s = getSelection();
-  if (!s.rangeCount || s.isCollapsed) { itb.style.display = 'none'; return; }
-  var f = fieldOf(s.anchorNode);
-  if (!f || !f.hasAttribute('data-rich') || f !== fieldOf(s.focusNode)) { itb.style.display = 'none'; return; }
-  var r = s.getRangeAt(0).getBoundingClientRect(); if (!r.width && !r.height) { itb.style.display = 'none'; return; }
-  itb.style.display = 'flex';
-  var w = itb.offsetWidth, top = r.top - 42; if (top < 58) top = r.bottom + 8;
-  itb.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px'; itb.style.top = top + 'px';
+/* Barre de mise en forme : un seul élément, déplacé dans l'ancre .collant du bloc dont un texte riche a le curseur,
+   à gauche de la bande collée du menu du bloc (13-collant.js). Jamais dans le HTML rendu d'un bloc : replacée après un rendu. */
+// [data-mf, infobulle, contenu] ; '|' : séparateur
+var BOUTONS_MF = [
+  ['bold', 'Gras (Ctrl+B)', '<b>G</b>'], ['italic', 'Italique (Ctrl+I)', '<i>I</i>'], ['underline', 'Souligné (Ctrl+U)', '<u>S</u>'], ['strikeThrough', 'Barré', '<s>B</s>'], '|',
+  ['code', 'Code (Ctrl+J)', '<span style="font-family:var(--f-mono)">&lt;/&gt;</span>'], ['link', 'Lien vers une adresse (Ctrl+K)', 'Lien'], ['pagelink', 'Lien vers une page ou une section du document', 'Page'], '|',
+  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(var(--ok) 0 25%,var(--bad) 0 50%,var(--warn) 0 75%,var(--info) 0)"></span> Pastille'],
+  ['couleur', 'Couleur du texte', '<span class="bmf-c">A</span>'], ['surlignage', 'Surlignage', '<span class="bmf-s">ab</span>'], '|',
+  ['clear', 'Effacer la mise en forme', '⌫']
+];
+var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
+// fenêtre étroite (moins de 600 px, editor.css) : le bouton « Aa » remplace la barre, et l'ouvre juste sous lui
+bmf.innerHTML = '<button type="button" class="bmf-aa" data-mf="ouvrir" title="Mise en forme" aria-label="Mise en forme" aria-expanded="false">Aa</button>' +
+  '<div class="bmf-b">' + BOUTONS_MF.map(function (x) {
+  return x === '|' ? '<span class="vsep"></span>' : '<button type="button" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '">' + x[2] + '</button>';
+}).join('') + '</div>';
+// souris et toucher : la sélection et le focus restent dans le texte
+// paletteAvant : palette ouverte à l'appui (pointerdown empêché supprime le mousedown, le document ne la referme donc pas) ;
+// un second clic sur son bouton la ferme
+var paletteAvant = null;
+['mousedown', 'pointerdown'].forEach(function (t) { bmf.addEventListener(t, function (e) { e.preventDefault(); if (t === 'pointerdown') paletteAvant = pop && pop.bmfPal; }); });
+bmf.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-mf]'), avant = paletteAvant; paletteAvant = null; if (!b) return;
+  var k = b.dataset.mf;
+  if (k === 'ouvrir') ouvrirBarre(!bmf.classList.contains('ouverte'));
+  else if (FAMILLES_TEINTE[k]) { if (avant !== k) ouvrirPalette(k, b); else closePop(); }
+  else inlineAction(k);
 });
+/* Couleur du texte et surlignage : palettes fixes (COULEURS_TEXTE, SURLIGNAGES, 02-assainissement.js), ouvertes en fenêtre pop
+   qui ne prend pas le focus. Un texte porte au plus une couleur et au plus un surlignage, indépendants l'un de l'autre */
+var FAMILLES_TEINTE = { couleur: COULEURS_TEXTE, surlignage: SURLIGNAGES };
+function ouvrirPalette(famille, ancre) {
+  closePop();
+  var p = document.createElement('div'); p.className = 'pop bmf-pal'; p.bmfPal = famille;
+  p.setAttribute('aria-label', famille === 'couleur' ? 'Couleur du texte' : 'Surlignage');
+  p.innerHTML = FAMILLES_TEINTE[famille].map(function (x) {
+    return '<button type="button" data-teinte="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '"><span class="' + x[0] + '">A</span></button>';
+  }).join('') + '<button type="button" class="bmf-sans" data-teinte="" title="Sans couleur" aria-label="Sans couleur"><span></span></button>';
+  ['mousedown', 'pointerdown'].forEach(function (t) { p.addEventListener(t, function (e) { e.preventDefault(); }); });
+  p.addEventListener('click', function (e) { var b = e.target.closest('[data-teinte]'); if (!b) return; closePop(); appliquerTeinte(famille, b.dataset.teinte); });
+  pop = p; placePop(p, ancre);
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop && pop.bmfPal) { e.preventDefault(); e.stopPropagation(); closePop(); } }, true);
+function deLaFamille(n, famille) { return n.nodeType === 1 && n.tagName === 'SPAN' && FAMILLES_TEINTE[famille].some(function (x) { return n.classList.contains(x[0]); }); }
+// retire les classes de la famille ; un span sans plus aucune classe est défait
+function retirerFamille(el, famille) {
+  FAMILLES_TEINTE[famille].forEach(function (x) { el.classList.remove(x[0]); });
+  if (!el.classList.length) unwrap(el);
+}
+// cls : classe de la palette, '' pour « Sans couleur ». Sans sélection, rien
+function appliquerTeinte(famille, cls) {
+  var s = getSelection(); if (!s.rangeCount || s.isCollapsed) return;
+  var r = s.getRangeAt(0), fld = fieldOf(r.commonAncestorContainer); if (!fld || !fld.hasAttribute('data-rich')) return;
+  // ancêtre de la famille qui englobe la sélection : coupé en trois (avant, sélection, après), les deux bouts gardent leur teinte
+  var n = r.commonAncestorContainer, haut = null; if (n.nodeType !== 1) n = n.parentNode;
+  for (; n && n !== fld; n = n.parentNode) if (deLaFamille(n, famille)) haut = n;
+  if (haut) {
+    var deb = r.startContainer, debO = r.startOffset, fin = r.endContainer, finO = r.endOffset;
+    var bout = function (avant) {
+      var b = document.createRange();
+      if (avant) { b.setStart(haut, 0); b.setEnd(deb, debO); } else { b.setStart(fin, finO); b.setEnd(haut, haut.childNodes.length); }
+      var f = b.extractContents(); if (!f.textContent.replace(/​/g, '') && !f.querySelector('br, span.pill')) return;
+      // éléments vidés par la coupe (le reste d'un gras coupé à son bord) retirés
+      Array.prototype.slice.call(f.querySelectorAll('*')).reverse().forEach(function (x) { if (!x.textContent && !x.matches('br') && !x.querySelector('br')) x.remove(); });
+      var c = haut.cloneNode(false); c.appendChild(f); haut.parentNode.insertBefore(c, avant ? haut : haut.nextSibling);
+    };
+    bout(false); bout(true);   // la fin d'abord : le début de la sélection reste valable
+    r = document.createRange(); r.selectNode(haut);
+  }
+  // les teintes de la famille présentes dans la sélection sont retirées, puis la sélection est enveloppée
+  var f = r.extractContents();
+  Array.prototype.slice.call(f.querySelectorAll('span')).forEach(function (x) { if (deLaFamille(x, famille)) retirerFamille(x, famille); });
+  var nr = document.createRange();
+  if (cls) { var el = document.createElement('span'); el.className = cls; el.appendChild(f); r.insertNode(el); nr.selectNodeContents(el); }
+  else { var premier = f.firstChild, dernier = f.lastChild; if (!premier) return; r.insertNode(f); nr.setStartBefore(premier); nr.setEndAfter(dernier); }
+  s.removeAllRanges(); s.addRange(nr);
+  fire(fld);
+}
+// barre ouverte sous « Aa » (fenêtre étroite) ; fermée, une palette ouverte se ferme avec elle
+function ouvrirBarre(oui) {
+  if (oui) { bmf.classList.add('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'true'); } else fermerBarre();
+  if (bmf.parentNode && bmf.parentNode.style) ajusterBande(bmf.parentNode);
+}
+function fermerBarre() {
+  if (pop && pop.bmfPal) closePop();
+  bmf.classList.remove('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'false');
+}
+function cacherBarreMiseEnForme() {
+  fermerBarre();
+  bmf.hidden = true;
+  var a = bmf.parentNode; if (a && a.style) a.style.removeProperty('--recul');
+}
+// blocBarre : id du bloc qui porte la barre. Un nouveau rendu du même bloc (ligne ajoutée à un tableau…) remplace son ancre
+// sans fermer la barre ouverte ; seul le départ du curseur vers un autre bloc la referme
+var blocBarre = null;
+function placerBarreMiseEnForme() {
+  var f = mode === 'edit' ? fieldOf(document.activeElement) : null, blk = f && f.hasAttribute('data-rich') && f.closest('.blk');
+  var ancre = blk && $(':scope > .collant', blk);
+  if (!ancre) { cacherBarreMiseEnForme(); return; }
+  if (bmf.parentNode !== ancre) { if (blk.dataset.id !== blocBarre) cacherBarreMiseEnForme(); ancre.appendChild(bmf); blocBarre = blk.dataset.id; }
+  bmf.hidden = false;
+  ajusterBande(ancre);
+}
+// barre à gauche, menu à droite, bas contre bas. Si la barre ne tient pas avant le menu (fenêtre étroite, menu large),
+// elle passe juste au-dessus du menu, jamais par-dessus ; le recul de l'ancre suit la hauteur de la bande pour qu'une fois
+// collée elle reste entière sous le haut d'écran
+function ajusterBande(ancre) {
+  var m = $(':scope > .blk-bar', ancre);
+  var barre = $('.bmf-b', bmf);
+  bmf.style.bottom = ''; barre.style.width = barre.style.left = '';
+  if (!bmf.offsetWidth) { ancre.style.removeProperty('--recul'); return; }
+  var place = m ? m.getBoundingClientRect().left - bmf.getBoundingClientRect().left - 8 : Infinity, dessus = bmf.offsetWidth > place;
+  if (dessus) bmf.style.bottom = (m.offsetHeight + 6) + 'px';
+  var h = bmf.offsetHeight + (dessus ? m.offsetHeight + 3 : 0);
+  if (h > 30.5) ancre.style.setProperty('--recul', (h + 3) + 'px'); else ancre.style.removeProperty('--recul');
+  // barre ouverte sous « Aa » (position absolue : hors de la bande mesurée par 13-collant.js) : largeur du bloc, dans l'écran
+  if (bmf.classList.contains('ouverte') && etroite.matches) {
+    var ra = ancre.getBoundingClientRect(), w = Math.min(ra.width, innerWidth - 16);
+    barre.style.width = w + 'px';
+    barre.style.left = (Math.min(Math.max(ra.left, 8), innerWidth - 8 - w) - bmf.getBoundingClientRect().left) + 'px';
+  }
+}
+// largeur suivie sans rechargement : la barre ouverte se referme en passant 600 px dans un sens ou dans l'autre
+var etroite = matchMedia('(max-width:599px)');
+etroite.addEventListener('change', function () { fermerBarre(); if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
+// appui hors de la barre ouverte (et hors d'une palette ou de la fenêtre du lien ouvertes depuis elle) : elle se referme
+document.addEventListener('pointerdown', function (e) { if (bmf.classList.contains('ouverte') && !bmf.contains(e.target) && !(pop && pop.contains(e.target))) ouvrirBarre(false); }, true);
+document.addEventListener('selectionchange', placerBarreMiseEnForme);   // synchrone : avant la mesure du dégagement (13-collant.js)
+document.addEventListener('focusin', placerBarreMiseEnForme);
+document.addEventListener('focusout', function () { requestAnimationFrame(placerBarreMiseEnForme); });
+window.addEventListener('resize', function () { if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
 function fieldOf(n) { while (n && n !== app) { if (n.nodeType === 1 && n.classList.contains('fld')) return n; n = n.parentNode; } return null; }
 function unwrap(el) { var p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
 function inlineAction(kind) {
   var s = getSelection(); if (!s.rangeCount) return;
   var r = s.getRangeAt(0), fld = fieldOf(r.commonAncestorContainer); if (!fld) return;
-  if (kind === 'bold' || kind === 'italic') { document.execCommand(kind); fire(fld); return; }
+  // sans sélection, la forme vaut pour la frappe suivante ; le barré de Chromium (<strike>) devient <s> à l'assainissement
+  if (kind === 'bold' || kind === 'italic' || kind === 'underline' || kind === 'strikeThrough') { document.execCommand(kind); fire(fld); return; }
   function ancestor(test) { var n = r.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentNode; while (n && n !== fld) { if (test(n)) return n; n = n.parentNode; } return null; }
   if (kind === 'clear') {
-    var a; while ((a = ancestor(function (n) { return /^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(n.tagName); }))) unwrap(a);
-    var txt = r.toString(); r.deleteContents(); var tn = document.createTextNode(txt); r.insertNode(tn);
+    // la sélection devient son seul texte, puis les formes qui l'englobent sont défaites. Dans cet ordre : défaire d'abord
+    // l'ancêtre qui contient exactement la sélection (couleur, surlignage posés par la palette) l'effondrait, et le gras
+    // intérieur restait jusqu'au clic suivant
+    var tn = document.createTextNode(r.toString()); r.deleteContents(); r.insertNode(tn);
+    for (var a = tn.parentNode; a && a !== fld; ) { var haut = a.parentNode; if (/^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(a.tagName)) unwrap(a); a = haut; }
     s.removeAllRanges(); var nr = document.createRange(); nr.selectNode(tn); s.addRange(nr); fire(fld); return;
   }
   var tag = 'span', cls = '';
   if (kind === 'code') tag = 'code';
   else if (kind === 'link' || kind === 'pagelink') tag = 'a';
-  else if (kind === 'alert') cls = 'alert';
   else cls = 'pill';
   var existing = ancestor(function (n) {
     if (tag === 'code') return n.tagName === 'CODE';
     if (tag === 'a') return n.tagName === 'A';
-    if (kind === 'alert') return n.tagName === 'SPAN' && n.classList.contains('alert');
     return n.tagName === 'SPAN' && n.classList.contains('pill');
   });
   if (existing && tag === 'a') {
@@ -414,7 +527,7 @@ function openLinkPop(kind, range, fld, a) {
     if (k === 'to-page' || k === 'to-url') { popClose = null; closePop(); openLinkPop(k === 'to-page' ? 'page' : 'url', range, fld, a); return; }
     if (k === 'unlink') { popClose = null; closePop(); if (a && fld.contains(a)) { unwrap(a); fld.focus({ preventScroll: true }); fire(fld); } return; }
   });
-  var anchor = a && fld.contains(a) ? a : (itb.style.display !== 'none' ? itb : fld);
+  var anchor = a && fld.contains(a) ? a : (!bmf.hidden && bmf.parentNode ? bmf : fld);
   placePop(p, anchor);
   popClose = restore;
   (url || q).focus();
@@ -465,7 +578,7 @@ function wrapInline(tag, cls, href, fld) {
   var r = s.getRangeAt(0);
   var el = document.createElement(tag); if (cls) el.className = cls; if (href) el.setAttribute('href', href);
   el.appendChild(r.extractContents());
-  $$(tag === 'span' ? 'span.pill,span.alert' : tag, el).forEach(unwrap);
+  $$(tag === 'span' ? 'span.pill' : tag, el).forEach(unwrap);   // même famille seulement : une couleur ou un surlignage enveloppé reste
   r.insertNode(el);
   s.removeAllRanges(); var nr2 = document.createRange(); nr2.selectNodeContents(el); s.addRange(nr2);
   fire(fld);

@@ -23,10 +23,10 @@ function caretAtEnd(el) {
   var r = document.createRange(); r.selectNodeContents(el); r.setStart(s.anchorNode, s.anchorOffset);
   return r.toString().replace(/\u200B/g, '') === '';
 }
-// Sortir d'une mise en forme en ligne (pastille, code, lien, texte rouge) : flèche au bord de l'élément,
+// Sortir d'une mise en forme en ligne (pastille, code, lien, couleur du texte, surlignage) : flèche au bord de l'élément,
 // ou clic à côté de lui. Le curseur est posé sur un espace sans chasse placé contre l'élément, sinon le
 // navigateur le laisse à l'intérieur (notamment quand l'élément est seul sur sa ligne)
-var INLINE_SEL = 'span.pill, span.alert, code, a';
+var INLINE_SEL = ['span.pill'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return 'span.' + x[0]; }), ['code', 'a']).join(', ');
 function inlineEdge(fld, dir) {
   // élément en ligne dont le curseur (ou la fin de la sélection) touche le bord, dans le sens dir
   var s = getSelection(); if (!s.rangeCount) return null;
