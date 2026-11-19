@@ -363,8 +363,11 @@ function inlineAction(kind) {
   if (kind === 'bold' || kind === 'italic' || kind === 'underline' || kind === 'strikeThrough') { document.execCommand(kind); fire(fld); return; }
   function ancestor(test) { var n = r.commonAncestorContainer; if (n.nodeType !== 1) n = n.parentNode; while (n && n !== fld) { if (test(n)) return n; n = n.parentNode; } return null; }
   if (kind === 'clear') {
-    var a; while ((a = ancestor(function (n) { return /^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(n.tagName); }))) unwrap(a);
-    var txt = r.toString(); r.deleteContents(); var tn = document.createTextNode(txt); r.insertNode(tn);
+    // la sélection devient son seul texte, puis les formes qui l'englobent sont défaites. Dans cet ordre : défaire d'abord
+    // l'ancêtre qui contient exactement la sélection (couleur, surlignage posés par la palette) l'effondrait, et le gras
+    // intérieur restait jusqu'au clic suivant
+    var tn = document.createTextNode(r.toString()); r.deleteContents(); r.insertNode(tn);
+    for (var a = tn.parentNode; a && a !== fld; ) { var haut = a.parentNode; if (/^(B|I|U|S|CODE|A|SPAN|STRONG|EM)$/.test(a.tagName)) unwrap(a); a = haut; }
     s.removeAllRanges(); var nr = document.createRange(); nr.selectNode(tn); s.addRange(nr); fire(fld); return;
   }
   var tag = 'span', cls = '';
