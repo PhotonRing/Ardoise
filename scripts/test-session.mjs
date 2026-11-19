@@ -910,7 +910,7 @@ test('libellé : l\'import Markdown remplace la page en une étape « page impor
   const r = m.ctx.blocsDuMarkdown('# Note\n\nUn\n\n- a', []);
   m.s.modifier(() => { m.doc.pages[0].blocks = r.blocs.map((b) => m.ctx.mk(b.type, b)); }, null, { etape: m.ctx.ETAPE_MARKDOWN });
   egal(libelles(m)[0], 'page importée du Markdown');
-  egal(blocsDe(m).map((b) => b.type), ['texte', 'list']);
+  egal(blocsDe(m).map((b) => b.type), ['texte', 'texte'], 'la liste devient un bloc texte');
   m.s.annuler();
   egal(blocsDe(m), [{ lignes: [{ html: 'a' }], id: 'b1', type: 'texte' }], 'un seul Ctrl+Z rend la page d\'avant');
   egal(libelles(m), ['', 'page importée du Markdown']);

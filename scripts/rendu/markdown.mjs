@@ -44,24 +44,39 @@ test('markdown : le HTML brut reste brut, pour l\'assainisseur appelé dans le n
   egal(H(blocs('Texte <script>alert(1)</script> <u>souligné</u>')[0]), 'Texte <script>alert(1)</script> <u>souligné</u>');
 });
 
-test('markdown : liste à puces avec niveaux (2 espaces, tabulation, 4 espaces), ligne de suite jointe, plafond de 6 niveaux', () => {
-  egal(blocs('- a\n  - b\n\t\t- c\n    suite\n* d\n+ e\n    - f'), [{ type: 'list', ordered: false, items: [
-    { html: 'a' }, { html: 'b', lv: 1 }, { html: 'c<br>suite', lv: 2 }, { html: 'd' }, { html: 'e' }, { html: 'f', lv: 1 }] }]);
+// bloc texte attendu d'une liste : [html, genre, lv, done] par ligne, valeurs par défaut omises
+const LS = (...ls) => ({ type: 'texte', lignes: ls.map(([html, genre, lv, done]) => {
+  const o = { html }; if (lv) o.lv = lv; if (genre) o.genre = genre; if (done) o.done = true; return o;
+}) });
+
+test('markdown : liste à puces → bloc texte de puces, niveaux (2 espaces, tabulation, 4 espaces), ligne de suite gardée, plafond de 6 niveaux', () => {
+  egal(blocs('- a\n  - b\n\t\t- c\n    suite\n* d\n+ e\n    - f'), [LS(['a', 'puce'], ['b', 'puce', 1], ['c<br>suite', 'puce', 2], ['d', 'puce'], ['e', 'puce'], ['f', 'puce', 1])]);
   const profond = Array.from({ length: 9 }, (_, i) => '  '.repeat(i) + '- n' + i).join('\n');
-  egal(blocs(profond)[0].items.map((it) => it.lv || 0), [0, 1, 2, 3, 4, 5, 6, 6, 6]);
+  egal(blocs(profond)[0].lignes.map((l) => l.lv || 0), [0, 1, 2, 3, 4, 5, 6, 6, 6]);
 });
 
-test('markdown : liste numérotée, une ligne vide entre deux éléments ne coupe pas la liste', () => {
-  egal(blocs('1. un\n2) deux\n\n3. trois\n   1. sous\n\nAprès'), [{ type: 'list', ordered: true, items: [{ html: 'un' }, { html: 'deux' }, { html: 'trois' }, { html: 'sous', lv: 1 }] }, TX('Après')]);
+test('markdown : liste numérotée → lignes de numéro, une ligne vide entre deux éléments ne coupe pas la liste, numéro de départ ignoré', () => {
+  egal(blocs('1. un\n2) deux\n\n3. trois\n   1. sous\n\nAprès'), [LS(['un', 'numero'], ['deux', 'numero'], ['trois', 'numero'], ['sous', 'numero', 1]), TX('Après')]);
+  egal(blocs('3. trois\n4. quatre'), [LS(['trois', 'numero'], ['quatre', 'numero'])], 'les numéros affichés viennent de numerosDesLignes');
 });
 
-test('markdown : - [ ] et - [x] donnent une liste à cocher ; les puces simples d\'une liste mixte deviennent des cases non cochées', () => {
-  egal(blocs('- [ ] à faire\n- [x] fait\n  - [X] sous-tâche\n- simple'), [{ type: 'check', items: [
-    { html: 'à faire', done: false }, { html: 'fait', done: true }, { html: 'sous-tâche', done: true, lv: 1 }, { html: 'simple', done: false }] }]);
+test('markdown : liste numérotée imbriquée sous des numéros et des puces, chaque élément garde sa marque', () => {
+  egal(blocs('1. Tour\n2. Planning\n   - Jalons\n     1. Lot A\n     2. Lot B\n   - Risques\n3. Fin'), [LS(['Tour', 'numero'], ['Planning', 'numero'],
+    ['Jalons', 'puce', 1], ['Lot A', 'numero', 2], ['Lot B', 'numero', 2], ['Risques', 'puce', 1], ['Fin', 'numero'])]);
+});
+
+test('markdown : - [ ], - [x] et - [X] donnent des cases ; dans une liste mêlée, les puces restent des puces', () => {
+  egal(blocs('- [ ] à faire\n- [x] fait\n  - [X] sous-tâche\n- simple\n* [ ]\n1. [x] numéro coché'), [LS(['à faire', 'case'], ['fait', 'case', 0, true],
+    ['sous-tâche', 'case', 1, true], ['simple', 'puce'], ['', 'case'], ['numéro coché', 'case', 0, true])]);
+  egal(blocs('- [y] pas une case\n- [ ]collé'), [LS(['[y] pas une case', 'puce'], ['[ ]collé', 'puce'])]);
+});
+
+test('markdown : l\'import ne crée plus de Liste ni de Liste à cocher', () => {
+  egal(blocs('- a\n1. b\n- [ ] c\n\n1. un\n\n- [x] fait').map((b) => b.type), ['texte'], 'liste mêlée : un seul bloc texte');
 });
 
 test('markdown : une liste suit un paragraphe sans ligne vide ; *gras* en début de ligne n\'est pas une puce', () => {
-  egal(blocs('Courses :\n- pain\n\n*mot* fin'), [TX('Courses :'), { type: 'list', ordered: false, items: [{ html: 'pain' }] }, TX('<i>mot</i> fin')]);
+  egal(blocs('Courses :\n- pain\n\n*mot* fin'), [TX('Courses :'), LS(['pain', 'puce']), TX('<i>mot</i> fin')], 'pas de fusion du paragraphe et de la liste voisins');
 });
 
 test('markdown : tableau → bloc Tableau, première ligne en en-tête, mise en forme gardée, \\| et | dans du code restent dans la cellule', () => {
@@ -96,7 +111,7 @@ test('markdown : encadré replié (-) → bloc dépliable fermé, dépliable (+)
 });
 
 test('markdown : fins de ligne Windows et marque d\'ordre des octets lues sans caractère parasite', () => {
-  egal(md('﻿# Titre\r\n\r\nUn\r\ndeux\r\n\r\n- a\r\n'), { entete: { title: 'Titre' }, blocs: [TX('Un<br>deux'), { type: 'list', ordered: false, items: [{ html: 'a' }] }], imagesManquantes: 0, images: [] });
+  egal(md('﻿# Titre\r\n\r\nUn\r\ndeux\r\n\r\n- a\r\n'), { entete: { title: 'Titre' }, blocs: [TX('Un<br>deux'), LS(['a', 'puce'])], imagesManquantes: 0, images: [] });
   egal(blocs('ligne\rseule'), [TX('ligne<br>seule')], 'ancien Mac');
 });
 
@@ -107,11 +122,11 @@ test('markdown : texte vide ou fait de blancs → aucun bloc', () => {
 test('markdown : note de référence (syntaxe documentée d\'Obsidian, fixtures/markdown/note-obsidian.md)', () => {
   const r = md(readFileSync(new URL('../fixtures/markdown/note-obsidian.md', import.meta.url), 'utf8'));
   egal(r.entete, { title: 'Réunion de lancement' });
-  egal(r.blocs.map((b) => b.type), ['texte', 'h2', 'list', 'h3', 'check', 'note', 'details', 'subtitle', 'table', 'code', 'divider', 'note', 'texte']);
+  egal(r.blocs.map((b) => b.type), ['texte', 'h2', 'texte', 'h3', 'texte', 'note', 'details', 'subtitle', 'table', 'code', 'divider', 'note', 'texte']);
   egal(H(r.blocs[0]), 'Note écrite pour le banc d\'après la syntaxe documentée d\'Obsidian (help.obsidian.md), pas une vraie note du propriétaire.<br>' +
     'Deuxième ligne du même paragraphe, avec <b>gras</b>, <i>italique</i>, <s>barré</s> et <code>code</code>.');
-  egal(r.blocs[2], { type: 'list', ordered: true, items: [{ html: 'Tour de table' }, { html: 'Planning' }, { html: 'Jalons', lv: 1 }, { html: 'Risques', lv: 1 }] });
-  egal(r.blocs[4].items, [{ html: 'Réserver la salle', done: true }, { html: 'Envoyer le compte rendu', done: false }, { html: 'Relire', done: false, lv: 1 }, { html: 'Imprimer', done: false }]);
+  egal(r.blocs[2], LS(['Tour de table', 'numero'], ['Planning', 'numero'], ['Jalons', 'puce', 1], ['Risques', 'puce', 1]));
+  egal(r.blocs[4], LS(['Réserver la salle', 'case', 0, true], ['Envoyer le compte rendu', 'case'], ['Relire', 'case', 1], ['Imprimer', 'puce']));
   egal(r.blocs[5], { type: 'note', variant: 'warn', html: '<b>Budget serré</b><br>Ne pas dépasser <b>10 k€</b>.' });
   egal(r.blocs[6], { type: 'details', title: 'Détails pratiques', html: 'Salle B, 2e étage.', open: false });
   egal(r.blocs[8].rows, [['Poste', 'Montant'], ['Matériel', '4 000'], ['Logiciel', '<a href="https://exemple.fr/devis">devis</a>']]);
