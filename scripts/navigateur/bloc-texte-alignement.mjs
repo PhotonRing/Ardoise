@@ -103,6 +103,17 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   await verifie('Entrée', 't1', [{ html: 'ab', genre: 'puce', align: 'centre', taille: 'petit' }, { html: 'cd', genre: 'puce', align: 'centre', taille: 'petit' },
     { html: 'titre', genre: 'soustitre', align: 'droite' }, { html: '', align: 'droite' }]);
 
+  // à 1000 px, la barre aux libellés les plus longs tient à côté du menu, même dans un groupe (règle du lot 4a)
+  await charge([{ id: 'gr', type: 'group', title: 'Groupe', blocks: [{ id: 't1', type: 'texte', lignes: [{ html: 'titre', genre: 'soustitre', align: 'justifie' }] }] }]);
+  await evalue(curseur('t1', 0, 2)); await attendre(250);
+  mesure();
+  {
+    const x = await evalue(`(() => { const b = document.querySelector('.bmf'), m = b.parentElement.querySelector(':scope > .blk-bar'), r = b.getBoundingClientRect(), rm = m.getBoundingClientRect();
+      return { droite: r.right, bas: r.bottom, mGauche: rm.left, mBas: rm.bottom }; })()`);
+    if (!(Math.abs(x.bas - x.mBas) <= 1 && x.droite <= x.mGauche - 2)) echec('groupe à 1000 px : barre et menu pas sur la même ligne ' + JSON.stringify(x));
+    if ((await libelles()) !== 'Sous-titre,Justifié,Normal') echec('libellés dans le groupe : ' + await libelles());
+  }
+
   // lecture : alignement et taille rendus
   await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'grand', align: 'centre', taille: 'grand' }, { html: 'petit', align: 'droite', taille: 'petit' }, { html: 'just', align: 'justifie' }] }]);
   await evalue(`document.querySelector('#ui [data-ui="mode"]').click()`); await attendre(150);

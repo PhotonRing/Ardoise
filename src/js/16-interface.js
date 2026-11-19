@@ -263,7 +263,7 @@ var BOUTONS_MF = [
 var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
 // fenêtre étroite (moins de 600 px, editor.css) : le bouton « Aa » remplace la barre, et l'ouvre juste sous lui
 bmf.innerHTML = '<button type="button" class="bmf-aa" data-mf="ouvrir" title="Mise en forme" aria-label="Mise en forme" aria-expanded="false">Aa</button>' +
-  '<div class="bmf-b"><span class="bmf-tx">' + [['genre', 'Genre de la ligne', 'Texte'], ['align', 'Alignement de la ligne', 'Gauche'], ['taille', 'Taille du texte', 'Normal']].map(function (x) {
+  '<div class="bmf-b"><span class="bmf-tx">' + [['genre', 'Genre de la ligne', 'Texte'], ['align', 'Alignement de la ligne', iconeAlign('') + '<span class="bmf-cache">Gauche</span>'], ['taille', 'Taille du texte', 'Normal']].map(function (x) {
     return '<button type="button" class="bmf-choix" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '" aria-haspopup="true">' + x[2] + '</button>';
   }).join('') + '<span class="vsep"></span></span>' +
   BOUTONS_MF.map(function (x) {
@@ -300,9 +300,12 @@ function ouvrirPalette(famille, ancre) {
    sans focus ; le choix vaut pour toutes les lignes touchées par la sélection, en une étape. [valeur ('' : défaut), libellé] */
 var CHOIX_MF = {
   genre: { nom: 'Genre de la ligne', vals: [['', 'Texte'], ['puce', 'Puce'], ['numero', 'Numéro'], ['case', 'Case'], ['soustitre', 'Sous-titre']], lire: genreEl, poser: poserGenre },
-  align: { nom: 'Alignement de la ligne', vals: [['', 'Gauche'], ['centre', 'Centré'], ['droite', 'Droite'], ['justifie', 'Justifié']], lire: alignEl, poser: poserAlign },
+  align: { nom: 'Alignement de la ligne', vals: [['', 'Gauche'], ['centre', 'Centré'], ['droite', 'Droite'], ['justifie', 'Justifié']], lire: alignEl, poser: poserAlign, icone: iconeAlign },
   taille: { nom: 'Taille du texte', vals: [['petit', 'Petit'], ['', 'Normal'], ['grand', 'Grand']], lire: tailleEl, poser: poserTaille }   // sans effet sur un sous-titre
 };
+// icône d'alignement (quatre traits, editor.css) : le bouton de la barre ne montre qu'elle, pour que la barre d'un bloc texte
+// tienne à côté du menu du bloc à 1000 px, même dans un groupe ; son libellé reste dans le texte du bouton (bmf-cache)
+function iconeAlign(v) { return '<span class="bmf-al" data-al="' + (v || 'gauche') + '" aria-hidden="true"></span>'; }
 // libellé d'une valeur ; une valeur inconnue montre celui de la valeur par défaut ('')
 function libelleChoix(k, v) {
   var t = function (w) { return CHOIX_MF[k].vals.filter(function (y) { return y[0] === w; })[0]; };
@@ -320,7 +323,7 @@ function ouvrirChoix(k, ancre) {
   var fld = fieldOf(getSelection().anchorNode), lg = lignesTouchees(fld)[0], cur = lg ? CHOIX_MF[k].lire(lg) : '';
   var p = document.createElement('div'); p.className = 'pop bmf-pal bmf-choix-pop'; p.bmfPal = k; p.setAttribute('aria-label', CHOIX_MF[k].nom);
   p.innerHTML = CHOIX_MF[k].vals.map(function (x) {
-    return '<button type="button" data-choix="' + x[0] + '" aria-pressed="' + (x[0] === cur) + '">' + x[1] + '</button>';
+    return '<button type="button" data-choix="' + x[0] + '" aria-pressed="' + (x[0] === cur) + '">' + (CHOIX_MF[k].icone ? CHOIX_MF[k].icone(x[0]) : '') + x[1] + '</button>';
   }).join('');
   ['mousedown', 'pointerdown'].forEach(function (t) { p.addEventListener(t, function (e) { e.preventDefault(); }); });
   p.addEventListener('click', function (e) { var b = e.target.closest('[data-choix]'); if (!b) return; closePop(); appliquerChoix(k, b.dataset.choix); });
@@ -338,7 +341,10 @@ function appliquerChoix(k, v) {
 // taille désactivée quand toutes les lignes touchées sont des sous-titres
 function majChoix(fld) {
   var ls = lignesTouchees(fld), lg = ls[0];
-  Object.keys(CHOIX_MF).forEach(function (k) { var b = $('[data-mf="' + k + '"]', bmf); if (b) b.textContent = libelleChoix(k, lg ? CHOIX_MF[k].lire(lg) : ''); });
+  Object.keys(CHOIX_MF).forEach(function (k) {
+    var b = $('[data-mf="' + k + '"]', bmf), c = CHOIX_MF[k], v = lg ? c.lire(lg) : ''; if (!b) return;
+    if (c.icone) b.innerHTML = c.icone(v) + '<span class="bmf-cache">' + libelleChoix(k, v) + '</span>'; else b.textContent = libelleChoix(k, v);
+  });
   var bt = $('[data-mf="taille"]', bmf);
   if (bt) bt.disabled = ls.length > 0 && ls.every(function (x) { return genreEl(x) === 'soustitre'; });
 }
