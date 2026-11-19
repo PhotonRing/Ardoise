@@ -138,17 +138,17 @@ html.sheet-on{overflow:hidden}
 .blk.bar-on>.collant>.blk-bar{transition:none}
 .blk:hover>.collant>.blk-bar,.blk:focus-within>.collant>.blk-bar,.blk.bar-on>.collant>.blk-bar,.blk-bar:hover{opacity:1;visibility:visible;transition-delay:0s}
 .blk-bar::before{content:"";position:absolute;inset:-8px -14px -10px -14px;z-index:-1}
-.bmf{position:absolute;bottom:3px;left:-6px;z-index:1;display:flex;box-sizing:border-box;max-width:calc(100% + 12px);background:#17212b;border:1px solid #17212b;border-radius:7px;padding:2px;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.bmf{position:absolute;bottom:3px;left:-6px;z-index:1;display:flex;box-sizing:border-box;max-width:calc(100% + 12px);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:2px;box-shadow:0 3px 10px rgba(0,0,0,.1)}
 .bmf[hidden],html:not(.is-edit) .bmf{display:none}
 .bmf-b{display:flex;flex-wrap:wrap;align-items:center;gap:1px}
-.bmf button{border:0;background:none;color:#e4ebf0;height:24px;min-width:24px;padding:0 6px;border-radius:5px;cursor:pointer;font:600 12px/1 var(--f-body)}
-.bmf button:hover{background:#2c3a46}
+.bmf button{border:0;background:none;color:var(--fg);height:24px;min-width:24px;padding:0 6px;border-radius:5px;cursor:pointer;font:600 12px/1 var(--f-body)}
+.bmf button:hover{background:var(--accent-soft)}
 .bmf button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .bmf .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-.bmf .vsep{width:1px;height:16px;background:#3a4955;margin:0 2px}
-/* boutons Couleur du texte et Surlignage (teintes fixes : la barre a un fond sombre fixe), et leurs palettes aux teintes du thème */
-.bmf .bmf-c{display:inline-block;padding-bottom:1px;border-bottom:3px solid #ff8a80;line-height:1}
-.bmf .bmf-s{display:inline-block;padding:2px 3px;border-radius:3px;background:#f2c35b;color:#17212b;line-height:1}
+.bmf .vsep{width:1px;height:16px;background:var(--line);margin:0 2px}
+/* barre aux couleurs du thème, comme le menu du bloc ; boutons Couleur du texte et Surlignage et leurs palettes aux teintes du thème */
+.bmf .bmf-c{display:inline-block;padding-bottom:1px;border-bottom:3px solid var(--bad);line-height:1}
+.bmf .bmf-s{display:inline-block;padding:2px 3px;border-radius:3px;background:var(--s-jaune);color:var(--fg);line-height:1}
 .pop.bmf-pal{min-width:0;display:flex;flex-wrap:wrap;gap:4px;padding:6px}
 .bmf-pal button{width:30px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);cursor:pointer;display:grid;place-items:center;font:700 15px/1 var(--f-body)}
 .bmf-pal button:hover{border-color:var(--fg)}

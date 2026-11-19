@@ -256,7 +256,7 @@ function openFile(anchor) {
 var BOUTONS_MF = [
   ['bold', 'Gras (Ctrl+B)', '<b>G</b>'], ['italic', 'Italique (Ctrl+I)', '<i>I</i>'], ['underline', 'Souligné (Ctrl+U)', '<u>S</u>'], ['strikeThrough', 'Barré', '<s>B</s>'], '|',
   ['code', 'Code (Ctrl+J)', '<span style="font-family:var(--f-mono)">&lt;/&gt;</span>'], ['link', 'Lien vers une adresse (Ctrl+K)', 'Lien'], ['pagelink', 'Lien vers une page ou une section du document', 'Page'], '|',
-  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(#5fd09a 0 25%,#ff8a80 0 50%,#f2c35b 0 75%,#8cc3f2 0)"></span> Pastille'],
+  ['pill', 'Pastille : sa couleur suit son nom (cliquez ensuite dans la pastille pour la changer)', '<span class="dot" style="background:conic-gradient(var(--ok) 0 25%,var(--bad) 0 50%,var(--warn) 0 75%,var(--info) 0)"></span> Pastille'],
   ['couleur', 'Couleur du texte', '<span class="bmf-c">A</span>'], ['surlignage', 'Surlignage', '<span class="bmf-s">ab</span>'], '|',
   ['clear', 'Effacer la mise en forme', '⌫']
 ];
