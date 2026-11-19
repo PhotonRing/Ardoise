@@ -328,7 +328,8 @@ function splitItem(b, k, el) {
 }
 
 app.addEventListener('paste', function (e) {
-  var el = e.target;
+  // bloc texte : l'événement part de la ligne du curseur (div.lg), pas du champ
+  var el = (e.target.closest && e.target.closest('.fld[data-texte]')) || e.target;
   if (mode !== 'edit') return;
   var cd = e.clipboardData; if (!cd) return;
   var html = cd.getData('text/html'), text = cd.getData('text/plain');
