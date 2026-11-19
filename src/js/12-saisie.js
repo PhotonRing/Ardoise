@@ -455,6 +455,7 @@ app.addEventListener('paste', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   e.preventDefault();
   if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
+  if (el.hasAttribute('data-texte')) { collerLignes(el, lignesCollees(html, text)); return; }   // 12-bloc-texte.js
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
     if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && !multiLigne(el)) clean = clean.replace(/<br>/g, ' ');
@@ -467,9 +468,15 @@ app.addEventListener('paste', function (e) {
     document.execCommand('insertText', false, text);
   }
 });
+// lignes collées dans un bloc texte : HTML assaini ligne par ligne (une ligne vidée par l'assainissement, une image seule, part), sinon texte brut
+function lignesCollees(html, text) {
+  if (!html) return lignesDuTexteBrut(text);
+  return lignesDuCollage(pastillesDuCollage(html, doc.id)).map(function (l) { return { l: ligne(sanitize(l.html), l.lv), avant: l.html }; })
+    .filter(function (x) { return x.l.html || !x.avant; }).map(function (x) { return x.l; });
+}
 // cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne
 function celluleCollee(h) { return compacterLigne(sanitize(pastillesDuCollage(h, doc.id)).replace(/<br>/g, ' ')); }
-// plage collée : remplit le tableau depuis la cellule (collerGrille, 05-tableau.js), ailleurs devient un bloc tableau (à la place d'un paragraphe vide)
+// plage collée : remplit le tableau depuis la cellule (collerGrille, 05-tableau.js), ailleurs devient un bloc tableau (à la place d'un paragraphe ou d'un bloc texte vides)
 function collerPlage(el, g) {
   var b = byId(el.dataset.b); if (!b) return;
   if (el.hasAttribute('data-cell') && b.type === 'table') {
@@ -477,27 +484,30 @@ function collerPlage(el, g) {
     session.modifier(function () { b.rows = reprendreLignes(b.rows, rows); }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
     lastCell = { b: b.id, r: x.r, c: x.c }; return;
   }
-  if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
+  if (!(b.type === 'p' ? isBlank(b.html) : b.type === 'texte' && texteVide(b.lignes))) { insertAfter(b, 'table', { rows: g }); return; }
   var nb = mk('table', { rows: g }), o = position(b);
   session.modifier(function () { o.liste.splice(o.i, 1, nb); revealBlock(nb.id); });
   focusField(nb.id, null, false);
 }
-// Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée
-// et marquées du document d'origine ; text/plain les écrit « #nom ». Sans pastille, la copie reste celle du navigateur.
+// Copie d'un passage qui contient des pastilles ou touche un bloc texte (édition et lecture) : text/html garde les pastilles, sans
+// couleur calculée et marquées du document d'origine ; text/plain les écrit « #nom ». Un bloc texte y passe par ses lignes
+// (copieDeSelection, 12-bloc-texte.js). Sinon, la copie reste celle du navigateur.
 function copierPastilles(e) {
   var sel = window.getSelection(), cd = e.clipboardData;
   if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
   var r = sel.getRangeAt(0);
   if (!app.contains(r.commonAncestorContainer)) return;
-  var boite = document.createElement('div'); boite.appendChild(r.cloneContents());
-  if (!boite.querySelector('span.pill')) return;
-  var html = pastillesSansCouleur(boite.innerHTML, doc.id);
+  var lignes = copieDeSelection(r, doc.id), boite = document.createElement('div'); boite.appendChild(r.cloneContents());
+  if (!lignes && !boite.querySelector('span.pill')) return;
+  var html = lignes ? lignes.html : pastillesSansCouleur(boite.innerHTML, doc.id);
   e.preventDefault();
-  cd.setData('text/html', html); cd.setData('text/plain', texteBrutDePresse(html));
-  if (e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld')) document.execCommand('delete');
+  cd.setData('text/html', html); cd.setData('text/plain', lignes ? lignes.texte : texteBrutDePresse(html));
+  var fld = e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld');
+  if (fld && fld.hasAttribute('data-texte') && fld.contains(r.commonAncestorContainer)) couperLignes(fld, r);   // 12-bloc-texte.js
+  else if (fld) document.execCommand('delete');
 }
 app.addEventListener('copy', copierPastilles);
 app.addEventListener('cut', copierPastilles);
-function multiLigne(el) { var t = b0type(el); return t === 'p' || t === 'texte'; }   // les sauts de ligne collés restent
+function multiLigne(el) { return b0type(el) === 'p'; }   // les sauts de ligne collés restent
 function b0type(el) { var b = byId(el.dataset.b); return b ? b.type : ''; }
 

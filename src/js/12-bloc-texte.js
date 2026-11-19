@@ -122,3 +122,70 @@ function toucheTexte(e, el, b) {
   if (e.key === 'ArrowDown' && i < lignes.length - 1) return true;
   return false;
 }
+/* ---------- Collage et copie (règles : 05-lignes.js) ---------- */
+// couper dans un bloc texte : la sélection part et ses deux lignes de bord se joignent (sans commande d'édition : un couper lancé
+// par execCommand('cut') refuse une seconde commande pendant son événement)
+function couperLignes(el, r) {
+  var a = ligneDuNoeud(el, r.startContainer), z = ligneDuNoeud(el, r.endContainer);
+  r.deleteContents();
+  if (a && z && a !== z && a.parentNode && z.parentNode) { joindreLignes(el, a, z); return; }
+  reparerLignes(el); fire(el);
+}
+// lignes collées au curseur : la ligne du curseur est coupée, la première ligne collée se joint à son début, la dernière à sa fin ;
+// chaque ligne collée garde son niveau, la première prend celui de la ligne du curseur. Une seule étape d'historique (fire).
+function collerLignes(el, ls) {
+  var s = getSelection(); if (!ls.length || !s.rangeCount) return;
+  if (!s.isCollapsed) { s.getRangeAt(0).deleteContents(); reparerLignes(el); }
+  var r = s.getRangeAt(0), lg = ligneDuNoeud(el, r.startContainer);
+  if (!lg) { lg = lignesDe(el)[lignesDe(el).length - 1]; r = document.createRange(); r.selectNodeContents(lg); r.collapse(false); }
+  if (ls.length === 1) {
+    s.removeAllRanges(); s.addRange(r);
+    document.execCommand('insertHTML', false, ls[0].html);
+    $$('span.pill', el).forEach(paintPill); return;
+  }
+  var fin = document.createRange(); fin.selectNodeContents(lg); fin.setStart(r.startContainer, r.startOffset);
+  var queue = document.createElement('div'); queue.appendChild(fin.extractContents());
+  if (ligneVideEl(lg)) lg.innerHTML = '';
+  lg.insertAdjacentHTML('beforeend', ls[0].html);
+  var der = lg;
+  ls.slice(1).forEach(function (l) { var d = document.createElement('div'); d.className = 'lg'; poserNiveau(d, +l.lv || 0); d.innerHTML = l.html; der.after(d); der = d; });
+  var n = der.childNodes.length;
+  if (!ligneVideEl(queue) || queue.querySelector('br:not(:last-child)')) while (queue.firstChild) der.appendChild(queue.firstChild);
+  [lg, der].forEach(function (x) { if (!x.firstChild) x.appendChild(document.createElement('br')); });
+  var c = document.createRange(); c.setStart(der, Math.min(n, der.childNodes.length)); c.collapse(true); s.removeAllRanges(); s.addRange(c);
+  $$('span.pill', el).forEach(paintPill);
+  fire(el);
+}
+// lignes d'une partie (plage p) d'un bloc texte : une par ligne clonée ; une sélection dans une seule ligne en garde le niveau
+function lignesDeLaPlage(t, p) {
+  var box = document.createElement('div'); box.appendChild(p.cloneContents());
+  var lgs = Array.prototype.filter.call(box.children, function (x) { return x.classList.contains('lg'); });
+  if (!lgs.length) { var lg = ligneDuNoeud(t, p.startContainer); return [ligne(sanitize(box.innerHTML), lg ? niveauEl(lg) : 0)]; }
+  return lgs.map(function (x) { return ligne(sanitize(x.innerHTML), niveauEl(x)); });
+}
+// copie d'une sélection qui touche un bloc texte (édition et lecture) : { html, texte }, ou null (la copie reste celle d'aujourd'hui).
+// Les blocs texte passent par le module pur ; le reste de la sélection, comme la copie d'un passage à pastilles.
+function copieDeSelection(r, idDoc) {
+  var tx = $$('.texte', app).filter(function (t) { return r.intersectsNode(t); });
+  if (!tx.length) return null;
+  var html = [], texte = [], dc = r.startContainer, doff = r.startOffset;
+  var morceau = function (fc, foff) {
+    var a = document.createRange(); a.setStart(dc, doff); a.setEnd(fc, foff); if (a.collapsed) return;
+    var box = document.createElement('div'); box.appendChild(a.cloneContents());
+    $$('button, select, input, textarea, .collant, .blk-gut', box).forEach(function (x) { x.parentNode.removeChild(x); });   // commandes du bloc
+    var h = pastillesSansCouleur(box.innerHTML, idDoc), t = texteBrutDePresse(h);
+    if (t.trim() || box.querySelector('img')) { html.push(h); texte.push(t); }
+  };
+  tx.forEach(function (t) {
+    var i = Array.prototype.indexOf.call(t.parentNode.childNodes, t);
+    if (r.comparePoint(t.parentNode, i) === 0) morceau(t.parentNode, i);   // passage avant le bloc texte
+    var p = document.createRange(); p.selectNodeContents(t);
+    if (r.comparePoint(t, 0) < 0) p.setStart(r.startContainer, r.startOffset);
+    if (r.comparePoint(t, t.childNodes.length) > 0) p.setEnd(r.endContainer, r.endOffset);
+    var ls = lignesDeLaPlage(t, p);
+    html.push(lignesEnHtml(ls, idDoc)); texte.push(lignesEnTexte(ls));
+    if (r.comparePoint(t.parentNode, i + 1) === 0) { dc = t.parentNode; doff = i + 1; } else { dc = r.endContainer; doff = r.endOffset; }
+  });
+  morceau(r.endContainer, r.endOffset);
+  return { html: html.join(''), texte: texte.join('\n') };
+}
