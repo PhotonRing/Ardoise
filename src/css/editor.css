@@ -154,8 +154,16 @@ html.sheet-on{overflow:hidden}
 .bmf-pal button:hover{border-color:var(--fg)}
 .bmf-pal button>span{display:grid;place-items:center;width:22px;height:22px;border-radius:4px}
 .bmf-pal .bmf-sans>span{background:linear-gradient(to top right,transparent calc(50% - 1px),var(--bad) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px));border:1px solid var(--line)}
-/* sous 600 px, la barre est remplacée par le bouton « Aa » (ticket 04 du lot barre-mise-en-forme) */
-@media (max-width:599px){.bmf{display:none}}
+/* sous 600 px de largeur de fenêtre, la barre se replie en un bouton « Aa » (16-interface.js) ; un appui l'ouvre juste sous lui,
+   par-dessus le haut du bloc, boutons à la ligne au besoin (largeur et position posées par ajusterBande) */
+.bmf .bmf-aa{display:none;font:700 13px/1 var(--f-body)}
+.bmf.ouverte .bmf-aa{background:var(--accent-soft);color:var(--accent)}
+@media (max-width:599px){
+  .bmf .bmf-aa{display:block}
+  .bmf:not(.ouverte) .bmf-b{display:none}
+  .bmf.ouverte .bmf-b{position:absolute;top:calc(100% + 4px);left:0;z-index:2;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:2px;box-shadow:0 3px 10px rgba(0,0,0,.1)}
+  .pop.bmf-pal{max-width:calc(100vw - 16px)}
+}
 /* sous 800 px, les barres de l'ancre et la zone de survol du menu restent dans le bloc */
 @media (max-width:800px){.blk-bar{right:0}.blk-bar::before{right:0}.bmf{left:0;max-width:100%}}
 .blk-bar button,.blk-bar select{font:500 12px/1 var(--f-body);height:24px;min-width:24px;padding:0 6px;border:0;border-radius:5px;background:none;color:var(--fg);cursor:pointer}

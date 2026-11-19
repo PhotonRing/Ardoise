@@ -16,7 +16,9 @@ const MESURE = `(() => {
   const haut = Math.max(vis(tb) ? tb.getBoundingClientRect().bottom : 0, vis(on) ? on.getBoundingClientRect().bottom : 0);
   const blk = (id) => document.querySelector('.blk[data-id="' + id + '"]');
   const r = (id) => { const b = blk(id), m = b.querySelector('.blk-bar'), rb = b.getBoundingClientRect(), rm = m.getBoundingClientRect();
-    return { haut: rb.top, bas: rb.bottom, mHaut: rm.top, mBas: rm.bottom, visible: getComputedStyle(m).visibility === 'visible' && +getComputedStyle(m).opacity === 1 }; };
+    // haut de la bande collée : le menu, ou la barre de mise en forme (bouton « Aa » sous 600 px) posée au-dessus quand elle ne tient pas à côté
+    const bande = Math.min(rm.top, ...[...b.querySelectorAll(':scope > .collant > .bmf')].filter((x) => x.getClientRects().length).map((x) => x.getBoundingClientRect().top));
+    return { haut: rb.top, bas: rb.bottom, mHaut: rm.top, mBas: rm.bottom, bHaut: bande, visible: getComputedStyle(m).visibility === 'visible' && +getComputedStyle(m).opacity === 1 }; };
   return { haut, tb: tb.getBoundingClientRect().bottom, tab: r('tab'), avant: r('avant') }; })()`;
 const FOCUS = (ligne) => `(() => { const c = document.querySelector('.blk[data-id="tab"] tbody tr:nth-child(${ligne}) td'); c.focus({ preventScroll: true });
   const s = getSelection(), rg = document.createRange(); rg.selectNodeContents(c); rg.collapse(false); s.removeAllRanges(); s.addRange(rg); return true; })()`;
@@ -52,7 +54,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     await evalue(DEFILER(-600)); await attendre(100);
     let o = await evalue(MESURE); mesure();
     if (!o.tab.visible) echec(`${cas} : menu du tableau invisible après défilement`);
-    if (!pres(o.tab.mHaut, o.haut)) echec(`${cas} : menu à ${o.tab.mHaut.toFixed(1)} px, attendu contre le haut d'écran (${o.haut.toFixed(1)} px)`);
+    if (!pres(o.tab.bHaut, o.haut)) echec(`${cas} : bande collée (menu, barre de mise en forme) à ${o.tab.bHaut.toFixed(1)} px, attendu contre le haut d'écran (${o.haut.toFixed(1)} px)`);
     if (o.tab.mHaut < o.tb - 0.5) echec(`${cas} : menu qui chevauche la barre du haut (${o.tab.mHaut.toFixed(1)} < ${o.tb.toFixed(1)})`);
 
     // bas du tableau presque atteint : le menu ne descend pas sous le bas du bloc
@@ -84,7 +86,7 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
     await evalue(`(() => { const s = document.createElement('style'); s.textContent = '.tb{height:80px!important}html.is-edit.nav-tabs .pnav-tabs{top:80px!important}'; document.head.appendChild(s); dispatchEvent(new Event('resize')); return true; })()`);
     await attendre(150); await evalue(DEFILER(-600)); await attendre(100);
     o = await evalue(MESURE); mesure();
-    if (!pres(o.tab.mHaut, o.haut)) echec(`${cas}, barre du haut de 80 px : menu à ${o.tab.mHaut.toFixed(1)} px, attendu ${o.haut.toFixed(1)} px`);
+    if (!pres(o.tab.bHaut, o.haut)) echec(`${cas}, barre du haut de 80 px : bande collée à ${o.tab.bHaut.toFixed(1)} px, attendu ${o.haut.toFixed(1)} px`);
   }
 
   // frappe dans un bloc au milieu de l'écran : sa barre est à sa place normale, la page ne défile pas

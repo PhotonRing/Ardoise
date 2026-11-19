@@ -261,7 +261,9 @@ var BOUTONS_MF = [
   ['clear', 'Effacer la mise en forme', '⌫']
 ];
 var bmf = document.createElement('div'); bmf.className = 'bmf'; bmf.hidden = true;
-bmf.innerHTML = '<div class="bmf-b">' + BOUTONS_MF.map(function (x) {
+// fenêtre étroite (moins de 600 px, editor.css) : le bouton « Aa » remplace la barre, et l'ouvre juste sous lui
+bmf.innerHTML = '<button type="button" class="bmf-aa" data-mf="ouvrir" title="Mise en forme" aria-label="Mise en forme" aria-expanded="false">Aa</button>' +
+  '<div class="bmf-b">' + BOUTONS_MF.map(function (x) {
   return x === '|' ? '<span class="vsep"></span>' : '<button type="button" data-mf="' + x[0] + '" title="' + x[1] + '" aria-label="' + x[1] + '">' + x[2] + '</button>';
 }).join('') + '</div>';
 // souris et toucher : la sélection et le focus restent dans le texte
@@ -272,7 +274,8 @@ var paletteAvant = null;
 bmf.addEventListener('click', function (e) {
   var b = e.target.closest('[data-mf]'), avant = paletteAvant; paletteAvant = null; if (!b) return;
   var k = b.dataset.mf;
-  if (FAMILLES_TEINTE[k]) { if (avant !== k) ouvrirPalette(k, b); else closePop(); }
+  if (k === 'ouvrir') ouvrirBarre(!bmf.classList.contains('ouverte'));
+  else if (FAMILLES_TEINTE[k]) { if (avant !== k) ouvrirPalette(k, b); else closePop(); }
   else inlineAction(k);
 });
 /* Couleur du texte et surlignage : palettes fixes (COULEURS_TEXTE, SURLIGNAGES, 02-assainissement.js), ouvertes en fenêtre pop
@@ -325,8 +328,15 @@ function appliquerTeinte(famille, cls) {
   s.removeAllRanges(); s.addRange(nr);
   fire(fld);
 }
+// barre ouverte sous « Aa » (fenêtre étroite) ; fermée, une palette ouverte se ferme avec elle
+function ouvrirBarre(oui) {
+  if (!oui && pop && pop.bmfPal) closePop();
+  bmf.classList.toggle('ouverte', oui); $('.bmf-aa', bmf).setAttribute('aria-expanded', String(oui));
+  if (bmf.parentNode && bmf.parentNode.style) ajusterBande(bmf.parentNode);
+}
 function cacherBarreMiseEnForme() {
   if (pop && pop.bmfPal) closePop();
+  bmf.classList.remove('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'false');
   bmf.hidden = true;
   var a = bmf.parentNode; if (a && a.style) a.style.removeProperty('--recul');
 }
@@ -343,13 +353,25 @@ function placerBarreMiseEnForme() {
 // collée elle reste entière sous le haut d'écran
 function ajusterBande(ancre) {
   var m = $(':scope > .blk-bar', ancre);
-  bmf.style.bottom = '';
-  if (!bmf.offsetWidth) { ancre.style.removeProperty('--recul'); return; }   // cachée par le CSS (fenêtre étroite)
+  var barre = $('.bmf-b', bmf);
+  bmf.style.bottom = ''; barre.style.width = barre.style.left = '';
+  if (!bmf.offsetWidth) { ancre.style.removeProperty('--recul'); return; }
   var place = m ? m.getBoundingClientRect().left - bmf.getBoundingClientRect().left - 8 : Infinity, dessus = bmf.offsetWidth > place;
   if (dessus) bmf.style.bottom = (m.offsetHeight + 6) + 'px';
   var h = bmf.offsetHeight + (dessus ? m.offsetHeight + 3 : 0);
   if (h > 30.5) ancre.style.setProperty('--recul', (h + 3) + 'px'); else ancre.style.removeProperty('--recul');
+  // barre ouverte sous « Aa » (position absolue : hors de la bande mesurée par 13-collant.js) : largeur du bloc, dans l'écran
+  if (bmf.classList.contains('ouverte') && etroite.matches) {
+    var ra = ancre.getBoundingClientRect(), w = Math.min(ra.width, innerWidth - 16);
+    barre.style.width = w + 'px';
+    barre.style.left = (Math.min(Math.max(ra.left, 8), innerWidth - 8 - w) - bmf.getBoundingClientRect().left) + 'px';
+  }
 }
+// largeur suivie sans rechargement : la barre ouverte se referme en passant 600 px dans un sens ou dans l'autre
+var etroite = matchMedia('(max-width:599px)');
+etroite.addEventListener('change', function () { bmf.classList.remove('ouverte'); $('.bmf-aa', bmf).setAttribute('aria-expanded', 'false'); if (pop && pop.bmfPal) closePop(); if (!bmf.hidden && bmf.parentNode) ajusterBande(bmf.parentNode); });
+// appui hors de la barre ouverte (et hors d'une palette ou de la fenêtre du lien ouvertes depuis elle) : elle se referme
+document.addEventListener('pointerdown', function (e) { if (bmf.classList.contains('ouverte') && !bmf.contains(e.target) && !(pop && pop.contains(e.target))) ouvrirBarre(false); }, true);
 document.addEventListener('selectionchange', placerBarreMiseEnForme);   // synchrone : avant la mesure du dégagement (13-collant.js)
 document.addEventListener('focusin', placerBarreMiseEnForme);
 document.addEventListener('focusout', function () { requestAnimationFrame(placerBarreMiseEnForme); });
