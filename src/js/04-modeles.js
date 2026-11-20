@@ -1,4 +1,14 @@
 /* ---------- Modèles ---------- */
+// lignes d'un même genre pour un bloc texte de modèle : chaînes ou { html, lv, done } (done seulement sur une case cochée)
+function lignesEn(genre, items) {
+  return { lignes: items.map(function (it) {
+    var o = { html: typeof it === 'string' ? it : it.html };
+    if (it.lv) o.lv = it.lv;
+    o.genre = genre;
+    if (genre === 'case' && it.done) o.done = true;
+    return o;
+  }) };
+}
 var TEMPLATES = {
   tour: function () {
     // visite guidée : écrite au format TEMPLATES_V (05-document.js), sur plusieurs pages
@@ -12,26 +22,32 @@ var TEMPLATES = {
       mk('facts', { items: [{ k: 'Format', v: 'Un seul fichier .html', alert: false }, { k: 'Enregistrement', v: 'Automatique (Chrome, Edge)', alert: false }, { k: 'Firefox, Safari', v: 'Téléchargement à chaque sauvegarde', alert: false }, { k: 'Données', v: 'JSON lisible dans le fichier', alert: false }] }),
       mk('summary', { title: 'Les autres pages de la visite', src: 'pages' }),
       mk('step', { title: 'Prendre en main' }),
-      mk('check', { items: chk(['<b>Ctrl+E</b> bascule entre lecture et édition.', 'Survolez un bloc : sa barre en haut à droite le règle, le déplace, le duplique ou le supprime ; sur un bloc plus haut que l’écran, elle reste visible en haut pendant le défilement.',
+      mk('texte', lignesEn('case', ['<b>Ctrl+E</b> bascule entre lecture et édition.', 'Survolez un bloc : sa barre en haut à droite le règle, le déplace, le duplique ou le supprime ; sur un bloc plus haut que l’écran, elle reste visible en haut pendant le défilement.',
         '<b>↶</b> et <b>↷</b> (<b>Ctrl+Z</b>, <b>Ctrl+Y</b>) annulent et rétablissent ; leur bulle dit ce que l’étape défait ou refait : la page, le bloc et ses premiers mots, puis le changement (« texte modifié », « bloc ajouté »…).',
         'La barre de l’en-tête, tout en haut, masque ou affiche le surtitre et le chapeau ; le texte masqué est conservé.',
         'Sur un téléphone, la barre ne garde que le nom du document et l’état de l’enregistrement ; le menu <b>☰</b> ouvre toutes les actions en plein écran.',
-        'Dans un paragraphe vide, tapez <code>/</code> pour insérer un bloc.',
+        'Dans un bloc texte vide, tapez <code>/</code> pour insérer un bloc.',
         'Quand le curseur est dans un texte, la barre de mise en forme s’affiche en haut du bloc, à gauche de son menu, et le suit sur un long bloc. Elle passe le texte sélectionné en <b>gras</b>, en <i>italique</i>, en <u>souligné</u>, en <s>barré</s>, en <code>code</code>, en lien (vers une adresse, une page ou une section) ou en pastille ' + P('OK') + ' : la couleur d’une pastille suit son nom, et un clic dedans permet de la changer. Sans sélection, gras, italique, souligné et barré valent pour ce que vous tapez ensuite.',
         'Dans une fenêtre de moins de 600 px de large (un téléphone ou une petite fenêtre), la barre se replie en un bouton <b>Aa</b> : un appui l’ouvre juste en dessous, un second appui ou un appui ailleurs la referme.',
         'Les boutons <b>Couleur du texte</b> et <b>Surlignage</b> de la barre ouvrent une palette : <span class="c-bleu">texte en bleu</span>, <span class="s-jaune">texte surligné en jaune</span>, ou <span class="c-violet"><span class="s-rose">les deux à la fois</span></span>. Une nouvelle couleur remplace l’ancienne ; « Sans couleur » retire la couleur ou le surlignage seul, sans toucher au gras, et le bouton <b>⌫</b> efface toute la mise en forme.',
         '<b>Ctrl+S</b> enregistre. La première fois, choisissez l’emplacement du fichier ; ensuite chaque modification est enregistrée toute seule.',
-        'Le sommaire à gauche range les pages en arborescence : <b>+</b> crée une sous-page, glissez une page pour la déplacer ou la ranger dans une autre. Sur petit écran, les pages passent en onglets.']) }),
+        'Le sommaire à gauche range les pages en arborescence : <b>+</b> crée une sous-page, glissez une page pour la déplacer ou la ranger dans une autre. Sur petit écran, les pages passent en onglets.'])),
       mk('step', { id: 'ecrire', title: 'Écrire' }),
-      mk('texte', { lignes: [{ html: '<b>Entrée</b> passe à la ligne ; une seconde fois sur une ligne vide, elle crée un nouveau bloc. <b>Tab</b> met la ligne en retrait :' }, { html: 'comme celle-ci,', lv: 1 }, { html: 'ou celle-ci, sur deux niveaux, dont la suite reste alignée sur son retrait quand elle est trop longue pour tenir sur une seule ligne.', lv: 2 }] }),
+      mk('texte', { lignes: [{ html: 'Un bloc texte s’écrit ligne par ligne. <b>Entrée</b> crée une ligne du même genre ; sur une ligne de texte vide, en fin de bloc, elle crée un nouveau bloc. <b>Maj+Entrée</b> va à la ligne sans en créer une. <b>Tab</b> et <b>Maj+Tab</b> changent le niveau des lignes sélectionnées :' }, { html: 'comme celle-ci,', lv: 1 }, { html: 'ou celle-ci, sur deux niveaux, dont la suite reste alignée sur son retrait quand elle est trop longue pour tenir sur une seule ligne.', lv: 2 }] }),
       mk('h3', { html: 'Une sous-section' }),
       mk('texte', texteDuHtml('Elle apparaît dans le sommaire, contrairement au sous-titre ci-dessous.')),
-      mk('subtitle', { html: 'Un sous-titre' }),
-      mk('list', { items: [{ html: 'Les listes ont des sous-niveaux :' }, { html: '<b>Tab</b> pour descendre d’un niveau,', lv: 1 }, { html: 'autant de fois que nécessaire,', lv: 2 }, { html: '<b>Maj+Tab</b> ou <b>Retour arrière</b> pour remonter.', lv: 1 }] }),
+      mk('texte', { lignes: [{ html: 'Un sous-titre', genre: 'soustitre' }, { html: 'Le sous-titre est un genre de ligne : il reste hors du sommaire.' }] }),
+      mk('texte', { lignes: [{ html: 'Chaque ligne a un genre : texte, puce, numéro, case ou sous-titre. Tapez au début d’une ligne <code>- </code>, <code>1. </code>, <code>[ ] </code> ou <code>## </code>, ou choisissez-le avec <b>Genre de la ligne</b>, dans la barre de mise en forme, pour toutes les lignes sélectionnées.' },
+        { html: 'Une puce,', genre: 'puce' }, { html: 'une sous-puce,', lv: 1, genre: 'puce' }, { html: '<b>Retour arrière</b> au début la rend à du texte.', genre: 'puce' }] }),
+      mk('texte', { lignes: [{ html: 'Les numéros se suivent à chaque niveau,', genre: 'numero' }, { html: 'même après des lignes plus profondes,', lv: 1, genre: 'numero' }, { html: 'et repartent à 1 après une ligne d’un autre genre.', genre: 'numero' },
+        { html: 'Par exemple ici,' }, { html: '1 à nouveau.', genre: 'numero' }] }),
+      mk('texte', { lignes: [{ html: '<b>Alignement de la ligne</b> et <b>Taille du texte</b>, dans la même barre, règlent chaque ligne :' }, { html: 'Une ligne centrée,', align: 'centre' }, { html: 'une autre à droite,', align: 'droite' },
+        { html: 'une en grand', taille: 'grand' }, { html: 'et une en petit.', taille: 'petit' }] }),
       mk('texte', texteDuHtml('Tapez <code>#</code> suivi de quelques lettres : Ardoise propose les pastilles du document, comme ' + P('Prod') + ' ou ' + P('Recette') + ', ou « Créer » pour un nouveau nom. <b>Style → Pastilles du document…</b> liste leurs usages, change leur couleur et retire celles qui ne servent plus ; copiée hors d’Ardoise, une pastille devient le texte <code>#nom</code>.')),
       mk('divider', {}),
       mk('image', { src: IMG, alt: 'Collines au soleil couchant', caption: 'Une image se choisit dans un fichier, se colle, se dépose ou se télécharge depuis une adresse : elle est toujours intégrée au document.' }),
-      mk('check', { order: 'doneLast', items: [{ html: 'Cochez cette case : elle passe à la fin de la liste.', done: false }, { html: 'La liste est réglée sur « cochées à la fin » (barre du bloc) ; l’ordre saisi est conservé.', done: false }, { html: 'Cette case est déjà cochée.', done: true }] }),
+      mk('texte', lignesEn('case', ['Clic droit (ou appui long) sur une case, en édition : « Cochées à la fin de la liste » range les cases cochées après les autres.',
+        { html: 'Cette case est déjà cochée : essayez sur cette liste.', done: true }, 'Une case encore à faire.'])),
       mk('step', { title: 'Les blocs de code' }),
       mk('texte', texteDuHtml('Trois styles : sombre avec bouton copier, boîte avec nom de fichier et numéros de ligne, ou commande courte. La coloration s’adapte au langage : détecté automatiquement, ou choisi dans la barre du bloc.')),
       mk('code', { variant: 'dark', code: '#!/usr/bin/env bash\n# Exemple : les dix plus gros dossiers du répertoire courant\ndu -sh -- */ 2>/dev/null | sort -rh | head -n 10' }),
@@ -66,7 +82,7 @@ var TEMPLATES = {
       mk('texte', texteDuHtml('Pour décrire un événement d’intrusion : adversaire, capacité, infrastructure et victime, chacun en texte enrichi avec ses pastilles. Sur un écran étroit, les sommets s’empilent. Un bloc requête sur la source « Modèles diamant » les rassemble en tableau.')),
       mk('diamond', { title: 'Campagne X', adversaire: 'Groupe ' + P('APT fictif'), capacite: 'Hameçonnage ciblé, puis vol d’identifiants', infrastructure: 'Domaine <code>exemple-portail.test</code> ' + P('à vérifier'), victime: '' }),
       mk('step', { nonum: true, title: 'Formats et limites' }),
-      mk('list', { ordered: true, items: [{ html: '<b>Enregistrement direct</b> dans le fichier sur Chrome, Edge et autres navigateurs Chromium. Ailleurs, chaque enregistrement télécharge une copie à mettre à la place de l’ancienne.' }, { html: '<b>Fichier → Exporter en page statique</b> produit une version lecture seule, sans éditeur.' }, { html: '<b>Fichier → Exporter la page en Word (.docx)</b> produit un document Word (titres en styles Word, tableaux, pastilles surlignées, cartes et chronologies en images) ; le menu <b>⋯</b> d’un bloc exporte ce bloc seul.' }, { html: '<b>Copier pour Office</b>, dans le menu <b>⋯</b> d’un bloc, le copie pour le coller dans PowerPoint, Word, LibreOffice Writer ou Google Docs avec sa mise en forme.' }, { html: '<b>Fichier → Copier le JSON</b> permet de faire rédiger la page par une IA, puis de la réimporter.' }, { html: '<b>Fichier → Importer du Markdown…</b> remplace la page courante par une note (Obsidian…) : titres, listes, tâches, tableaux, code, propriétés en fiche de faits, <code>#tag</code> en pastilles.' }, { html: '<b>Fichier → Protéger par mot de passe…</b> réserve l’édition, et peut aussi chiffrer le contenu : le mot de passe est alors demandé à l’ouverture.' }, { html: '<b>Fichier → Synchronisation</b> garde plusieurs copies du fichier à jour entre elles, en direct ou après un passage hors ligne, par un relais qui ne voit que des données chiffrées (installable chez soi).' }, { html: '<b>Les images</b> sont intégrées au fichier (redimensionnées à 1600 px) : préférez des captures légères.' }, { html: '<b>Fichier → Mettre à jour Ardoise</b> remplace l’éditeur embarqué par la dernière version, en gardant le contenu.' }, { html: '<b>Les cartes</b> : le fond simplifié (Natural Earth, avec environ 7 300 villes et 1 000 ports pour la recherche) marche hors ligne ; plan (Esri, ou CARTO avec une clé) et satellite demandent une connexion.' }] }),
+      mk('texte', lignesEn('numero', [{ html: '<b>Enregistrement direct</b> dans le fichier sur Chrome, Edge et autres navigateurs Chromium. Ailleurs, chaque enregistrement télécharge une copie à mettre à la place de l’ancienne.' }, { html: '<b>Fichier → Exporter en page statique</b> produit une version lecture seule, sans éditeur.' }, { html: '<b>Fichier → Exporter la page en Word (.docx)</b> produit un document Word (titres en styles Word, tableaux, pastilles surlignées, cartes et chronologies en images) ; le menu <b>⋯</b> d’un bloc exporte ce bloc seul.' }, { html: '<b>Copier pour Office</b>, dans le menu <b>⋯</b> d’un bloc, le copie pour le coller dans PowerPoint, Word, LibreOffice Writer ou Google Docs avec sa mise en forme.' }, { html: '<b>Fichier → Copier le JSON</b> permet de faire rédiger la page par une IA, puis de la réimporter.' }, { html: '<b>Fichier → Importer du Markdown…</b> remplace la page courante par une note (Obsidian…) : titres, listes, tâches, tableaux, code, propriétés en fiche de faits, <code>#tag</code> en pastilles.' }, { html: '<b>Fichier → Protéger par mot de passe…</b> réserve l’édition, et peut aussi chiffrer le contenu : le mot de passe est alors demandé à l’ouverture.' }, { html: '<b>Fichier → Synchronisation</b> garde plusieurs copies du fichier à jour entre elles, en direct ou après un passage hors ligne, par un relais qui ne voit que des données chiffrées (installable chez soi).' }, { html: '<b>Les images</b> sont intégrées au fichier (redimensionnées à 1600 px) : préférez des captures légères.' }, { html: '<b>Fichier → Mettre à jour Ardoise</b> remplace l’éditeur embarqué par la dernière version, en gardant le contenu.' }, { html: '<b>Les cartes</b> : le fond simplifié (Natural Earth, avec environ 7 300 villes et 1 000 ports pour la recherche) marche hors ligne ; plan (Esri, ou CARTO avec une clé) et satellite demandent une connexion.' }])),
       mk('details', { title: 'Où sont stockées les données ?', html: 'Dans une balise <code>&lt;script id="ardoise-doc" type="application/json"&gt;</code> au début du fichier. Un brouillon de secours est aussi gardé dans le navigateur, et proposé à la réouverture s’il est plus récent.' }),
       mk('footer', { html: 'Ce fichier est autonome : il s’ouvre dans n’importe quel navigateur, sans installation ni connexion.' })
       ] },
@@ -101,7 +117,7 @@ var TEMPLATES = {
         mk('texte', texteDuHtml('Sur des lignes de tableaux, le filtre <b>Valeur d’une colonne</b> garde les lignes selon le contenu d’une colonne : ici, les incidents majeurs ou critiques.')),
         mk('query', { title: 'Incidents graves', src: 'table', scope: 'here', view: 'list', filtres: [{ id: 'f1', prop: 'valeur', colonne: 'gravité', vals: ['majeure', 'critique'] }], cards: [{ label: '', total: 'none' }] }),
         mk('h2', { html: 'Contrôles' }),
-        mk('check', { items: [{ html: 'Sauvegardes ' + P('Prod'), done: true }, { html: 'Restauration testée', lv: 1, done: true }, { html: 'Supervision ' + P('Prod'), done: false }, { html: 'Alertes reçues', lv: 1, done: false }, { html: 'Recette validée ' + P('Recette'), done: false }] }),
+        mk('texte', { lignes: [{ html: 'Une requête « cases à cocher » lit les cases des blocs texte : celle-ci liste les cases ' + P('Prod') + ', cochées ou non.' }].concat(lignesEn('case', [{ html: 'Sauvegardes ' + P('Prod'), done: true }, { html: 'Restauration testée', lv: 1, done: true }, 'Supervision ' + P('Prod'), { html: 'Alertes reçues', lv: 1 }, 'Recette validée ' + P('Recette')]).lignes) }),
         mk('query', { src: 'check', scope: 'here', view: 'list', filtres: [{ id: 'f1', prop: 'tags', vals: ['prod'] }], cards: [{ label: '', filtres: [{ id: 'f2', prop: 'state', vals: ['done'] }], total: 'all' }] })
       ] },
       { id: 'organiser', title: '', lv: 1, blocks: [
@@ -118,7 +134,7 @@ var TEMPLATES = {
         mk('texte', texteDuHtml('En lecture, la barre en bas à droite imprime ou enregistre en PDF (les blocs qui doivent rester entiers ne sont pas coupés entre deux pages), exporte une page statique, plie ou déplie toutes les sections, et choisit un thème clair ou sombre pour soi seulement.')),
         mk('group', { title: 'Un groupe repliable', blocks: [
           mk('texte', texteDuHtml('Un groupe plie quelques blocs sans ouvrir de section : il n’entre pas dans le sommaire. Insérez-le avec <b>+</b> ou <code>/</code> ; dans un de ses blocs, <b>+</b>, <code>/</code> et <b>Entrée</b> ajoutent au groupe. Le menu <b>⋯</b> d’un bloc propose « Mettre dans un groupe » ou « Sortir du groupe », et celui du groupe « Dégrouper ».')),
-          mk('check', { items: chk(['En édition, le chevron plie le groupe et cet état est enregistré.', 'En lecture, chacun l’ouvre et le ferme pour soi ; à l’impression, il est ouvert.']) })] })
+          mk('texte', lignesEn('case', ['En édition, le chevron plie le groupe et cet état est enregistré.', 'En lecture, chacun l’ouvre et le ferme pour soi ; à l’impression, il est ouvert.']))] })
       ] },
       { id: 'niveau2', title: '', lv: 2, blocks: [
         mk('header', { eyebrow: 'Visite guidée · deuxième niveau', title: 'Une sous-page de sous-page', lede: '' }),
@@ -130,7 +146,7 @@ var TEMPLATES = {
       mk('header', { eyebrow: 'Procédure · Périmètre', title: 'Titre de la procédure', lede: 'Objectif en une ou deux phrases : ce que fait la procédure, sur quel périmètre, et à quoi on reconnaît qu’elle a réussi.' }),
       mk('facts', { items: [{ k: 'Responsable', v: 'Équipe ou personne', alert: false }, { k: 'Durée estimée', v: 'À compléter', alert: false }, { k: 'Impact', v: 'Interruption, aucun…', alert: false }, { k: 'Dernière revue', v: 'Date', alert: false }] }),
       mk('step', { num: '1', title: 'Prérequis' }),
-      mk('check', { items: chk(['Accès et droits nécessaires obtenus.', 'Fenêtre d’intervention validée, personnes concernées prévenues.', 'Sauvegarde ou point de retour disponible.']) }),
+      mk('texte', lignesEn('case', ['Accès et droits nécessaires obtenus.', 'Fenêtre d’intervention validée, personnes concernées prévenues.', 'Sauvegarde ou point de retour disponible.'])),
       mk('step', { title: 'Relever l’état initial' }),
       mk('texte', texteDuHtml('Lancer sur chaque système concerné : <code>bash controle.sh</code>. Le script ne fait que lire, il ne modifie rien.')),
       mk('code', { variant: 'dark', tall: true, code: '#!/usr/bin/env bash\n# Contrôle de l’état initial (lecture seule)\n' }),
@@ -142,14 +158,14 @@ var TEMPLATES = {
         { title: 'C. Environnement ou variante', text: '', checks: chk(['Action', 'Action']) },
         { title: 'D. Environnement ou variante', text: '', checks: chk(['Action', 'Action']) }] }),
       mk('step', { title: 'Vérifier' }),
-      mk('check', { items: chk(['Relancer le contrôle : chaque ligne doit être OK.', 'Contrôle complémentaire.']) }),
+      mk('texte', lignesEn('case', ['Relancer le contrôle : chaque ligne doit être OK.', 'Contrôle complémentaire.'])),
       mk('step', { title: 'Revenir en arrière si besoin' }),
       mk('texte', texteDuHtml('À déclencher si la vérification échoue ou si un effet inattendu apparaît.')),
-      mk('check', { items: chk(['Action de retour arrière.', 'Vérifier le retour à l’état initial.']) }),
+      mk('texte', lignesEn('case', ['Action de retour arrière.', 'Vérifier le retour à l’état initial.'])),
       mk('step', { title: 'Clôturer' }),
-      mk('check', { items: chk(['Informer les personnes concernées.', 'Mettre à jour la documentation ou le ticket.']) }),
+      mk('texte', lignesEn('case', ['Informer les personnes concernées.', 'Mettre à jour la documentation ou le ticket.'])),
       mk('step', { nonum: true, title: 'Points d’attention' }),
-      mk('list', { ordered: true, items: ['<b>Point d’attention.</b> Explication.', '<b>Point d’attention.</b> Explication.'] }),
+      mk('texte', lignesEn('numero', ['<b>Point d’attention.</b> Explication.', '<b>Point d’attention.</b> Explication.'])),
       mk('note', { variant: 'warn', html: 'Ce qu’il faut faire si l’un de ces cas se présente.' }),
       mk('table', { rows: [['Rôle', 'Nom', 'Contact'], ['Escalade', '', ''], ['Validation', '', '']] }),
       mk('footer', { html: 'Références : <a href="https://exemple.org">Document de référence</a>' })
@@ -161,7 +177,7 @@ var TEMPLATES = {
       mk('h2', { html: 'Utilisation' }),
       mk('code', { variant: 'cmd', code: 'python3 nom_du_script.py entree.json --option valeur\npython3 nom_du_script.py -h   # aide complète' }),
       mk('h2', { html: 'Procédure' }),
-      mk('list', { ordered: true, items: ['Première étape.', 'Deuxième étape.', 'Troisième étape.'] }),
+      mk('texte', lignesEn('numero', ['Première étape.', 'Deuxième étape.', 'Troisième étape.'])),
       mk('note', { variant: 'line', html: '<b>Point d’attention.</b> Contrainte importante à respecter.' }),
       mk('code', { variant: 'box', name: 'nom_du_script.py', code: '#!/usr/bin/env python3\n"""Description du script."""\n\nimport argparse\n\n\ndef main():\n    ap = argparse.ArgumentParser()\n    ap.parse_args()\n\n\nif __name__ == "__main__":\n    main()' })
     ] };

@@ -85,8 +85,49 @@ test('visite guidée : filtres à plusieurs valeurs, « sauf », « Valeur d\'un
 
 test('visite guidée : « Copier pour Office » nomme PowerPoint, sans image au collage spécial (ticket 09)', () => {
   const { brut } = visite();
-  const items = brut.pages.flatMap((pg) => tous(pg.blocks)).flatMap((b) => b.items || []).map((it) => it.html || '');
+  const items = brut.pages.flatMap((pg) => tous(pg.blocks)).flatMap((b) => b.lignes || b.items || []).map((it) => it.html || '');
   const phrase = items.find((h) => /Copier pour Office/.test(h));
   vrai(phrase, 'élément sur Copier pour Office absent');
   vrai(/PowerPoint/.test(phrase) && !/collage spécial/.test(phrase) && !/en image/.test(phrase), phrase);
+});
+
+// Origine : spec bloc-texte, ticket 12 (user stories 73 et 74) : les modèles s'écrivent en blocs texte
+const MODELES = ['tour', 'runbook', 'outil', 'vide'];
+const blocsDe = (t) => (t.pages ? t.pages.flatMap((pg) => tous(pg.blocks)) : tous(t.blocks));
+
+test('modèles : plus aucun bloc Liste, Liste à cocher ni Sous-titre', () => {
+  const ctx = contexte();
+  MODELES.forEach((k) => {
+    const anciens = blocsDe(ctx.template(k)).filter((b) => ['list', 'check', 'subtitle', 'p'].includes(b.type)).map((b) => b.type);
+    egal(anciens, [], 'modèle ' + k);
+  });
+});
+
+test('visite guidée : la section Écrire montre chaque genre, l\'alignement, la taille et la numérotation', () => {
+  const { ctx, brut } = visite();
+  const d = ctx.normalize(brut);
+  const pg = d.pages.find((p) => p.id === 'visite');
+  const debut = pg.blocks.findIndex((b) => b.id === 'ecrire'), fin = pg.blocks.findIndex((b, i) => i > debut && b.type === 'step');
+  const textes = pg.blocks.slice(debut, fin).filter((b) => b.type === 'texte'), lignes = textes.flatMap((b) => b.lignes);
+  egal(['puce', 'numero', 'case', 'soustitre'].filter((g) => !lignes.some((l) => l.genre === g)), [], 'genres absents');
+  egal(['centre', 'droite'].filter((a) => !lignes.some((l) => l.align === a)), [], 'alignements absents');
+  egal(['petit', 'grand'].filter((t) => !lignes.some((l) => l.taille === t)), [], 'tailles absentes');
+  const num = textes.find((b) => b.lignes.filter((l) => l.genre === 'numero').length > 2);
+  egal(ctx.numerosDesLignes(num.lignes), [1, 1, 2, null, 1], 'la suite continue après une ligne plus profonde et repart après du texte');
+  vrai(lignes.some((l) => /Cochées à la fin de la liste/.test(l.html) && l.genre === 'case'), 'Cochées à la fin présentée sur une case');
+  vrai(lignes.some((l) => /<code>- <\/code>/.test(l.html) && /<code>## <\/code>/.test(l.html)), 'raccourcis présentés');
+});
+
+test('visite guidée : la requête « cases à cocher » de Contrôles compte des cases d\'un bloc texte', () => {
+  const { ctx, brut } = visite();
+  const d = ctx.normalize(brut);
+  const i = d.pages.findIndex((pg) => pg.id === 'suivi'), bl = d.pages[i].blocks;
+  const q = bl.find((b) => b.type === 'query' && b.src === 'check');
+  const recs = ctx.queryRecords(q, d, i);
+  vrai(recs.length > 0, 'des résultats');
+  const sources = new Set(recs.map((r) => r.x.blk.id));
+  egal([...sources].map((id) => bl.find((b) => b.id === id).type), ['texte'], 'résultats tirés d\'un bloc texte');
+  egal(recs.map((r) => r.html.replace(/<[^>]*>/g, '').trim()), ['Sauvegardes Prod', 'Supervision Prod'], 'les deux cases Prod');
+  const h = ctx.queryResult(q, d, { page: i, view: 'read' });
+  egal([(h.match(/aria-pressed="true"/g) || []).length, (h.match(/aria-pressed="false"/g) || []).length], [1, 1], 'une cochée, une non cochée');
 });
