@@ -22,9 +22,11 @@ if (!binaire) ignorer('aucun Chromium trouvé ; variable CHROME pour en indiquer
 if (typeof WebSocket !== 'function') ignorer('WebSocket absent de Node ' + process.version + ' ; Node 22 ou plus');
 
 const page = 'file://' + fileURLToPath(new URL('../dist/ardoise.html', import.meta.url));
-const dir = mkdtempSync(join(tmpdir(), 'ardoise-cdp-'));
-const chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-let journal = ''; chr.stderr.on('data', (d) => { journal = (journal + d).slice(-4000); });   // montré si Chromium ne démarre pas
+// un Chromium qui ne démarre pas est relancé une fois : en CI, deux runs sans bug ont échoué sur un démarrage à froid (lot 4b)
+let dir, chr;
+const lancer = () => { dir = mkdtempSync(join(tmpdir(), 'ardoise-cdp-')); chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] }); chr.stderr.on('data', (d) => { journal = (journal + d).slice(-4000); }); };
+let journal = '';   // montré si Chromium ne démarre pas
+lancer();
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const fin = (code) => { try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } process.exit(code); };
 // arrêté de l'extérieur ou bloqué : Chromium est fermé quand même, et le délai global nomme le sujet en cours
@@ -33,7 +35,9 @@ for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { console.error('
 setTimeout(() => { console.error('navigateur : ÉCHEC, plus de 480 s au total, bloqué dans ' + enCours); fin(1); }, 480000).unref();
 
 // démarrage à froid lent sur les machines de CI : jusqu'à 45 s
-let port; for (let i = 0; i < 450 && !port && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
+const portDe = async () => { for (let i = 0; i < 450 && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) return readFileSync(f, 'utf8').split('\n')[0]; } return null; };
+let port = await portDe();
+if (!port) { console.error('navigateur : Chromium ne répond pas, relancé une fois'); try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } lancer(); port = await portDe(); }
 if (!port) { console.error('navigateur : Chromium ne répond pas (' + binaire + (chr.exitCode !== null ? ', sorti avec le code ' + chr.exitCode : '') + ')\n' + journal.trim()); fin(1); }
 const cibles = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const ws = new WebSocket(cibles.find((c) => c.type === 'page').webSocketDebuggerUrl);

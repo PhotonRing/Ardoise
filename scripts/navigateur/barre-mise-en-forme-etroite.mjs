@@ -1,7 +1,7 @@
 // Sujet : barre de mise en forme en fenêtre étroite (moins de 600 px). Un bouton « Aa » remplace la barre dans l'ancre du bloc ;
 // un appui l'ouvre juste sous lui, la sélection est gardée au toucher. Origine : spec barre-mise-en-forme, ticket 04.
 
-import { LIBELLE_ENTIER } from './bloc-texte-genres.mjs';
+import { LIBELLE_ENTIER } from './outils/mesures.mjs';
 const LONG = 'Un mot ici, puis une phrase assez longue pour remplir plusieurs lignes à quatre cents pixels de large, '
   + 'encore une autre pour descendre sous la barre ouverte, et une dernière pour finir le paragraphe tout en bas.';
 const DOC = {

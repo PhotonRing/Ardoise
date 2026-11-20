@@ -12,13 +12,17 @@ if (!fichiers.length) { console.error('usage : node scripts/ouvrir-sans-erreur.m
 const binaire = process.env.CHROME || ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable'].map((n) => { try { return execFileSync('which', [n], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch (_) { return ''; } }).find(Boolean);
 if (!binaire) { console.error('aucun Chromium trouvé ; variable CHROME pour en indiquer un'); process.exit(2); }
 
-const dir = mkdtempSync(join(tmpdir(), 'ardoise-ouvrir-'));
-const chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+// relancé une fois s'il ne démarre pas (voir test-navigateur.mjs)
+let dir, chr;
+const lancer = () => { dir = mkdtempSync(join(tmpdir(), 'ardoise-ouvrir-')); chr = spawn(binaire, ['--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + dir, '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' }); };
+lancer();
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const fin = (code) => { try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } process.exit(code); };
 setTimeout(() => { console.error('ouvrir : plus de 120 s, abandon'); fin(1); }, 120000).unref();
 
-let port; for (let i = 0; i < 450 && !port && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
+const portDe = async () => { for (let i = 0; i < 450 && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) return readFileSync(f, 'utf8').split('\n')[0]; } return null; };
+let port = await portDe();
+if (!port) { console.error('ouvrir : Chromium ne répond pas, relancé une fois'); try { chr.kill(); } catch (_) { /* déjà fermé */ } try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* rien */ } lancer(); port = await portDe(); }
 if (!port) { console.error('ouvrir : Chromium ne répond pas (' + binaire + ')'); fin(1); }
 const cibles = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const ws = new WebSocket(cibles.find((c) => c.type === 'page').webSocketDebuggerUrl);
