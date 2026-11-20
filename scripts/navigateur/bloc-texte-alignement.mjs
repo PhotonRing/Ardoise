@@ -35,6 +35,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     mesure();
     const coupes = (await visibles('.pop [data-choix]', LIBELLE_ENTIER)).filter((x) => x);
     if (coupes.length) echec(`fenêtre ${k} : libellés coupés ` + JSON.stringify(coupes));
+    // icône d'alignement de 12 x 10 px, centrée en hauteur dans son bouton (vérification c62 : agrandie et calée en haut)
+    const icones = (await visibles('.pop [data-choix] .bmf-al', `const i = x.getBoundingClientRect(), b = x.closest('button').getBoundingClientRect();
+      return Math.round(i.width) === 12 && Math.round(i.height) === 10 && Math.abs((i.top + i.bottom) / 2 - (b.top + b.bottom) / 2) <= 1 ? '' : x.closest('button').textContent.trim() + ' (' + i.width.toFixed(0) + 'x' + i.height.toFixed(0) + ', décalée de ' + ((i.top + i.bottom) / 2 - (b.top + b.bottom) / 2).toFixed(1) + ' px)'`)).filter((x) => x);
+    if (icones.length) echec(`fenêtre ${k} : icônes mal placées ` + JSON.stringify(icones));
     const c = await evalue(centre(`.pop [data-choix="${v}"]`)); if (!c) { echec(`fenêtre ${k} : choix ${v} absent`); return; }
     await clic(c); await attendre(150);
   };
