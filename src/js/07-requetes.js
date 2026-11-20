@@ -374,9 +374,9 @@ function qCards(b, d, ctx, recs) {
   }).join('') + (e ? '<button type="button" class="q-cadd" data-act="q-card-add" title="Ajouter une carte de nombre">+ Carte</button>' : '') + '</div>';
 }
 function qSource(d, x) {
-  // lien vers la section du résultat ; un modèle diamant ou un bloc texte, ancrés (id b-<id>, 07-rendu.js), sont visés eux-mêmes
+  // lien vers la section du résultat ; un bloc ancré (blocAncre, 07-rendu.js) est visé lui-même
   var pg = d.pages[x.pi], t = pageTitle(pg, x.pi), st = x.sec ? textOf(x.sec.type === 'step' ? x.sec.title : x.sec.html) : '';
-  var cible = x.blk && (x.blk.type === 'diamond' || x.blk.type === 'texte') ? x.blk.id : x.sec ? x.sec.id : '';
+  var cible = x.blk && blocAncre(x.blk) ? x.blk.id : x.sec ? x.sec.id : '';
   return '<a class="q-src" href="#pg-' + esc(pg.id) + (cible ? '/' + esc(cible) : '') + '">' + esc(t) + (st ? ' › ' + esc(st) : '') + '</a>';
 }
 var viewSort = {};   // tri choisi en lecture d'un clic sur un en-tête (id du bloc → { by, dir }) : jamais enregistré

@@ -128,9 +128,8 @@ function docxDepuisElements(elts, d) {
     if (!s || n !== s.n + 1) s = suiteNum[lv] = { id: numerotation(2, lv, n) };
     s.n = n; return s.id;
   };
-  var JC = { centre: 'center', droite: 'right', justifie: 'both' };
-  var jc = function (e) { return JC[e.alignement] ? '<w:jc w:val="' + JC[e.alignement] + '"/>' : ''; };
-  var TAILLE = { petit: 19, grand: 26 };   // Normal 22 demi-points, × 13/15 et × 18/15 (--t-petit, --t-grand)
+  var jc = function (e) { var a = LIGNE_ALIGNEMENTS[e.alignement]; return a ? '<w:jc w:val="' + a.word + '"/>' : ''; };
+  var TAILLE = {}; LIGNE_TAILLES.forEach(function (t) { TAILLE[t] = Math.round(22 * LIGNE_TAILLES_PX[t] / 15); });   // demi-points : Normal 22 pour 15 px
   // liste : cases (coche) en paragraphes ☐/☑ en retrait ; numéros d'un bloc texte (n) par numeroTexte ; sinon une numérotation
   // par liste, à puces ou numérotée (Liste, sommaire, requêtes : les numéros repartent de 1)
   var liste = function (e) {
@@ -138,7 +137,7 @@ function docxDepuisElements(elts, d) {
     if (e.items.some(function (it) { return it.coche == null && it.n == null; })) id = numerotation(e.ordonnee ? 2 : 1, 0, 1);
     return e.items.map(function (it) {
       var lv = Math.max(0, Math.min(8, +it.niveau || 0)), o = TAILLE[it.taille] ? { sz: TAILLE[it.taille] } : {};
-      if (it.coche != null) return P(serre + (lv ? '<w:ind w:left="' + 360 * lv + '"/>' : '') + jc(it), runs([{ texte: it.coche ? '☑ ' : '☐ ' }].concat(it.segs), o));
+      if (it.coche != null) return P(serre + (lv ? '<w:ind w:left="' + 360 * lv + '"/>' : '') + jc(it), runs([{ texte: marqueDeLigne({ genre: 'case', done: it.coche }) }].concat(it.segs), o));
       if (it.genre && it.n == null && !puces) puces = numerotation(1, 0, 1);
       var nid = it.n != null ? numeroTexte(lv, it.n) : it.genre ? puces : id;
       return P('<w:numPr><w:ilvl w:val="' + lv + '"/><w:numId w:val="' + nid + '"/></w:numPr>' + serre + jc(it), runs(it.segs, o));

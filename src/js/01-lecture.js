@@ -184,12 +184,24 @@ function ardoiseReader() {
       try { var v = localStorage.getItem(cleCase(lg)); if (v !== null) { if (v === '1') lg.setAttribute('data-done', ''); else lg.removeAttribute('data-done'); } } catch (_) {}
     });
     document.addEventListener('mousedown', function (e) {
-      var lg = e.button === 0 && e.target.closest && e.target.closest('.texte[data-tx] > .lg[data-g="case"]'); if (!lg) return;
-      if (e.clientX - lg.getBoundingClientRect().left >= (parseFloat(getComputedStyle(lg).paddingLeft) || 0)) return;
+      var lg = e.button === 0 && caseSousPointeur(e, '.texte[data-tx] > .lg[data-g="case"]'); if (!lg) return;
       e.preventDefault();
       var oui = !lg.hasAttribute('data-done'); if (oui) lg.setAttribute('data-done', ''); else lg.removeAttribute('data-done');
       try { localStorage.setItem(cleCase(lg), oui ? '1' : '0'); } catch (_) {}
     });
+  }
+  // ligne de case (sel) dont la marque (::before) est sous le pointeur, ou null. Alignée à gauche ou justifiée, la marque occupe
+  // la marge de la ligne ; centrée ou à droite, les 1.6em devant le texte
+  function caseSousPointeur(e, sel) {
+    var lg = e.target.closest && e.target.closest(sel); if (!lg) return null;
+    var g = lg.getBoundingClientRect(), cs = getComputedStyle(lg), pad = parseFloat(cs.paddingLeft) || 0;
+    if (getComputedStyle(lg, '::before').position !== 'static') return e.clientX - g.left < pad ? lg : null;
+    var w = 1.6 * (parseFloat(cs.fontSize) || 15), r = document.createRange(); r.selectNodeContents(lg);
+    var t = Array.prototype.filter.call(r.getClientRects(), function (x) { return x.width > 0; })[0], x0;
+    if (t) x0 = t.left;
+    else x0 = lg.getAttribute('data-align') === 'droite' ? g.right - parseFloat(cs.paddingRight || 0) : g.left + g.width / 2 + w / 2;   // ligne vide : marque seule
+    var y0 = t ? t.top : g.top, y1 = t ? t.bottom : g.top + parseFloat(cs.lineHeight || 24);
+    return e.clientX >= x0 - w && e.clientX < x0 && e.clientY >= y0 && e.clientY <= y1 ? lg : null;
   }
   function lireAdresse(hash, pages) {
     // copie autonome de lireAdresse (09-adresse.js) : #pg-<page>[/<bloc>], ancienne forme #p<N>, #edit ; la section déplacée
@@ -334,7 +346,7 @@ function ardoiseReader() {
     tlTips();
     exportPages();
   }
-  return { tlFit: tlFit, tlTips: tlTips, foldHidden: foldHidden, foldToggle: foldToggle, foldReveal: foldReveal, printKeep: printKeep, printPrep: printPrep,
+  return { caseSousPointeur: caseSousPointeur, tlFit: tlFit, tlTips: tlTips, foldHidden: foldHidden, foldToggle: foldToggle, foldReveal: foldReveal, printKeep: printKeep, printPrep: printPrep,
     viewScript: viewScript, lireAdresse: lireAdresse, exportPages: exportPages, tocFold: tocFold, navLayout: navLayout, navSpy: navSpy, startExport: startExport };
 }
 var Reader = ardoiseReader();

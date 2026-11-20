@@ -83,7 +83,7 @@ app.addEventListener('change', function (e) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
     if (b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast')) { var sy = scrollY; render(); scrollTo(0, sy); var cb = $('[data-b="' + b.id + '"][data-k="' + el.dataset.k + '"]', app); if (cb) cb.focus({ preventScroll: true }); }
-    if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+    rafraichirRequetes();
     return;
   }
   if (el.matches('.ch-v')) {

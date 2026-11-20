@@ -1,9 +1,7 @@
 /* ---------- Menus contextuels : cellules d'un tableau, cases d'un bloc texte ---------- */
-// Clic droit, touche Menu, Maj+F10 ou appui long (contextmenu sous Android) en édition ; Ctrl+clic droit, la lecture et le
-// reste du document gardent le menu natif.
-// Menu d'Ardoise : entrées { label, fn, op facultatif (data-op, repère des bancs) }, flèches, Début et Fin ; Échap ou Tab rendent le curseur à sa place dans le champ
-// (pas au clic extérieur, qui place le sien). cible : élément visé (garde contre le contextmenu qui suit la touche Menu,
-// fermeture au défilement) ; champ : élément qui reprend le focus ; point absent (clavier) : au bord de la cible.
+// Clic droit, touche Menu, Maj+F10 ou appui long en édition (Ctrl+clic droit et la lecture : menu natif). Entrées { label, fn,
+// op (data-op des bancs) } ; Échap ou Tab rendent le curseur au champ. cible : élément visé (garde contre le contextmenu qui suit
+// la touche Menu, fermeture au défilement) ; champ : reprend le focus ; point absent (clavier) : au bord de la cible
 function ouvrirMenuContextuel(cible, champ, point, entrees) {
   var s = getSelection(), plage = s.rangeCount && champ.contains(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
   closePop();
@@ -65,7 +63,7 @@ function rangerCases(lg) {
   if (range.every(function (x, k) { return x === b.lignes[k]; })) { caretLigne(bid, i, 0); return; }
   session.modifier(function () { b.lignes = range; });
   caretLigne(bid, range.indexOf(l), 0);
-  if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+  rafraichirRequetes();
 }
 
 app.addEventListener('contextmenu', function (e) {

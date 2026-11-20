@@ -1,14 +1,19 @@
 /* ---------- Lignes d'un bloc texte : module pur ---------- */
-// Règles du bloc texte, sans DOM (testées par scripts/rendu/bloc-texte.mjs). Une ligne : { html, lv, genre, align, taille, done },
-// valeurs par défaut omises (lv absent au niveau 0, de 1 à 6 sinon ; genre absent pour une ligne de texte ; align absent pour
-// gauche ; taille absente pour Normal, jamais sur un sous-titre ; done seulement sur une case cochée). Un bloc texte a
-// toujours au moins une ligne.
+// Sans DOM (scripts/rendu/bloc-texte.mjs). Ligne : { html, lv (1 à 6), genre, align, taille, done }, défauts omis (texte,
+// gauche, Normal ; jamais de taille sur un sous-titre ; done sur une case cochée) ; un bloc texte a au moins une ligne
 var LIGNE_LV_MAX = 6;
 var LIGNE_GENRES = ['puce', 'numero', 'case', 'soustitre'];
-var LIGNE_ALIGNS = ['centre', 'droite', 'justifie'];
-var LIGNE_TAILLES = ['petit', 'grand'];
+var GENRES_LISTE = ['puce', 'numero', 'case'];   // genres dont la ligne vide sort par Entrée et Retour arrière ; un élément liste à l'export
+// alignements : valeur CSS (écran, Copier pour Office) et de Word (w:jc)
+var LIGNE_ALIGNEMENTS = { centre: { css: 'center', word: 'center' }, droite: { css: 'right', word: 'right' }, justifie: { css: 'justify', word: 'both' } };
+var LIGNE_ALIGNS = Object.keys(LIGNE_ALIGNEMENTS);
+var LIGNE_TAILLES_PX = { petit: 13, grand: 18 };   // Normal : 15 px (--t-petit et --t-grand de page.css)
+var LIGNE_TAILLES = Object.keys(LIGNE_TAILLES_PX);
+function enChaine(x) { return String(x == null ? '' : x); }
+function niveauDe(l) { return +l.lv || 0; }
+function sansZ(t) { return enChaine(t).replace(/​/g, ''); }   // espaces sans chasse posés pour sortir d'une pastille
 function ligne(html, lv) {
-  var o = { html: String(html == null ? '' : html) }, n = Math.max(0, Math.min(LIGNE_LV_MAX, Math.floor(+lv) || 0));
+  var o = { html: enChaine(html) }, n = Math.max(0, Math.min(LIGNE_LV_MAX, Math.floor(+lv) || 0));
   if (n) o.lv = n;
   return o;
 }
@@ -44,11 +49,11 @@ function lignesDuParagraphe(html, indent) {
     out.push(ligne(sansFormesVides(h), base + cur.lv));
   };
   debut();
-  String(html == null ? '' : html).split(/(<[^>]*>)/).forEach(function (m, i) {
+  enChaine(html).split(/(<[^>]*>)/).forEach(function (m, i) {
     if (!m) return;
     if (i % 2 === 0) {
       if (pile.some(function (x) { return x.x === 'tab'; })) return;   // le caractère du taquet
-      var t = m.replace(/​/g, ''); if (!t) return;
+      var t = sansZ(m); if (!t) return;
       cur.tete = false; cur.h += t; return;
     }
     if (/^<br\b/i.test(m)) { fin(); debut(); return; }
@@ -82,7 +87,7 @@ function texteDuHtml(html) { return { type: 'texte', lignes: lignesDuParagraphe(
 function numerosDesLignes(lignes) {
   var cpt = [];
   return lignes.map(function (l) {
-    var n = +l.lv || 0; cpt.length = Math.min(cpt.length, n + 1);
+    var n = niveauDe(l); cpt.length = Math.min(cpt.length, n + 1);
     if (l.genre !== 'numero') { cpt[n] = 0; return null; }
     cpt[n] = (cpt[n] || 0) + 1; return cpt[n];
   });
@@ -90,23 +95,19 @@ function numerosDesLignes(lignes) {
 // raccourci tapé au début d'une ligne (« - », « * », « 1. », « [] », « [ ] », « ## » suivis d'une espace) : { genre, html restant }, ou null
 var LIGNE_RACCOURCI = /^(?:([-*])|(\d+\.)|(\[ ?\])|(##))(?: |&nbsp;|\u00a0)/;
 function raccourciDeLigne(html) {
-  var m = String(html == null ? '' : html).match(LIGNE_RACCOURCI); if (!m) return null;
+  var m = enChaine(html).match(LIGNE_RACCOURCI); if (!m) return null;
   return { genre: m[1] ? 'puce' : m[2] ? 'numero' : m[3] ? 'case' : 'soustitre', html: html.slice(m[0].length) };
 }
 /* ---------- Collage et copie ---------- */
 var LIGNE_BLOC = /^(p|div|li|h[1-6]|tr|blockquote|pre|dt|dd|ul|ol|dl|table|section|article|header|footer|hr)$/;
 var LIGNE_VIDE_EL = /^(img|wbr|input|meta|link|col|source|area|base|embed|param|track)$/;
 var LIGNE_IGNOREE = /^(head|style|script|title|template|noscript)$/;
-// HTML collé → lignes : <br> coupe la ligne ; un bloc (p, div, li…) la coupe s'il a du contenu, ou s'il est vide
-// (<p></p> : ligne vide) ; les formes ouvertes sont refermées et rouvertes à chaque coupe. Genres : un <li> d'un <ul> donne une
-// puce, d'un <ol> un numéro, au niveau de sa profondeur de liste (Writer imbrique <ol><ol> sans <li> parent ; aria-level de
-// Google Docs l'emporte) ; un <input type=checkbox>, ou ☐/☑ en tête de ligne, donne une case (☑ ou checked : cochée) ; un
-// paragraphe de liste de Word (mso-list) donne une puce ou un numéro selon son symbole, écarté du texte. Copie d'Ardoise :
-// data-lv (niveau), data-g et data-done d'un bloc ou d'une liste. Un titre venu d'ailleurs reste du texte.
-// Le html des lignes n'est pas assaini (l'appelant le fait, ligne par ligne).
+// HTML collé → lignes (html non assaini) : <br> coupe la ligne, un bloc (p, li…) aussi s'il a du contenu ou s'il est vide.
+// Genres : <li> d'un <ul>/<ol> au niveau de sa profondeur (aria-level de Docs l'emporte), <input type=checkbox> ou ☐/☑ en tête,
+// liste de Word (mso-list) selon son symbole, data-lv/g/done d'une copie d'Ardoise ; un titre venu d'ailleurs reste du texte
 var LIGNE_MARQUE_CASE = /^((?:<[^>]*>)*)\s*([☐☑])(?: |&nbsp;| )?/;
 function lignesDuCollage(html) {
-  var s = String(html == null ? '' : html)
+  var s = enChaine(html)
     // symbole d'une liste de Word, avant le retrait des commentaires (deux formes : <![if !supportLists]> et <!--[if !supportLists]-->)
     .replace(/<!(?:--)?\[if !supportLists\](?:--)?>([\s\S]*?)<!(?:--)?\[endif\](?:--)?>/gi, function (x, m) { return '<msoliste m="' + esc(htmlText(m).replace(/[\s ]+/g, '')) + '">'; })
     .replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, '');
@@ -172,11 +173,12 @@ function lignesDuCollage(html) {
 }
 // texte brut collé : une ligne de texte par saut de ligne (un saut final ne fait pas de ligne), rien n'est converti
 function lignesDuTexteBrut(texte) {
-  var t = String(texte == null ? '' : texte).split(/\r\n|\r|\n/);
+  var t = enChaine(texte).split(/\r\n|\r|\n/);
   if (t.length > 1 && t[t.length - 1] === '') t.pop();
   return t.map(function (x) { return ligne(esc(x)); });
 }
-// marque d'une ligne en texte brut : « - » puce, « N. » numéro affiché n, « ☐ »/« ☑ » case ; rien pour le texte et le sous-titre
+// marque d'une ligne en texte brut : « - » puce, « N. » numéro affiché n, « ☐ »/« ☑ » case ; rien pour le texte et le sous-titre.
+// Seule source des marques de genre (copie, Copier pour Office, Word)
 function marqueDeLigne(l, n) {
   if (l.genre === 'puce') return '- ';
   if (l.genre === 'numero') return (n || 1) + '. ';
@@ -187,17 +189,16 @@ function marqueDeLigne(l, n) {
 // 05-presse-papier.js) ; nums : numéros affichés dans le bloc d'origine (par défaut, ceux des lignes copiées)
 function lignesEnTexte(lignes, nums) {
   nums = nums || numerosDesLignes(lignes);
-  return lignes.map(function (l, i) { return new Array((+l.lv || 0) + 1).join('  ') + marqueDeLigne(l, nums[i]) + texteBrutDePresse(l.html); }).join('\n');
+  return lignes.map(function (l, i) { return new Array(niveauDe(l) + 1).join('  ') + marqueDeLigne(l, nums[i]) + texteBrutDePresse(l.html); }).join('\n');
 }
-// marche des listes d'un bloc texte : puces et numéros en <ul>/<ol> imbriqués (une ligne plus profonde s'imbrique dans le <li>
-// du dessus ; un autre genre au même niveau ferme la liste) ; toute autre ligne ferme les listes ouvertes. f fournit le HTML :
-// liste(tag, niveau, haut (liste ouverte au-dessus ou null), numéro affiché, i) → balise ouvrante ; li(l, i) → <li…> et son
-// contenu ; ligne(l, i) → HTML d'une ligne hors liste (case, sous-titre, texte). Copie (lignesEnHtml) et Copier pour Office
+// puces et numéros en <ul>/<ol> imbriqués (un autre genre au même niveau ferme la liste, toute autre ligne les ferme toutes) ;
+// f.liste(tag, niveau, haut (liste au-dessus ou null), numéro, i) → balise ouvrante ; f.li(l, i) → <li…> et contenu ;
+// f.ligne(l, i) → ligne hors liste. Copie (lignesEnHtml) et Copier pour Office
 function lignesEnListes(lignes, nums, f) {
   var out = '', ouvertes = [];
   var fermer = function (jusqua) { while (ouvertes.length > jusqua) out += '</li></' + ouvertes.pop().tag + '>'; };
   lignes.forEach(function (l, i) {
-    var n = +l.lv || 0;
+    var n = niveauDe(l);
     if (l.genre === 'puce' || l.genre === 'numero') {
       var tag = l.genre === 'puce' ? 'ul' : 'ol';
       while (ouvertes.length && ouvertes[ouvertes.length - 1].lv > n) fermer(ouvertes.length - 1);
@@ -227,7 +228,7 @@ function lignesEnHtml(lignes, idDoc, nums) {
     },
     li: function (l) { return '<li>' + (h(l) || '<br>'); },
     ligne: function (l) {
-      var n = +l.lv || 0;
+      var n = niveauDe(l);
       if (l.genre === 'case') return '<p data-g="case"' + (l.done ? ' data-done' : '') + retrait(n) + '>' + marqueDeLigne(l) + h(l) + '</p>';
       if (l.genre === 'soustitre') return '<h3 data-g="soustitre"' + retrait(n) + '>' + (h(l) || '<br>') + '</h3>';
       return '<p' + retrait(n) + '>' + (h(l) || '<br>') + '</p>';
@@ -237,8 +238,8 @@ function lignesEnHtml(lignes, idDoc, nums) {
 // case parente (requêtes « cases à cocher ») : html de la ligne la plus proche au-dessus de niveau strictement inférieur,
 // quel que soit son genre, cochée ou non ; '' au niveau 0. Ne lit que html et lv : vaut aussi pour une Liste à cocher
 function caseParente(lignes, i) {
-  var lv = +lignes[i].lv || 0;
-  for (var j = i - 1; lv > 0 && j >= 0; j--) if ((+lignes[j].lv || 0) < lv) return lignes[j].html;
+  var lv = niveauDe(lignes[i]);
+  for (var j = i - 1; lv > 0 && j >= 0; j--) if (niveauDe(lignes[j]) < lv) return lignes[j].html;
   return '';
 }
 // Cochées à la fin (menu contextuel d'une case) : la suite de cases de même niveau autour de la ligne i, chacune suivie de
@@ -246,7 +247,7 @@ function caseParente(lignes, i) {
 // des mêmes objets ligne ; les lignes hors de la suite restent à leur place. Ligne i qui n'est pas une case : même ordre.
 function casesALaFin(lignes, i) {
   var out = lignes.slice(), l = lignes[i]; if (!l || l.genre !== 'case') return out;
-  var lv = +l.lv || 0, nv = function (j) { return +lignes[j].lv || 0; }, estCase = function (j) { return lignes[j].genre === 'case' && nv(j) === lv; };
+  var lv = niveauDe(l), nv = function (j) { return niveauDe(lignes[j]); }, estCase = function (j) { return lignes[j].genre === 'case' && nv(j) === lv; };
   var debut = i;
   for (var j = i - 1; j >= 0 && nv(j) >= lv; j--) { if (nv(j) > lv) continue; if (!estCase(j)) break; debut = j; }
   var unites = [], k = debut;

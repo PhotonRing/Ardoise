@@ -61,10 +61,9 @@ function synParagraphes(s) {
   s.pending = s.pending.concat(synDiff(s.st, brut, conv));
   clearTimeout(s.sendT); s.sendT = setTimeout(function () { synFlush(false); }, 120);
 }
-// saisies d'une copie 1.26 dans le html d'un bloc déjà converti ici (paragraphe, ou Sous-titre converti par « Convertir en
-// texte ») : le moteur les écarte (registre html retiré), on les compte pour avertir. Seuls les envois d'avant le format du
-// bloc texte sont comptés : une copie à jour qui tape dans un Sous-titre pendant qu'une autre le convertit perd sa frappe
-// comme dans un bloc supprimé par l'autre copie, sans avertissement
+// saisies d'une copie 1.26 dans le html d'un bloc converti ici en bloc texte : écartées par le moteur, comptées pour avertir.
+// Seuls les envois d'avant le format 8 comptent : une copie à jour qui tape dans un Sous-titre qu'une autre convertit perd sa
+// frappe sans avertissement, comme dans un bloc supprimé
 var FORMAT_BLOC_TEXTE = 8;
 function synSaisiesParagraphes(st, ops) {
   var n = 0;

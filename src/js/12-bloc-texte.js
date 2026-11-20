@@ -2,7 +2,7 @@
 // Le champ d'un bloc texte (data-texte) contient une div.lg par ligne. Les gestes à l'intérieur du bloc changent ce DOM
 // en place puis passent par la saisie (fire), ce qui garde le curseur ; ceux qui touchent un autre bloc passent par session.modifier.
 function lignesDe(el) { return Array.prototype.filter.call(el.children, function (x) { return x.classList.contains('lg'); }); }
-function ligneVideEl(lg) { return lg.textContent.replace(/​/g, '') === '' && !lg.querySelector('img'); }
+function ligneVideEl(lg) { return sansZ(lg.textContent) === '' && !lg.querySelector('img'); }
 function poserNiveau(lg, n) { n = Math.max(0, Math.min(LIGNE_LV_MAX, n)); if (n) lg.dataset.lv = n; else lg.removeAttribute('data-lv'); }
 function niveauEl(lg) { return +lg.dataset.lv || 0; }
 // genre d'une ligne (data-g, absent pour une ligne de texte) ; une case qui change de genre ou qui naît perd sa coche,
@@ -19,7 +19,6 @@ function alignEl(lg) { return lg.dataset.align || ''; }
 function poserAlign(lg, v) { if (v) lg.dataset.align = v; else lg.removeAttribute('data-align'); }
 function tailleEl(lg) { return lg.dataset.taille || ''; }
 function poserTaille(lg, v) { if (v && genreEl(lg) !== 'soustitre') lg.dataset.taille = v; else lg.removeAttribute('data-taille'); }
-var GENRES_LISTE = ['puce', 'numero', 'case'];   // genres dont la ligne vide sort par Entrée et Retour arrière
 function ligneDeEl(lg, html) {
   var o = ligne(html, niveauEl(lg));
   if (lg.dataset.g) o.genre = lg.dataset.g;
@@ -65,7 +64,7 @@ function ligneDuNoeud(el, n) { while (n && n.parentNode !== el) n = n.parentNode
 function auBordDeLigne(lg, r, dir) {
   var t = document.createRange(); t.selectNodeContents(lg);
   if (dir < 0) t.setEnd(r.startContainer, r.startOffset); else t.setStart(r.endContainer, r.endOffset);
-  if (t.toString().replace(/​/g, '') !== '') return false;
+  if (sansZ(t.toString()) !== '') return false;
   var brs = t.cloneContents().querySelectorAll('br');
   return !brs.length || (dir > 0 && brs.length === 1 && lg.lastChild && lg.lastChild.nodeName === 'BR');   // le <br> qui tient une ligne vide
 }
@@ -178,21 +177,7 @@ function raccourciTexte(el, e) {
   session.valider();
   avant.deleteContents(); poserGenre(lg, rc.genre);
   if (ligneVideEl(lg) && !lg.querySelector('br')) lg.innerHTML = '<br>';   // un nœud de texte vide ne tient pas la ligne
-  var c = document.createRange(); c.setStart(lg, 0); c.collapse(true); s.removeAllRanges(); s.addRange(c);
-  fire(el); session.valider();
-}
-// clic sur la marque d'une case (là où ::before la dessine) : le curseur ne bouge pas, la case est cochée ou décochée.
-// Alignée à gauche ou justifiée, la marque occupe la marge de la ligne ; centrée ou à droite, les 1.6em devant le texte
-function caseSousPointeur(e) {
-  var lg = e.target.closest && e.target.closest('.texte > .lg[data-g="case"]'); if (!lg) return null;
-  var g = lg.getBoundingClientRect(), cs = getComputedStyle(lg), pad = parseFloat(cs.paddingLeft) || 0;
-  if (getComputedStyle(lg, '::before').position !== 'static') return e.clientX - g.left < pad ? lg : null;
-  var w = 1.6 * (parseFloat(cs.fontSize) || 15), r = document.createRange(); r.selectNodeContents(lg);
-  var t = Array.prototype.filter.call(r.getClientRects(), function (x) { return x.width > 0; })[0], x0;
-  if (t) x0 = t.left;
-  else x0 = alignEl(lg) === 'droite' ? g.right - parseFloat(cs.paddingRight || 0) : g.left + g.width / 2 + w / 2;   // ligne vide : marque seule
-  var y0 = t ? t.top : g.top, y1 = t ? t.bottom : g.top + parseFloat(cs.lineHeight || 24);
-  return e.clientX >= x0 - w && e.clientX < x0 && e.clientY >= y0 && e.clientY <= y1 ? lg : null;
+  caretTo(lg, false); fire(el); session.valider();
 }
 // une étape d'historique, synchronisée (lignes.i.done), en édition comme en lecture (comme une Liste à cocher)
 function basculerCase(lg) {
@@ -202,11 +187,13 @@ function basculerCase(lg) {
   session.valider();
   session.saisir(function () { if (oui) b.lignes[i].done = true; else delete b.lignes[i].done; }); session.valider();
   lg.toggleAttribute('data-done', oui);
-  if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+  rafraichirRequetes();
 }
+// après un changement de coche : les requêtes sur les cases à cocher suivent
+function rafraichirRequetes() { if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon(); }
 app.addEventListener('mousedown', function (e) {
   if (e.button !== 0) return;
-  var lg = caseSousPointeur(e); if (!lg) return;
+  var lg = Reader.caseSousPointeur(e, '.texte > .lg[data-g="case"]'); if (!lg) return;
   e.preventDefault(); basculerCase(lg);
 });
 /* ---------- Collage et copie (règles : 05-lignes.js) ---------- */
@@ -220,13 +207,12 @@ function couperLignes(el, r) {
 }
 // genre, niveau et coche d'une ligne collée posés sur une ligne du champ (alignement et taille jamais repris)
 function poserLigneCollee(lg, l) {
-  poserNiveau(lg, +l.lv || 0); poserGenre(lg, l.genre || '');
+  poserNiveau(lg, niveauDe(l)); poserGenre(lg, l.genre || '');
   if (l.genre === 'case' && l.done) lg.setAttribute('data-done', '');
 }
-// lignes collées au curseur : la ligne du curseur est coupée, la première ligne collée se joint à son début, la dernière à sa fin ;
-// chaque ligne collée garde son niveau et son genre, la première prend ceux de la ligne du curseur, sauf si c'est une ligne de
-// texte vide et que la première ligne collée a un genre : elle prend alors son genre, son niveau et sa coche. Une seule étape
-// d'historique (fire).
+// lignes collées au curseur, en une étape : la ligne du curseur est coupée, la première ligne collée se joint à son début, la
+// dernière à sa fin. Chaque ligne garde niveau et genre ; la première prend ceux de la ligne du curseur, sauf sur une ligne de
+// texte vide : elle y pose alors son genre, son niveau et sa coche
 function collerLignes(el, ls) {
   var s = getSelection(); if (!ls.length || !s.rangeCount) return;
   if (!s.isCollapsed) { s.getRangeAt(0).deleteContents(); reparerLignes(el); }
@@ -263,7 +249,7 @@ function lignesDeLaPlage(t, p) {
   var lgs = Array.prototype.filter.call(box.children, function (x) { return x.classList.contains('lg'); });
   var num = function (x) { return (x && x.dataset.g === 'numero' && +x.dataset.n) || null; };
   if (!lgs.length) {
-    var lg = ligneDuNoeud(t, p.startContainer), html = sanitize(box.innerHTML), sansZ = function (x) { return x.replace(/​/g, ''); };
+    var lg = ligneDuNoeud(t, p.startContainer), html = sanitize(box.innerHTML);
     if (lg && sansZ(box.textContent) === sansZ(lg.textContent)) return { lignes: [ligneDeEl(lg, html)], nums: [num(lg)] };
     return { lignes: [ligne(html, lg ? niveauEl(lg) : 0)], nums: [null] };
   }

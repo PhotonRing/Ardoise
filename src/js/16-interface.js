@@ -360,7 +360,7 @@ function couperAutour(haut, r) {
   var bout = function (avant) {
     var b = document.createRange();
     if (avant) { b.setStart(haut, 0); b.setEnd(deb, debO); } else { b.setStart(fin, finO); b.setEnd(haut, haut.childNodes.length); }
-    var f = b.extractContents(); if (!f.textContent.replace(/​/g, '') && !f.querySelector('br, span.pill')) return;
+    var f = b.extractContents(); if (!sansZ(f.textContent) && !f.querySelector('br, span.pill')) return;
     // éléments vidés par la coupe (le reste d'un gras coupé à son bord) retirés
     Array.prototype.slice.call(f.querySelectorAll('*')).reverse().forEach(function (x) { if (!x.textContent && !x.matches('br') && !x.querySelector('br')) x.remove(); });
     var c = haut.cloneNode(false); c.appendChild(f); haut.parentNode.insertBefore(c, avant ? haut : haut.nextSibling);
@@ -443,7 +443,7 @@ window.addEventListener('resize', function () { if (!bmf.hidden && bmf.parentNod
 function fieldOf(n) { while (n && n !== app) { if (n.nodeType === 1 && n.classList.contains('fld')) return n; n = n.parentNode; } return null; }
 function unwrap(el) { var p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
 /* Effacer : la forme (gras, italique, souligné, barré, code, lien, couleur, surlignage) n'est retirée que du texte sélectionné.
-   Une forme qui englobe la sélection est coupée en trois ; pastilles, taquets et sauts de ligne restent. Sans sélection, rien */
+   Une forme qui englobe la sélection est coupée en trois ; pastilles et sauts de ligne restent. Sans sélection, rien */
 function deForme(n) {
   if (n.nodeType !== 1) return false;
   if (/^(B|I|U|S|STRIKE|CODE|A|STRONG|EM)$/.test(n.tagName)) return true;
@@ -457,7 +457,7 @@ function sansForme(n) {
 }
 // plage r d'une seule borne (le champ, ou une ligne d'un bloc texte) : rend le premier et le dernier nœud effacés, ou null
 function effacerPlage(r, fld) {
-  // un bord dans une pastille ou un taquet est repoussé hors de lui (jamais coupé) ; une sélection dans une pastille reste dedans
+  // un bord dans une pastille est repoussé hors d'elle (jamais coupée) ; une sélection dans une pastille reste dedans
   var garde = function (n) { for (; n && n !== fld; n = n.parentNode) if (intact(n)) return n; return null; };
   var g1 = garde(r.startContainer), g2 = garde(r.endContainer);
   if (g1 !== g2) { if (g1) r.setStartBefore(g1); if (g2) r.setEndAfter(g2); }
@@ -470,7 +470,7 @@ function effacerPlage(r, fld) {
   var premier = f.firstChild, dernier = f.lastChild; if (!premier) return null;
   r.insertNode(f);
   // formes vidées aux bords de la sélection (extractContents y laisse des éléments vides) retirées
-  Array.prototype.slice.call(fld.querySelectorAll('*')).reverse().forEach(function (x) { if (deForme(x) && !x.textContent.replace(/​/g, '') && !x.querySelector('br, span.pill, span.tab')) x.remove(); });
+  Array.prototype.slice.call(fld.querySelectorAll('*')).reverse().forEach(function (x) { if (deForme(x) && !sansZ(x.textContent) && !x.querySelector('br, span.pill')) x.remove(); });
   return [premier, dernier];
 }
 function effacerForme(s, r, fld) {

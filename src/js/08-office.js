@@ -117,16 +117,15 @@ function officeBloc(b, d, opts) {
       var num = stepNums(d.pages[pi].blocks)[b.id];
       out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
     case 'texte':
-      // ligne de texte → paragraphe à son retrait ; sous-titre → titre de niveau 3 ; suite de puces, numéros et cases (tous
-      // niveaux) → un élément liste, coupé par une ligne de texte ou un sous-titre ; chaque item porte son genre et son numéro
-      // affiché (numerosDesLignes : la coupe ne change pas les numéros). serre : pas d'espace après (sauf la dernière ligne,
-      // comme .texte .lg) ; ligne : gardée vide dans le texte brut ; alignement et taille : réglages de la ligne
+      // texte → paragraphe à son retrait ; sous-titre → titre de niveau 3 ; suite de puces, numéros et cases → un élément liste
+      // (items à genre et numéro affiché). serre : pas d'espace après (sauf la dernière ligne, comme .texte .lg) ; ligne : gardée
+      // vide dans le texte brut ; alignement et taille : réglages de la ligne
       var ls = normLignes(b.lignes), nums = numerosDesLignes(ls), suite = null;
       ls.forEach(function (l, i) {
-        var o = {}, lv = Math.min(LIGNE_LV_MAX, +l.lv || 0), dernier = i === ls.length - 1;
+        var o = {}, lv = Math.min(LIGNE_LV_MAX, niveauDe(l)), dernier = i === ls.length - 1;
         if (l.align) o.alignement = l.align;
         if (l.taille) o.taille = l.taille;
-        if (l.genre === 'puce' || l.genre === 'numero' || l.genre === 'case') {
+        if (GENRES_LISTE.indexOf(l.genre) >= 0) {
           var it = { niveau: lv, segs: S(l.html), genre: l.genre }; for (var k in o) it[k] = o[k];
           if (l.genre === 'numero') it.n = nums[i];
           if (l.genre === 'case') it.coche = !!l.done;
@@ -426,7 +425,8 @@ function officeTexte(elts) {
         return e.items.map(function (it) {
           n[it.niveau] = (n[it.niveau] || 0) + 1; n.length = it.niveau + 1;
           // numéro d'un item de bloc texte (n) : celui d'Ardoise ; sinon compté dans la liste
-          return new Array(it.niveau + 1).join('  ') + (it.coche != null ? (it.coche ? '☑ ' : '☐ ') : it.n != null ? it.n + '. ' : e.ordonnee ? n[it.niveau] + '. ' : '- ') + lig(it.segs);
+          var g = it.coche != null ? { genre: 'case', done: it.coche } : { genre: it.n != null || e.ordonnee ? 'numero' : 'puce' };
+          return new Array(it.niveau + 1).join('  ') + marqueDeLigne(g, it.n != null ? it.n : n[it.niveau]) + lig(it.segs);
         }).join('\n');
       case 'tableau': return e.lignes.map(function (l) { return l.map(function (c) { return tous(c).replace(/[\t\n]+/g, ' '); }).join('\t'); }).join('\n');
       case 'cadre': return tous(e.contenu);

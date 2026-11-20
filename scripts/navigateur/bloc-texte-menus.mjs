@@ -14,7 +14,7 @@ const MENU = `(() => { const p = document.querySelector('#ui .pop'); return p ? 
 const ANNULER = `(document.querySelector('#ui [data-ui=undo]') || {}).title || ''`;
 
 export const nom = 'menus du bloc texte';
-export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, ordreEcran, mesure, echec }) {
   const touche = async (key, code, vk, modifiers = 0) => {
     for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers });
     await attendre(100);
@@ -138,10 +138,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   await charge([{ id: 'v', type: 'texte', lignes: [{ html: '' }] }, { id: 'c2', type: 'check', items: [{ html: 'Pain', done: false }] }]);
   await evalue(`document.querySelector('.fld[data-b="v"]').focus(), true`);
   await cdp('Input.insertText', { text: '/' }); await attendre(150);
-  const types = await evalue(`[...document.querySelectorAll('#ui .pop .mi[data-t]')].map((x) => x.dataset.t)`);
+  const types = await ordreEcran('#ui .pop .mi[data-t]', 'return x.dataset.t');
   attendu('menu d\'insertion sans Liste, Liste à cocher ni Sous-titre', types.length > 5 && !types.some((x) => ['list', 'check', 'subtitle', 'p'].includes(x)) && types[0] === 'texte', types);
   await evalue(`(() => { const q = document.querySelector('#ui .pop .menu-q'); q.value = 'liste'; q.dispatchEvent(new Event('input')); return true; })()`); await attendre(80);
-  const liste = await evalue(`[...document.querySelectorAll('#ui .pop .mi[data-t]')].map((x) => x.dataset.t)`);
+  const liste = await ordreEcran('#ui .pop .mi[data-t]', 'return x.dataset.t');
   attendu('« liste » propose Texte', liste[0] === 'texte', liste);
   await touche(...ECHAP);
   // une Liste à cocher existante reste modifiable

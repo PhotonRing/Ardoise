@@ -27,19 +27,16 @@ OFFICE_RENDUS.step = function (b, x) {
     // retrait du titre : Writer ne l'applique qu'à une cellule bordée (bordure de la couleur du fond)
     officeCellule(titre, 'border:1px solid ' + x.C.surface + ';padding:0pt 0pt 0pt 9pt', '94%', 'middle') + '</tr>', 'margin:0 0 6pt');
 };
-// bloc texte : texte en <p>, sous-titre en <h3>, puces et numéros en listes imbriquées (lignesEnListes : <ol start> = numéro
-// d'Ardoise, puces •◦▪ selon le niveau comme .lg, numéros décimaux à tous les niveaux), cases en <p> avec ☐/☑ (jamais de <li> :
-// Writer remet des puces). Retrait de 2em (30 px) par niveau ; lignes sans espace entre elles (.texte .lg), 6 pt après la
-// dernière ; alignement en text-align (Writer le lit sur <p>, <h3> et <li>), Petit et Grand en points (--t-petit, --t-grand) ;
-// ligne vide en &nbsp; (Writer réduit un <p> vide)
+// bloc texte : listes par lignesEnListes (<ol start> = numéro d'Ardoise, puces •◦▪ selon le niveau), cases en <p> ☐/☑ (Writer
+// remet des puces à un <li>) ; 30 px de retrait par niveau, 6 pt après la dernière ligne ; text-align lu par Writer sur <p>, <h3>
+// et <li> ; ligne vide en &nbsp; (Writer réduit un <p> vide)
 var OFFICE_TEXTE_PUCES = ['disc', 'circle', 'square'];
-var OFFICE_TEXTE_ALIGN = { centre: 'center', droite: 'right', justifie: 'justify' };
 OFFICE_RENDUS.texte = function (b, x) {
   var ls = normLignes(b.lignes), der = ls.length - 1;
   var apres = function (i) { return i === der ? '6pt' : '0pt'; };
   // morceaux de style terminés par « ; »
-  var retrait = function (l) { return +l.lv ? 'margin-left:' + officePt(30 * Math.min(LIGNE_LV_MAX, +l.lv)) + ';' : ''; };
-  var reglages = function (l) { return (l.align ? 'text-align:' + OFFICE_TEXTE_ALIGN[l.align] + ';' : '') + (l.taille ? 'font-size:' + officePt(l.taille === 'petit' ? 13 : 18) + ';' : ''); };
+  var retrait = function (l) { return niveauDe(l) ? 'margin-left:' + officePt(30 * niveauDe(l)) + ';' : ''; };   // niveau borné par normLignes
+  var reglages = function (l) { return (l.align ? 'text-align:' + LIGNE_ALIGNEMENTS[l.align].css + ';' : '') + (l.taille ? 'font-size:' + officePt(LIGNE_TAILLES_PX[l.taille]) + ';' : ''); };
   var contenu = function (l) { return x.segs(x.S(l.html)); };
   return lignesEnListes(ls, numerosDesLignes(ls), {
     liste: function (tag, n, haut, num) {
@@ -52,7 +49,8 @@ OFFICE_RENDUS.texte = function (b, x) {
       var h = contenu(l);
       if (l.genre === 'soustitre') return officeTxtTitre('h3', 15, h || '&nbsp;', x, ('margin-top:' + officePt(8) + ';margin-bottom:' + apres(i) + ';' + retrait(l) + reglages(l)).replace(/;$/, ''));
       var marges = 'margin:0pt 0pt ' + apres(i) + ';' + retrait(l) + reglages(l);
-      if (l.genre === 'case') return '<p style="' + marges + '">' + (l.done ? '<span style="color:' + x.acc + '">☑</span> <span style="color:' + x.C.muted + '">' + h + '</span>' : '<span style="color:' + x.C.muted + '">☐</span> ' + h) + '</p>';
+      var m = marqueDeLigne(l).trim();
+      if (l.genre === 'case') return '<p style="' + marges + '">' + (l.done ? '<span style="color:' + x.acc + '">' + m + '</span> <span style="color:' + x.C.muted + '">' + h + '</span>' : '<span style="color:' + x.C.muted + '">' + m + '</span> ' + h) + '</p>';
       return '<p style="' + marges + '">' + (h || '&nbsp;') + '</p>';
     }
   });

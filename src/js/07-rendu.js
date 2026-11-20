@@ -1,4 +1,6 @@
 /* ---------- Rendu ---------- */
+// bloc ancré (id b-<id>, même dans l'export) : cible du lien d'une requête vers un modèle diamant ou un bloc texte
+function blocAncre(b) { return b.type === 'diamond' || b.type === 'texte'; }
 function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
@@ -36,7 +38,7 @@ function renderPage(d, ctx) {
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
-      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond' || b.type === 'texte') at += ' id="b-' + b.id + '"';   // diamant, bloc texte : cible du lien d'une requête
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || blocAncre(b)) at += ' id="b-' + b.id + '"';
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
@@ -72,13 +74,12 @@ function anchorBlock(d, ctx, id) {
 // bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé,
 // coche, alignement et taille en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
 function lignesHTML(lignes) {
-  var nums = numerosDesLignes(lignes);
-  return lignes.map(function (l, i) {
-    var h = R(l.html), g = LIGNE_GENRES.indexOf(l.genre) >= 0 ? l.genre : '';
-    var al = LIGNE_ALIGNS.indexOf(l.align) >= 0 ? l.align : '', ta = g !== 'soustitre' && LIGNE_TAILLES.indexOf(l.taille) >= 0 ? l.taille : '';
-    return '<div class="lg"' + (l.lv > 0 ? ' data-lv="' + Math.min(6, +l.lv) + '"' : '') + (g ? ' data-g="' + g + '"' : '') +
-      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (g === 'case' && l.done ? ' data-done' : '') +
-      (al ? ' data-align="' + al + '"' : '') + (ta ? ' data-taille="' + ta + '"' : '') + '>' + (h || '<br>') + '</div>';
+  var ls = normLignes(lignes), nums = numerosDesLignes(ls);   // niveau borné (LIGNE_LV_MAX), genre, coche, alignement et taille validés
+  return ls.map(function (l, i) {
+    var h = R(l.html);
+    return '<div class="lg"' + (l.lv ? ' data-lv="' + l.lv + '"' : '') + (l.genre ? ' data-g="' + l.genre + '"' : '') +
+      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (l.done ? ' data-done' : '') +
+      (l.align ? ' data-align="' + l.align + '"' : '') + (l.taille ? ' data-taille="' + l.taille + '"' : '') + '>' + (h || '<br>') + '</div>';
   }).join('');
 }
 // bloc vide : une seule ligne de texte (sans genre), vide et sans retrait
@@ -195,8 +196,8 @@ function renderBlock(b, d, ctx, num) {
           '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
       return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
         var ci = renderBlock(c, d, ctx, null);
-        // ancrage de la bascule (19-mode-lecture-edition.js) ; un modèle diamant ou un bloc texte garde sa cible de lien (id b-<id>), même dans l'export
-        var at = (c.type === 'diamond' || c.type === 'texte' ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
+        // ancrage de la bascule (19-mode-lecture-edition.js) ; un bloc ancré garde sa cible de lien
+        var at = (blocAncre(c) ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
         return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
       }).join('') + '</div></details>';
     case 'details':
