@@ -79,6 +79,33 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     await verifie('clic sur une case centrée', 't1', [{ html: 'avant' }, { html: 'un', align: 'centre' }, { html: 'deux', genre: 'puce', align: 'centre' }, { html: 'trois', genre: 'case', align: 'centre', done: true }, { html: 'après' }]);
   }
 
+  // la case ne bouge pas en se cochant, quel que soit l'alignement, en Grand aussi (vérification c61 : centrée ou à droite,
+  // elle descendait de quelques pixels) ; boîte du ::before lue par le protocole DevTools (un pseudo-élément n'a pas de rect)
+  {
+    const cases = [{ html: 'à gauche', genre: 'case' }, { html: 'centrée en Grand', genre: 'case', align: 'centre', taille: 'grand' },
+      { html: 'à droite', genre: 'case', align: 'droite' }, { html: 'à droite en Petit', genre: 'case', align: 'droite', taille: 'petit' }];
+    const hauts = async () => {
+      await cdp('DOM.enable'); const racine = (await cdp('DOM.getDocument', { depth: -1 })).result.root;
+      const lgs = []; const parcours = (n) => { const a = n.attributes || []; if (a[a.indexOf('class') + 1] === 'lg' && a.includes('class')) lgs.push(n); (n.children || []).forEach(parcours); };
+      parcours(racine);
+      const r = [];
+      for (const lg of lgs) {
+        const av = (lg.pseudoElements || []).find((x) => x.pseudoType === 'before'); if (!av) { r.push(null); continue; }
+        const q = (await cdp('DOM.getBoxModel', { nodeId: av.nodeId })).result.model.border, l = (await cdp('DOM.getBoxModel', { nodeId: lg.nodeId })).result.model.border;
+        r.push(+(q[1] - l[1]).toFixed(1));
+      }
+      await cdp('DOM.disable');
+      return r;
+    };
+    await charge([{ id: 't1', type: 'texte', lignes: cases }]);
+    const avant = await hauts();
+    await charge([{ id: 't1', type: 'texte', lignes: cases.map((l) => ({ ...l, done: true })) }]);
+    const apres = await hauts();
+    mesure();
+    if (avant.length !== 4 || avant.includes(null)) echec('cases : marques introuvables ' + JSON.stringify(avant));
+    else if (JSON.stringify(avant) !== JSON.stringify(apres)) echec('case qui bouge en se cochant (haut de la case dans la ligne, avant puis après) : ' + JSON.stringify(avant) + ' ' + JSON.stringify(apres));
+  }
+
   // taille désactivée sur des sous-titres ; active sur un sous-titre et un texte, sans taille posée sur le sous-titre
   await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'titre un', genre: 'soustitre' }, { html: 'titre deux', genre: 'soustitre' }, { html: 'texte', taille: 'grand' }] }]);
   await evalue(choisir('t1', 0, 1, 1, 3)); await attendre(250);

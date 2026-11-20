@@ -15,9 +15,12 @@ const centre = (sel) => `(() => { const b = document.querySelector(${JSON.string
 // point dans la marge (marque) de la ligne i d'un bloc texte
 const marque = (sel, i) => `(() => { const lg = document.querySelectorAll(${JSON.stringify(sel)} + ' > .lg')[${i}]; if (!lg) return null; const r = lg.getBoundingClientRect(); return { x: r.left + 6, y: r.top + Math.min(10, r.height / 2) }; })()`;
 
-// pour visibles() : '' si le libellé du bouton tient dans le bouton, sinon le libellé et les deux largeurs
+// pour visibles() : '' si le libellé du bouton (icône comprise) tient dans le bouton, en largeur et en hauteur, sur une seule
+// rangée, sinon le libellé et les mesures. Vérification c62 : la largeur seule ne voyait pas un libellé passé sous son icône.
 export const LIBELLE_ENTIER = `const r = document.createRange(); r.selectNodeContents(x); const t = r.getBoundingClientRect(), b = x.getBoundingClientRect();
-  return t.left >= b.left - 0.5 && t.right <= b.right + 0.5 ? '' : x.textContent.trim() + ' (' + t.width.toFixed(0) + ' dans ' + b.width.toFixed(0) + ')'`;
+  const m = [...r.getClientRects()].filter((q) => q.width > 0).map((q) => q.top + q.height / 2).sort((a, z) => a - z), rangees = m.filter((v, i) => !i || v - m[i - 1] > 4).length;
+  const dedans = t.left >= b.left - 0.5 && t.right <= b.right + 0.5 && t.top >= b.top - 0.5 && t.bottom <= b.bottom + 0.5;
+  return dedans && rangees <= 1 ? '' : x.textContent.trim() + ' (' + t.width.toFixed(0) + 'x' + t.height.toFixed(0) + ' dans ' + b.width.toFixed(0) + 'x' + b.height.toFixed(0) + ', ' + rangees + ' rangées)'`;
 
 export const nom = 'genres de ligne';
 export default async function ({ ecran, charger, evalue, cdp, attendre, visibles, mesure, echec }) {
