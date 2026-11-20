@@ -1,7 +1,7 @@
 // Sujet : alignement et taille des lignes d'un bloc texte. Sélecteurs de la barre de mise en forme sur plusieurs lignes
 // (sélection gardée, une étape d'historique), libellés de la ligne du curseur, taille désactivée sur des sous-titres, Entrée
 // qui garde les réglages, marque qui suit le texte centré, rendu en lecture. Origine : spec bloc-texte, ticket 06.
-import { LIBELLE_ENTIER } from './bloc-texte-genres.mjs';
+import { LIBELLE_ENTIER } from './outils/mesures.mjs';
 
 const doc = (blocks) => ({ title: 'Alignement', pages: [{ id: 'p1', title: 'Accueil', blocks }] });
 const LIGNES = (bid) => `JSON.stringify(((window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)})) || {}).lignes)`;
