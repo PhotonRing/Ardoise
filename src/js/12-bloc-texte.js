@@ -209,17 +209,25 @@ function couperLignes(el, r) {
   if (a && z && a !== z && a.parentNode && z.parentNode) { joindreLignes(el, a, z); return; }
   reparerLignes(el); fire(el);
 }
+// genre, niveau et coche d'une ligne collée posés sur une ligne du champ (alignement et taille jamais repris)
+function poserLigneCollee(lg, l) {
+  poserNiveau(lg, +l.lv || 0); poserGenre(lg, l.genre || '');
+  if (l.genre === 'case' && l.done) lg.setAttribute('data-done', '');
+}
 // lignes collées au curseur : la ligne du curseur est coupée, la première ligne collée se joint à son début, la dernière à sa fin ;
-// chaque ligne collée garde son niveau, la première prend celui de la ligne du curseur. Une seule étape d'historique (fire).
+// chaque ligne collée garde son niveau et son genre, la première prend ceux de la ligne du curseur, sauf si c'est une ligne de
+// texte vide et que la première ligne collée a un genre : elle prend alors son genre, son niveau et sa coche. Une seule étape
+// d'historique (fire).
 function collerLignes(el, ls) {
   var s = getSelection(); if (!ls.length || !s.rangeCount) return;
   if (!s.isCollapsed) { s.getRangeAt(0).deleteContents(); reparerLignes(el); }
   var r = s.getRangeAt(0), lg = ligneDuNoeud(el, r.startContainer);
   if (!lg) { lg = lignesDe(el)[lignesDe(el).length - 1]; r = document.createRange(); r.selectNodeContents(lg); r.collapse(false); }
+  if (ls[0].genre && !genreEl(lg) && ligneVideEl(lg)) poserLigneCollee(lg, ls[0]);
   if (ls.length === 1) {
     // inséré à la main : insertHTML de Chrome change une pastille collée seule en span à styles calculés
     var t = document.createElement('template'); t.innerHTML = ls[0].html;
-    var der1 = t.content.lastChild; if (!der1) return;
+    var der1 = t.content.lastChild; if (!der1) { fire(el); return; }
     r.insertNode(t.content);
     var c1 = document.createRange(); c1.setStartAfter(der1); c1.collapse(true); s.removeAllRanges(); s.addRange(c1);
     $$('span.pill', el).forEach(paintPill);
@@ -230,7 +238,7 @@ function collerLignes(el, ls) {
   if (ligneVideEl(lg)) lg.innerHTML = '';
   lg.insertAdjacentHTML('beforeend', ls[0].html);
   var der = lg;
-  ls.slice(1).forEach(function (l) { var d = document.createElement('div'); d.className = 'lg'; poserNiveau(d, +l.lv || 0); d.innerHTML = l.html; der.after(d); der = d; });
+  ls.slice(1).forEach(function (l) { var d = document.createElement('div'); d.className = 'lg'; poserLigneCollee(d, l); d.innerHTML = l.html; der.after(d); der = d; });
   var n = der.childNodes.length;
   if (!ligneVideEl(queue) || queue.querySelector('br:not(:last-child)')) while (queue.firstChild) der.appendChild(queue.firstChild);
   [lg, der].forEach(function (x) { if (!x.firstChild) x.appendChild(document.createElement('br')); });
@@ -238,12 +246,19 @@ function collerLignes(el, ls) {
   $$('span.pill', el).forEach(paintPill);
   fire(el);
 }
-// lignes d'une partie (plage p) d'un bloc texte : une par ligne clonée ; une sélection dans une seule ligne en garde le niveau
+// lignes d'une partie (plage p) d'un bloc texte, avec leurs numéros affichés (data-n des lignes clonées) : { lignes, nums }.
+// Une ligne clonée garde niveau, genre et coche ; une sélection dans une seule ligne en garde le niveau, et le genre si elle
+// couvre toute la ligne
 function lignesDeLaPlage(t, p) {
   var box = document.createElement('div'); box.appendChild(p.cloneContents());
   var lgs = Array.prototype.filter.call(box.children, function (x) { return x.classList.contains('lg'); });
-  if (!lgs.length) { var lg = ligneDuNoeud(t, p.startContainer); return [ligne(sanitize(box.innerHTML), lg ? niveauEl(lg) : 0)]; }
-  return lgs.map(function (x) { return ligne(sanitize(x.innerHTML), niveauEl(x)); });
+  var num = function (x) { return (x && x.dataset.g === 'numero' && +x.dataset.n) || null; };
+  if (!lgs.length) {
+    var lg = ligneDuNoeud(t, p.startContainer), html = sanitize(box.innerHTML), sansZ = function (x) { return x.replace(/​/g, ''); };
+    if (lg && sansZ(box.textContent) === sansZ(lg.textContent)) return { lignes: [ligneDeEl(lg, html)], nums: [num(lg)] };
+    return { lignes: [ligne(html, lg ? niveauEl(lg) : 0)], nums: [null] };
+  }
+  return { lignes: lgs.map(function (x) { return ligneDeEl(x, sanitize(x.innerHTML)); }), nums: lgs.map(num) };
 }
 // copie d'une sélection qui touche un bloc texte (édition et lecture) : { html, texte }, ou null (la copie reste celle d'aujourd'hui).
 // Les blocs texte passent par le module pur ; le reste de la sélection, comme la copie d'un passage à pastilles.
@@ -264,8 +279,8 @@ function copieDeSelection(r, idDoc) {
     var p = document.createRange(); p.selectNodeContents(t);
     if (r.comparePoint(t, 0) < 0) p.setStart(r.startContainer, r.startOffset);
     if (r.comparePoint(t, t.childNodes.length) > 0) p.setEnd(r.endContainer, r.endOffset);
-    var ls = lignesDeLaPlage(t, p);
-    html.push(lignesEnHtml(ls, idDoc)); texte.push(lignesEnTexte(ls));
+    var ls = lignesDeLaPlage(t, p);   // numéros affichés dans le bloc : la copie des lignes 3 et 4 d'une liste donne « 3. », « 4. »
+    html.push(lignesEnHtml(ls.lignes, idDoc, ls.nums)); texte.push(lignesEnTexte(ls.lignes, ls.nums));
     if (r.comparePoint(t.parentNode, i + 1) === 0) { dc = t.parentNode; doff = i + 1; } else { dc = r.endContainer; doff = r.endOffset; }
   });
   morceau(r.endContainer, r.endOffset);

@@ -16,9 +16,11 @@ const curseur = (bid, i, n) => `(() => { ${POS} champ('${bid}').focus(); const p
 const choisir = (bid, i0, n0, i1, n1) => `(() => { ${POS} const c = champ('${bid}'); if (c.isContentEditable) c.focus(); const a = pos('${bid}', ${i0}, ${n0}), b = pos('${bid}', ${i1}, ${n1}), r = document.createRange();
   r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return s.toString(); })()`;
 const CALC = readFileSync(new URL('../fixtures/presse-papier/calc/presse.html', import.meta.url), 'utf8');
+const WRITER = readFileSync(new URL('../fixtures/presse-papier/writer-liste/presse.html', import.meta.url), 'utf8');   // vraie capture (LibreOffice 26.8)
+const G = (html, genre, lv, done) => { const o = lv ? { html, lv, genre } : { html, genre }; if (done) o.done = true; return o; };
 
 export const nom = 'bloc texte : collage et copie';
-export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, visibles, mesure, echec }) {
   const charge = async (blocks) => { if (!(await evalue(`window.ardoise.load(${JSON.stringify(doc(blocks))})`))) throw new Error('document refusé'); await attendre(120); };
   const lignes = async (bid) => JSON.parse((await evalue(LIGNES(bid))) || 'null');
   const verifie = async (cas, bid, attendu) => { mesure(); const l = await lignes(bid); if (JSON.stringify(l) !== JSON.stringify(attendu)) echec(cas + ' : ' + JSON.stringify(l) + ' au lieu de ' + JSON.stringify(attendu)); };
@@ -145,4 +147,69 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   for (const type of ['rawKeyDown', 'keyUp']) await cdp('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
   await attendre(150);
   await verifie('Entrée après Ctrl+V', 't3', colle.concat([L('', 2)]));
+
+  // ---- genres (ticket 07) ----
+  // vraie liste de Writer collée dans un bloc vide : puces et numéros à leurs niveaux, la ligne vide prend le genre de la première
+  await charge([{ id: 't1', type: 'texte', lignes: [L('')] }]);
+  await evalue(curseur('t1', 0, 0));
+  await coller(WRITER, 'ignoré');
+  await verifie('liste de Writer collée', 't1', [G('Puce niv1', 'puce'), G('numéro niv2', 'numero', 1), G('numéro niv2', 'numero', 1), G('puce niv1', 'puce'),
+    G('numéro niv1', 'numero'), G('puce niv2', 'puce', 1), G('puce niv3', 'puce', 2)]);
+  mesure();
+  const marques = await visibles('.texte[data-b="t1"] .lg', 'return getComputedStyle(x, "::before").content');
+  if (marques.join(' ') !== '"•" "1." "2." "•" "1." "◦" "▪"') echec('liste de Writer : marques affichées ' + JSON.stringify(marques));
+  await ctrl('z');
+  await verifie('annuler le collage de la liste', 't1', [L('')]);
+
+  // liste de cases (case à cocher HTML, ☑ en tête) ; texte brut « - a », « ☐ b » resté du texte
+  await charge([{ id: 't1', type: 'texte', lignes: [L('')] }, { id: 't2', type: 'texte', lignes: [L('')] }]);
+  await evalue(curseur('t1', 0, 0));
+  await coller('<ul><li><input type="checkbox" checked> a</li><li><input type="checkbox"> b</li></ul><p>☑ c</p>', '');
+  await verifie('liste de cases collée', 't1', [G('a', 'case', 0, true), G('b', 'case'), G('c', 'case', 0, true)]);
+  await evalue(curseur('t2', 0, 0));
+  await coller('', '- a\n☐ b');
+  await verifie('texte brut resté du texte', 't2', [L('- a'), L('☐ b')]);
+
+  // collage au milieu d'une puce : la première ligne collée garde la puce de la ligne du curseur, les suivantes leur genre
+  await charge([{ id: 't1', type: 'texte', lignes: [G('ab', 'puce', 1)] }]);
+  await evalue(curseur('t1', 0, 1));
+  await coller('<ol><li>x</li><li>y</li></ol>', '');
+  await verifie('collage au milieu d\'une puce', 't1', [G('ax', 'puce', 1), G('yb', 'numero')]);
+
+  // copie d'un passage mêlé : texte brut et HTML ; numéros affichés ; recollé dans un autre bloc texte, puis dans un titre
+  const MELE = [L('intro'), G('p0', 'puce'), G('p1', 'puce', 1), G('n1', 'numero'), G('n2', 'numero'), G('n3', 'numero'), G('à faire', 'case'), G('fait', 'case', 1, true), G('Sous', 'soustitre')];
+  await charge([{ id: 't1', type: 'texte', lignes: MELE }, { id: 't2', type: 'texte', lignes: [L('')] }, { id: 'h2', type: 'h2', html: 'Cible' }]);
+  await evalue(choisir('t1', 0, 0, 8, 4));
+  const mc = await copier();
+  mesure();
+  if (mc.texte !== 'intro\n- p0\n  - p1\n1. n1\n2. n2\n3. n3\n☐ à faire\n  ☑ fait\nSous') echec('copie mêlée : texte brut ' + JSON.stringify(mc.texte));
+  if (mc.html !== '<p>intro</p><ul><li>p0<ul><li>p1</li></ul></li></ul><ol><li>n1</li><li>n2</li><li>n3</li></ol><p data-g="case">☐ à faire</p><p data-g="case" data-done data-lv="1" style="margin-left:2em">☑ fait</p><h3 data-g="soustitre">Sous</h3>') echec('copie mêlée : HTML ' + mc.html);
+  await evalue(curseur('t2', 0, 0));
+  await coller(mc.html, mc.texte);
+  await verifie('copier-coller mêlé d\'un bloc texte à l\'autre', 't2', MELE);
+  await evalue(`(() => { const f = document.querySelector('.fld[data-b="h2"]'); f.focus(); const r = document.createRange(); r.selectNodeContents(f); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`);
+  await coller(mc.html, mc.texte);
+  mesure();
+  const t2 = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 'h2').html`);
+  if (t2 !== 'Cibleintro p0 p1 n1 n2 n3 à faire fait Sous') echec('copie mêlée collée dans un titre : ' + JSON.stringify(t2));
+  // lignes 2 et 3 d'une liste numérotée : « 2. », « 3. », <ol start="2"> ; une seule ligne entière garde son genre, une partie non
+  await evalue(choisir('t1', 4, 0, 5, 2));
+  const nc = await copier();
+  mesure();
+  if (nc.texte !== '2. n2\n3. n3' || nc.html !== '<ol start="2"><li>n2</li><li>n3</li></ol>') echec('copie des numéros 2 et 3 : ' + JSON.stringify(nc));
+  await evalue(choisir('t1', 7, 0, 7, 4));
+  const un = await copier();
+  await evalue(choisir('t1', 7, 1, 7, 3));
+  const part = await copier();
+  mesure();
+  if (un.texte !== '  ☑ fait' || part.texte !== '  ai') echec('copie dans une seule ligne : ' + JSON.stringify([un.texte, part.texte]));
+
+  // copie en lecture : mêmes genres
+  await ctrl('e');
+  for (let i = 0; i < 40 && (await evalue('!!document.querySelector(".texte.fld")')); i++) await attendre(50);
+  await evalue(choisir('t1', 1, 0, 3, 2));
+  const lg = await copier();
+  mesure();
+  if (lg.texte !== '- p0\n  - p1\n1. n1') echec('copie mêlée en lecture : ' + JSON.stringify(lg.texte));
+  await ctrl('e');
 }

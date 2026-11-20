@@ -1,4 +1,5 @@
 // Bloc texte : module pur des lignes (05-lignes.js), normalisation et rendu en lecture.
+import { readFileSync } from 'node:fs';
 import { contexte, monter, test, egal, vrai } from './commun.mjs';
 
 const TAB = '<span class="tab">\t</span>';
@@ -87,7 +88,7 @@ test('collage HTML → lignes : <p>, <div> et <br> donnent des lignes de texte',
 
 test('collage HTML → lignes : paragraphe vide explicite gardé, blancs de mise en page ignorés', () => {
   egal(brut('lignesDuCollage', '<p>a</p>\n<p></p>\n<p>&nbsp;</p>\n<p>b</p>'), [{ html: 'a' }, { html: '' }, { html: '' }, { html: 'b' }]);
-  egal(brut('lignesDuCollage', '<ul>\n  <li>\n    un\n    deux\n  </li>\n  <li>trois</li>\n</ul>'), [{ html: 'un deux' }, { html: 'trois' }]);
+  egal(brut('lignesDuCollage', '<ul>\n  <li>\n    un\n    deux\n  </li>\n  <li>trois</li>\n</ul>'), [{ html: 'un deux', genre: 'puce' }, { html: 'trois', genre: 'puce' }]);
   egal(brut('lignesDuCollage', '<p>a<br></p><p>b</p>'), [{ html: 'a' }, { html: 'b' }], '<br> final d\'un paragraphe');
 });
 
@@ -237,4 +238,74 @@ test('convertir en texte : liste à cocher → cases avec coches, ordre saisi ga
 
 test('convertir en texte : sous-titre → une ligne de sous-titre', () => {
   egal(convertir({ id: 's1', type: 'subtitle', html: 'Mon <i>titre</i>' }), { id: 's1', type: 'texte', lignes: [{ html: 'Mon <i>titre</i>', genre: 'soustitre' }] });
+});
+
+// Collage et copie des genres (ticket 07)
+const P = (html, lv) => (lv ? { html, lv, genre: 'puce' } : { html, genre: 'puce' });
+const NU = (html, lv) => (lv ? { html, lv, genre: 'numero' } : { html, genre: 'numero' });
+const fixture = (f) => readFileSync(new URL('../fixtures/presse-papier/' + f, import.meta.url), 'utf8');
+
+test('collage HTML → lignes : listes imbriquées en puces et numéros, un niveau par profondeur', () => {
+  egal(brut('lignesDuCollage', '<ul><li>a<ul><li>b<ol><li>c</li><li>d</li></ol></li></ul></li><li>e</li></ul><p>f</p>'),
+    [P('a'), P('b', 1), NU('c', 2), NU('d', 2), P('e'), { html: 'f' }]);
+  egal(brut('lignesDuCollage', '<ol><li><p>un</p></li><li><p>deux</p></li></ol>'), [NU('un'), NU('deux')], '<p> dans un <li> : une seule ligne');
+  egal(brut('lignesDuCollage', '<ul><li>a</li></ul><ul><li></li></ul>'), [P('a'), P('')], '<li> vide : une puce vide');
+});
+
+test('collage HTML → lignes : vraie copie de Writer (listes sans <li> parent, une liste par genre)', () => {
+  egal(brut('lignesDuCollage', fixture('writer-liste/presse.html')),
+    [P('Puce niv1'), NU('numéro niv2', 1), NU('numéro niv2', 1), P('puce niv1'), NU('numéro niv1'), P('puce niv2', 1), P('puce niv3', 2)]);
+});
+
+test('collage HTML → lignes : aria-level de Google Docs donne le niveau', () => {
+  egal(brut('lignesDuCollage', '<ul><li aria-level="1"><p><span>a</span></p></li><li aria-level="3"><p><span>b</span></p></li></ul>'),
+    [P('<span>a</span>'), P('<span>b</span>', 2)]);
+});
+
+const CA = (html, done, lv) => { const o = lv ? { html, lv, genre: 'case' } : { html, genre: 'case' }; if (done) o.done = true; return o; };
+test('collage HTML → lignes : cases par case à cocher (liste de tâches GitHub) ou par ☐/☑ en tête', () => {
+  egal(brut('lignesDuCollage', '<ul class="contains-task-list"><li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled> a</li><li><input type="checkbox" disabled checked=""> b<ul><li><input type="checkbox"> c</li></ul></li></ul>'),
+    [CA('a'), CA('b', true), CA('c', false, 1)]);
+  egal(brut('lignesDuCollage', '<p>☐ a</p><p><b>☑&nbsp;b</b></p><p style="margin-left:2em">☐</p><p>x ☐ y</p>'),
+    [CA('a'), CA('<b>b</b>', true), CA(''), { html: 'x ☐ y' }], 'marque en tête seulement, retirée avec son espace');
+});
+
+// extrait RECONSTITUÉ d'après le HTML de Word documenté (pas d'Office chez le propriétaire : à vérifier au travail)
+test('collage HTML → lignes : listes de Word (mso-list), symbole écarté, niveau par level', () => {
+  const word = "<html xmlns:o='urn:schemas-microsoft-com:office:office'><body><!--StartFragment-->" +
+    "<p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'>·<span style='font:7.0pt \"Times New Roman\"'>&nbsp;&nbsp;&nbsp; </span></span><![endif]>un<o:p></o:p></p>" +
+    "<p class=MsoListParagraphCxSpMiddle style='mso-list:l0 level2 lfo1'><![if !supportLists]><span style='font-family:\"Courier New\"'>o<span>&nbsp; </span></span><![endif]>deux<o:p></o:p></p>" +
+    "<p class=MsoListParagraphCxSpLast style='mso-list:l1 level3 lfo2'><!--[if !supportLists]--><span>1.<span>&nbsp; </span></span><!--[endif]-->trois<o:p></o:p></p>" +
+    "<p class=MsoNormal>quatre<o:p></o:p></p><!--EndFragment--></body></html>";
+  egal(brut('lignesDuCollage', word), [P('un'), P('deux', 1), NU('trois', 2), { html: 'quatre' }]);
+});
+
+test('collage HTML → lignes : sous-titre et coche d\'une copie d\'Ardoise ; titre venu d\'ailleurs resté du texte', () => {
+  egal(brut('lignesDuCollage', '<h3 data-g="soustitre">S</h3><h1>T</h1><h3>U</h3><div class="lg" data-g="case" data-done data-lv="1">c</div>'),
+    [{ html: 'S', genre: 'soustitre' }, { html: 'T' }, { html: 'U' }, CA('c', true, 1)]);
+});
+
+test('collage de texte brut : « - a », « ☐ a », « 1. a » restent du texte', () => {
+  egal(brut('lignesDuTexteBrut', '- a\n☐ b\n1. c'), [{ html: '- a' }, { html: '☐ b' }, { html: '1. c' }]);
+});
+
+const MELEES = [{ html: 'intro' }, P('p0'), P('p1', 1), NU('n1', 1), NU('n2', 1), CA('à faire'), CA('<b>fait</b>', true, 1), { html: 'Sous', genre: 'soustitre' }, { html: 'fin' }];
+test('copie : texte brut avec « - », « N. » (numéros affichés), « ☐ » et « ☑ »', () => {
+  egal(contexte().lignesEnTexte(MELEES), 'intro\n- p0\n  - p1\n  1. n1\n  2. n2\n☐ à faire\n  ☑ fait\nSous\nfin');
+  egal(contexte().lignesEnTexte([NU('c'), NU('d')], [3, 4]), '3. c\n4. d', 'numéros affichés dans le bloc d\'origine');
+});
+
+test('copie : HTML en listes imbriquées, cases en <p>, sous-titre en <h3>', () => {
+  egal(contexte().lignesEnHtml(MELEES, 'd1'),
+    '<p>intro</p><ul><li>p0<ul><li>p1</li></ul><ol><li>n1</li><li>n2</li></ol></li></ul>' +
+    '<p data-g="case">☐ à faire</p><p data-g="case" data-done data-lv="1" style="margin-left:2em">☑ <b>fait</b></p><h3 data-g="soustitre">Sous</h3><p>fin</p>');
+  egal(contexte().lignesEnHtml([NU('c', 2), NU('d', 2), P('e')], 'd1', [3, 4, null]),
+    '<ol data-lv="2" style="margin-left:4em" start="3"><li>c</li><li>d</li></ol><ul><li>e</li></ul>', 'liste commencée au niveau 2, numéros affichés');
+  egal(contexte().lignesEnHtml([P('')], 'd1'), '<ul><li><br></li></ul>');
+});
+
+test('copie puis collage d\'Ardoise à Ardoise : genres, niveaux et coches gardés', () => {
+  egal(brut('lignesDuCollage', contexte().lignesEnHtml(MELEES, 'd1')), MELEES);
+  const ls = [NU('c', 2), P('x', 4), NU('d', 2), CA('', true), { html: '', genre: 'soustitre' }, P('')];
+  egal(brut('lignesDuCollage', contexte().lignesEnHtml(ls, 'd1')), ls);
 });

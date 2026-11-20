@@ -97,20 +97,34 @@ function raccourciDeLigne(html) {
 var LIGNE_BLOC = /^(p|div|li|h[1-6]|tr|blockquote|pre|dt|dd|ul|ol|dl|table|section|article|header|footer|hr)$/;
 var LIGNE_VIDE_EL = /^(img|wbr|input|meta|link|col|source|area|base|embed|param|track)$/;
 var LIGNE_IGNOREE = /^(head|style|script|title|template|noscript)$/;
-// HTML collé → lignes de texte : <br> coupe la ligne ; un bloc (p, div, li…) la coupe s'il a du contenu, ou s'il est vide
-// (<p></p> : ligne vide) ; les formes ouvertes sont refermées et rouvertes à chaque coupe ; data-lv d'un bloc (copie d'Ardoise)
-// donne le niveau. Le html des lignes n'est pas assaini (l'appelant le fait, ligne par ligne).
+// HTML collé → lignes : <br> coupe la ligne ; un bloc (p, div, li…) la coupe s'il a du contenu, ou s'il est vide
+// (<p></p> : ligne vide) ; les formes ouvertes sont refermées et rouvertes à chaque coupe. Genres : un <li> d'un <ul> donne une
+// puce, d'un <ol> un numéro, au niveau de sa profondeur de liste (Writer imbrique <ol><ol> sans <li> parent ; aria-level de
+// Google Docs l'emporte) ; un <input type=checkbox>, ou ☐/☑ en tête de ligne, donne une case (☑ ou checked : cochée) ; un
+// paragraphe de liste de Word (mso-list) donne une puce ou un numéro selon son symbole, écarté du texte. Copie d'Ardoise :
+// data-lv (niveau), data-g et data-done d'un bloc ou d'une liste. Un titre venu d'ailleurs reste du texte.
+// Le html des lignes n'est pas assaini (l'appelant le fait, ligne par ligne).
+var LIGNE_MARQUE_CASE = /^((?:<[^>]*>)*)\s*([☐☑])(?: |&nbsp;| )?/;
 function lignesDuCollage(html) {
-  var s = String(html == null ? '' : html).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, '');
-  var out = [], pile = [], cur = null, ignore = 0, vu = false;
-  var debut = function () { cur = { h: pile.map(function (x) { return x.o; }).join(''), lv: 0, plein: false }; };
+  var s = String(html == null ? '' : html)
+    // symbole d'une liste de Word, avant le retrait des commentaires (deux formes : <![if !supportLists]> et <!--[if !supportLists]-->)
+    .replace(/<!(?:--)?\[if !supportLists\](?:--)?>([\s\S]*?)<!(?:--)?\[endif\](?:--)?>/gi, function (x, m) { return '<msoliste m="' + esc(htmlText(m).replace(/[\s ]+/g, '')) + '">'; })
+    .replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, '');
+  var out = [], pile = [], listes = [], cur = null, ignore = 0, vu = false;
+  var debut = function () { cur = { h: pile.map(function (x) { return x.o; }).join(''), lv: 0, plein: false, genre: '', done: false }; };
   var fin = function () {
     var h = cur.h;
     for (var i = pile.length - 1; i >= 0; i--) h += '</' + pile[i].n + '>';
     h = sansFormesVides(h).replace(/\s+((?:<\/[a-z0-9]+>)*)$/i, '$1');
-    if (!/<(img|wbr)\b/i.test(h) && htmlText(h).replace(/[\s ​]/g, '') === '') h = '';
-    out.push(ligne(h, cur.lv)); vu = false; debut();
+    var mc = h.match(LIGNE_MARQUE_CASE);
+    if (mc) { h = mc[1] + h.slice(mc[0].length); cur.done = cur.genre === 'case' ? cur.done || mc[2] === '☑' : mc[2] === '☑'; cur.genre = 'case'; }
+    if (!/<(img|wbr)\b/i.test(h) && htmlText(h).replace(/[\s ​]/g, '') === '') h = '';
+    var l = ligne(h, cur.lv);
+    if (cur.genre) l.genre = cur.genre;
+    if (cur.genre === 'case' && cur.done) l.done = true;
+    out.push(l); vu = false; debut();
   };
+  var attr = function (m, nom) { var a = m.match(new RegExp('\\s' + nom + '=(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i')); return a ? (a[1] != null ? a[1] : a[2] != null ? a[2] : a[3]) : null; };
   debut();
   s.split(/(<(?:[^>"']|"[^"]*"|'[^']*')*>)/).forEach(function (m, i) {
     if (!m) return;
@@ -123,18 +137,30 @@ function lignesDuCollage(html) {
     }
     var ferme = /^<\//.test(m), nom = ((m.match(/^<\/?([a-z0-9:]+)/i) || [])[1] || '').toLowerCase();
     if (LIGNE_IGNOREE.test(nom)) { ignore = Math.max(0, ignore + (ferme ? -1 : 1)); return; }
-    if (ignore || !nom || /^<!/.test(m)) return;
+    if (ignore || !nom || /^<!/.test(m) || nom.indexOf(':') >= 0) return;   // <o:p> de Word
+    if (nom === 'msoliste') { if (cur.genre) cur.genre = /^[0-9a-z]+[.)]$/i.test(attr(m, 'm') || '') ? 'numero' : 'puce'; return; }
     if (nom === 'br') { fin(); return; }
     if (LIGNE_BLOC.test(nom)) {
       if (cur.plein) fin();
       else if (ferme && vu) fin();
+      if (nom === 'ul' || nom === 'ol') {
+        if (ferme) { listes.pop(); return; }
+        var dl = attr(m, 'data-lv'), haut = listes[listes.length - 1];
+        listes.push({ g: nom === 'ul' ? 'puce' : 'numero', lv: dl != null ? +dl || 0 : haut ? haut.lv + 1 : 0 });
+        return;
+      }
       if (!ferme) {
         vu = nom !== 'hr';
-        var lv = m.match(/\sdata-lv="(\d+)"/);
-        if (lv) cur.lv = +lv[1];
+        var lv = attr(m, 'data-lv'), g = attr(m, 'data-g'), al = attr(m, 'aria-level'), mso = m.match(/mso-list:\s*l\d+\s+level(\d+)/i);
+        if (nom === 'li' && listes.length) { cur.genre = listes[listes.length - 1].g; cur.lv = listes[listes.length - 1].lv; }
+        if (nom === 'li' && al != null && +al >= 1) cur.lv = +al - 1;
+        if (mso) { cur.genre = 'puce'; cur.lv = +mso[1] - 1; }
+        if (lv != null) cur.lv = +lv || 0;
+        if (g != null && LIGNE_GENRES.indexOf(g) >= 0) { cur.genre = g; cur.done = /\sdata-done\b/i.test(m); }
       }
       return;
     }
+    if (nom === 'input' && /^checkbox$/i.test(attr(m, 'type') || '')) { cur.genre = 'case'; cur.done = /\schecked\b/i.test(m); return; }
     if (LIGNE_VIDE_EL.test(nom)) { if (nom !== 'meta' && nom !== 'link' && nom !== 'base') { cur.h += m; cur.plein = true; } return; }
     if (!ferme) { pile.push({ n: nom, o: m }); cur.h += m; return; }
     var j = pile.length - 1; while (j >= 0 && pile[j].n !== nom) j--;
@@ -150,16 +176,50 @@ function lignesDuTexteBrut(texte) {
   if (t.length > 1 && t[t.length - 1] === '') t.pop();
   return t.map(function (x) { return ligne(esc(x)); });
 }
-// copie hors d'Ardoise : texte brut à deux espaces par niveau, pastilles en #nom (texteBrutDePresse : 05-presse-papier.js)
-function lignesEnTexte(lignes) {
-  return lignes.map(function (l) { return new Array((+l.lv || 0) + 1).join('  ') + texteBrutDePresse(l.html); }).join('\n');
+// marque d'une ligne en texte brut : « - » puce, « N. » numéro affiché n, « ☐ »/« ☑ » case ; rien pour le texte et le sous-titre
+function marqueDeLigne(l, n) {
+  if (l.genre === 'puce') return '- ';
+  if (l.genre === 'numero') return (n || 1) + '. ';
+  if (l.genre === 'case') return l.done ? '☑ ' : '☐ ';
+  return '';
 }
-// copie : un <p> par ligne ; data-lv pour un collage dans Ardoise, marge pour les autres applications
-function lignesEnHtml(lignes, idDoc) {
-  return lignes.map(function (l) {
-    var n = +l.lv || 0;
-    return '<p' + (n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : '') + '>' + (pastillesSansCouleur(l.html, idDoc) || '<br>') + '</p>';
-  }).join('');
+// copie hors d'Ardoise : texte brut à deux espaces par niveau, marque du genre, pastilles en #nom (texteBrutDePresse :
+// 05-presse-papier.js) ; nums : numéros affichés dans le bloc d'origine (par défaut, ceux des lignes copiées)
+function lignesEnTexte(lignes, nums) {
+  nums = nums || numerosDesLignes(lignes);
+  return lignes.map(function (l, i) { return new Array((+l.lv || 0) + 1).join('  ') + marqueDeLigne(l, nums[i]) + texteBrutDePresse(l.html); }).join('\n');
+}
+// copie : puces et numéros en <ul>/<ol> imbriqués (une ligne plus profonde s'imbrique dans le <li> du dessus ; une liste sans
+// parent à son niveau porte data-lv, et une marge hors de toute liste ; <ol start> = numéro affiché) ; cases en <p> avec ☐/☑
+// (Writer change une liste de cases en puces) ; sous-titre en <h3> ; texte en <p>. data-lv, data-g et data-done : pour un
+// collage dans Ardoise, la marge pour les autres applications
+function lignesEnHtml(lignes, idDoc, nums) {
+  nums = nums || numerosDesLignes(lignes);
+  var out = '', ouvertes = [];
+  var fermer = function (jusqua) { while (ouvertes.length > jusqua) out += '</li></' + ouvertes.pop().tag + '>'; };
+  var retrait = function (n) { return n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : ''; };
+  lignes.forEach(function (l, i) {
+    var n = +l.lv || 0, h = pastillesSansCouleur(l.html, idDoc);
+    if (l.genre === 'puce' || l.genre === 'numero') {
+      var tag = l.genre === 'puce' ? 'ul' : 'ol';
+      while (ouvertes.length && ouvertes[ouvertes.length - 1].lv > n) fermer(ouvertes.length - 1);
+      var haut = ouvertes[ouvertes.length - 1];
+      if (haut && haut.lv === n && haut.tag !== tag) { fermer(ouvertes.length - 1); haut = ouvertes[ouvertes.length - 1]; }
+      if (haut && haut.lv === n) out += '</li>';
+      else {
+        var att = !haut ? retrait(n) : n !== haut.lv + 1 ? ' data-lv="' + n + '"' : '';
+        if (tag === 'ol' && nums[i] && nums[i] !== 1) att += ' start="' + nums[i] + '"';
+        out += '<' + tag + att + '>'; ouvertes.push({ tag: tag, lv: n });
+      }
+      out += '<li>' + (h || '<br>'); return;
+    }
+    fermer(0);
+    if (l.genre === 'case') out += '<p data-g="case"' + (l.done ? ' data-done' : '') + retrait(n) + '>' + marqueDeLigne(l) + h + '</p>';
+    else if (l.genre === 'soustitre') out += '<h3 data-g="soustitre"' + retrait(n) + '>' + (h || '<br>') + '</h3>';
+    else out += '<p' + retrait(n) + '>' + (h || '<br>') + '</p>';
+  });
+  fermer(0);
+  return out;
 }
 // case parente (requêtes « cases à cocher ») : html de la ligne la plus proche au-dessus de niveau strictement inférieur,
 // quel que soit son genre, cochée ou non ; '' au niveau 0. Ne lit que html et lv : vaut aussi pour une Liste à cocher

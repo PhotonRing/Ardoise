@@ -353,7 +353,8 @@ app.addEventListener('paste', function (e) {
   if (el.hasAttribute('data-texte')) { collerLignes(el, lignesCollees(html, text)); return; }   // 12-bloc-texte.js
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
-    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li')) clean = clean.replace(/<br>/g, ' ');
+    // champ d'une ligne (titre, cellule) : les lignes collées (listes imbriquées comprises) jointes par une espace
+    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li')) clean = lignesCollees(html, text).map(function (l) { return l.html; }).filter(Boolean).join(' ');
     // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
     if (!el.hasAttribute('data-ml')) clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
@@ -363,10 +364,14 @@ app.addEventListener('paste', function (e) {
     document.execCommand('insertText', false, text);
   }
 });
-// lignes collées dans un bloc texte : HTML assaini ligne par ligne (une ligne vidée par l'assainissement, une image seule, part), sinon texte brut
+// lignes collées dans un bloc texte : HTML assaini ligne par ligne, genre et coche gardés (une ligne vidée par l'assainissement,
+// une image seule, part), sinon texte brut
 function lignesCollees(html, text) {
   if (!html) return lignesDuTexteBrut(text);
-  return lignesDuCollage(pastillesDuCollage(html, doc.id)).map(function (l) { return { l: ligne(sanitize(l.html), l.lv), avant: l.html }; })
+  return lignesDuCollage(pastillesDuCollage(html, doc.id)).map(function (l) {
+    var o = ligne(sanitize(l.html), l.lv); if (l.genre) o.genre = l.genre; if (l.done) o.done = true;
+    return { l: o, avant: l.html };
+  })
     .filter(function (x) { return x.l.html || !x.avant; }).map(function (x) { return x.l; });
 }
 // cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne

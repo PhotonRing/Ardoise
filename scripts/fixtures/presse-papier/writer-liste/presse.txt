@@ -1,0 +1,7 @@
+    • Puce niv1
+        1. numéro niv2
+        2. numéro niv2
+    • puce niv1
+    1. numéro niv1
+        ◦ puce niv2
+            ▪ puce niv3
