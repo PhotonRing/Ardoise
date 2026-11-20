@@ -32,7 +32,7 @@ app.addEventListener('input', function (e) {
     $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { x.textContent = ct; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
-  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
+  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
   if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
@@ -359,6 +359,7 @@ app.addEventListener('paste', function (e) {
     if (!el.hasAttribute('data-ml')) clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
     $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
+    peindreFormulesDans(el);   // 15-formules.js
   } else {
     if (!el.hasAttribute('data-rich') || !el.hasAttribute('data-ml')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);

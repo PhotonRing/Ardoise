@@ -22,6 +22,7 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '03-types-de-blocs.js',
     '04-modeles.js',
     '05-document.js',
+    '05-formules.js',
     '05-lignes.js',
     '05-markdown.js',
     '05-migrations.js',

@@ -44,7 +44,8 @@ var MIGRATIONS = [
   } },
   { from: 7, desc: 'Paragraphes en blocs texte : une ligne par passage à la ligne, taquets et retrait en niveaux', run: function (d) {
     migBlocks(d, function (b) { if (b.type === 'p') paragrapheEnTexte(b); });   // 05-lignes.js
-  } }
+  } },
+  { from: 8, desc: 'Formules (span.formule) : étape vide, pour qu’un éditeur plus ancien ouvre le document en lecture seule au lieu de défaire les formules', run: function () {} }
 ];
 // --- format 7 : filtres des requêtes { id, prop, vals, mode } (filtres-logiques) ---
 // Anciens champs, dans l'ordre figé de la migration (indépendant de Q_FILTRES, 07-requetes.js, qui évoluera)

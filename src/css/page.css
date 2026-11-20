@@ -100,6 +100,11 @@ b,strong{font-weight:600}
 .s-jaune{background:var(--s-jaune)} .s-vert{background:var(--s-vert)} .s-bleu{background:var(--s-bleu)} .s-rose{background:var(--s-rose)} .s-gris{background:var(--s-gris)}
 .s-jaune,.s-vert,.s-bleu,.s-rose,.s-gris{-webkit-box-decoration-break:clone;box-decoration-break:clone;border-radius:2px}
 .pill span{color:inherit;background:none}
+/* formule (05-formules.js) : élément insécable, en couleur du texte qui l'entoure (thème, palette, couleur de la barre) ;
+   une commande inconnue en rouge */
+.formule{white-space:nowrap}
+.formule math{color:inherit;font-size:1.05em}
+math .f-err{color:var(--bad)}
 /* modèle diamant : sommets dans une grille 3 × 3 (Adversaire en haut, Infrastructure à gauche, Capacité à droite, Victime en bas),
    traits en SVG derrière ; sous 480 px, pile dans l'ordre du HTML (Adversaire, Capacité, Infrastructure, Victime) */
 .dia{display:flex;flex-direction:column;gap:10px}

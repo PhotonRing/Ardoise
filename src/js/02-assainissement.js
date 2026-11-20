@@ -2,8 +2,8 @@
 // palettes de la barre de mise en forme : [classe, nom] ; Rouge garde la classe alert de l'ancien bouton « A » (aucune migration)
 var COULEURS_TEXTE = [['alert', 'Rouge'], ['c-orange', 'Orange'], ['c-vert', 'Vert'], ['c-bleu', 'Bleu'], ['c-violet', 'Violet'], ['c-gris', 'Gris']];
 var SURLIGNAGES = [['s-jaune', 'Jaune'], ['s-vert', 'Vert'], ['s-bleu', 'Bleu'], ['s-rose', 'Rose'], ['s-gris', 'Gris']];
-// pastille, couleurs et surlignages, et pc-N : couleur d'exception d'une pastille ; un ancien taquet (span.tab) est défait
-var SPAN_CLASSES = ['pill'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return x[0]; }));
+// pastille, formule, couleurs et surlignages, et pc-N : couleur d'exception d'une pastille ; un ancien taquet (span.tab) est défait
+var SPAN_CLASSES = ['pill', 'formule'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return x[0]; }));
 var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg|math|noscript|input|button|select|textarea|img|video|audio|canvas|form)$/;
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;
 var sanCache = new Map();
@@ -36,6 +36,7 @@ function walk(src, dst) {
     if (n.nodeType === 3) { dst.appendChild(document.createTextNode(n.nodeValue)); continue; }
     if (n.nodeType !== 1) continue;
     var tag = n.tagName.toLowerCase(), el = null;
+    if (tag === 'math' || (tag === 'span' && n.classList.contains('formule'))) { formuleRelue(n, tag, dst); continue; }
     if (DROP.test(tag)) continue;
     if (tag === 'br') { dst.appendChild(document.createElement('br')); continue; }
     if (tag === 'b' || tag === 'strong') el = document.createElement('b');
@@ -62,6 +63,14 @@ function walk(src, dst) {
     else walk(n, dst);
     if (BLOCKY.test(tag) && n.nextSibling && dst.lastChild && dst.lastChild.nodeName !== 'BR') dst.appendChild(document.createElement('br'));
   }
+}
+// formule (05-formules.js) : l'élément rendu, ou un <math> qui porte sa source LaTeX en annotation, est relu en
+// <span class="formule">source</span> ; la forme stockée garde son texte ; un <math> sans annotation est jeté
+function formuleRelue(n, tag, dst) {
+  var an = n.querySelector('annotation[encoding="application/x-tex"]');
+  var src = an ? an.textContent : (tag === 'span' && !n.querySelector('math') ? n.textContent : '');
+  if (!src.trim()) return;
+  var el = document.createElement('span'); el.className = 'formule'; el.textContent = src; dst.appendChild(el);
 }
 var R = sanitize;
 function textOf(html) { var d = document.createElement('div'); d.innerHTML = R(html); return d.textContent.replace(/\s+/g, ' ').trim(); }

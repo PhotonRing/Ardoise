@@ -56,7 +56,7 @@ function conteneurClair(b) {
   var c = document.createElement('div'), v = officeVariables(doc), k;
   c.style.cssText = 'position:fixed;left:-30000px;top:0;width:' + OFFICE_LARGEUR + 'px;padding:8px;box-sizing:content-box;background:#ffffff;color:' + OFFICE_CLAIR.fg + ';color-scheme:light;font:15px/1.6 var(--f-body)';
   for (k in v) c.style.setProperty(k, v[k]);
-  c.innerHTML = paintPills(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc);
+  c.innerHTML = rendreFormules(paintPills(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc), false);
   document.body.appendChild(c);
   return c;
 }

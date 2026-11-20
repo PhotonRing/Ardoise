@@ -225,7 +225,7 @@ function collerLignes(el, ls) {
     var der1 = t.content.lastChild; if (!der1) { fire(el); return; }
     r.insertNode(t.content);
     var c1 = document.createRange(); c1.setStartAfter(der1); c1.collapse(true); s.removeAllRanges(); s.addRange(c1);
-    $$('span.pill', el).forEach(paintPill);
+    $$('span.pill', el).forEach(paintPill); peindreFormulesDans(el);
     fire(el); return;
   }
   var fin = document.createRange(); fin.selectNodeContents(lg); fin.setStart(r.startContainer, r.startOffset);
@@ -238,7 +238,7 @@ function collerLignes(el, ls) {
   if (!ligneVideEl(queue) || queue.querySelector('br:not(:last-child)')) while (queue.firstChild) der.appendChild(queue.firstChild);
   [lg, der].forEach(function (x) { if (!x.firstChild) x.appendChild(document.createElement('br')); });
   var c = document.createRange(); c.setStart(der, Math.min(n, der.childNodes.length)); c.collapse(true); s.removeAllRanges(); s.addRange(c);
-  $$('span.pill', el).forEach(paintPill);
+  $$('span.pill', el).forEach(paintPill); peindreFormulesDans(el);
   fire(el);
 }
 // lignes d'une partie (plage p) d'un bloc texte, avec leurs numéros affichés (data-n des lignes clonées) : { lignes, nums }.

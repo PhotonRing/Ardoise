@@ -8,7 +8,7 @@ window.addEventListener('beforeprint', function () {
   $$('.kb[data-kb]', app).forEach(function (el) {
     var b = byId(el.dataset.kb); if (!b || !$('[data-red]', el)) return;
     var ctx = viewCtx(); ctx.kbCols = {}; b.cols.forEach(function (c) { ctx.kbCols[c.id] = { red: false, base: !!c.collapsed }; });
-    el.outerHTML = renderBlock(b, doc, ctx, null);
+    el.outerHTML = rendreFormules(renderBlock(b, doc, ctx, null), false);
   });
   Reader.printPrep(true);
 });

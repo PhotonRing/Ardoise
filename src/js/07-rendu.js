@@ -50,7 +50,7 @@ function renderPage(d, ctx) {
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
-  return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>', d);
+  return rendreFormules(paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>', d), edit);   // 05-formules.js
 }
 // bloc d'ancrage de la bascule dans la vue ctx : le bloc, sinon le titre plié qui le masque, sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
 function anchorBlock(d, ctx, id) {
@@ -597,7 +597,7 @@ function refreshDerived() {
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
-      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); if (fen && fen.b === b.id) fenPlacer(); }   // filtre des lignes et fenêtre (accrochée aux puces des cartes) hors de .q-res : remis
+      var h = rendreFormules(paintPills(queryResult(b, doc, vc), doc), false); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); if (fen && fen.b === b.id) fenPlacer(); }   // filtre des lignes et fenêtre (accrochée aux puces des cartes) hors de .q-res : remis
     }
     var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces:not(.q-cpuces)', app);
     if (form && !form.contains(document.activeElement)) {   // pas pendant que le focus est sur une puce

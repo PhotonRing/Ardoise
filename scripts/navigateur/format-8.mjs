@@ -36,7 +36,7 @@ export default async function ({ ecran, charger, evalue, attendre, visibles, mes
   if (!gp || gp.type !== 'texte' || gp.lignes[0].html !== 'dans le groupe') echec('paragraphe du groupe : ' + JSON.stringify(gp));
   const vus = await visibles('.blk[data-id="x1"] .lg'); mesure();
   if (JSON.stringify(vus) !== JSON.stringify(['Première', 'en retrait', 'gras', 'suite'])) echec('lignes affichées : ' + JSON.stringify(vus));
-  if (await evalue('window.ardoise.doc.v') !== 8) echec('format après ouverture : ' + await evalue('window.ardoise.doc.v'));
+  if (await evalue('window.ardoise.doc.v') !== 9) echec('format après ouverture : ' + await evalue('window.ardoise.doc.v'));
 
   // un lien vers un ancien paragraphe d'une autre page mène encore au bloc, à l'écran
   await evalue(`document.querySelector('#app a[href="#pg-p2/x9"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))`);
