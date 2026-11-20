@@ -31,13 +31,13 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   if (!menu.includes('facts')) echec('le menu d\'un bloc du groupe ne propose pas la fiche de faits');
   await evalue(`document.querySelector('.pop .mi[data-t="facts"]').click(), true`); await attendre(50);
   mesure();
-  if (await evalue(PAGE_IDS) !== 'hd s1 g1[p,facts,p] x1') echec('« + » dans le groupe : ' + await evalue(PAGE_IDS));
+  if (await evalue(PAGE_IDS) !== 'hd s1 g1[texte,facts,texte] x1') echec('« + » dans le groupe : ' + await evalue(PAGE_IDS));
 
   // Entrée dans le paragraphe vide du groupe : le nouveau paragraphe reste dans le groupe
-  await evalue(`(() => { const f = document.querySelector('[data-b="c2"][data-k="html"]'); f.focus(); return true; })()`);
+  await evalue(`(() => { const f = document.querySelector('[data-b="c2"][data-k="lignes"]'); f.focus(); return true; })()`);
   await evalue(TOUCHE('Enter')); await attendre(50);
   mesure();
-  if (await evalue(PAGE_IDS) !== 'hd s1 g1[p,facts,p,p] x1') echec('Entrée dans le groupe : ' + await evalue(PAGE_IDS));
+  if (await evalue(PAGE_IDS) !== 'hd s1 g1[texte,facts,texte,texte] x1') echec('Entrée dans le groupe : ' + await evalue(PAGE_IDS));
   await evalue(TOUCHE('z', { ctrlKey: true })); await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(50);
 
   // pli d'édition : enregistré, compteur, blocs non rendus ; Ctrl+Z déplie
@@ -71,17 +71,17 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   await evalue(TOUCHE('z', { ctrlKey: true })); await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(50);
   if (await evalue(`${GROUPE}.folded`) !== false) echec('deux Ctrl+Z ne ramènent pas le groupe ouvert');
 
-  // insertion d'un groupe en fin de page : un paragraphe vide dedans, le curseur dans le titre
+  // insertion d'un groupe en fin de page : un bloc texte vide dedans, le curseur dans le titre
   await evalue(`document.querySelector('[data-act="add-end"]').click(), true`); await attendre(50);
   await evalue(`document.querySelector('.pop .mi[data-t="group"]').click(), true`); await attendre(80);
-  const neuf = await evalue(`(() => { const bl = window.ardoise.doc.pages[0].blocks, g = bl[bl.length - 1], a = document.activeElement; return { t: g.type, k: g.blocks.map((c) => c.type + ':' + c.html).join(), fb: a && a.dataset.b === g.id, fk: a && a.dataset.k }; })()`);
+  const neuf = await evalue(`(() => { const bl = window.ardoise.doc.pages[0].blocks, g = bl[bl.length - 1], a = document.activeElement; return { t: g.type, k: g.blocks.map((c) => c.type + ':' + JSON.stringify(c.lignes)).join(), fb: a && a.dataset.b === g.id, fk: a && a.dataset.k }; })()`);
   mesure();
-  if (neuf.t !== 'group' || neuf.k !== 'p:' || !neuf.fb || neuf.fk !== 'title') echec('groupe neuf : ' + JSON.stringify(neuf));
+  if (neuf.t !== 'group' || neuf.k !== 'texte:[{"html":""}]' || !neuf.fb || neuf.fk !== 'title') echec('groupe neuf : ' + JSON.stringify(neuf));
 
   // supprimer le premier groupe : tout son contenu part ; un seul Ctrl+Z le rend entier
   await evalue(`document.querySelector('.blk[data-id="g1"] > .collant .del').click(), true`); await attendre(50);
   mesure();
   if (/g1/.test(await evalue(PAGE_IDS))) echec('le groupe n\'est pas supprimé');
   await evalue(TOUCHE('z', { ctrlKey: true })); await attendre(50);
-  if (!(await evalue(PAGE_IDS)).startsWith('hd s1 g1[p,p] x1')) echec('un Ctrl+Z ne rend pas le groupe entier : ' + await evalue(PAGE_IDS));
+  if (!(await evalue(PAGE_IDS)).startsWith('hd s1 g1[texte,texte] x1')) echec('un Ctrl+Z ne rend pas le groupe entier : ' + await evalue(PAGE_IDS));
 }

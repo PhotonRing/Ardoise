@@ -17,29 +17,14 @@ app.addEventListener('input', function (e) {
   if (el.matches('.st-in')) { var bs = byId(el.dataset.b), rr = bs.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(bs.id); if (ms) ms.setRoutes(bs.routes); session.saisir(); return; }
   if (el.matches('.zn-in')) { var bz = byId(el.dataset.b); bz.zones[+el.dataset.zn].label = el.value; var mz = mapOf(bz.id); if (mz) mz.setZones(bz.zones); session.saisir(); return; }
   if (!el.classList || !el.classList.contains('fld')) return;
-  if (el.textContent === '' && !el.querySelector('img')) el.innerHTML = '';
-  if (el.querySelector('span.tab, span.ln')) {
-    // enveloppes des lignes en retrait recalculées ; le curseur est gardé par un repère (les sauts de ligne ne comptent pas comme des caractères)
-    var sl = getSelection(), mk = null;
-    if (sl.rangeCount && sl.isCollapsed && el.contains(sl.anchorNode)) { mk = document.createElement('i'); var rr = sl.getRangeAt(0).cloneRange(); rr.insertNode(mk); }
-    layoutLines(el);
-    if (mk) {
-      var pv = mk.previousSibling, cr2 = document.createRange(); cr2.setStartBefore(mk); cr2.collapse(true); mk.remove();
-      sl.removeAllRanges(); sl.addRange(cr2);
-      if (pv && pv.nodeType === 1 && pv.classList.contains('tab')) tabExit(pv);
-    }
-  }
-  $$('span.tab', el).forEach(function (t) {
-    if (t.textContent === '\t') return;
-    var extra = t.textContent.replace(/\t/g, ''); t.textContent = '\t';
-    if (extra) { var tn = document.createTextNode(extra); t.after(tn); var r = document.createRange(); r.setStart(tn, extra.length); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); }
-  });
+  if (el.textContent === '' && !el.querySelector('img') && !el.hasAttribute('data-texte')) el.innerHTML = '';   // bloc texte : reparerLignes garde une ligne
   var bl = byId(el.dataset.b); if (!bl) return;
-  if (bl.type === 'p' && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
-    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
-    slashMenu(el, bl); el.innerHTML = ''; return;
+  if (bl.type === 'texte' && lignesDe(el).length === 1 && !el.querySelector('[data-lv], [data-g]') && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
+    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré ; même règle que texteVide au clavier
+    slashMenu(el, bl); el.innerHTML = '<div class="lg"><br></div>'; return;
   }
   setPath(bl, el.dataset.k, fieldValue(el));
+  if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
     var ct = curTitle(); document.title = ct;
@@ -50,6 +35,7 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
+  if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
 // d'Ardoise, sinon les deux mécanismes se mélangent et le texte se défait lettre par lettre ou se duplique
@@ -97,7 +83,7 @@ app.addEventListener('change', function (e) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
     if (b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast')) { var sy = scrollY; render(); scrollTo(0, sy); var cb = $('[data-b="' + b.id + '"][data-k="' + el.dataset.k + '"]', app); if (cb) cb.focus({ preventScroll: true }); }
-    if (tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; })) refreshDerivedSoon();   // requêtes sur les cases à cocher
+    rafraichirRequetes();
     return;
   }
   if (el.matches('.ch-v')) {
@@ -205,6 +191,7 @@ app.addEventListener('keydown', function (e) {
   var b = byId(el.dataset.b), k = el.dataset.k;
   if (!b) return;
   if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moveBlock(b, e.key === 'ArrowUp' ? -1 : 1); focusField(b.id, k); return; }
+  if (el.hasAttribute('data-texte') && toucheTexte(e, el, b)) return;   // 12-bloc-texte.js
   if (e.key === 'Enter') {
     if (e.isComposing) return;
     var rich = el.hasAttribute('data-rich');
@@ -220,35 +207,12 @@ app.addEventListener('keydown', function (e) {
       if (caretAtEnd(el)) addRowAfter(b, cr);
       return;
     }
-    if (b.type === 'p') {
-      // Entrée passe à la ligne ; Entrée sur la dernière ligne restée vide (ou dans un paragraphe vide) crée un nouveau bloc
-      var lb = lineBefore(el), lt = lineTabs(el);
-      // ligne en retrait restée vide : elle remonte d'un niveau (comme un élément de liste)
-      if (lt.length && lb.line.replace(/[\t\u200B]/g, '') === '' && lineAfter(el) === '') { indentLine(el, -1); return; }
-      // ligne en retrait : la nouvelle ligne garde le même retrait
-      if (lt.length) { newLineTabs(el, lt.length); return; }
-      if (caretAtEnd(el) && (el.textContent.replace(/\u200B/g, '') === '' || (lb.multi && lb.line === ''))) {
-        b.html = sanitize(el.innerHTML);   // la ligne vide finale disparaît (l'assainissement retire les sauts de ligne finaux)
-        insertAfter(b, 'p', b.indent > 0 ? { indent: b.indent } : {}); return;
-      }
-      document.execCommand('insertLineBreak'); return;
-    }
     if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'subtitle', 'step'].indexOf(b.type) >= 0) {
       if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
-      insertAfter(b, 'p', {}); return;
+      insertAfter(b, 'texte', {}); return;
     }
     nextField(el, 1); return;
   }
-  if (e.key === 'Tab' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault();
-    if (!indentLine(el, e.shiftKey ? -1 : 1) && e.shiftKey && b.indent > 0) indentPara(b, el, -1);   // ancien retrait du paragraphe entier
-    return;
-  }
-  if (e.key === 'Backspace' && b.type === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && getSelection().isCollapsed && lineTabs(el).length && lineBefore(el).line.replace(/[\t\u200B]/g, '') === '') {
-    // début du texte d'une ligne en retrait : un niveau de retrait en moins (même si un espace sans chasse précède le curseur)
-    e.preventDefault(); indentLine(el, -1); return;
-  }
-  if (e.key === 'Backspace' && b.type === 'p' && b.indent > 0 && caretAtStart(el)) { e.preventDefault(); indentPara(b, el, -1); return; }
   if (el.hasAttribute('data-li') && (b.type === 'list' || b.type === 'check')) {
     // sous-niveaux : Tab / Maj+Tab, ou Retour arrière en début d'un élément en retrait
     var li0 = listParts(k).i, it0 = b.items[li0];
@@ -264,17 +228,7 @@ app.addEventListener('keydown', function (e) {
         session.modifier(function () { setPath(b, prevKey, prev + cur); arr.splice(lp.i, 1); }, { b: b.id, k: prevKey, end: true }); return;
       }
     }
-    if (b.type === 'p') {
-      // dans sa liste : la page, ou le groupe qui le contient (un groupe peut rester vide)
-      var o = position(b), i = o.i, pb = o.liste[i - 1];
-      if (el.textContent === '' && (o.parent || doc.blocks.length > 1)) { e.preventDefault(); deleteBlock(b, true); return; }
-      if (pb && ['p', 'h2', 'h3', 'subtitle'].indexOf(pb.type) >= 0) {
-        e.preventDefault(); var html = sanitize(el.innerHTML);
-        session.modifier(function () { pb.html = pb.html + html; o.liste.splice(i, 1); }, { b: pb.id, end: true }); return;
-      }
-    }
   }
-  if (e.key === '/' && b.type === 'p' && el.textContent === '') { e.preventDefault(); slashMenu(el, b); return; }
   if (e.key === 'Tab' && el.hasAttribute('data-cell')) {
     e.preventDefault(); var tm = k.split('.');
     if (!e.shiftKey && +tm[1] === b.rows.length - 1 && +tm[2] === b.rows[0].length - 1) { addRowAfter(b, +tm[1]); return; }
@@ -343,64 +297,6 @@ function cellArrow(e, el, b, k) {
   if (e.key === 'ArrowDown' && caretLine(el, 1)) { e.preventDefault(); if (!(dn > 0 && focusCell(b, dn, c, false))) leaveTable(el, b, 1); return true; }
   return false;
 }
-function lineBefore(el) {
-  // texte de la ligne du curseur avant lui, et présence d'une ligne au-dessus (saut de ligne avant le curseur)
-  var s = getSelection(); if (!s.rangeCount) return { line: '', multi: false };
-  var r = document.createRange(); r.selectNodeContents(el); r.setEnd(s.anchorNode, s.anchorOffset);
-  var d = document.createElement('div'); d.appendChild(r.cloneContents());
-  $$('br', d).forEach(function (br) { br.replaceWith('\n'); });
-  var t = d.textContent.replace(/​/g, ''), i = t.lastIndexOf('\n');
-  return { line: i < 0 ? t : t.slice(i + 1), multi: i >= 0 };
-}
-function lineAfter(el) {
-  // texte de la ligne du curseur après lui (jusqu'au saut de ligne suivant)
-  var s = getSelection(); if (!s.rangeCount) return '';
-  var r = document.createRange(); r.selectNodeContents(el); r.setStart(s.anchorNode, s.anchorOffset);
-  var d = document.createElement('div'); d.appendChild(r.cloneContents());
-  var br = d.querySelector('br'); if (br) { while (br.nextSibling) br.nextSibling.remove(); var p = br.parentNode; while (p && p !== d) { while (p.nextSibling) p.nextSibling.remove(); p = p.parentNode; } br.remove(); }
-  return d.textContent.replace(/​/g, '');
-}
-function newLineTabs(el, k) {
-  // nouvelle ligne au curseur avec k taquets (sans le saut de ligne supplémentaire que le navigateur ajoute en fin de ligne)
-  var s = getSelection(), r = s.getRangeAt(0); r.deleteContents();
-  var frag = document.createDocumentFragment(), last = null; frag.appendChild(document.createElement('br'));
-  for (var i = 0; i < k; i++) { last = document.createElement('span'); last.className = 'tab'; last.textContent = '\t'; frag.appendChild(last); }
-  r.insertNode(frag); tabExit(last); fire(el);
-}
-function lineStart(el) {
-  // position du début de la ligne du curseur : juste après le saut de ligne qui la précède, sinon début du champ
-  var s = getSelection(), cr = s.getRangeAt(0), start = document.createRange(), brs = $$('br', el), last = null;
-  brs.forEach(function (br) { var t = document.createRange(); t.setStartAfter(br); if (t.compareBoundaryPoints(Range.START_TO_START, cr) <= 0) last = br; });
-  if (last) start.setStartAfter(last); else start.setStart(el, 0);
-  start.collapse(true); return start;
-}
-function lineTabs(el) {
-  // taquets en début de la ligne du curseur (dans l'ordre)
-  var st = lineStart(el), n = st.startContainer.nodeType === 3 ? st.startContainer : st.startContainer.childNodes[st.startOffset], out = [];
-  for (; n; n = n.nextSibling) {
-    if (n.nodeType === 1 && n.classList.contains('ln')) { n = { nextSibling: n.firstChild }; continue; }   // ligne enveloppée (retrait suspendu)
-    if (n.nodeType === 3) { if (n.nodeValue.replace(/​/g, '') === '') continue; break; }
-    if (n.nodeType === 1 && n.classList.contains('tab')) out.push(n); else break;
-  }
-  return out;
-}
-function indentLine(el, d) {
-  // retrait de la ligne du curseur : un taquet (span.tab) de plus en début de ligne, ou un de moins. Vrai si la ligne a changé
-  var tabs = lineTabs(el);
-  if (d > 0) { var tab = document.createElement('span'); tab.className = 'tab'; tab.textContent = '\t'; lineStart(el).insertNode(tab); tabs = lineTabs(el); }
-  else { if (!tabs.length) return false; tabs.pop().remove(); }
-  // curseur : s'il était en début de ligne (avant ou dans les taquets), juste après le dernier taquet
-  var s = getSelection(), cr = s.getRangeAt(0), last = tabs[tabs.length - 1];
-  if (last) { var after = document.createRange(); after.setStartAfter(last); if (cr.compareBoundaryPoints(Range.START_TO_START, after) <= 0 || cr.startContainer.parentNode.closest('span.tab')) tabExit(last); }
-  fire(el); return true;
-}
-function indentPara(b, el, d) {
-  // retrait du paragraphe, appliqué en place pour garder le curseur où il est
-  var n = Math.max(0, Math.min(6, (+b.indent || 0) + d));
-  if (n === (+b.indent || 0)) return;
-  session.saisir(function () { if (n) b.indent = n; else delete b.indent; }); session.valider();
-  for (var i = 1; i <= 6; i++) el.classList.toggle('ind-' + i, i === n);
-}
 function slashMenu(el, b) { var o = position(b); openBlockMenu(el, function (t) { replaceBlock(b, t); }, function () { focusField(b.id); }, !!(o && o.parent)); }
 function listParts(k) { var m = k.match(/^(.*)\.(\d+)(\.html)?$/); return { base: m[1], i: +m[2], suf: m[3] || '' }; }
 function listIndent(b, i, d, el) {
@@ -419,7 +315,7 @@ function splitItem(b, k, el) {
   if (el.textContent === '' && (b.type === 'list' || b.type === 'check') && arr[lp.i] && +arr[lp.i].lv > 0) { listIndent(b, lp.i, -1, el); return; }   // élément vide en retrait : il remonte d'un niveau
   if (el.textContent === '' && lp.i === arr.length - 1 && arr.length > 1 && b.type !== 'cards') {
     // Entrée sur un élément vide en fin de liste : sortir de la liste
-    session.modifier(function () { arr.pop(); }); insertAfter(b, 'p', {}); return;
+    session.modifier(function () { arr.pop(); }); insertAfter(b, 'texte', {}); return;
   }
   var tail = extractTail(el); var head = sanitize(el.innerHTML);
   session.modifier(function () {
@@ -433,7 +329,8 @@ function splitItem(b, k, el) {
 }
 
 app.addEventListener('paste', function (e) {
-  var el = e.target;
+  // bloc texte : l'événement part de la ligne du curseur (div.lg), pas du champ
+  var el = (e.target.closest && e.target.closest('.fld[data-texte]')) || e.target;
   if (mode !== 'edit') return;
   var cd = e.clipboardData; if (!cd) return;
   var html = cd.getData('text/html'), text = cd.getData('text/plain');
@@ -453,21 +350,33 @@ app.addEventListener('paste', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   e.preventDefault();
   if (plage) { collerPlage(el, plage.map(function (l) { return l.map(celluleCollee); })); return; }
+  if (el.hasAttribute('data-texte')) { collerLignes(el, lignesCollees(html, text)); return; }   // 12-bloc-texte.js
   if (el.hasAttribute('data-rich') && html) {
     var clean = sanitize(pastillesDuCollage(html, doc.id).replace(/<!--[\s\S]*?-->/g, '').replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, ''));
-    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li') && b0type(el) !== 'p') clean = clean.replace(/<br>/g, ' ');
+    // champ d'une ligne (titre, cellule) : les lignes collées (listes imbriquées comprises) jointes par une espace
+    if (!el.hasAttribute('data-ml') && !el.hasAttribute('data-li')) clean = lignesCollees(html, text).map(function (l) { return l.html; }).filter(Boolean).join(' ');
     // champ d'une ligne : compacter avant l'insertion, qui changerait les blancs de bord en espaces insécables
-    if (!el.hasAttribute('data-ml') && b0type(el) !== 'p') clean = compacterLigne(clean);
+    if (!el.hasAttribute('data-ml')) clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
     $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
   } else {
-    if (!el.hasAttribute('data-rich') || (!el.hasAttribute('data-ml') && b0type(el) !== 'p')) text = compacterTexte(text);
+    if (!el.hasAttribute('data-rich') || !el.hasAttribute('data-ml')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
   }
 });
+// lignes collées dans un bloc texte : HTML assaini ligne par ligne, genre et coche gardés (une ligne vidée par l'assainissement,
+// une image seule, part), sinon texte brut
+function lignesCollees(html, text) {
+  if (!html) return lignesDuTexteBrut(text);
+  return lignesDuCollage(pastillesDuCollage(html, doc.id)).map(function (l) {
+    var o = ligne(sanitize(l.html), l.lv); if (l.genre) o.genre = l.genre; if (l.done) o.done = true;
+    return { l: o, avant: l.html };
+  })
+    .filter(function (x) { return x.l.html || !x.avant; }).map(function (x) { return x.l; });
+}
 // cellule d'une plage collée : nettoyée comme un collage HTML dans un champ riche d'une ligne
 function celluleCollee(h) { return compacterLigne(sanitize(pastillesDuCollage(h, doc.id)).replace(/<br>/g, ' ')); }
-// plage collée : remplit le tableau depuis la cellule (collerGrille, 05-tableau.js), ailleurs devient un bloc tableau (à la place d'un paragraphe vide)
+// plage collée : remplit le tableau depuis la cellule (collerGrille, 05-tableau.js), ailleurs devient un bloc tableau (à la place d'un bloc texte vide)
 function collerPlage(el, g) {
   var b = byId(el.dataset.b); if (!b) return;
   if (el.hasAttribute('data-cell') && b.type === 'table') {
@@ -475,26 +384,28 @@ function collerPlage(el, g) {
     session.modifier(function () { b.rows = reprendreLignes(b.rows, rows); }, { b: b.id, k: el.dataset.k, end: false }, 'cellules collées');
     lastCell = { b: b.id, r: x.r, c: x.c }; return;
   }
-  if (b.type !== 'p' || !isBlank(b.html)) { insertAfter(b, 'table', { rows: g }); return; }
+  if (!(b.type === 'texte' && texteVide(b.lignes))) { insertAfter(b, 'table', { rows: g }); return; }
   var nb = mk('table', { rows: g }), o = position(b);
   session.modifier(function () { o.liste.splice(o.i, 1, nb); revealBlock(nb.id); });
   focusField(nb.id, null, false);
 }
-// Copie d'un passage qui contient des pastilles (édition et lecture) : text/html garde les pastilles, sans couleur calculée
-// et marquées du document d'origine ; text/plain les écrit « #nom ». Sans pastille, la copie reste celle du navigateur.
+// Copie d'un passage qui contient des pastilles ou touche un bloc texte (édition et lecture) : text/html garde les pastilles, sans
+// couleur calculée et marquées du document d'origine ; text/plain les écrit « #nom ». Un bloc texte y passe par ses lignes
+// (copieDeSelection, 12-bloc-texte.js). Sinon, la copie reste celle du navigateur.
 function copierPastilles(e) {
   var sel = window.getSelection(), cd = e.clipboardData;
   if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
   var r = sel.getRangeAt(0);
   if (!app.contains(r.commonAncestorContainer)) return;
-  var boite = document.createElement('div'); boite.appendChild(r.cloneContents());
-  if (!boite.querySelector('span.pill')) return;
-  var html = pastillesSansCouleur(boite.innerHTML, doc.id);
+  var lignes = copieDeSelection(r, doc.id), boite = document.createElement('div'); boite.appendChild(r.cloneContents());
+  if (!lignes && !boite.querySelector('span.pill')) return;
+  var html = lignes ? lignes.html : pastillesSansCouleur(boite.innerHTML, doc.id);
   e.preventDefault();
-  cd.setData('text/html', html); cd.setData('text/plain', texteBrutDePresse(html));
-  if (e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld')) document.execCommand('delete');
+  cd.setData('text/html', html); cd.setData('text/plain', lignes ? lignes.texte : texteBrutDePresse(html));
+  var fld = e.type === 'cut' && mode === 'edit' && e.target.closest && e.target.closest('.fld');
+  if (fld && fld.hasAttribute('data-texte') && fld.contains(r.commonAncestorContainer)) couperLignes(fld, r);   // 12-bloc-texte.js
+  else if (fld) document.execCommand('delete');
 }
 app.addEventListener('copy', copierPastilles);
 app.addEventListener('cut', copierPastilles);
-function b0type(el) { var b = byId(el.dataset.b); return b ? b.type : ''; }
 

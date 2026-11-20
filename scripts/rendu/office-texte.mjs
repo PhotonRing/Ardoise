@@ -12,6 +12,7 @@ const DOC = { v: 6, title: 'Doc', theme: 'dark', palette: 'indigo', tags: { ok: 
   { id: 'e1', type: 'step', num: '', title: 'Isoler' }, { id: 'e2', type: 'step', num: '', title: 'Nettoyer' }, { id: 'e3', type: 'step', nonum: true, title: 'Sans numéro' },
   { id: 'p1', type: 'p', html: 'A <b>gras</b> <i>it</i> <u>sou</u> <s>bar</s> <code>x&lt;y</code> <a href="https://ex.fr/a">web</a> <a href="#pg-p2">interne</a> ' + P('OK') + ' ' + P('Inconnue') },
   { id: 'p2', type: 'p', indent: 2, html: 'retrait' },
+  { id: 'tx', type: 'texte', lignes: [{ html: 'un ' + P('OK') }, { html: 'deux', lv: 2 }, { html: '' }, { html: 'fin <b>gras</b>', lv: 1 }] },
   { id: 'pc', type: 'p', html: 'a <span class="c-vert">vert</span> <span class="s-jaune">jaune</span> <span class="c-violet s-rose">les deux <code>x</code> ' + P('OK') + '</span> <span class="alert">rouge</span>' },
   { id: 'pn', type: 'p', html: 'a vert jaune les deux <code>x</code> ' + P('OK') + ' rouge' },
   { id: 'ft', type: 'footer', html: 'Sources' }, { id: 'dv', type: 'divider' },
@@ -78,4 +79,17 @@ test('office (texte) : couleur du texte et surlignage en styles en ligne aux tei
   vrai(/<span style="background:#e3f3ea;color:#1f7a4d;[^"]*">OK<\/span>/.test(html), 'pastille à ses couleurs : ' + html);
   vrai(html.includes('<span style="color:#b42318">rouge</span>'), 'alert toujours rouge : ' + html);
   egal(texte, office('pn').texte, 'texte brut');
+});
+
+test('office (texte) : bloc texte, un paragraphe par ligne, retrait par niveau, lignes serrées, ligne vide gardée', () => {
+  const { html, texte, e } = office('tx');
+  egal(e.map((x) => [x.t, x.retrait || 0, !!x.serre]), [['para', 0, true], ['para', 2, true], ['para', 0, true], ['para', 1, false]], 'éléments neutres');
+  const ps = [...html.matchAll(/<p style="([^"]*)">([\s\S]*?)<\/p>/g)];
+  egal(ps.length, 4, html);
+  egal(ps.map((m) => (m[1].match(/margin-left:([\d.]+pt)/) || [])[1] || '0'), ['0', '45pt', '0', '22.5pt'], 'retrait de 2em par niveau (comme p.ind-N)');
+  egal(ps.map((m) => /^margin:0pt 0pt 0pt;/.test(m[1])), [true, true, true, false], 'lignes sans espace entre elles, sauf après la dernière');
+  vrai(/^margin:0pt 0pt 6pt;/.test(ps[3][1]), 'dernière ligne : espace du paragraphe');
+  egal(ps[2][2], '&nbsp;', 'ligne vide : Writer réduit un paragraphe vide');
+  vrai(ps[3][2] === 'fin <b>gras</b>', ps[3][2]);
+  egal(texte, 'un #OK\n    deux\n\n  fin gras', 'texte brut : deux espaces par niveau, ligne vide gardée');
 });

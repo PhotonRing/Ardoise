@@ -70,9 +70,14 @@ function libelleGrille(ra, rb) {
   if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
   return null;
 }
+// mêmes éléments dans un ordre quelconque : même valeur
+function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }).sort().join('\n'); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
-  if (ba.type !== b.type) return 'bloc modifié';
+  if (ba.type !== b.type) return b.type === 'texte' && /^(list|check|subtitle)$/.test(ba.type) ? 'converti en texte' : 'bloc modifié';   // 10-operations-blocs.js
+  if (b.type === 'texte' && Array.isArray(ba.lignes) && Array.isArray(b.lignes) && libelleSans(ba, 'lignes') === libelleSans(b, 'lignes') &&
+    ba.lignes.length === b.lignes.length && JSON.stringify(ba.lignes) !== JSON.stringify(b.lignes) &&
+    libelleTri(ba.lignes) === libelleTri(b.lignes)) return 'lignes réordonnées';   // cochées à la fin
   if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
   if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
     // une seule colonne bascule par étape : réduite si l'une l'est devenue

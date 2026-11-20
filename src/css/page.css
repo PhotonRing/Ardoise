@@ -49,7 +49,32 @@ header.b-header{display:flex;flex-direction:column;gap:8px}
 h1{font:800 clamp(28px,5vw,40px)/1.1 var(--f-display);margin:0;text-wrap:balance}
 h2{font:600 21px/1.25 var(--f-display);margin:0;text-wrap:balance}
 h3,.subtitle{font:600 15px/1.3 var(--f-body);margin:0}
-p.ind-1{margin-left:2em} p.ind-2{margin-left:4em} p.ind-3{margin-left:6em} p.ind-4{margin-left:8em} p.ind-5{margin-left:10em} p.ind-6{margin-left:12em}
+/* bloc texte : une ligne par élément, retrait par niveau (même pas que l'ancien retrait du paragraphe) */
+.texte .lg{margin:0}
+.lg[data-lv="1"]{margin-left:2em} .lg[data-lv="2"]{margin-left:4em} .lg[data-lv="3"]{margin-left:6em} .lg[data-lv="4"]{margin-left:8em} .lg[data-lv="5"]{margin-left:10em} .lg[data-lv="6"]{margin-left:12em}
+/* genres de ligne : puce, numéro (calculé : data-n) et case dessinés par ::before dans la marge de la ligne, hors du texte
+   éditable (ni curseur ni copie) ; la case a la taille et l'accent de ul.check input, et se coche d'un clic dans cette marge */
+.lg[data-g="puce"],.lg[data-g="numero"],.lg[data-g="case"]{position:relative;padding-left:1.6em}
+.lg[data-g="puce"]::before,.lg[data-g="numero"]::before,.lg[data-g="case"]::before{position:absolute;left:0;top:0;width:1.6em;user-select:none;pointer-events:none}
+.lg[data-g="puce"]::before{content:"•";text-align:center}
+.lg[data-g="puce"][data-lv="1"]::before,.lg[data-g="puce"][data-lv="4"]::before{content:"◦"}
+.lg[data-g="puce"][data-lv="2"]::before,.lg[data-g="puce"][data-lv="5"]::before{content:"▪"}
+.lg[data-g="numero"]::before{content:attr(data-n) ".";font-variant-numeric:tabular-nums}
+.lg[data-g="case"]::before{content:"";top:.3em;left:.1em;width:15px;height:15px;box-sizing:border-box;border:1.5px solid var(--muted);border-radius:3px;
+  font:700 11px/12px var(--f-body);text-align:center;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.lg[data-g="case"][data-done]::before{content:"✓";background:var(--accent);border-color:var(--accent)}
+.lg[data-g="case"][data-done]{color:var(--muted)}
+.lg[data-g="soustitre"]{font:600 15px/1.3 var(--f-body);margin-top:.5em}
+/* alignement et taille d'une ligne (texte courant : 15px/1.6 ; Petit comme les légendes, Grand sous le titre de section) */
+:root{--t-petit:13px;--t-grand:18px}
+.lg[data-taille="petit"]{font-size:var(--t-petit)} .lg[data-taille="grand"]{font-size:var(--t-grand)}
+.lg[data-align="centre"]{text-align:center} .lg[data-align="droite"]{text-align:right} .lg[data-align="justifie"]{text-align:justify}
+/* centrée ou à droite, la marque suit le texte : dessinée dans la ligne (::before en ligne) ; la case (police propre de 11px) garde
+   l'écart de la case alignée à gauche ; overflow:hidden met sa ligne de base au bord bas, vide ou cochée (avec le ✓, la ligne
+   de base serait celle du ✓ et la case descendrait en se cochant) */
+.lg[data-g][data-align="centre"],.lg[data-g][data-align="droite"]{padding-left:0}
+.lg[data-g][data-align="centre"]::before,.lg[data-g][data-align="droite"]::before{position:static;display:inline-block;text-indent:0}
+.lg[data-g="case"][data-align="centre"]::before,.lg[data-g="case"][data-align="droite"]::before{margin-right:8px;vertical-align:-2px;overflow:hidden}
 :root[data-typo="sobre"] .eyebrow{color:var(--muted);letter-spacing:.06em}
 :root[data-typo="sobre"] h1{font:500 28px/1.2 var(--f-mono)}
 :root[data-typo="sobre"] h2{font:600 17px/1.3 var(--f-body)}
@@ -503,13 +528,6 @@ a.q-count{text-decoration:none;color:inherit}
 .q-linked:hover{border-color:var(--accent)}
 .q-go{position:absolute;top:6px;right:32px;width:22px;height:22px;display:grid;place-items:center;border-radius:5px;color:var(--muted);text-decoration:none}
 .q-go:hover{background:var(--accent-soft);color:var(--accent)}
-
-/* retrait d'une ligne de paragraphe (Tab) */
-span.tab{white-space:pre;tab-size:2em;-moz-tab-size:2em}
-/* ligne en retrait : retrait suspendu, la suite de la ligne reste alignée sur son texte */
-span.ln{display:block;padding-left:calc(var(--n,1) * 2em)}
-span.ln>span.tab{display:none}
-span.ln+br{display:none}
 
 /* kanban (bloc et vue en colonnes du bloc requête) */
 .kb-cols{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 40%,transparent) transparent}

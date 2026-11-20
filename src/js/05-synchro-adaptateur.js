@@ -27,16 +27,22 @@ function synLocal() {
   clearTimeout(syn.sendT); syn.sendT = setTimeout(function () { synFlush(false); }, 120);
 }
 
-// réception : intègre les modifications reçues et les passe à la session ; vrai si le document a changé
+// réception : intègre les modifications reçues et les passe à la session ; vrai si le document a changé. Chaque lot
+// { o, v } porte ses opérations et le format du document de la copie qui l'a envoyé (24-synchronisation.js)
 function synIntegrer(s, batches, reload) {
   if (!batches.length && !reload) return false;
   // la frappe en attente devient une étape d'annulation, et ce qui a été saisi ici part d'abord (sinon la
   // comparaison effacerait l'arrivée) ; après l'arrivée, ce serait trop tard
   session.valider();
   synLocal();
-  var changed = reload;
-  batches.forEach(function (ops) { if (synApply(s.st, ops)) changed = true; });
+  var changed = reload, perdues = 0;
+  batches.forEach(function (lot) {
+    if (!(+lot.v >= FORMAT_BLOC_TEXTE)) perdues += synSaisiesParagraphes(s.st, lot.o);
+    if (synApply(s.st, lot.o)) changed = true;
+  });
+  if (perdues) toast('Une copie restée en Ardoise 1.26 a écrit dans un bloc déjà converti en bloc texte ici : cette saisie n’a pas été reprise. Mettez cette copie à jour et vérifiez le bloc.', 10000);
   if (!changed) return false;
+  synParagraphes(s);
   var before = s.base, after = synJSON(s.st.root);
   if (s.adopt) { s.adopt = false; toast('Document mis à jour depuis les autres copies', 4000); }
   if (synEq(before, after)) return false;
@@ -45,6 +51,29 @@ function synIntegrer(s, batches, reload) {
   var pt = []; synPaths(before, after, [], pt); s.patches.push(pt);
   session.recevoir(after, SYN_KEYS);
   return true;
+}
+// Copie restée en 1.26 (format 7) : ses envois arrivent sans migration. Un paragraphe reçu est converti ici en bloc texte
+// (conversion déterministe : deux copies qui la font posent les mêmes valeurs), et la conversion part vers les autres copies
+function synParagraphes(s) {
+  var brut = synJSON(s.st.root), conv = synClone(brut), vu = false;
+  migBlocks(conv, function (b) { if (b.type === 'p') { paragrapheEnTexte(b); vu = true; } });   // 05-migrations.js, 05-lignes.js
+  if (!vu) return;
+  s.pending = s.pending.concat(synDiff(s.st, brut, conv));
+  clearTimeout(s.sendT); s.sendT = setTimeout(function () { synFlush(false); }, 120);
+}
+// saisies d'une copie 1.26 dans le html d'un bloc converti ici en bloc texte : écartées par le moteur, comptées pour avertir.
+// Seuls les envois d'avant le format 8 comptent : une copie à jour qui tape dans un Sous-titre qu'une autre convertit perd sa
+// frappe sans avertissement, comme dans un bloc supprimé
+var FORMAT_BLOC_TEXTE = 8;
+function synSaisiesParagraphes(st, ops) {
+  var n = 0;
+  (ops || []).forEach(function (op) {
+    if (!op || (op.o !== 'ti' && op.o !== 'td') || !Array.isArray(op.p) || !op.p.length) return;
+    var der = op.p[op.p.length - 1]; if (!Array.isArray(der) || der[0] !== 'html') return;
+    var bloc = synAt(st, op.p.slice(0, -1)), ty = bloc && bloc.t === 'm' && bloc.f.type && bloc.f.type.v;
+    if (ty && synJSON(ty) === 'texte' && !(bloc.f.html && bloc.f.html.v)) n++;
+  });
+  return n;
 }
 // différences de chemin à chemin, pour l'annulation ; les tableaux d'objets à identifiant sont suivis par identifiant
 function synPaths(a, b, path, out, pos) {

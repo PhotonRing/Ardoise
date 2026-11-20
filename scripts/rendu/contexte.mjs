@@ -44,7 +44,8 @@ test('kanban : cartes déplaçables en lecture, sans commande de déplacement en
 });
 
 // attributs de pliage posés sur la balise de chaque bloc rendu en lecture
-const plis = (h) => Object.fromEntries([...h.matchAll(/<\w+[^>]*>(?:<button[^>]*data-vfold[^>]*><\/button>)?([^<]+)</g)]
+// un bloc texte porte son état sur son élément, autour de ses lignes (div.lg)
+const plis = (h) => Object.fromEntries([...h.matchAll(/<\w+[^>]*>(?:<button[^>]*data-vfold[^>]*><\/button>)?(?:<div class="lg">)?([^<]+)</g)]
   .map((m) => [m[1], /data-folded/.test(m[0]) ? 'plié' : /data-fh/.test(m[0]) ? 'masqué' : '']));
 
 test('pliage en lecture : plis de session en vue read, état enregistré sinon', () => {

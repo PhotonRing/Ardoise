@@ -16,7 +16,7 @@ function goPage(i, keepScroll, sansEntree) {
   if (!sansEntree) naviguer(adressePage(doc.pages, i));
 }
 function insertPage(at, lv) {
-  var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('p', {})] }; if (lv) pg.lv = lv;
+  var pg = { id: uid(), title: '', blocks: [mk('header', {}), mk('texte', {})] }; if (lv) pg.lv = lv;
   session.modifier(function () { doc.pages.splice(at, 0, pg); doc.cur = at; });
   scrollTo(0, 0); pageHash(at); renamePage(at);
 }
@@ -117,7 +117,7 @@ app.addEventListener('click', function (e) {
   if (qc) {
     // case cochée depuis un bloc requête : la vraie case, dans sa liste d'origine (enregistré, en lecture comme en édition)
     var qp = qc.dataset.qchk.split('|'), qpi = pageIndex(doc.pages, qp[0]), qo = qpi >= 0 && ouEst(doc.pages[qpi].blocks, qp[1]), qb = qo && qo.b;   // liste d'un groupe comprise
-    if (qb && getPath(qb, qp[2]) != null) { var sy = scrollY; session.modifier(function () { setPath(qb, qp[2], !getPath(qb, qp[2])); }); scrollTo(0, sy); }
+    if (qb) { var sy = scrollY; session.modifier(function () { basculerCaseRequete(qb, qp[2]); }); scrollTo(0, sy); }   // 07-requetes.js
     return;
   }
   var qs = t.closest('[data-qsort]');

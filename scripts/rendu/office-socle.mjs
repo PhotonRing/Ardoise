@@ -67,6 +67,11 @@ const TOUS = { v: 6, title: 'Doc', theme: 'dark', palette: 'indigo', tags: { ok:
   { id: 'g', type: 'group', title: 'Groupe', blocks: [{ id: 'gp', type: 'p', html: 'dedans' }] },
   { id: 'dm', type: 'diamond', title: 'C', adversaire: 'A', capacite: '', infrastructure: 'I', victime: 'V' },
   { id: 'dv', type: 'divider' }, { id: 'ft', type: 'footer', html: 'Sources' },
+  { id: 'tx', type: 'texte', lignes: [{ html: 'un' }, { html: 'deux', lv: 2 }, { html: '' }, { html: 'fin <b>gras</b>', lv: 1 }] },
+  // bloc texte mêlé : puces et numéros imbriqués, numéro de départ, cases, sous-titre, alignements, Petit et Grand
+  { id: 'tm', type: 'texte', lignes: [{ html: 'a', genre: 'numero' }, { html: 'b', genre: 'puce', lv: 1 }, { html: 'c', genre: 'numero', lv: 3 }, { html: 'd', genre: 'numero' },
+    { html: 'e', genre: 'case', done: true, lv: 1 }, { html: 'f', genre: 'soustitre', align: 'centre' }, { html: 'g', align: 'justifie', taille: 'petit' },
+    { html: 'h', genre: 'numero', lv: 2, align: 'droite', taille: 'grand' }, { html: '', genre: 'puce' }] },
 ] }] };
 
 test('office (socle) : chaque type de bloc suit le socle (sans classe, tableaux pleine largeur, polices d\'Office, couleurs claires)', () => {

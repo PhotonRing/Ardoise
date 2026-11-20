@@ -27,8 +27,34 @@ OFFICE_RENDUS.step = function (b, x) {
     // retrait du titre : Writer ne l'applique qu'à une cellule bordée (bordure de la couleur du fond)
     officeCellule(titre, 'border:1px solid ' + x.C.surface + ';padding:0pt 0pt 0pt 9pt', '94%', 'middle') + '</tr>', 'margin:0 0 6pt');
 };
-// retrait : 2em de 15 px par niveau (p.ind-N)
-OFFICE_RENDUS.p = function (b, x) { return '<p style="' + OFFICE_P + (b.indent > 0 ? 'margin-left:' + officePt(30 * Math.min(6, +b.indent)) + ';' : '') + '">' + x.segs(x.S(b.html)) + '</p>'; };
+// bloc texte : listes par lignesEnListes (<ol start> = numéro d'Ardoise, puces •◦▪ selon le niveau), cases en <p> ☐/☑ (Writer
+// remet des puces à un <li>) ; 30 px de retrait par niveau, 6 pt après la dernière ligne ; text-align lu par Writer sur <p>, <h3>
+// et <li> ; ligne vide en &nbsp; (Writer réduit un <p> vide)
+var OFFICE_TEXTE_PUCES = ['disc', 'circle', 'square'];
+OFFICE_RENDUS.texte = function (b, x) {
+  var ls = normLignes(b.lignes), der = ls.length - 1;
+  var apres = function (i) { return i === der ? '6pt' : '0pt'; };
+  // morceaux de style terminés par « ; »
+  var retrait = function (l) { return niveauDe(l) ? 'margin-left:' + officePt(30 * niveauDe(l)) + ';' : ''; };   // niveau borné par normLignes
+  var reglages = function (l) { return (l.align ? 'text-align:' + LIGNE_ALIGNEMENTS[l.align].css + ';' : '') + (l.taille ? 'font-size:' + officePt(LIGNE_TAILLES_PX[l.taille]) + ';' : ''); };
+  var contenu = function (l) { return x.segs(x.S(l.html)); };
+  return lignesEnListes(ls, numerosDesLignes(ls), {
+    liste: function (tag, n, haut, num) {
+      var type = tag === 'ul' ? OFFICE_TEXTE_PUCES[n % 3] : '1';
+      return '<' + tag + ' type="' + type + '"' + (tag === 'ol' && num && num !== 1 ? ' start="' + num + '"' : '') + ' style="' +
+        (haut ? 'margin-top:0pt;margin-bottom:0pt' : 'margin:0pt 0pt 0pt' + (n ? ';margin-left:' + officePt(30 * n) : '')) + ';list-style-type:' + (tag === 'ul' ? type : 'decimal') + '">';
+    },
+    li: function (l, i) { return '<li style="margin-top:0pt;margin-bottom:' + apres(i) + ';' + reglages(l) + '">' + (contenu(l) || '&nbsp;'); },
+    ligne: function (l, i) {
+      var h = contenu(l);
+      if (l.genre === 'soustitre') return officeTxtTitre('h3', 15, h || '&nbsp;', x, ('margin-top:' + officePt(8) + ';margin-bottom:' + apres(i) + ';' + retrait(l) + reglages(l)).replace(/;$/, ''));
+      var marges = 'margin:0pt 0pt ' + apres(i) + ';' + retrait(l) + reglages(l);
+      var m = marqueDeLigne(l).trim();
+      if (l.genre === 'case') return '<p style="' + marges + '">' + (l.done ? '<span style="color:' + x.acc + '">' + m + '</span> <span style="color:' + x.C.muted + '">' + h + '</span>' : '<span style="color:' + x.C.muted + '">' + m + '</span> ' + h) + '</p>';
+      return '<p style="' + marges + '">' + (h || '&nbsp;') + '</p>';
+    }
+  });
+};
 OFFICE_RENDUS.footer = function (b, x) { return '<p style="margin-top:12pt;margin-bottom:6pt;padding-top:12pt;border-top:1px solid ' + x.C.line + ';font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.html)) + '</p>'; };
 OFFICE_RENDUS.divider = function (b, x) { return officeTxtFilet(x, '6pt', '6pt'); };
 OFFICE_RENDUS.image = function (b, x) {

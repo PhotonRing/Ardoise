@@ -41,6 +41,9 @@ var MIGRATIONS = [
   { from: 5, desc: 'Nouveaux blocs « Groupe repliable » et « Modèle diamant » (aucune conversion)', run: function () {} },
   { from: 6, desc: 'Filtres des requêtes en liste (plusieurs valeurs, modes « l’une de », « toutes », « aucune de »)', run: function (d) {
     migBlocks(d, function (b) { if (b.type === 'query') migFiltresRequete(b); });
+  } },
+  { from: 7, desc: 'Paragraphes en blocs texte : une ligne par passage à la ligne, taquets et retrait en niveaux', run: function (d) {
+    migBlocks(d, function (b) { if (b.type === 'p') paragrapheEnTexte(b); });   // 05-lignes.js
   } }
 ];
 // --- format 7 : filtres des requêtes { id, prop, vals, mode } (filtres-logiques) ---

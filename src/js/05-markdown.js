@@ -38,7 +38,7 @@ function blocsDuMarkdownLu(lignes) {
       else r.blocs.push({ type: g.niveau <= 2 ? 'h2' : g.niveau === 3 ? 'h3' : 'subtitle', html: html });
     } else if (g.sorte === 'paragraphe') {
       var x = imagesDuParagrapheMd(g.lignes.join('\n'));
-      if (x.texte) r.blocs.push({ type: 'p', html: enLigneMd(x.texte) });
+      if (x.texte) r.blocs.push(texteDuHtml(enLigneMd(x.texte)));   // 05-lignes.js : une ligne par retour à la ligne
       poserImages(x.images);
     } else {
       // images d'un élément de liste ou d'une ligne de tableau : sorties comme celles d'un paragraphe, après le bloc entier
@@ -142,7 +142,7 @@ function decouperMarkdown(lignes) {
 }
 function blocDuGroupe(g) {
   if (g.sorte === 'separateur') return { type: 'divider' };
-  if (g.sorte === 'paragraphe') return { type: 'p', html: enLigneMd(g.lignes.join('\n')) };
+  if (g.sorte === 'paragraphe') return texteDuHtml(enLigneMd(g.lignes.join('\n')));
   if (g.sorte === 'code') {
     var c = { type: 'code', variant: 'dark', name: g.langue, code: g.code, tall: false }, lg = LANGUES_MD[g.langue.toLowerCase()];
     if (lg) c.lang = lg;
@@ -156,18 +156,19 @@ function blocDuGroupe(g) {
   if (g.sorte === 'liste') return listeMd(g.elements);
   return citationMd(g.lignes);
 }
-// éléments de liste → Liste (à puces ou numérotée, selon le premier) ou Liste à cocher dès qu'un élément est une case ;
+// éléments de liste → bloc texte, une ligne par élément (05-lignes.js) : [ ] ou [x] en tête → case (quelle que soit la marque,
+// comme Obsidian), sinon - * + → puce, 1. ou 1) → numéro (numéro de départ ignoré : numerosDesLignes le recalcule) ;
 // niveau : pile des retraits (2 espaces ou une tabulation par niveau, 4 espaces tolérés), plafonné à 6
 function listeMd(elements) {
-  var pile = [], cases = false, items = elements.map(function (e) {
+  var pile = [];
+  return { type: 'texte', lignes: elements.map(function (e) {
     while (pile.length && e.retrait < pile[pile.length - 1]) pile.pop();
     if (!pile.length || e.retrait > pile[pile.length - 1]) pile.push(e.retrait);
-    var lv = Math.min(6, pile.length - 1), m = e.texte.match(/^\[([ xX])\](?:[ \t]+([\s\S]*))?$/);
-    if (m) cases = true;
-    return { lv: lv, done: !!m && m[1] !== ' ', html: enLigneMd(m ? m[2] || '' : e.texte) };
-  });
-  return cases ? { type: 'check', items: items.map(function (it) { var o = { html: it.html, done: it.done }; if (it.lv) o.lv = it.lv; return o; }) }
-    : { type: 'list', ordered: /\d/.test(elements[0].marque), items: items.map(function (it) { var o = { html: it.html }; if (it.lv) o.lv = it.lv; return o; }) };
+    var m = e.texte.match(/^\[([ xX])\](?:[ \t]+([\s\S]*))?$/), l = ligne(enLigneMd(m ? m[2] || '' : e.texte), pile.length - 1);
+    l.genre = m ? 'case' : /\d/.test(e.marque) ? 'numero' : 'puce';
+    if (m && m[1] !== ' ') l.done = true;
+    return l;
+  }) };
 }
 // citation → Encadré ; « [!type] Titre » d'Obsidian : variante selon le type, titre en gras ; replié (-) ou dépliable (+) → Bloc dépliable
 function citationMd(lignes) {
@@ -242,7 +243,8 @@ function lienWikiMd(cible) {
 function pageAContenu(blocs) {
   return blocs.some(function (b) {
     if (b.type === 'header' || b.type === 'footer' || b.type === 'divider') return false;
-    if (b.type === 'p' || b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle') return !!htmlText(b.html).trim();
+    if (b.type === 'texte') return b.lignes.some(function (l) { return !!htmlText(l.html).trim(); });
+    if (b.type === 'h2' || b.type === 'h3' || b.type === 'subtitle') return !!htmlText(b.html).trim();
     return true;
   });
 }

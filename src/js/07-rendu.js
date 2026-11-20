@@ -1,4 +1,6 @@
 /* ---------- Rendu ---------- */
+// bloc ancré (id b-<id>, même dans l'export) : cible du lien d'une requête vers un modèle diamant ou un bloc texte
+function blocAncre(b) { return b.type === 'diamond' || b.type === 'texte'; }
 function hlLine(line) {
   var e = esc(line);
   return /^\s*(#(?!!)|\/\/|--\s|;|rem\s|%)/i.test(line) ? '<span class="c">' + e + '</span>' : e;
@@ -36,7 +38,7 @@ function renderPage(d, ctx) {
     if (!edit && inner) {
       // lecture : ancre des titres, niveau (data-fl) pour plier au clic, état plié, blocs masqués (data-fh)
       var lv = foldLevel(b), fold = lv > 0 && reg[b.id] > 0, folded = fold && isF(b), at = '';
-      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'diamond') at += ' id="b-' + b.id + '"';   // diamant : cible du lien d'une requête
+      if (b.type === 'step' || b.type === 'h2' || b.type === 'h3' || blocAncre(b)) at += ' id="b-' + b.id + '"';
       if (lv >= 0) at += ' data-fl="' + lv + '"';
       if (folded) at += ' data-folded';
       if (fi.hidden[b.id]) at += ' data-fh';
@@ -69,12 +71,30 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
+// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé,
+// coche, alignement et taille en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
+function lignesHTML(lignes) {
+  var ls = normLignes(lignes), nums = numerosDesLignes(ls);   // niveau borné (LIGNE_LV_MAX), genre, coche, alignement et taille validés
+  return ls.map(function (l, i) {
+    var h = R(l.html);
+    return '<div class="lg"' + (l.lv ? ' data-lv="' + l.lv + '"' : '') + (l.genre ? ' data-g="' + l.genre + '"' : '') +
+      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (l.done ? ' data-done' : '') +
+      (l.align ? ' data-align="' + l.align + '"' : '') + (l.taille ? ' data-taille="' + l.taille + '"' : '') + '>' + (h || '<br>') + '</div>';
+  }).join('');
+}
+// bloc vide : une seule ligne de texte (sans genre), vide et sans retrait
+function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && !lignes[0].genre && isBlank(lignes[0].html); }
+function texteHTML(b, e) {
+  var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
+  if (!e) return '<div data-tx="' + b.id + '" class="texte">' + lignesHTML(ls) + '</div>';   // data-tx : cases cochées de l'export statique (01-lecture.js)
+  return '<div class="texte fld soft" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="lignes" data-rich data-texte' + (texteVide(ls) ? ' data-vide' : '') +
+    ' data-ph="Écrire, ou taper / pour insérer un bloc">' + lignesHTML(ls) + '</div>';
+}
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
     o = o || {};
     var rich = o.rich !== false, body = rich ? R(val) : esc(val);
-    if (o.lines) body = linesHTML(body);   // paragraphe : retrait suspendu des lignes en retrait
     if (!e) return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + body + '</' + tag + '>';
     return '<' + tag + ' class="' + (cls ? cls + ' ' : '') + 'fld' + (o.soft ? ' soft' : '') + '" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="' + k + '"' +
       (rich ? ' data-rich' : '') + (o.li ? ' data-li' : '') + (o.cell ? ' data-cell' : '') + (o.ml ? ' data-ml' : '') + (o.nl ? ' data-nl' : '') +
@@ -104,7 +124,7 @@ function renderBlock(b, d, ctx, num) {
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
     case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'p': return f('p', b.indent > 0 ? 'ind-' + Math.min(6, +b.indent) : '', 'html', b.html, { ph: 'Écrire, ou taper / pour insérer un bloc', soft: 1, lines: 1 });
+    case 'texte': return texteHTML(b, e);
     case 'step':
       var badge = '';
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
@@ -176,8 +196,8 @@ function renderBlock(b, d, ctx, num) {
           '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
       return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
         var ci = renderBlock(c, d, ctx, null);
-        // ancrage de la bascule (19-mode-lecture-edition.js) ; un modèle diamant garde sa cible de lien (id b-<id>), même dans l'export
-        var at = (c.type === 'diamond' ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
+        // ancrage de la bascule (19-mode-lecture-edition.js) ; un bloc ancré garde sa cible de lien
+        var at = (blocAncre(c) ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
         return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
       }).join('') + '</div></details>';
     case 'details':

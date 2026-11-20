@@ -12,7 +12,6 @@ const PURS = `
 function R(h) { return String(h == null ? '' : h); }
 function textOf(h) { return htmlText(h).replace(/\\s+/g, ' ').trim(); }
 function isBlank(h) { return !textOf(h); }
-function linesHTML(h) { return h; }
 function paintPills(h) { return h; }
 `;
 const SOURCE = entete.slice(OUVERTURE.length) + PURS +
@@ -23,6 +22,7 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '03-types-de-blocs.js',
     '04-modeles.js',
     '05-document.js',
+    '05-lignes.js',
     '05-markdown.js',
     '05-migrations.js',
     '05-presse-papier.js',

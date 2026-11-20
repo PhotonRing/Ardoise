@@ -116,7 +116,31 @@ function officeBloc(b, d, opts) {
     case 'step':
       var num = stepNums(d.pages[pi].blocks)[b.id];
       out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
-    case 'p': out.push(para(S(b.html), b.indent > 0 ? { retrait: Math.min(6, +b.indent) } : {})); break;
+    case 'texte':
+      // texte → paragraphe à son retrait ; sous-titre → titre de niveau 3 ; suite de puces, numéros et cases → un élément liste
+      // (items à genre et numéro affiché). serre : pas d'espace après (sauf la dernière ligne, comme .texte .lg) ; ligne : gardée
+      // vide dans le texte brut ; alignement et taille : réglages de la ligne
+      var ls = normLignes(b.lignes), nums = numerosDesLignes(ls), suite = null;
+      ls.forEach(function (l, i) {
+        var o = {}, lv = Math.min(LIGNE_LV_MAX, niveauDe(l)), dernier = i === ls.length - 1;
+        if (l.align) o.alignement = l.align;
+        if (l.taille) o.taille = l.taille;
+        if (GENRES_LISTE.indexOf(l.genre) >= 0) {
+          var it = { niveau: lv, segs: S(l.html), genre: l.genre }; for (var k in o) it[k] = o[k];
+          if (l.genre === 'numero') it.n = nums[i];
+          if (l.genre === 'case') it.coche = !!l.done;
+          if (!suite) { suite = { t: 'liste', ordonnee: false, items: [] }; out.push(suite); }
+          suite.items.push(it); suite.serre = !dernier;
+          return;
+        }
+        suite = null;
+        if (lv) o.retrait = lv;
+        if (!dernier) o.serre = true;
+        o.ligne = true;
+        if (l.genre === 'soustitre') { o.t = 'titre'; o.niveau = 3; o.segs = S(l.html); out.push(o); return; }
+        out.push(para(S(l.html), o));
+      });
+      break;
     case 'summary':
       if (b.title) out.push(para([txt(b.title, { gras: true })]));
       var entrees = [], parcours = function (arr, lv) { arr.forEach(function (it) { entrees.push({ niveau: lv, segs: [txt((it.n ? it.n + ' ' : '') + it.t, { interne: true, souligne: true })] }); parcours(it.kids, lv + 1); }); };
@@ -400,7 +424,9 @@ function officeTexte(elts) {
       case 'liste': var n = [];
         return e.items.map(function (it) {
           n[it.niveau] = (n[it.niveau] || 0) + 1; n.length = it.niveau + 1;
-          return new Array(it.niveau + 1).join('  ') + (it.coche != null ? (it.coche ? '☑ ' : '☐ ') : e.ordonnee ? n[it.niveau] + '. ' : '- ') + lig(it.segs);
+          // numéro d'un item de bloc texte (n) : celui d'Ardoise ; sinon compté dans la liste
+          var g = it.coche != null ? { genre: 'case', done: it.coche } : { genre: it.n != null || e.ordonnee ? 'numero' : 'puce' };
+          return new Array(it.niveau + 1).join('  ') + marqueDeLigne(g, it.n != null ? it.n : n[it.niveau]) + lig(it.segs);
         }).join('\n');
       case 'tableau': return e.lignes.map(function (l) { return l.map(function (c) { return tous(c).replace(/[\t\n]+/g, ' '); }).join('\t'); }).join('\n');
       case 'cadre': return tous(e.contenu);
@@ -410,6 +436,6 @@ function officeTexte(elts) {
     }
     return '';
   };
-  var tous = function (arr) { return arr.map(un).filter(function (t) { return t !== ''; }).join('\n'); };
+  var tous = function (arr) { return arr.filter(function (e) { return e.ligne || un(e) !== ''; }).map(un).join('\n'); };
   return tous(elts);
 }

@@ -1,0 +1,25 @@
+{
+  "v": 8,
+  "title": "Document 1.26",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Notes",
+      "blocks": [
+        { "id": "t", "type": "h2", "html": "Section" },
+        { "id": "p1", "type": "texte", "lignes": [{ "html": "Première ligne" }, { "html": "en retrait", "lv": 1 }, { "html": "deux niveaux", "lv": 2 }] },
+        { "id": "p2", "type": "texte", "lignes": [{ "html": "Paragraphe en retrait", "lv": 2 }, { "html": "et un taquet de plus", "lv": 3 }] },
+        { "id": "p3", "type": "texte", "lignes": [{ "html": "Avant <b>gras</b>" }, { "html": "<b>sur deux lignes</b> après" }] },
+        { "id": "p4", "type": "texte", "lignes": [{ "html": "un taquet au milieu, <span class=\"pill\">prod</span>" }] },
+        { "id": "p5", "type": "texte", "lignes": [{ "html": "" }] },
+        { "id": "g", "type": "group", "title": "Repli", "blocks": [
+          { "id": "p6", "type": "texte", "lignes": [{ "html": "Dans le groupe" }, { "html": "seconde ligne" }] },
+          { "id": "l", "type": "list", "items": [{ "html": "puce" }] }
+        ] },
+        { "id": "s", "type": "subtitle", "html": "Sous-titre gardé" },
+        { "id": "q", "type": "query", "title": "Prod", "src": "facts", "scope": "doc", "view": "table", "filtres": [{ "id": "f1", "prop": "tags", "vals": ["prod"] }] }
+      ]
+    }
+  ],
+  "tags": { "prod": { "c": 4 } }
+}

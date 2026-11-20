@@ -1,6 +1,7 @@
 // Sujet : barre de mise en forme en fenêtre étroite (moins de 600 px). Un bouton « Aa » remplace la barre dans l'ancre du bloc ;
 // un appui l'ouvre juste sous lui, la sélection est gardée au toucher. Origine : spec barre-mise-en-forme, ticket 04.
 
+import { LIBELLE_ENTIER } from './bloc-texte-genres.mjs';
 const LONG = 'Un mot ici, puis une phrase assez longue pour remplir plusieurs lignes à quatre cents pixels de large, '
   + 'encore une autre pour descendre sous la barre ouverte, et une dernière pour finir le paragraphe tout en bas.';
 const DOC = {
@@ -15,7 +16,7 @@ const SELECTIONNER = (a, b) => `(() => { const el = document.querySelector('.fld
   const pos = (n) => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) { if (n <= t.nodeValue.length) return [t, n]; n -= t.nodeValue.length; } };
   const [t1, o1] = pos(${a}), [t2, o2] = pos(${b}), r = document.createRange(); r.setStart(t1, o1); r.setEnd(t2, o2);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`;
-const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).html.replace(/​/g, '')`;
+const HTML = (bid) => `window.ardoise.doc.pages[0].blocks.find((b) => b.id === ${JSON.stringify(bid)}).lignes.map((l) => l.html).join('<br>').replace(/​/g, '')`;
 const RECT = (sel) => `(() => { const x = document.querySelector(${JSON.stringify(sel)}); if (!x || !x.getClientRects().length) return null;
   const r = x.getBoundingClientRect(); return { haut: r.top, bas: r.bottom, gauche: r.left, droite: r.right }; })()`;
 // boutons de la barre affichés à l'écran
@@ -87,6 +88,33 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
     if (h.indexOf(`class="${cls}"`) < 0) echec(`${famille} ${nomCase} au toucher : ${h.slice(0, 80)}`);
     if (!(await ouverte())) echec(`${famille} : la barre se ferme après la palette`);
   }
+  // sélecteur de genre du bloc texte (ticket 05 du lot bloc-texte) : dans la barre ouverte et dans l'écran, sa fenêtre aussi
+  await evalue(SELECTIONNER(3, 6)); await attendre(100);
+  if (!(await ouverte())) await appuyer('.bmf-aa');
+  await dedans('sélecteur de genre', '.bmf [data-mf="genre"]');
+  await appuyer('.bmf [data-mf="genre"]');
+  await dedans('fenêtre du sélecteur de genre', '.bmf-choix-pop, .bmf-choix-pop button');
+  await appuyer('.bmf-choix-pop [data-choix="puce"]'); await attendre(300);
+  const g = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 'pa').lignes[0].genre`); mesure();
+  if (g !== 'puce') echec(`sélecteur de genre au toucher : ${g}`);
+  if ((await evalue('getSelection().toString()')) !== 'mot') echec('sélecteur de genre au toucher : sélection perdue');
+  await dedans('barre ouverte avec le sélecteur', '.bmf-b, .bmf-b button');
+  // alignement et taille (ticket 06) : les trois sélecteurs dans la barre ouverte, fenêtres à libellés entiers dans l'écran
+  if (!(await ouverte())) await appuyer('.bmf-aa');
+  if ((await visibles('.bmf [data-mf="genre"], .bmf [data-mf="align"], .bmf [data-mf="taille"]')).length !== 3) echec('les trois sélecteurs ne sont pas tous visibles');
+  await dedans('sélecteurs d\'alignement et de taille', '.bmf [data-mf="align"], .bmf [data-mf="taille"]');
+  for (const [k, v, attendu] of [['genre', '', ''], ['align', 'centre', 'centre'], ['taille', 'grand', 'grand']]) {
+    if (!(await ouverte())) await appuyer('.bmf-aa');
+    await appuyer(`.bmf [data-mf="${k}"]`);
+    await dedans(`fenêtre ${k}`, '.bmf-choix-pop, .bmf-choix-pop button');
+    const coupes = (await visibles('.bmf-choix-pop button', LIBELLE_ENTIER)).filter((x) => x); mesure();
+    if (coupes.length) echec(`fenêtre ${k} à 400 px : libellés coupés ` + JSON.stringify(coupes));
+    await appuyer(`.bmf-choix-pop [data-choix="${v}"]`); await attendre(300);
+    if (k === 'genre') continue;
+    const l = await evalue(`window.ardoise.doc.pages[0].blocks.find((b) => b.id === 'pa').lignes[0][${JSON.stringify(k)}]`); mesure();
+    if (l !== attendu) echec(`sélecteur ${k} au toucher : ${l}`);
+  }
+  await dedans('barre ouverte avec les trois sélecteurs', '.bmf-b, .bmf-b button');
   const large = await evalue('document.documentElement.scrollWidth'); mesure();
   if (large > 400) echec(`défilement horizontal à 400 px (${large})`);
 

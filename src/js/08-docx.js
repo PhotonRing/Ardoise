@@ -75,7 +75,9 @@ function docxDimensions(img) {
 }
 
 function docxDepuisElements(elts, d) {
-  var C = OFFICE_CLAIR, acc = docxCouleur(officeAccent(d)[0]), rels = [], medias = [], nums = [], docPr = 0;
+  // nums : instances de numérotation { abs (1 puces, 2 numéros), ilvl, depart } ; suiteNum[niveau] : dernière instance de numéros
+  // d'un bloc texte à ce niveau et son dernier numéro, réutilisée quand le numéro suivant la continue
+  var C = OFFICE_CLAIR, acc = docxCouleur(officeAccent(d)[0]), rels = [], medias = [], nums = [], suiteNum = [], docPr = 0;
   var rel = function (type, cible, ext) { var id = 'rId' + (rels.length + 3); rels.push('<Relationship Id="' + id + '" Type="' + DOCX_REL + type + '" Target="' + xmlAttr(cible) + '"' + (ext ? ' TargetMode="External"' : '') + '/>'); return id; };
   // segments → runs ; o : propriétés du paragraphe appliquées à chaque run (taille, couleur, capitales, gras)
   var rPr = function (g, o) {
@@ -118,13 +120,27 @@ function docxDepuisElements(elts, d) {
   };
   // contenu d'une cellule : jamais vide, et un paragraphe après un tableau imbriqué
   var dansCellule = function (arr, o) { var x = tous(arr, o); return x && !/<\/w:tbl>$/.test(x) ? x : x + '<w:p/>'; };
+  var numerotation = function (abs, ilvl, depart) { nums.push({ abs: abs, ilvl: ilvl, depart: depart }); return nums.length; };
+  // item numéroté d'un bloc texte (n : numéro d'Ardoise) : instance reprise si n continue la suite de ce niveau, sinon nouvelle,
+  // qui part de n sur ce niveau (startOverride)
+  var numeroTexte = function (lv, n) {
+    var s = suiteNum[lv];
+    if (!s || n !== s.n + 1) s = suiteNum[lv] = { id: numerotation(2, lv, n) };
+    s.n = n; return s.id;
+  };
+  var jc = function (e) { var a = LIGNE_ALIGNEMENTS[e.alignement]; return a ? '<w:jc w:val="' + a.word + '"/>' : ''; };
+  var TAILLE = {}; LIGNE_TAILLES.forEach(function (t) { TAILLE[t] = Math.round(22 * LIGNE_TAILLES_PX[t] / 15); });   // demi-points : Normal 22 pour 15 px
+  // liste : cases (coche) en paragraphes ☐/☑ en retrait ; numéros d'un bloc texte (n) par numeroTexte ; sinon une numérotation
+  // par liste, à puces ou numérotée (Liste, sommaire, requêtes : les numéros repartent de 1)
   var liste = function (e) {
-    var cases = e.items.some(function (it) { return it.coche != null; }), id = 0;
-    if (!cases) { nums.push(e.ordonnee ? 2 : 1); id = nums.length; }
+    var id = 0, puces = 0, serre = e.serre ? '<w:spacing w:after="0"/>' : '';
+    if (e.items.some(function (it) { return it.coche == null && it.n == null; })) id = numerotation(e.ordonnee ? 2 : 1, 0, 1);
     return e.items.map(function (it) {
-      var lv = Math.max(0, Math.min(8, +it.niveau || 0));
-      if (cases) return P(lv ? '<w:ind w:left="' + 360 * lv + '"/>' : '', runs([{ texte: it.coche ? '☑ ' : '☐ ' }].concat(it.segs)));
-      return P('<w:numPr><w:ilvl w:val="' + lv + '"/><w:numId w:val="' + id + '"/></w:numPr>', runs(it.segs));
+      var lv = Math.max(0, Math.min(8, +it.niveau || 0)), o = TAILLE[it.taille] ? { sz: TAILLE[it.taille] } : {};
+      if (it.coche != null) return P(serre + (lv ? '<w:ind w:left="' + 360 * lv + '"/>' : '') + jc(it), runs([{ texte: marqueDeLigne({ genre: 'case', done: it.coche }) }].concat(it.segs), o));
+      if (it.genre && it.n == null && !puces) puces = numerotation(1, 0, 1);
+      var nid = it.n != null ? numeroTexte(lv, it.n) : it.genre ? puces : id;
+      return P('<w:numPr><w:ilvl w:val="' + lv + '"/><w:numId w:val="' + nid + '"/></w:numPr>' + serre + jc(it), runs(it.segs, o));
     }).join('');
   };
   var image = function (e) {
@@ -143,10 +159,13 @@ function docxDepuisElements(elts, d) {
   };
   var un = function (e) {
     switch (e.t) {
-      case 'titre': return P('<w:pStyle w:val="' + (e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title') + '"/>', runs(e.segs));
+      case 'titre': return P('<w:pStyle w:val="' + (e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title') + '"/>' + (e.retrait ? '<w:ind w:left="' + 480 * e.retrait + '"/>' : '') + jc(e), runs(e.segs));
       case 'para':
         var st = STYLE[e.style] || {}, pp = e.style === 'pied' ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="' + docxCouleur(C.line) + '"/></w:pBdr>' : '';
+        if (e.serre) pp += '<w:spacing w:after="0"/>';   // ligne d'un bloc texte suivie d'une autre (avant w:ind : ordre du schéma)
         if (e.retrait) pp += '<w:ind w:left="' + 480 * e.retrait + '"/>';
+        pp += jc(e);   // après w:ind (ordre du schéma)
+        if (TAILLE[e.taille]) { st = Object.create(st); st.sz = TAILLE[e.taille]; }
         return P(pp, runs(e.segs, st));
       case 'liste': return liste(e);
       case 'tableau':
@@ -209,7 +228,8 @@ function docxStyles() {
     s('Caption', 'caption', '<w:spacing w:after="160"/>', '<w:i/><w:iCs/><w:color w:val="' + docxCouleur(C.muted) + '"/><w:sz w:val="18"/><w:szCs w:val="18"/>') +
     '</w:styles>';
 }
-// numérotation : 1 = puces, 2 = numéros (neuf niveaux) ; une instance par liste (les numéros repartent de 1)
+// numérotation : 1 = puces, 2 = numéros (neuf niveaux) ; instances [{ abs, ilvl, depart }] : une par liste (départ 1 au premier
+// niveau) ou par suite de numéros d'un bloc texte (départ = numéro d'Ardoise sur le niveau de la ligne)
 function docxNumerotation(nums) {
   var PUCES = ['•', '◦', '▪'], abs = function (id, ordonnee) {
     var h = '<w:abstractNum w:abstractNumId="' + id + '"><w:multiLevelType w:val="hybridMultilevel"/>';
@@ -217,7 +237,7 @@ function docxNumerotation(nums) {
       '<w:pPr><w:ind w:left="' + 360 * (l + 1) + '" w:hanging="360"/></w:pPr>' + (ordonnee ? '' : '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>') + '</w:lvl>';
     return h + '</w:abstractNum>';
   };
-  return DOCX_XML + '<w:numbering ' + DOCX_NS + '>' + abs(1, false) + abs(2, true) + nums.map(function (a, i) {
-    return '<w:num w:numId="' + (i + 1) + '"><w:abstractNumId w:val="' + a + '"/>' + (a === 2 ? '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="1"/></w:lvlOverride>' : '') + '</w:num>';
+  return DOCX_XML + '<w:numbering ' + DOCX_NS + '>' + abs(1, false) + abs(2, true) + nums.map(function (x, i) {
+    return '<w:num w:numId="' + (i + 1) + '"><w:abstractNumId w:val="' + x.abs + '"/>' + (x.abs === 2 ? '<w:lvlOverride w:ilvl="' + x.ilvl + '"><w:startOverride w:val="' + x.depart + '"/></w:lvlOverride>' : '') + '</w:num>';
   }).join('') + '</w:numbering>';
 }

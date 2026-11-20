@@ -56,7 +56,7 @@ function dupBlock(b) {
   session.modifier(function () { o.liste.splice(o.i + 1, 0, c); revealBlock(c.id); });
 }
 function replaceBlock(b, type) {
-  if (type === 'p') { focusField(b.id); return; }
+  if (type === 'texte' && b.type === 'texte') { focusField(b.id); return; }
   var o = position(b); if (!o) return;
   if (o.parent && HORS_GROUPE[type]) { focusField(b.id); return; }   // le menu d'un bloc d'un groupe ne le propose pas
   var nb = mk(type, {});
@@ -64,6 +64,13 @@ function replaceBlock(b, type) {
   if (type === 'image') pickImage(nb); else focusField(nb.id, type === 'group' ? 'title' : null, false);
 }
 
+// menu ⋯ d'une Liste, d'une Liste à cocher ou d'un Sous-titre : bloc texte à sa place (page ou groupe), même identifiant
+// (blocEnTexte : 05-lignes.js), une étape d'historique, curseur dans le nouveau bloc
+function convertirEnTexte(b) {
+  var o = position(b); if (!o) return;
+  session.modifier(function () { o.liste.splice(o.i, 1, blocEnTexte(b)); });
+  focusField(b.id, null, false);
+}
 // menu ⋯ d'un bloc : envelopper dans un groupe neuf (curseur dans son titre), sortir du groupe, dégrouper
 function gesteMettreDansGroupe(b) {
   var g = null; session.modifier(function () { g = mettreDansGroupe(doc.blocks, b.id); });
