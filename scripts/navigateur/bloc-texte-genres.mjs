@@ -129,13 +129,23 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   if ((await visibles('.bmf [data-mf="bold"]')).length !== 1) echec('cellule : barre de mise en forme absente');
   if ((await visibles('.bmf [data-mf="genre"]')).length) echec('cellule : sélecteur de genre visible');
 
+  // « Case » sur une sélection qui contient une case cochée : elle reste cochée (revue du lot) ; une sélection qui finit au
+  // début de la ligne suivante (Maj+↓) ne touche pas cette ligne
+  const versCase = async () => { await clic(await evalue(centre('.bmf [data-mf="genre"]'))); await clic(await evalue(centre('.pop [data-choix="case"]'))); };
+  await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'faite', genre: 'case', done: true }, { html: 'puce', genre: 'puce' }] }]);
+  await evalue(choisir('t1', 0, 1, 1, 2)); await attendre(250); await versCase();
+  await verifie('« Case » sur une case cochée', 't1', [{ html: 'faite', genre: 'case', done: true }, { html: 'puce', genre: 'case' }]);
+  await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'un' }, { html: 'deux' }] }]);
+  await evalue(curseur('t1', 0, 0)); await touche('ArrowDown', 'ArrowDown', 40, 8); await attendre(250); await versCase();
+  await verifie('« Case » après Maj+↓', 't1', [{ html: 'un', genre: 'case' }, { html: 'deux' }]);
+
   // clic sur une case : cochée (doc), le curseur ne bouge pas ; Ctrl+Z la décoche
   await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'puce', genre: 'puce' }, { html: 'à faire', genre: 'case' }] }]);
   await evalue(curseur('t1', 0, 2));
   await clic(await evalue(marque('.fld[data-b="t1"]', 1)));
   await verifie('clic sur une case', 't1', [{ html: 'puce', genre: 'puce' }, { html: 'à faire', genre: 'case', done: true }]);
   mesure();
-  if (!(await evalue(`document.querySelectorAll('.fld[data-b="t1"] > .lg')[1].hasAttribute('data-done')`))) echec('clic sur une case : coche invisible');
+  if ((await evalue(`getComputedStyle(document.querySelectorAll('.fld[data-b="t1"] > .lg')[1], '::before').content`)) !== '"✓"') echec('clic sur une case : coche invisible');
   await touche(...CTRL_Z); await attendre(150);
   await verifie('clic sur une case puis Ctrl+Z', 't1', [{ html: 'puce', genre: 'puce' }, { html: 'à faire', genre: 'case' }]);
   // clic sur la marque d'une puce : curseur au début du texte, la marque n'est ni texte ni sélection

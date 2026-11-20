@@ -314,9 +314,7 @@ function libelleChoix(k, v) {
 // lignes du bloc texte touchées par la sélection, ou []
 function lignesTouchees(fld) {
   var s = getSelection(); if (!s.rangeCount || !fld || !fld.hasAttribute('data-texte')) return [];
-  var r = s.getRangeAt(0), ls = lignesDe(fld), a = ls.indexOf(ligneDuNoeud(fld, r.startContainer)), z = ls.indexOf(ligneDuNoeud(fld, r.endContainer));
-  if (a < 0 || z < 0) return ls.filter(function (lg) { return r.intersectsNode(lg); });
-  return ls.slice(a, z + 1);
+  return lignesSousPlage(fld, s.getRangeAt(0));
 }
 function ouvrirChoix(k, ancre) {
   closePop();

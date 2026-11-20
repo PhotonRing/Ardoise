@@ -19,8 +19,8 @@ app.addEventListener('input', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img') && !el.hasAttribute('data-texte')) el.innerHTML = '';   // bloc texte : reparerLignes garde une ligne
   var bl = byId(el.dataset.b); if (!bl) return;
-  if (bl.type === 'texte' && lignesDe(el).length === 1 && !el.querySelector('[data-lv]') && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
-    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré
+  if (bl.type === 'texte' && lignesDe(el).length === 1 && !el.querySelector('[data-lv], [data-g]') && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
+    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré ; même règle que texteVide au clavier
     slashMenu(el, bl); el.innerHTML = '<div class="lg"><br></div>'; return;
   }
   setPath(bl, el.dataset.k, fieldValue(el));

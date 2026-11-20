@@ -45,6 +45,12 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   await ecran(1000, false);
   await charger();
 
+  // sélection qui finit au début de la ligne suivante (Maj+↓) : Droite et Petit ne touchent pas cette ligne (revue du lot)
+  await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'un' }, { html: 'deux' }] }]);
+  await evalue(curseur('t1', 0, 0)); await touche('ArrowDown', 'ArrowDown', 40, 8); await attendre(250);
+  await choix('align', 'droite'); await choix('taille', 'petit');
+  await verifie('Droite et Petit après Maj+↓', 't1', [{ html: 'un', align: 'droite', taille: 'petit' }, { html: 'deux' }]);
+
   // Centré puis Grand sur trois lignes sélectionnées : sélection gardée, une étape par choix
   const trois = [{ html: 'un' }, { html: 'deux', genre: 'puce' }, { html: 'trois', genre: 'case' }];
   await charge([{ id: 't1', type: 'texte', lignes: [{ html: 'avant' }].concat(trois, [{ html: 'après' }]) }]);

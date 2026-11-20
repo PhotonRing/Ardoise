@@ -58,6 +58,14 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   mesure();
   if (await evalue(`!!document.querySelector('.pop .mi')`)) echec('« / » dans un bloc non vide : le menu s\'ouvre');
   await verifie('« / » dans un bloc non vide', 't1', [L('a'), L('/')]);
+  // « / » au clavier virtuel sur une puce ou une case seule et vide : un caractère, comme au clavier physique (revue du lot)
+  for (const genre of ['puce', 'case']) {
+    await charge([{ id: 't1', type: 'texte', lignes: [{ html: '', genre }] }]);
+    await evalue(curseur('t1', 0, 0)); await cdp('Input.insertText', { text: '/' }); await attendre(120);
+    mesure();
+    if ((await visibles('.pop .mi')).length) echec('« / » au clavier virtuel dans une ' + genre + ' vide : le menu s\'ouvre');
+    await verifie('« / » au clavier virtuel dans une ' + genre + ' vide', 't1', [{ html: '/', genre }]);
+  }
 
   // Entrée au milieu d'une ligne en retrait : deux lignes du même niveau ; la saisie continue dans la seconde
   await charge([{ id: 't1', type: 'texte', lignes: [L('abcdef', 2)] }]);
@@ -95,6 +103,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, visibles
   mesure();
   const apres = await evalue('getSelection().toString()');
   if (apres !== avant) echec('Tab : sélection ' + JSON.stringify(apres) + ' au lieu de ' + JSON.stringify(avant));
+  // sélection qui finit au début de la ligne suivante (Maj+↓ depuis le début d'une ligne) : Tab ne touche pas cette ligne
+  await charge([{ id: 't1', type: 'texte', lignes: [L('un'), L('deux'), L('trois')] }]);
+  await evalue(curseur('t1', 0, 0)); await touche('ArrowDown', 'ArrowDown', 40, 8); await touche(...TAB);
+  await verifie('Tab après Maj+↓', 't1', [L('un', 1), L('deux'), L('trois')]);
   // plafond à 6, plancher à 0
   await charge([{ id: 't1', type: 'texte', lignes: [L('a', 6), L('b')] }]);
   await evalue(choisir('t1', 0, 0, 1, 1)); await touche(...TAB);

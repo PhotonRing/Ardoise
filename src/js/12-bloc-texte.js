@@ -5,11 +5,13 @@ function lignesDe(el) { return Array.prototype.filter.call(el.children, function
 function ligneVideEl(lg) { return lg.textContent.replace(/​/g, '') === '' && !lg.querySelector('img'); }
 function poserNiveau(lg, n) { n = Math.max(0, Math.min(LIGNE_LV_MAX, n)); if (n) lg.dataset.lv = n; else lg.removeAttribute('data-lv'); }
 function niveauEl(lg) { return +lg.dataset.lv || 0; }
-// genre d'une ligne (data-g, absent pour une ligne de texte) ; une case qui change de genre ou qui naît perd sa coche
+// genre d'une ligne (data-g, absent pour une ligne de texte) ; une case qui change de genre ou qui naît perd sa coche,
+// une case qui reste case la garde
 function genreEl(lg) { return lg.dataset.g || ''; }
 function poserGenre(lg, g) {
+  if (genreEl(lg) !== g) lg.removeAttribute('data-done');
   if (g) lg.dataset.g = g; else lg.removeAttribute('data-g');
-  lg.removeAttribute('data-done'); lg.removeAttribute('data-n');
+  lg.removeAttribute('data-n');
   if (g === 'soustitre') lg.removeAttribute('data-taille');   // le sous-titre a sa propre taille
 }
 // alignement (data-align, absent pour gauche) et taille (data-taille, absente pour Normal ; jamais sur un sous-titre)
@@ -66,6 +68,15 @@ function auBordDeLigne(lg, r, dir) {
   if (t.toString().replace(/​/g, '') !== '') return false;
   var brs = t.cloneContents().querySelectorAll('br');
   return !brs.length || (dir > 0 && brs.length === 1 && lg.lastChild && lg.lastChild.nodeName === 'BR');   // le <br> qui tient une ligne vide
+}
+// lignes touchées par la plage r (Tab, genre, alignement, taille) ; une sélection qui finit au tout début d'une ligne
+// (triple-clic, Maj+↓) ne touche pas cette ligne
+function lignesSousPlage(el, r) {
+  var ls = lignesDe(el), a = ls.indexOf(ligneDuNoeud(el, r.startContainer)), z = ls.indexOf(ligneDuNoeud(el, r.endContainer));
+  if (a < 0 || z < 0) return ls.filter(function (lg) { return r.intersectsNode(lg); });
+  var fin = document.createRange(); fin.setStart(r.endContainer, r.endOffset);
+  if (z > a && auBordDeLigne(ls[z], fin, -1)) z--;
+  return ls.slice(a, z + 1);
 }
 // joint la ligne b à la fin de la ligne a ; curseur à la jointure
 function joindreLignes(el, a, b) {
@@ -136,9 +147,7 @@ function toucheTexte(e, el, b) {
   if (e.key === 'Tab') {
     // ±1 niveau sur toutes les lignes touchées par la sélection
     e.preventDefault();
-    var a = lignes.indexOf(ligneDuNoeud(el, r.startContainer)), z = lignes.indexOf(ligneDuNoeud(el, r.endContainer));
-    if (a < 0 || z < 0) return true;
-    for (var j = a; j <= z; j++) poserNiveau(lignes[j], niveauEl(lignes[j]) + (e.shiftKey ? -1 : 1));
+    lignesSousPlage(el, r).forEach(function (x) { poserNiveau(x, niveauEl(x) + (e.shiftKey ? -1 : 1)); });
     fire(el); return true;
   }
   if (!lg) return false;
