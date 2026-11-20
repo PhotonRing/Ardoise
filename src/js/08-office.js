@@ -117,9 +117,28 @@ function officeBloc(b, d, opts) {
       var num = stepNums(d.pages[pi].blocks)[b.id];
       out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
     case 'texte':
-      // une ligne → un paragraphe à son retrait ; serre : pas d'espace après (toutes sauf la dernière, comme .texte .lg) ; ligne : gardée vide dans le texte brut
-      normLignes(b.lignes).forEach(function (l, i, ls) {
-        var o = { ligne: true }; if (l.lv > 0) o.retrait = Math.min(LIGNE_LV_MAX, +l.lv); if (i < ls.length - 1) o.serre = true;
+      // ligne de texte → paragraphe à son retrait ; sous-titre → titre de niveau 3 ; suite de puces, numéros et cases (tous
+      // niveaux) → un élément liste, coupé par une ligne de texte ou un sous-titre ; chaque item porte son genre et son numéro
+      // affiché (numerosDesLignes : la coupe ne change pas les numéros). serre : pas d'espace après (sauf la dernière ligne,
+      // comme .texte .lg) ; ligne : gardée vide dans le texte brut ; alignement et taille : réglages de la ligne
+      var ls = normLignes(b.lignes), nums = numerosDesLignes(ls), suite = null;
+      ls.forEach(function (l, i) {
+        var o = {}, lv = Math.min(LIGNE_LV_MAX, +l.lv || 0), dernier = i === ls.length - 1;
+        if (l.align) o.alignement = l.align;
+        if (l.taille) o.taille = l.taille;
+        if (l.genre === 'puce' || l.genre === 'numero' || l.genre === 'case') {
+          var it = { niveau: lv, segs: S(l.html), genre: l.genre }; for (var k in o) it[k] = o[k];
+          if (l.genre === 'numero') it.n = nums[i];
+          if (l.genre === 'case') it.coche = !!l.done;
+          if (!suite) { suite = { t: 'liste', ordonnee: false, items: [] }; out.push(suite); }
+          suite.items.push(it); suite.serre = !dernier;
+          return;
+        }
+        suite = null;
+        if (lv) o.retrait = lv;
+        if (!dernier) o.serre = true;
+        o.ligne = true;
+        if (l.genre === 'soustitre') { o.t = 'titre'; o.niveau = 3; o.segs = S(l.html); out.push(o); return; }
         out.push(para(S(l.html), o));
       });
       break;
@@ -406,7 +425,8 @@ function officeTexte(elts) {
       case 'liste': var n = [];
         return e.items.map(function (it) {
           n[it.niveau] = (n[it.niveau] || 0) + 1; n.length = it.niveau + 1;
-          return new Array(it.niveau + 1).join('  ') + (it.coche != null ? (it.coche ? '☑ ' : '☐ ') : e.ordonnee ? n[it.niveau] + '. ' : '- ') + lig(it.segs);
+          // numéro d'un item de bloc texte (n) : celui d'Ardoise ; sinon compté dans la liste
+          return new Array(it.niveau + 1).join('  ') + (it.coche != null ? (it.coche ? '☑ ' : '☐ ') : it.n != null ? it.n + '. ' : e.ordonnee ? n[it.niveau] + '. ' : '- ') + lig(it.segs);
         }).join('\n');
       case 'tableau': return e.lignes.map(function (l) { return l.map(function (c) { return tous(c).replace(/[\t\n]+/g, ' '); }).join('\t'); }).join('\n');
       case 'cadre': return tous(e.contenu);

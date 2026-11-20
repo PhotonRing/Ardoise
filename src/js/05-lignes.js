@@ -189,37 +189,50 @@ function lignesEnTexte(lignes, nums) {
   nums = nums || numerosDesLignes(lignes);
   return lignes.map(function (l, i) { return new Array((+l.lv || 0) + 1).join('  ') + marqueDeLigne(l, nums[i]) + texteBrutDePresse(l.html); }).join('\n');
 }
-// copie : puces et numéros en <ul>/<ol> imbriqués (une ligne plus profonde s'imbrique dans le <li> du dessus ; une liste sans
-// parent à son niveau porte data-lv, et une marge hors de toute liste ; <ol start> = numéro affiché) ; cases en <p> avec ☐/☑
-// (Writer change une liste de cases en puces) ; sous-titre en <h3> ; texte en <p>. data-lv, data-g et data-done : pour un
-// collage dans Ardoise, la marge pour les autres applications
-function lignesEnHtml(lignes, idDoc, nums) {
-  nums = nums || numerosDesLignes(lignes);
+// marche des listes d'un bloc texte : puces et numéros en <ul>/<ol> imbriqués (une ligne plus profonde s'imbrique dans le <li>
+// du dessus ; un autre genre au même niveau ferme la liste) ; toute autre ligne ferme les listes ouvertes. f fournit le HTML :
+// liste(tag, niveau, haut (liste ouverte au-dessus ou null), numéro affiché, i) → balise ouvrante ; li(l, i) → <li…> et son
+// contenu ; ligne(l, i) → HTML d'une ligne hors liste (case, sous-titre, texte). Copie (lignesEnHtml) et Copier pour Office
+function lignesEnListes(lignes, nums, f) {
   var out = '', ouvertes = [];
   var fermer = function (jusqua) { while (ouvertes.length > jusqua) out += '</li></' + ouvertes.pop().tag + '>'; };
-  var retrait = function (n) { return n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : ''; };
   lignes.forEach(function (l, i) {
-    var n = +l.lv || 0, h = pastillesSansCouleur(l.html, idDoc);
+    var n = +l.lv || 0;
     if (l.genre === 'puce' || l.genre === 'numero') {
       var tag = l.genre === 'puce' ? 'ul' : 'ol';
       while (ouvertes.length && ouvertes[ouvertes.length - 1].lv > n) fermer(ouvertes.length - 1);
       var haut = ouvertes[ouvertes.length - 1];
       if (haut && haut.lv === n && haut.tag !== tag) { fermer(ouvertes.length - 1); haut = ouvertes[ouvertes.length - 1]; }
       if (haut && haut.lv === n) out += '</li>';
-      else {
-        var att = !haut ? retrait(n) : n !== haut.lv + 1 ? ' data-lv="' + n + '"' : '';
-        if (tag === 'ol' && nums[i] && nums[i] !== 1) att += ' start="' + nums[i] + '"';
-        out += '<' + tag + att + '>'; ouvertes.push({ tag: tag, lv: n });
-      }
-      out += '<li>' + (h || '<br>'); return;
+      else { out += f.liste(tag, n, haut || null, nums[i], i); ouvertes.push({ tag: tag, lv: n }); }
+      out += f.li(l, i); return;
     }
     fermer(0);
-    if (l.genre === 'case') out += '<p data-g="case"' + (l.done ? ' data-done' : '') + retrait(n) + '>' + marqueDeLigne(l) + h + '</p>';
-    else if (l.genre === 'soustitre') out += '<h3 data-g="soustitre"' + retrait(n) + '>' + (h || '<br>') + '</h3>';
-    else out += '<p' + retrait(n) + '>' + (h || '<br>') + '</p>';
+    out += f.ligne(l, i);
   });
   fermer(0);
   return out;
+}
+// copie : listes par lignesEnListes (une liste sans parent à son niveau porte data-lv, et une marge hors de toute liste ;
+// <ol start> = numéro affiché) ; cases en <p> avec ☐/☑ (Writer change une liste de cases en puces) ; sous-titre en <h3> ;
+// texte en <p>. data-lv, data-g et data-done : pour un collage dans Ardoise, la marge pour les autres applications
+function lignesEnHtml(lignes, idDoc, nums) {
+  var retrait = function (n) { return n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : ''; };
+  var h = function (l) { return pastillesSansCouleur(l.html, idDoc); };
+  return lignesEnListes(lignes, nums || numerosDesLignes(lignes), {
+    liste: function (tag, n, haut, num) {
+      var att = !haut ? retrait(n) : n !== haut.lv + 1 ? ' data-lv="' + n + '"' : '';
+      if (tag === 'ol' && num && num !== 1) att += ' start="' + num + '"';
+      return '<' + tag + att + '>';
+    },
+    li: function (l) { return '<li>' + (h(l) || '<br>'); },
+    ligne: function (l) {
+      var n = +l.lv || 0;
+      if (l.genre === 'case') return '<p data-g="case"' + (l.done ? ' data-done' : '') + retrait(n) + '>' + marqueDeLigne(l) + h(l) + '</p>';
+      if (l.genre === 'soustitre') return '<h3 data-g="soustitre"' + retrait(n) + '>' + (h(l) || '<br>') + '</h3>';
+      return '<p' + retrait(n) + '>' + (h(l) || '<br>') + '</p>';
+    }
+  });
 }
 // case parente (requêtes « cases à cocher ») : html de la ligne la plus proche au-dessus de niveau strictement inférieur,
 // quel que soit son genre, cochée ou non ; '' au niveau 0. Ne lit que html et lv : vaut aussi pour une Liste à cocher

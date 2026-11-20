@@ -1,6 +1,7 @@
 // Export Word (src/js/08-docx.js) : écrivain de zip stocké et parties WordprocessingML. Le banc relit lui-même le zip
 // (méthode 0, CRC vérifié), contrôle que chaque XML est bien formé et cherche dans document.xml ce que l'auteur attend.
 import { monter, test, egal, vrai } from './commun.mjs';
+import { MELE } from './office-listes.mjs';
 
 const u32 = (o, i) => (o[i] | (o[i + 1] << 8) | (o[i + 2] << 16) | (o[i + 3] << 24)) >>> 0;
 const u16 = (o, i) => o[i] | (o[i + 1] << 8);
@@ -223,4 +224,29 @@ test('docx : bloc texte, un paragraphe par ligne, retrait par niveau, sans espac
   vrai(!/<w:ind/.test(un) && /<w:ind w:left="960"\/>/.test(deux) && /<w:ind w:left="480"\/>/.test(trois), 'retraits : ' + deux + trois);
   vrai(/<w:spacing w:after="0"\/>/.test(un) && /<w:spacing w:after="0"\/>/.test(deux) && !/<w:spacing/.test(trois), 'espacement : ' + un + trois);
   vrai(/<w:spacing w:after="0"\/><w:ind/.test(deux), 'w:spacing avant w:ind (ordre du schéma) : ' + deux);
+});
+
+test('docx : bloc texte mêlé, numérotation Word aux numéros d\'Ardoise, puces et cases, alignement (w:jc) et taille (w:sz)', () => {
+  const doc0 = { v: 6, title: 'Doc', tags: { ok: { c: 0 } }, pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'tm', type: 'texte', lignes: MELE },
+    { id: 'ol', type: 'list', ordered: true, items: [{ html: 'premier' }, { html: 'second' }] },
+  ] }] };
+  const { doc, t } = produire(doc0, {}), num = t['word/numbering.xml'];
+  for (const k in t) bienForme(t[k], k);
+  const numId = (mot) => { const m = para(doc, '>' + mot + '<').match(/<w:ilvl w:val="(\d)"\/><w:numId w:val="(\d+)"\/>/); return m ? [+m[1], +m[2]] : null; };
+  const inst = (id) => { const m = num.match(new RegExp('<w:num w:numId="' + id + '"><w:abstractNumId w:val="(\\d)"/>(?:<w:lvlOverride w:ilvl="(\\d)"><w:startOverride w:val="(\\d+)"/></w:lvlOverride>)?</w:num>')); return m ? [+m[1], m[2] == null ? null : +m[2], m[3] == null ? null : +m[3]] : null; };
+  const [un, deux, trois, encore, grand] = ['un', 'deux', 'trois', 'encore un', 'Grand'].map(numId);
+  egal([un[0], deux[1], trois[1]], [0, un[1], un[1]], '1, 2, 3 dans la même numérotation, malgré la puce plus profonde et la ligne de texte');
+  egal(inst(un[1]), [2, 0, 1], 'numérotation qui part de 1');
+  vrai(encore[1] !== un[1] && grand[1] !== encore[1], 'reprise à 1 : nouvelle numérotation');
+  egal(inst(encore[1]), [2, 0, 1]); egal(inst(grand[1]), [2, 0, 1]);
+  const sous = numId('sous'), puce = numId('puce');
+  egal([sous[0], inst(sous[1])[0], puce[0], inst(puce[1])[0]], [1, 1, 0, 1], 'puces : numérotation à puces, au niveau de la ligne');
+  vrai(!/<w:numPr>/.test(para(doc, 'note')) && /<w:ind w:left="480"\/>/.test(para(doc, 'note')), 'ligne de texte en retrait : ' + para(doc, 'note'));
+  vrai(/>☑ fait /.test(para(doc, 'fait')) && !/<w:numPr>/.test(para(doc, 'fait')) && />☐ à faire</.test(para(doc, 'à faire')) && /<w:ind w:left="360"\/>/.test(para(doc, 'à faire')), 'cases en texte');
+  vrai(/<w:jc w:val="center"\/>/.test(para(doc, 'Centré')) && /<w:sz w:val="19"\/>/.test(para(doc, 'Centré')), 'centré, Petit : ' + para(doc, 'Centré'));
+  vrai(/<w:jc w:val="right"\/>/.test(para(doc, '>Grand<')) && /<w:sz w:val="26"\/>/.test(para(doc, '>Grand<')), 'à droite, Grand : ' + para(doc, '>Grand<'));
+  vrai(para(doc, 'Partie').includes('<w:pStyle w:val="Heading3"/>'), 'sous-titre en Titre 3');
+  const [p1, p2] = ['premier', 'second'].map(numId);
+  egal(p1[1], p2[1], 'liste numérotée : une numérotation'); egal(inst(p1[1]), [2, 0, 1], 'qui part de 1');
 });

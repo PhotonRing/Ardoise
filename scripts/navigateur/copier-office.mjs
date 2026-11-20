@@ -18,6 +18,10 @@ const DOC = { v: 6, id: 'doc-copier-office', title: 'Office', theme: 'dark', tag
   { id: 't1', type: 'table', rows: [['Nom', 'État'], ['Serveur', P('OK')]] },
   { id: 'tl', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }, { date: '2025', title: 'Fin', text: '', color: 'ok' }] },
   { id: 'mp', type: 'map', height: 300, bg: 'vector', view: { lat: 48, lon: 2, z: 4 }, markers: [{ lat: 48.85, lon: 2.35, label: 'Paris', color: 'bad' }], zones: [], routes: [], list: false },
+  // bloc texte mêlé (ticket 08 du bloc texte) : numéros qui repartent à 1, puce imbriquée, cases, sous-titre, centrée, Petit, Grand
+  { id: 'tm', type: 'texte', lignes: [{ html: 'Étapes', genre: 'soustitre' }, { html: 'Geler', genre: 'numero' }, { html: 'prévenir', genre: 'puce', lv: 1 },
+    { html: 'Déployer', genre: 'numero' }, { html: 'Remarque', align: 'centre', taille: 'petit' }, { html: 'Relancer', genre: 'numero', taille: 'grand' },
+    { html: 'Serveurs', genre: 'case', done: true }, { html: 'Sauvegardes', genre: 'case', lv: 1 }] },
   { id: 'g1', type: 'group', title: 'Événement', folded: false, blocks: [
     { id: 'dm', type: 'diamond', title: 'Campagne X', adversaire: 'APT', capacite: '', infrastructure: '', victime: '' },
     { id: 'gt', type: 'timeline', orient: 'v', items: [{ date: '2024', title: 'Début', text: '', color: 'ok' }] }] },
@@ -135,6 +139,13 @@ export default async function ({ ecran, cdp, evalue, attendre, mesure, echec }) 
     await copier('g1'); const p6 = await presse(), h6 = p6['text/html'] || '';
     if (!/font-weight:600">[\s\S]{0,80}Événement<\/p>[\s\S]*<table[\s\S]*>ADVERSAIRE<\/span><\/p>[\s\S]*APT[\s\S]*<img src="data:image\/png;base64,/.test(h6)) echec('groupe copié : ' + h6.slice(0, 400));
     if (!(p6['text/plain'] || '').startsWith('Événement\nTitre\tCampagne X\nAdversaire\tAPT')) echec('texte brut du groupe : ' + JSON.stringify(p6['text/plain']));
+
+    // bloc texte mêlé : listes imbriquées aux numéros d'Ardoise, cases en paragraphes, alignement et taille ; texte brut à marques
+    mesure();
+    await copier('tm'); const p8 = await presse(), h8 = (p8['text/html'] || '').replace(/ style="[^"]*"/g, '').replace(/<\/?span>/g, '');
+    if (!h8.includes('<h3>Étapes</h3><ol type="1"><li>Geler<ul type="circle"><li>prévenir</li></ul></li><li>Déployer</li></ol><p>Remarque</p><ol type="1"><li>Relancer</li></ol><p>☑ Serveurs</p><p>☐ Sauvegardes</p>')) echec('bloc texte copié : ' + h8);
+    if (!/text-align:center;font-size:9\.75pt;">Remarque/.test(p8['text/html'] || '') || !/font-size:13\.5pt;">Relancer/.test(p8['text/html'] || '')) echec('alignement et taille du bloc texte : ' + p8['text/html']);
+    if (p8['text/plain'] !== 'Étapes\n1. Geler\n  - prévenir\n2. Déployer\nRemarque\n1. Relancer\n☑ Serveurs\n  ☐ Sauvegardes') echec('texte brut du bloc texte : ' + JSON.stringify(p8['text/plain']));
 
     // presse-papier qui refuse : message d'erreur, pas « Copié »
     mesure();
