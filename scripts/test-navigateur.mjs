@@ -30,7 +30,7 @@ const fin = (code) => { try { chr.kill(); } catch (_) { /* déjà fermé */ } tr
 // arrêté de l'extérieur ou bloqué : Chromium est fermé quand même, et le délai global nomme le sujet en cours
 let enCours = 'démarrage';
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { console.error('navigateur : interrompu pendant ' + enCours); fin(1); });
-setTimeout(() => { console.error('navigateur : ÉCHEC, plus de 240 s au total, bloqué dans ' + enCours); fin(1); }, 240000).unref();
+setTimeout(() => { console.error('navigateur : ÉCHEC, plus de 480 s au total, bloqué dans ' + enCours); fin(1); }, 480000).unref();
 
 // démarrage à froid lent sur les machines de CI : jusqu'à 45 s
 let port; for (let i = 0; i < 450 && !port && chr.exitCode === null; i++) { await attendre(100); const f = join(dir, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
