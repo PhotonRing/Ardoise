@@ -405,6 +405,12 @@ button.tl-dot:hover{transform:scale(1.2)}
 .link-pop .lk-lv1{padding-left:26px} .link-pop .lk-lv2{padding-left:44px}
 .link-pop .lk-lv1 .ic,.link-pop .lk-lv2 .ic{width:22px;height:22px;font-size:11px}
 .link-pop .mi.on .ic{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+/* fenêtre de la formule (15-formules.js) : source LaTeX, puis aperçu en direct ; une formule en édition s'ouvre au clic */
+.formule-pop{width:min(340px,calc(100vw - 16px));min-width:0;padding:8px}
+.formule-pop .menu-q{margin:0 0 6px;font-family:var(--f-mono)}
+.formule-pop .f-apercu{min-height:44px;display:flex;align-items:center;justify-content:center;padding:6px 8px;overflow-x:auto;font-size:22px;color:var(--fg)}
+.formule-pop .f-apercu .muted{font-size:12px}
+.fld .formule[contenteditable="false"]{cursor:pointer}
 
 .img-new{display:flex;flex-direction:column;gap:8px}
 .img-url{display:flex;gap:6px}
