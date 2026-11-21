@@ -121,7 +121,7 @@ function miroirChamps(o, filtres, pre, carte) {
   });
 }
 // --- outils des migrations (sans DOM : vérifiés aussi par scripts/check.mjs dans Node) ---
-var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1 };
+var MIG_SKIP = { id: 1, type: 1, src: 1, code: 1, name: 1, lang: 1, variant: 1, alt: 1, tex: 1 };
 function migStrings(d, fn) {
   // applique fn à chaque texte des blocs (texte enrichi compris), sauf identifiants, images et code
   function walk(o) {

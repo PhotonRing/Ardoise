@@ -105,6 +105,9 @@ b,strong{font-weight:600}
 .formule{white-space:nowrap}
 .formule math{color:inherit;font-size:1.05em}
 math .f-err{color:var(--bad)}
+/* bloc formule : la formule seule, centrée et en grand ; une formule plus large que la colonne défile dans le bloc */
+.formule-bloc{text-align:center;overflow-x:auto;overflow-y:hidden;padding:4px 0}
+.formule-bloc math{color:inherit;font-size:1.6em}
 /* modèle diamant : sommets dans une grille 3 × 3 (Adversaire en haut, Infrastructure à gauche, Capacité à droite, Victime en bas),
    traits en SVG derrière ; sous 480 px, pile dans l'ordre du HTML (Adversaire, Capacité, Infrastructure, Victime) */
 .dia{display:flex;flex-direction:column;gap:10px}

@@ -177,6 +177,12 @@ function renderBlock(b, d, ctx, num) {
         (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
         '<button class="copy" type="button" data-copy>Copier</button>' +
         (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
+    case 'formule':
+      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
+      var fap = formuleBlocApercu(b.tex, e);
+      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
+      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
+        '<div class="formule-apercu">' + fap + '</div></div>';
     case 'table':
       var rows = b.rows;
       return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
@@ -643,7 +649,7 @@ function render(focus) {
   app.innerHTML = lastNav + renderPage(doc, vc);
   applyTheme();
   if (navSpyFn) navSpyFn();
-  if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
+  if (mode === 'edit') { $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); }); $$('textarea.formule-ta', app).forEach(autosize); }
   mountMaps();
   Reader.tlFit(app);
   poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
@@ -1015,6 +1021,10 @@ function syncCodeLayer(t) {
   pre.style.padding = cs.paddingTop + ' ' + cs.paddingRight + ' ' + cs.paddingBottom + ' ' + cs.paddingLeft;
   pre.style.font = cs.font; pre.style.tabSize = cs.tabSize; pre.style.letterSpacing = cs.letterSpacing;
   pre.scrollLeft = t.scrollLeft;
+}
+// aperçu d'un bloc formule (rendu, et saisie de la source : 12-saisie.js) ; source vide : une invite en édition, rien en lecture
+function formuleBlocApercu(tex, edition) {
+  return texEnMathML(tex, 'bloc') || (edition ? '<span class="formule-invite">Tapez une formule LaTeX, par exemple \\frac{a}{b}</span>' : '');
 }
 function autosize(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 

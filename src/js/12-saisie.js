@@ -3,6 +3,13 @@ var tlTimers = {};
 app.addEventListener('input', function (e) {
   var el = e.target;
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
+  if (el.matches('textarea.formule-ta')) {
+    // bloc formule : l'aperçu suit la source sans rendre la page (07-rendu.js formuleBlocApercu)
+    var bf = byId(el.dataset.b); if (!bf) return;
+    bf.tex = el.value; autosize(el);
+    var fa = el.parentNode.querySelector('.formule-apercu'); if (fa) fa.innerHTML = formuleBlocApercu(bf.tex, true);
+    session.saisir(); return;
+  }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); session.saisir(); return; }
   if (el.matches('.map-q')) { mapSearch(el); return; }
   if (el.matches('.ch-q')) { chSearch(el); return; }
@@ -282,7 +289,7 @@ function caretLine(el, dir) {
 }
 function leaveTable(el, b, dir) {
   // premier champ avant le tableau, ou après lui
-  var all = $$('.fld, textarea.code-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
+  var all = $$('.fld, textarea.code-ta, textarea.formule-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
   if (!cells.length) return;
   var n = all[all.indexOf(cells[dir < 0 ? 0 : cells.length - 1]) + dir]; if (!n) return;
   n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0);
