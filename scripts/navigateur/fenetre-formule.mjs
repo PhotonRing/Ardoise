@@ -83,6 +83,13 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const c1 = { fen: await evalue(FEN(TB)), doc: await evalue(BLOC('tb') + '.rows[1][1]') };
   attendu('clic ailleurs : fenêtre fermée, source de la cellule écrite', !c1.fen && c1.doc === F('E=mc^3'), c1);
 
+  // une source qui contient des `$` (saisie $…$, ticket 02) reste une seule formule : pas de formule imbriquée
+  await cliquer(TB);
+  await remplacer('a$b$');
+  await touche('Enter', 'Enter');
+  const s1 = { doc: await evalue(BLOC('tb') + '.rows[1][1]'), ecran: await evalue(SOURCES(TB)), imbriquees: await evalue(`document.querySelectorAll(${JSON.stringify(TB + ' .formule')}).length`) };
+  attendu('source avec `$` : une seule formule, sans formule imbriquée', s1.doc === F('a$b$') && JSON.stringify(s1.ecran) === '["a$b$"]' && s1.imbriquees === 0, s1);
+
   // source vidée : la formule disparaît du texte et de l'écran
   await cliquer(T1);
   await remplacer('');
