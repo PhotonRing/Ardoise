@@ -32,7 +32,8 @@ test('formules : lettres en italique mathématique Unicode, chiffres groupés, o
   egal(corps('12.5+3'), mn('12.5') + '<mo>+</mo>' + mn('3'));
   egal(corps('a-b'), '<mi>𝑎</mi><mo>−</mo><mi>𝑏</mi>', 'moins : U+2212');
   egal(corps('x < y'), x + '<mo>&lt;</mo>' + y, 'blancs ignorés, < échappé');
-  egal(corps('f(x)=1'), '<mi>𝑓</mi><mo>(</mo>' + x + '<mo>)</mo><mo>=</mo>' + mn('1'));
+  egal(corps('f(x)=1'), '<mi>𝑓</mi><mo stretchy="false">(</mo>' + x + '<mo stretchy="false">)</mo><mo>=</mo>' + mn('1'), 'parenthèse tapée : non étirée, comme en LaTeX');
+  egal(corps('[a]|b|\\{\\}'), '<mo stretchy="false">[</mo><mi>𝑎</mi><mo stretchy="false">]</mo><mo stretchy="false" lspace="0" rspace="0">|</mo><mi>𝑏</mi><mo stretchy="false" lspace="0" rspace="0">|</mo><mo stretchy="false">{</mo><mo stretchy="false">}</mo>');
 });
 
 test('formules : indices et exposants, seuls, ensemble, avec ou sans accolades', () => {
@@ -108,4 +109,120 @@ test('rendu : rendreFormules ne retouche pas une formule déjà rendue', () => {
   egal(ctx.rendreFormules(une, true), une);
   egal(ctx.rendreFormules('a &lt;span class="formule"&gt;x&lt;/span&gt;', false), 'a &lt;span class="formule"&gt;x&lt;/span&gt;', 'texte échappé intact');
   vrai(ctx.rendreFormules(F('a &amp;lt; b'), false).includes('<annotation encoding="application/x-tex">a &amp;lt; b</annotation>'), 'entités décodées puis réécrites');
+});
+
+// ---------- ticket 04 : sous-ensemble complet ----------
+const somme = '<mo>∑</mo>', kEg1 = '<mrow>' + k + '<mo>=</mo>' + mn('1') + '</mrow>';
+
+test('formules : \\sum, \\prod, \\lim : bornes dessous et dessus en bloc, à côté en ligne', () => {
+  egal(corps('\\sum_{k=1}^n', 'bloc'), '<munderover>' + somme + kEg1 + n + '</munderover>');
+  egal(corps('\\sum_{k=1}^n'), '<msubsup>' + somme + kEg1 + n + '</msubsup>');
+  egal(corps('\\prod_k', 'bloc'), '<munder><mo>∏</mo>' + k + '</munder>');
+  egal(corps('\\prod^k', 'bloc'), '<mover><mo>∏</mo>' + k + '</mover>');
+  egal(corps('\\prod_k'), '<msub><mo>∏</mo>' + k + '</msub>');
+  egal(corps('\\lim_{x\\to 0} f', 'bloc'), '<munder><mi>lim</mi><mrow>' + x + '<mo>→</mo>' + mn('0') + '</mrow></munder><mi>𝑓</mi>');
+  egal(corps('\\sum', 'bloc'), somme, 'sans bornes');
+});
+
+test('formules : \\int garde ses bornes à côté, même dans un bloc', () => {
+  egal(corps('\\int_0^1 x', 'bloc'), '<msubsup><mo>∫</mo>' + mn('0') + mn('1') + '</msubsup>' + x);
+  egal(corps('\\int_0^\\infty', 'ligne'), '<msubsup><mo>∫</mo>' + mn('0') + '<mi>∞</mi></msubsup>');
+  egal(corps('\\frac\\sum x y_1', 'bloc'), '<mfrac>' + somme + x + '</mfrac><msub>' + y + mn('1') + '</msub>', 'opérateur en argument : bornes non reportées');
+});
+
+test('formules : fonctions usuelles en romain, suivies de l\'application de fonction', () => {
+  egal(corps('\\sin x'), '<mi>sin</mi><mo>&#x2061;</mo>' + x);
+  egal(corps('\\log_2 n'), '<msub><mi>log</mi>' + mn('2') + '</msub><mo>&#x2061;</mo>' + n);
+  for (const f of ['cos', 'tan', 'ln', 'exp', 'max', 'min', 'arctan', 'det']) egal(corps('\\' + f), '<mi>' + f + '</mi><mo>&#x2061;</mo>', f);
+});
+
+test('formules : relations, flèches et symboles courants', () => {
+  egal(corps('a\\leq b\\neq c\\approx d'), '<mi>𝑎</mi><mo>≤</mo><mi>𝑏</mi><mo>≠</mo><mi>𝑐</mi><mo>≈</mo><mi>𝑑</mi>');
+  egal(corps('\\in\\subset\\to\\Rightarrow\\iff'), '<mo>∈</mo><mo>⊂</mo><mo>→</mo><mo>⇒</mo><mo>⟺</mo>');
+  egal(corps('\\geq\\notin\\subseteq\\leftarrow\\Leftrightarrow\\mapsto'), '<mo>≥</mo><mo>∉</mo><mo>⊆</mo><mo>←</mo><mo>⇔</mo><mo>↦</mo>');
+  egal(corps('\\times\\cdot\\pm\\cdots'), '<mo>×</mo><mo>⋅</mo><mo>±</mo><mo>⋯</mo>');
+  egal(corps('\\partial\\nabla\\emptyset'), '<mi>∂</mi><mi>∇</mi><mi>∅</mi>');
+  egal(corps('x\\rightarrow y'), x + '<mo>→</mo>' + y);
+});
+
+test('formules : accents', () => {
+  const acc = (c) => '<mover accent="true">' + x + '<mo stretchy="false">' + c + '</mo></mover>';
+  egal(corps('\\hat x'), acc('ˆ'));
+  egal(corps('\\vec{x}'), acc('→'));
+  egal(corps('\\bar x'), acc('¯'));
+  egal(corps('\\tilde x'), acc('˜'));
+  egal(corps('\\dot x'), acc('˙'));
+  egal(corps('\\overline{x+y}'), '<mover accent="true"><mrow>' + x + '<mo>+</mo>' + y + '</mrow><mo stretchy="true">―</mo></mover>');
+  egal(corps('\\underline{x}'), '<munder accentunder="true">' + x + '<mo stretchy="true">―</mo></munder>');
+  egal(corps('\\vec{v}^2'), '<msup><mover accent="true"><mi>𝑣</mi><mo stretchy="false">→</mo></mover>' + mn('2') + '</msup>');
+});
+
+test('formules : \\text en mtext, blancs des bords gardés en espaces insécables', () => {
+  egal(corps('x \\text{si } x>0'), x + '<mtext>si </mtext>' + x + '<mo>&gt;</mo>' + mn('0'));
+  egal(corps('\\text{a {b} <c>}'), '<mtext>a {b} &lt;c&gt;</mtext>', 'accolades imbriquées, échappement');
+  egal(corps('\\text{non fermé'), '<mtext>non fermé</mtext>');
+});
+
+test('formules : ensembles, cursive et gras en caractères Unicode', () => {
+  egal(corps('\\mathbb{R}'), '<mi>ℝ</mi>');
+  egal(corps('\\mathcal{F}'), '<mi>ℱ</mi>');
+  egal(corps('\\mathbf{v}'), '<mi>𝐯</mi>');
+  egal(corps('\\mathbb{NZQCA}'), '<mrow><mi>ℕ</mi><mi>ℤ</mi><mi>ℚ</mi><mi>ℂ</mi><mi>𝔸</mi></mrow>');
+  egal(corps('\\mathcal{AB}'), '<mrow><mi>𝒜</mi><mi>ℬ</mi></mrow>');
+  egal(corps('\\mathbf{M}x'), '<mi>𝐌</mi>' + x, 'la variante ne déborde pas');
+  egal(corps('\\mathbf{x}_1'), '<msub><mi>𝐱</mi>' + mn('1') + '</msub>');
+  egal(corps('\\mathbb 1'), '<mn>𝟙</mn>');
+});
+
+test('formules : espaces', () => {
+  const sp = (w) => '<mspace width="' + w + '"></mspace>';
+  egal(corps('a\\,b'), '<mi>𝑎</mi>' + sp('0.1667em') + '<mi>𝑏</mi>');
+  egal(corps('\\;\\quad\\qquad\\!'), sp('0.2778em') + sp('1em') + sp('2em') + sp('-0.1667em'));
+  egal(corps('a\\ b'), '<mi>𝑎</mi>' + sp('0.25em') + '<mi>𝑏</mi>', 'barre oblique et espace');
+});
+
+const fe = (c) => '<mo fence="true" stretchy="true">' + c + '</mo>';
+const a1 = '<mi>𝑎</mi>', b1 = '<mi>𝑏</mi>', c1 = '<mi>𝑐</mi>', d1 = '<mi>𝑑</mi>';
+const tr = (...cs) => '<mtr>' + cs.map((c) => '<mtd>' + c + '</mtd>').join('') + '</mtr>';
+// balises ouvrantes et fermantes équilibrées dans le corps
+const equilibre = (h) => { const pile = []; for (const [, f, t] of h.matchAll(/<(\/?)([a-z]+)[^>]*>/g)) { if (!f) pile.push(t); else if (pile.pop() !== t) return false; } return !pile.length; };
+
+test('formules : délimiteurs adaptables \\left … \\right', () => {
+  egal(corps('\\left( \\frac{a}{b} \\right)'), '<mrow>' + fe('(') + '<mfrac>' + a1 + b1 + '</mfrac>' + fe(')') + '</mrow>');
+  egal(corps('\\left. x \\right|_0'), '<msub><mrow>' + x + fe('|') + '</mrow>' + mn('0') + '</msub>', '\\left. : aucun délimiteur');
+  egal(corps('\\left\\{ x \\right\\rangle'), '<mrow>' + fe('{') + x + fe('⟩') + '</mrow>');
+  egal(corps('\\left[ \\left( x \\right) \\right]'), '<mrow>' + fe('[') + '<mrow>' + fe('(') + x + fe(')') + '</mrow>' + fe(']') + '</mrow>', 'imbriqués');
+  egal(corps('\\left( x\\rightarrow y'), '<mrow>' + fe('(') + x + '<mo>→</mo>' + y + '</mrow>', 'sans \\right, \\rightarrow n\'est pas \\right');
+  egal(corps('x \\right) y'), x + '<mo stretchy="false">)</mo>' + y, '\\right orphelin');
+});
+
+test('formules : matrices', () => {
+  egal(corps('\\begin{matrix} a & b \\\\ c & d \\end{matrix}'), '<mtable>' + tr(a1, b1) + tr(c1, d1) + '</mtable>');
+  egal(corps('\\begin{pmatrix} a & b \\\\ c & d \\\\ \\end{pmatrix}'), '<mrow>' + fe('(') + '<mtable>' + tr(a1, b1) + tr(c1, d1) + '</mtable>' + fe(')') + '</mrow>', 'dernière ligne vide retirée');
+  egal(corps('\\begin{bmatrix} 1 & x+1 \\\\ & 0 \\end{bmatrix}'), '<mrow>' + fe('[') + '<mtable>' + tr(mn('1'), x + '<mo>+</mo>' + mn('1')) + tr('', mn('0')) + '</mtable>' + fe(']') + '</mrow>', 'cellule vide, plusieurs éléments');
+});
+
+test('formules : cas et égalités alignées', () => {
+  egal(corps('f(x)=\\begin{cases} 1 & \\text{si } x>0 \\\\ 0 & \\text{sinon} \\end{cases}').replace(/^.*?<mo>=<\/mo>/, ''),
+    '<mrow>' + fe('{') + '<mtable class="f-cases" columnalign="left left">' + tr(mn('1'), '<mtext>si\u00a0</mtext>' + x + '<mo>&gt;</mo>' + mn('0')) + tr(mn('0'), '<mtext>sinon</mtext>') + '</mtable></mrow>');
+  egal(corps('\\begin{aligned} a &= b \\\\ &= c \\end{aligned}', 'bloc'),
+    '<mtable class="f-aligned" displaystyle="true" columnalign="right left">' + tr(a1, '<mo>=</mo>' + b1) + tr('', '<mo>=</mo>' + c1) + '</mtable>');
+});
+
+test('formules : \\\\ hors environnement : lignes au premier niveau, ignoré dans un groupe', () => {
+  egal(corps('a \\\\ b', 'bloc'), '<mtable>' + tr(a1) + tr(b1) + '</mtable>');
+  egal(corps('{a \\\\ b}'), '<mrow>' + a1 + b1 + '</mrow>');
+  egal(corps('a \\\\[2pt] b \\\\'), '<mtable>' + tr(a1) + tr(b1) + '</mtable>', 'argument d\'espacement absorbé, dernière ligne vide retirée');
+});
+
+test('formules : environnement mal fermé ou inconnu, \\left sans \\right : sans exception, le reste rendu', () => {
+  egal(corps('\\begin{pmatrix} 1 & 2'), '<mrow>' + fe('(') + '<mtable>' + tr(mn('1'), mn('2')) + '</mtable>' + fe(')') + '</mrow>', 'non fermé');
+  egal(corps('\\begin{cases} a \\end{matrix} + b'), '<mrow>' + fe('{') + '<mtable class="f-cases" columnalign="left left">' + tr(a1) + '</mtable></mrow><mo>+</mo>' + b1, 'fermé sous un autre nom');
+  egal(corps('\\begin{foo} a \\end{foo}'), '<mtext class="f-err">\\begin{foo}</mtext>' + a1 + '<mtext class="f-err">\\end{foo}</mtext>');
+  for (const s of ['\\begin{matrix', '\\begin{aligned} a &', '\\left( \\begin{bmatrix} a', '\\left', '\\left\\', '\\text', '\\begin', '\\end', '\\\\', '\\left( a \\\\ b \\right)', '\\begin{matrix} \\left( a & b \\end{matrix}'])
+    vrai(equilibre(tex(s, 'bloc')), s + ' : ' + tex(s, 'bloc'));
+});
+
+test('formules : commandes hors sous-ensemble en rouge, le reste rendu', () => {
+  egal(corps('\\ce{H2O} + x'), '<mtext class="f-err">\\ce</mtext><mrow><mi>𝐻</mi>' + mn('2') + '<mi>𝑂</mi></mrow><mo>+</mo>' + x);
 });
