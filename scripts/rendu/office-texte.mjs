@@ -93,3 +93,27 @@ test('office (texte) : bloc texte, un paragraphe par ligne, retrait par niveau, 
   vrai(ps[3][2] === 'fin <b>gras</b>', ps[3][2]);
   egal(texte, 'un #OK\n    deux\n\n  fin gras', 'texte brut : deux espaces par niveau, ligne vide gardée');
 });
+
+// Formules (lot 9, ticket 07) : texte brut `$source$` et `$$source$$` sur sa ligne ; le HTML écrit `$source$` jusqu'aux images (ticket 08)
+const FO = (s) => '<span class="formule">' + s + '</span>';
+const DOCF = { v: 6, title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+  { id: 'fp', type: 'p', html: 'Aire ' + FO('x^2') + ' et <b>' + FO('\\frac{a}{b}') + '</b> fin' },
+  { id: 'ft', type: 'texte', lignes: [{ html: 'avant' }, { html: FO('a &lt; b') }] },
+  { id: 'fb', type: 'formule', tex: '\\frac{a}{b}' }, { id: 'fv', type: 'formule', tex: '  ' },
+  { id: 'fh', type: 'table', rows: [['Valeur ' + FO('\\alpha'), 'B'], ['1', '2']] },
+] }] };
+test('office (texte) : formule en ligne en $source$ dans le texte brut et le HTML, un segment à part qui porte sa source', () => {
+  const r = monterOffice(DOCF, 'fp'); verifierSocle(r.html, 'fp');
+  egal(r.texte, 'Aire $x^2$ et $\\frac{a}{b}$ fin');
+  egal(r.e[0].segs.filter((g) => g.formule), [{ texte: '$x^2$', formule: 'x^2' }, { texte: '$\\frac{a}{b}$', gras: true, formule: '\\frac{a}{b}' }]);
+  vrai(r.html.includes('Aire $x^2$ et <b>$\\frac{a}{b}$</b> fin'), 'HTML : ' + r.html);
+  egal(monterOffice(DOCF, 'ft').texte, 'avant\n$a < b$');
+});
+test('office (texte) : bloc formule en $$source$$ sur sa ligne dans le texte brut, rien pour une source vide', () => {
+  egal(monterOffice(DOCF, 'fb').texte, '$$\\frac{a}{b}$$');
+  egal(monterOffice(DOCF, 'fv').texte, '');
+});
+test('office (texte) : formule d\'un en-tête de tableau gardée telle quelle, hors capitales', () => {
+  const r = monterOffice(DOCF, 'fh');
+  vrai(r.html.includes('VALEUR $\\alpha$'), 'en-tête : ' + r.html);
+});

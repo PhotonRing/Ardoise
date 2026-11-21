@@ -139,3 +139,34 @@ test('markdown : page à avertir avant l\'import = un bloc non vide autre que l\
   egal([avec(), avec(TX(''), TX('<br>'), { type: 'h2', html: ' ' }, { type: 'divider' }), avec(TX('<b>x</b>')), avec({ type: 'table', rows: [['', '']] })],
     [false, false, true, true]);
 });
+
+// Formules (lot 9, ticket 07) : règle des dollars de la saisie (dollarsFermes), après le code en ligne et les échappements
+const F = (s) => '<span class="formule">' + s + '</span>';
+test('markdown : $…$ donne une formule, source gardée telle quelle ; \\$, prix, chiffre après le fermant et code restent du texte', () => {
+  egal(H(blocs('Aire $x^2$ et $a+b$.')[0]), 'Aire ' + F('x^2') + ' et ' + F('a+b') + '.');
+  egal(H(blocs('Coût \\$5 et $x$')[0]), 'Coût $5 et ' + F('x'));
+  egal(H(blocs('5 $ et 10 $')[0]), '5 $ et 10 $', 'prix');
+  egal(H(blocs('5$ et 10$')[0]), '5$ et 10$', 'prix collés');
+  egal(H(blocs('$x$1 et $ x$')[0]), '$x$1 et $ x$');
+  egal(H(blocs('`$x$` puis $y$')[0]), '<code>$x$</code> puis ' + F('y'));
+  egal(H(blocs('$a_1 * b_2*c$ et $\\{x\\}$ et $\\$5$')[0]), F('a_1 * b_2*c') + ' et ' + F('\\{x\\}') + ' et ' + F('\\$5'), 'ni italique ni échappement mangé');
+  egal(H(blocs('$x < y \\& #tag$')[0]), F('x &lt; y \\&amp; #tag'), 'échappée une fois, sans pastille');
+});
+
+test('markdown : paragraphe $$…$$ (une ou plusieurs lignes) → bloc formule ; $$…$$ dans un paragraphe → formule en ligne', () => {
+  egal(blocs('Avant\n\n$$\\frac{a}{b}$$\n\nAprès'), [TX('Avant'), { type: 'formule', tex: '\\frac{a}{b}' }, TX('Après')]);
+  egal(blocs('$$\n\\begin{cases}\n- 1 & x<0 \\\\\n1 | 2\n\\end{cases}\n$$'), [{ type: 'formule', tex: '\\begin{cases}\n- 1 & x<0 \\\\\n1 | 2\n\\end{cases}' }], 'la ligne « - 1 » n\'ouvre pas de liste');
+  egal(blocs('Texte\n$$ x $$\nsuite'), [{ type: 'texte', lignes: [{ html: 'Texte' }, { html: F('x') }, { html: 'suite' }] }]);
+  egal(H(blocs('dans $$x+1$$ le texte')[0]), 'dans ' + F('x+1') + ' le texte');
+  egal(H(blocs('$$x$$ suite\nfin')[0]), F('x') + ' suite<br>fin', 'le $$ fermant ne finit pas la ligne : paragraphe');
+  egal(blocs('$$x$$\nsuite'), [{ type: 'formule', tex: 'x' }, TX('suite')], 'le bloc s\'arrête à la ligne du $$ fermant');
+});
+
+test('markdown : formule dans un titre, une liste, un tableau et une citation', () => {
+  const r = md('# Titre $n$\n\n## Section $x$\n\n- puce $y$\n\n| a |\n| - |\n| $z$ |\n\n> note $w$');
+  egal(r.entete, { title: 'Titre ' + F('n') });
+  egal(r.blocs[0], { type: 'h2', html: 'Section ' + F('x') });
+  egal(r.blocs[1].lignes[0].html, 'puce ' + F('y'));
+  egal(r.blocs[2].rows[1], [F('z')]);
+  egal(r.blocs[3].html, 'note ' + F('w'));
+});

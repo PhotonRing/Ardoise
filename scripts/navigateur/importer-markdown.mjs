@@ -140,6 +140,21 @@ export default async function ({ ecran, cdp, evalue, attendre, dialogues, visibl
     await touche('z');
     const avant = await evalue('window.ardoise.doc.pages[1].blocks.map((b) => b.type).join(",")');
     if (avant !== 'header,h2,texte') echec('Obsidian : un Ctrl+Z ne défait pas tout l\'import : ' + avant);
+
+    // formules (lot 9, ticket 07), sur la page « Vide » (courante) : $…$ en formule rendue, \$ et prix restent du texte, paragraphe $$…$$ sur plusieurs lignes → bloc formule
+    mesure();
+    await ouvrir();
+    await evalue(`document.querySelector('${fenetre} textarea').value = ${JSON.stringify('Aire $x^2$, coût \\$5, prix 5 $ et 10 $.\n\n$$\n\\frac{a}{b}\n- 1\n$$\n\nFin')}`);
+    await clic(fenetre + ' [data-m="2"]');
+    for (let i = 0; i < 60 && (await evalue(`!!document.querySelector('${fenetre}')`)); i++) await attendre(50);
+    const fo = await evalue(`(() => { const bl = window.ardoise.doc.pages[window.ardoise.doc.cur].blocks; return {
+      types: bl.map((b) => b.type), tex: (bl.find((b) => b.type === 'formule') || {}).tex, html: (bl.find((b) => b.type === 'texte') || { lignes: [{}] }).lignes[0].html }; })()`);
+    const vuFo = { types: ['header', 'texte', 'formule', 'texte'], tex: '\\frac{a}{b}\n- 1', html: 'Aire <span class="formule">x^2</span>, coût $5, prix 5 $ et 10 $.' };
+    for (const k in vuFo) if (JSON.stringify(fo[k]) !== JSON.stringify(vuFo[k])) echec(`formules : ${k} = ${JSON.stringify(fo[k])} au lieu de ${JSON.stringify(vuFo[k])}`);
+    const ecranFo = await visibles('#app .texte .lg span.formule math, #app .formule-bloc .formule-apercu math', 'return x.querySelector("annotation").textContent');
+    if (JSON.stringify(ecranFo) !== JSON.stringify(['x^2', '\\frac{a}{b}\n- 1'])) echec('formules à l\'écran : ' + JSON.stringify(ecranFo));
+    const texteFo = await evalue('document.querySelector("#app .texte .lg").textContent');
+    if (!/coût \$5, prix 5 \$ et 10 \$\./.test(texteFo)) echec('formules : texte autour à l\'écran ' + JSON.stringify(texteFo));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
