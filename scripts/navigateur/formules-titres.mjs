@@ -1,7 +1,9 @@
 // Sujet : formules dans les titres. Une formule d'un titre de section, de sous-section ou d'étape est rendue en MathML
 // dans le sommaire latéral et dans le bloc sommaire, en édition, en lecture et dans la page exportée ; le sommaire garde
-// le HTML assaini du titre sans lien imbriqué ; ailleurs (onglets, titre de la fenêtre, nom du fichier) une formule se
-// lit $source$, et le titre reste du texte échappé. Origine : spec formules, ticket 06.
+// le HTML assaini du titre sans lien imbriqué ; le nom d'une page y est rendu aussi, comme sur les onglets de pages. Le titre
+// de la fenêtre (et le <title> de la page exportée) retire les formules, sauf un titre fait d'une formule seule, lu sans ses
+// dollars ; le nom à côté du logo et le nom du fichier lisent la formule $source$. Origine : spec formules, tickets 06 et 11
+// (décision d9).
 
 const F = (s) => '<span class="formule">' + s + '</span>';
 const DOC = { title: 'Titres', pages: [{ id: 'p1', title: 'Accueil', blocks: [
@@ -12,7 +14,8 @@ const DOC = { title: 'Titres', pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 'e1', type: 'step', title: 'Étape ' + F('\\alpha') },
   { id: 's3', type: 'h2', html: 'Voir <a href="https://exemple.org">le site</a>' },
   { id: 's4', type: 'h2', html: '&lt;img src=x onerror=alert(1)&gt; texte' },
-] }, { id: 'p2', title: 'Deux', blocks: [{ id: 'h2', type: 'header', title: 'Page ' + F('y') }] }] };
+] }, { id: 'p2', title: 'Deux', blocks: [{ id: 'h2', type: 'header', title: 'Page ' + F('y') }] },
+  { id: 'p3', title: 'Trois', blocks: [{ id: 'h3', type: 'header', title: ' ' + F('\\pi r^2') + ' ' }] }] };
 const BASCULER = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))`;
 // formules visibles d'un conteneur : présence du MathML annoté et source
 const SOURCES = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].map((a) => [...a.querySelectorAll('.formule')].filter((x) => x.getClientRects().length)
@@ -22,7 +25,7 @@ const GUET = `(() => { window.__export = null; window.__nom = null; const o = UR
   HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__nom = this.download; window.__blob.text().then((t) => { window.__export = t; }); return; } return c.call(this); }; return true; })()`;
 
 export const nom = 'formules dans les titres';
-export default async function ({ ecran, charger, evalue, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
   await ecran(1400, false);
   await charger();
@@ -39,11 +42,16 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
     lienTexte: a[3].textContent.trim(), img: document.querySelectorAll('.pnav-side img, .pnav-tabs img, .toc-blk img').length, texte: a[4].textContent.trim() }; })()`);
   attendu('sommaire : HTML assaini, sans lien imbriqué ni injection', sur.gras && sur.lien === 0 && sur.lienTexte === 'Voir le site' && sur.img === 0 && sur.texte === '<img src=x onerror=alert(1)> texte', sur);
 
-  // ailleurs, le titre se lit en texte : formule $source$
-  const txt = await evalue(`({ titre: document.title, nom: document.querySelector('.tb .doc-name').textContent, onglets: [...document.querySelectorAll('.pnav-tabs [data-pg]')].map((b) => b.textContent),
-    pages: [...document.querySelectorAll('.pnav-side [data-pg]')].map((b) => b.innerHTML) })`);
-  attendu('titre de la fenêtre, onglets et pages du sommaire en $source$', txt.titre === 'Aire $\\pi r^2$' && txt.nom === txt.titre &&
-    JSON.stringify(txt.onglets) === JSON.stringify(['Aire $\\pi r^2$', 'Page $y$']) && JSON.stringify(txt.pages) === JSON.stringify(['Aire $\\pi r^2$', 'Page $y$']), txt);
+  // nom des pages rendu dans les onglets (masqués à cette largeur : formules présentes) et le sommaire ; titre de la fenêtre sans formule ; nom à côté du logo en $source$
+  const PAGES = [['\\pi r^2'], ['y'], ['\\pi r^2']];
+  const ong = await evalue(`[...document.querySelectorAll('.pnav-tabs [data-pg]')].map((b) => [...b.querySelectorAll('.formule math annotation')].map((x) => x.textContent))`), som = await evalue(SOURCES('.pnav-side [data-pg]'));
+  const txt = await evalue(`({ titre: document.title, nom: document.querySelector('.tb .doc-name').textContent, debut: [...document.querySelectorAll('.pnav-tabs [data-pg], .pnav-side [data-pg]')].map((b) => b.textContent.slice(0, 4)) })`);
+  attendu('onglets de pages et pages du sommaire : formules rendues', JSON.stringify(ong) === JSON.stringify(PAGES) && JSON.stringify(som) === JSON.stringify(PAGES) &&
+    txt.debut[0] === 'Aire' && txt.debut[1] === 'Page' && txt.debut[3] === 'Aire', [ong, som, txt.debut]);
+  attendu('titre de la fenêtre sans la formule, nom à côté du logo en $source$', txt.titre === 'Aire' && txt.nom === 'Aire $\\pi r^2$', txt);
+  const onglet = async (i) => { await evalue(`document.querySelector('[data-pg="${i}"]').click(), true`); await attendre(200); return evalue('document.title'); };
+  const fen = [await onglet(1), await onglet(2), await onglet(0)];
+  attendu('titre de la fenêtre par page : formule retirée, ou sa source sans dollars si le titre n\'est qu\'une formule', JSON.stringify(fen) === JSON.stringify(['Page', '\\pi r^2', 'Aire']), fen);
 
   // frappe dans un titre : le sommaire suit (mise à jour en place)
   await evalue(`(() => { const f = document.querySelector('.blk[data-id="s1"] h2[contenteditable="true"]'); f.focus(); const r = document.createRange(); r.setStart(f.firstChild, 0); r.collapse(true);
@@ -66,11 +74,19 @@ export default async function ({ ecran, charger, evalue, attendre, mesure, echec
   const ex = await evalue(`(() => { const d = new DOMParser().parseFromString(window.__export || '', 'text/html');
     return { titre: d.title, nom: window.__nom, toc: [...d.querySelectorAll('.pnav-side a[data-sec]')].map((a) => [...a.querySelectorAll('.formule math annotation')].map((x) => x.textContent)),
       img: d.querySelectorAll('.pnav-side img').length }; })()`);
-  attendu('page exportée : formules dans le sommaire, titre en $source$', ex.titre === 'Aire $\\pi r^2$' && ex.nom === 'Aire-pi-r-2-lecture.html' && ex.img === 0 &&
+  attendu('page exportée : formules dans le sommaire, titre sans la formule, nom du fichier inchangé', ex.titre === 'Aire' && ex.nom === 'Aire-pi-r-2-lecture.html' && ex.img === 0 &&
     JSON.stringify(ex.toc.slice(0, 5)) === JSON.stringify([['E=mc^2'], ['x_1'], ['\\alpha'], [], []]), ex);
+  const exporte = await evalue('window.__export');
   await evalue(`window.__nom = null, document.querySelector('.blk[data-id="s1"] [data-act="menu-bloc"]').click(),
     [...document.querySelectorAll('.menu-bloc .mi')].find((m) => m.textContent.includes('Exporter en Word (.docx)')).click(), true`);
   for (let i = 0; i < 50 && !(await evalue('!!window.__nom')); i++) await attendre(100);
   const word = await evalue('window.__nom');
   attendu('nom proposé du .docx d\'un titre à formule', word === 'Z-Energie-E-mc-2.docx', word);
+
+  // page exportée ouverte : nom des pages rendu, titre de la fenêtre sans formule à chaque page
+  await cdp('Page.navigate', { url: 'data:text/html;base64,' + Buffer.from(exporte).toString('base64') }); await attendre(400);
+  const exo = await evalue(SOURCES('.pnav-side [data-pg]'));
+  const exf = [await evalue('document.title'), await onglet(1), await onglet(2)];
+  attendu('page exportée ouverte : pages du sommaire rendues, titre de la fenêtre par page', JSON.stringify(exo) === JSON.stringify(PAGES) &&
+    JSON.stringify(exf) === JSON.stringify(['Aire', 'Page', '\\pi r^2']), [exo, exf]);
 }

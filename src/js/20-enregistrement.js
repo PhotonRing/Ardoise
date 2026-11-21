@@ -45,7 +45,7 @@ function buildFile(stored) {
   var body = root.querySelector('body');
   Array.prototype.slice.call(body.children).forEach(function (n) { if (['ardoise-doc', 'app', 'ardoise-geo', 'ardoise-app'].indexOf(n.id) < 0) n.remove(); });
   Array.prototype.slice.call(body.attributes).forEach(function (a) { body.removeAttribute(a.name); });
-  root.querySelector('title').textContent = sealedFile ? 'Document protégé' : docTitle();
+  root.querySelector('title').textContent = sealedFile ? 'Document protégé' : docTitreFenetre();
   root.querySelector('#ardoise-doc').textContent = stored.replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, function (c) { return c === '\u2028' ? '\\u2028' : '\\u2029'; });
   root.querySelector('#app').innerHTML = sealedFile ? '<div class="wrap"><p>Document chiffré : ouvrez ce fichier dans un navigateur et saisissez le mot de passe.</p></div>' : fileAppHTML(doc, doc.cur);
   return '<!doctype html>\n' + root.outerHTML;
