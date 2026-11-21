@@ -356,10 +356,10 @@ function summaryDepth(b) {
   return b.deep === false ? 1 : 0;
 }
 function summaryItems(b, d, pi) {
-  // entrées du bloc sommaire de la page pi : [{ t, n, href, kids }]
+  // entrées du bloc sommaire de la page pi : [{ t, h (HTML assaini du titre, formules rendues par l'appelant), n, href, kids }]
   var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
   if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
+    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), h: pageTitreHTML(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
     out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {

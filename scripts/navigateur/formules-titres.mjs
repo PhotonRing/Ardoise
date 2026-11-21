@@ -16,6 +16,8 @@ const DOC = { title: 'Titres', pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 's4', type: 'h2', html: '&lt;img src=x onerror=alert(1)&gt; texte' },
 ] }, { id: 'p2', title: 'Deux', blocks: [{ id: 'h2', type: 'header', title: 'Page ' + F('y') }] },
   { id: 'p3', title: 'Trois', blocks: [{ id: 'h3', type: 'header', title: ' ' + F('\\pi r^2') + ' ' }] }] };
+const SOUS_PAGES = { title: 'Sous-pages', pages: [{ id: 'q1', blocks: [{ id: 'hq', type: 'header', title: 'Parent' }, { id: 'sp', type: 'summary', src: 'pages' }] },
+  { id: 'q2', lv: 1, blocks: [{ id: 'hq2', type: 'header', title: 'Aire ' + F('x^2') }] }, { id: 'q3', lv: 1, title: 'Trois', blocks: [{ id: 'hq3', type: 'header', title: 'Sous ' + F('\\beta') }] }] };
 const BASCULER = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))`;
 // formules visibles d'un conteneur : présence du MathML annoté et source
 const SOURCES = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].map((a) => [...a.querySelectorAll('.formule')].filter((x) => x.getClientRects().length)
@@ -29,6 +31,11 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
   await ecran(1400, false);
   await charger();
+  // bloc sommaire en sous-pages : le nom de chaque sous-page y est rendu avec ses formules, comme dans le sommaire de gauche
+  await evalue(`window.ardoise.load(${JSON.stringify(SOUS_PAGES)})`); await attendre(150);
+  const sp = await evalue(SOURCES('.blk[data-id="sp"] .toc-blk-l a'));
+  const spt = await evalue(`[...document.querySelectorAll('.blk[data-id="sp"] .toc-blk-l a')].map((a) => a.textContent.slice(0, 4))`);
+  attendu('bloc sommaire en sous-pages : noms des pages rendus', JSON.stringify(sp) === JSON.stringify([['x^2'], ['\\beta']]) && spt[0] === 'Aire' && spt[1] === 'Sous', [sp, spt]);
   await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await attendre(150);
 
   // sommaire latéral en édition : formules des titres rendues, entrées dans l'ordre de la page
