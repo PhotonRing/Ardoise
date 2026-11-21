@@ -160,7 +160,7 @@ function ligneVide(l) { return l.every(function (v) { return !v; }); }   // lign
 function setPath(o, k, v) { var p = k.split('.'); for (var i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v; }
 function docTitle() {
   var h = doc.pages[0].blocks.filter(function (b) { return b.type === 'header'; })[0];
-  return (h && textOf(h.title)) || doc.title || 'Sans titre';
+  return (h && titreTexte(h.title)) || doc.title || 'Sans titre';   // formule lue $source$
 }
 // nom de fichier lisible tiré d'un titre : sans accents ni caractère interdit, 60 caractères au plus ('page' s'il ne reste rien)
 function nomDeFichier(titre) { return String(titre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page'; }

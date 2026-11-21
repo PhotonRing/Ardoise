@@ -12,6 +12,8 @@ const PURS = `
 function R(h) { return String(h == null ? '' : h); }
 function textOf(h) { return htmlText(h).replace(/\\s+/g, ' ').trim(); }
 function isBlank(h) { return !textOf(h); }
+function titreTexte(h) { return textOf(String(h == null ? '' : h).replace(/<span class="formule">([^<]*)<\\/span>/g, '$$$1$$')); }
+function titreHTML(h) { return R(h).replace(/<\\/?a\\b[^>]*>/g, ''); }
 function paintPills(h) { return h; }
 `;
 const SOURCE = entete.slice(OUVERTURE.length) + PURS +
