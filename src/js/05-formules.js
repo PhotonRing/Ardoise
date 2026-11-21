@@ -138,3 +138,19 @@ function rendreFormules(html, edition) {
   if (html.indexOf('class="formule"') < 0) return html;
   return html.replace(FORMULE_RE, function (m, src) { return formuleHTML(htmlText(src), edition); });
 }
+// Saisie `$…$` (règle des dollars de Pandoc) : avant = texte jusqu'au curseur, qui finit par le `$` tapé ; suivant = texte
+// après le curseur. Le `$` ouvrant n'est pas suivi d'une espace, le fermant n'est ni précédé d'une espace ni suivi d'un
+// chiffre, la source n'est pas vide (« 5 $ et 10 $ » reste du texte). Rend { debut (place du `$` ouvrant), source } ou null.
+function dollarsFermes(avant, suivant) {
+  avant = String(avant || '');
+  if (avant.slice(-1) !== '$' || /^\d/.test(suivant || '')) return null;
+  var m = avant.match(/\$([^\s$](?:[^$]*[^\s$])?)\$$/);
+  return m ? { debut: m.index, source: m[1] } : null;
+}
+// texte brut : une formule, stockée ou rendue (source dans l'annotation), s'écrit `$source$` ; la source reste échappée
+var FORMULE_RENDUE_RE = /<span class="formule"[^>]*>(?:(?!<\/span>)[\s\S])*?<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>[\s\S]*?<\/span>/g;
+function formulesEnTexte(html) {
+  html = String(html == null ? '' : html);
+  if (html.indexOf('class="formule"') < 0) return html;
+  return html.replace(FORMULE_RENDUE_RE, '$$$1$$').replace(FORMULE_RE, '$$$1$$');
+}

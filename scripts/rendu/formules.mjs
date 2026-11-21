@@ -109,3 +109,24 @@ test('rendu : rendreFormules ne retouche pas une formule déjà rendue', () => {
   egal(ctx.rendreFormules('a &lt;span class="formule"&gt;x&lt;/span&gt;', false), 'a &lt;span class="formule"&gt;x&lt;/span&gt;', 'texte échappé intact');
   vrai(ctx.rendreFormules(F('a &amp;lt; b'), false).includes('<annotation encoding="application/x-tex">a &amp;lt; b</annotation>'), 'entités décodées puis réécrites');
 });
+
+// Saisie `$…$` (ticket 02) : règle des dollars de Pandoc, appliquée au texte qui précède le curseur
+test('saisie : le `$` qui ferme `$x^2$` rend la source et la place du `$` ouvrant', () => {
+  egal(JSON.stringify(ctx.dollarsFermes('Aire $x^2$', '')), JSON.stringify({ debut: 5, source: 'x^2' }));
+  egal(JSON.stringify(ctx.dollarsFermes('$a + b$', ' fin')), JSON.stringify({ debut: 0, source: 'a + b' }));
+  egal(JSON.stringify(ctx.dollarsFermes('un $a$ puis $b$', '')), JSON.stringify({ debut: 12, source: 'b' }), 'le dernier couple');
+});
+test('saisie : prix, espaces aux bords, chiffre après, source vide : pas de formule', () => {
+  egal(ctx.dollarsFermes('5 $ et 10 $', ''), null, 'prix');
+  egal(ctx.dollarsFermes('5$ et 10$', ''), null, 'prix collés');
+  egal(ctx.dollarsFermes('$ x$', ''), null, 'espace après l\'ouvrant');
+  egal(ctx.dollarsFermes('$x $', ''), null, 'espace avant le fermant');
+  egal(ctx.dollarsFermes('$x$', '1'), null, 'chiffre après le fermant');
+  egal(ctx.dollarsFermes('$$', ''), null, 'source vide');
+  egal(ctx.dollarsFermes('$x', ''), null, 'pas de fermant');
+});
+test('texte brut : une formule, stockée ou rendue, s\'écrit `$source$`', () => {
+  egal(ctx.formulesEnTexte('a ' + ctx.formuleHTML('x^2', true) + ' b'), 'a $x^2$ b');
+  egal(ctx.formulesEnTexte('a <span class="formule">x &lt; y</span>'), 'a $x &lt; y$');
+  egal(ctx.formulesEnTexte(ctx.rendreFormules('<b><span class="formule">\\frac{1}{2}</span></b>', false)), '<b>$\\frac{1}{2}$</b>');
+});

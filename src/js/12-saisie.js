@@ -390,16 +390,16 @@ function collerPlage(el, g) {
   session.modifier(function () { o.liste.splice(o.i, 1, nb); revealBlock(nb.id); });
   focusField(nb.id, null, false);
 }
-// Copie d'un passage qui contient des pastilles ou touche un bloc texte (édition et lecture) : text/html garde les pastilles, sans
-// couleur calculée et marquées du document d'origine ; text/plain les écrit « #nom ». Un bloc texte y passe par ses lignes
-// (copieDeSelection, 12-bloc-texte.js). Sinon, la copie reste celle du navigateur.
+// Copie d'un passage à pastilles ou à formules, ou qui touche un bloc texte (lignes : copieDeSelection, 12-bloc-texte.js) : text/html
+// garde les pastilles sans couleur calculée, marquées du document d'origine, et le MathML annoté des formules ; text/plain écrit
+// « #nom » et « $source$ ». Sinon, la copie reste celle du navigateur.
 function copierPastilles(e) {
   var sel = window.getSelection(), cd = e.clipboardData;
   if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
   var r = sel.getRangeAt(0);
   if (!app.contains(r.commonAncestorContainer)) return;
   var lignes = copieDeSelection(r, doc.id), boite = document.createElement('div'); boite.appendChild(r.cloneContents());
-  if (!lignes && !boite.querySelector('span.pill')) return;
+  if (!lignes && !boite.querySelector('span.pill, span.formule')) return;
   var html = lignes ? lignes.html : pastillesSansCouleur(boite.innerHTML, doc.id);
   e.preventDefault();
   cd.setData('text/html', html); cd.setData('text/plain', lignes ? lignes.texte : texteBrutDePresse(html));
