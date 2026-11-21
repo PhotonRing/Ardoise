@@ -356,10 +356,10 @@ function summaryDepth(b) {
   return b.deep === false ? 1 : 0;
 }
 function summaryItems(b, d, pi) {
-  // entrées du bloc sommaire de la page pi : [{ t, n, href, kids }]
+  // entrées du bloc sommaire de la page pi : [{ t, h (HTML assaini du titre, formules rendues par l'appelant), n, href, kids }]
   var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
   if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
+    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), h: pageTitreHTML(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
     out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {
@@ -466,7 +466,12 @@ function pageTitle(pg, i) {
   var h = pageHeader(pg), t = h ? titreTexte(h.title) : '';
   return t || (pg.title || '').trim() || 'Page ' + (i + 1);
 }
+// nom d'une page dans les onglets de pages et le sommaire : HTML assaini du grand titre (formules rendues par navHTML)
+function pageTitreHTML(pg, i) { var h = pageHeader(pg); return h && titreTexte(h.title) ? titreHTML(h.title) : esc(pageTitle(pg, i)); }
+// nom d'une page dans le titre de la fenêtre : formules retirées (titreFenetre, 02-assainissement.js)
+function pageTitreFenetre(pg, i) { var h = pageHeader(pg), t = h ? titreFenetre(h.title) : ''; return t || pageTitle(pg, i); }
 function curTitle() { return pageTitle(doc.pages[doc.cur], doc.cur); }
+function curTitreFenetre() { return pageTitreFenetre(doc.pages[doc.cur], doc.cur); }
 function sectionsOf(pg) {
   var out = [], nums = stepNums(pg.blocks);
   pg.blocks.forEach(function (b) {
@@ -523,7 +528,7 @@ function navHTML(d, ctx) {
   var pages = d.pages, cur = ctx.page, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
   var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
   var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
-  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
+  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + ' data-titre="' + esc(pageTitreFenetre(pages[i], i)) + '">' + pageTitreHTML(pages[i], i) + '</button>'; };
   var tab = function (i) { var dl = pageLv(pages, i); return '<span class="ptab-w' + (i === cur || (i === curRoot && !all) ? ' on' : '') + (dl > 1 ? ' d' + Math.min(dl, 4) : '') + '">' + pgBtn('ptab', i) + menu(i) + '</span>'; };
   // onglets : pages de premier niveau, puis une seconde rangée avec toutes les sous-pages de la page affichée
   var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + roots.map(tab).join('') +
@@ -570,7 +575,7 @@ function applyTheme() {
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
   Reader.navLayout(); paintFavicon();
-  document.title = curTitle();
+  document.title = curTitreFenetre();
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
 var pointerBusy = false, navPending = false;
@@ -628,7 +633,7 @@ function refreshDerived() {
     var badge = $('.blk[data-id="' + id + '"] .num', app); if (badge && badge.getAttribute('data-ph') !== nums[id]) badge.setAttribute('data-ph', nums[id]);
   });
   chRefreshLinked();   // cartes dont les valeurs viennent d'un tableau
-  var ct = curTitle(); if (document.title !== ct) document.title = ct;
+  var ft = curTitreFenetre(), ct = curTitle(); if (document.title !== ft) document.title = ft;
   var dn = $('#ui .doc-name'); if (dn && dn.textContent !== ct) dn.textContent = ct;
 }
 function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }

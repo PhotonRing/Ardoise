@@ -34,9 +34,9 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
-    var ct = curTitle(); document.title = ct;
+    var ct = curTitle(), nh = rendreFormules(paintPills(pageTitreHTML(doc.pages[doc.cur], doc.cur), doc), false); document.title = curTitreFenetre();
     var dn = $('#ui .doc-name'); if (dn) dn.textContent = ct;
-    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { x.textContent = ct; });
+    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nh) x.innerHTML = nh; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }

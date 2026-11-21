@@ -108,6 +108,9 @@ math .f-err{color:var(--bad)}
 /* police mathématique nommée avant la famille générique : sous Linux, « math » peut tomber sur une police sans table MATH,
    et les délimiteurs de \left, des matrices et des cas ne s'étirent plus ; cas à gauche, égalités alignées autour du signe */
 math{font-family:'Cambria Math','STIX Two Math','Latin Modern Math','Noto Sans Math',math}
+/* accents (\hat, \vec, \bar, \tilde, \dot, \overline) : Chromium les pose au ras de la lettre, on les voyait mal ; remontés
+   de 0,12 em (mesuré avec Noto Sans Math : un accent touchait la majuscule, la barre de \bar{X}, le point de \dot{x}) */
+math mover[accent="true"]>mo:last-child{padding-bottom:.12em}
 math mtable.f-cases mtd{text-align:left;padding-left:0}
 math mtable.f-aligned mtd{padding-left:0;padding-right:0}
 math mtable.f-aligned mtd:nth-child(odd){text-align:right;text-align:-webkit-right}   /* Chromium n'aligne un mtd à droite qu'en -webkit-right (mesuré) */

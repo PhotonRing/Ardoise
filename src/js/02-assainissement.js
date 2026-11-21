@@ -75,11 +75,18 @@ function formuleRelue(n, tag, dst) {
 var R = sanitize;
 function textOf(html) { var d = document.createElement('div'); d.innerHTML = R(html); return d.textContent.replace(/\s+/g, ' ').trim(); }
 function isBlank(html) { return !textOf(html); }
-// titre lu en texte (onglets, titre de la fenêtre, nom du fichier, liens) : une formule s'y lit $source$
+// titre lu en texte (menus, confirmations, nom du fichier, liens) : une formule s'y lit $source$
 function titreTexte(html) {
   var d = document.createElement('div'); d.innerHTML = R(html);
   Array.prototype.forEach.call(d.querySelectorAll('span.formule'), function (f) { f.replaceWith('$' + f.textContent + '$'); });
   return d.textContent.replace(/\s+/g, ' ').trim();
+}
+// titre de la fenêtre (onglet du navigateur, <title>) : formules retirées, espaces resserrées ; un titre fait de formules
+// seules se lit par leurs sources, sans dollars (décision d9)
+function titreFenetre(html) {
+  var d = document.createElement('div'), src = []; d.innerHTML = R(html);
+  Array.prototype.forEach.call(d.querySelectorAll('span.formule'), function (x) { src.push(x.textContent.trim()); x.remove(); });
+  return d.textContent.replace(/\s+/g, ' ').trim() || src.join(' ').replace(/\s+/g, ' ').trim();
 }
 // titre dans une entrée du sommaire (un lien) : HTML assaini, ses liens défaits (leur texte reste)
 function titreHTML(html) {
