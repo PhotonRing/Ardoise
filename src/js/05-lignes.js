@@ -219,7 +219,7 @@ function lignesEnListes(lignes, nums, f) {
 // texte en <p>. data-lv, data-g et data-done : pour un collage dans Ardoise, la marge pour les autres applications
 function lignesEnHtml(lignes, idDoc, nums) {
   var retrait = function (n) { return n ? ' data-lv="' + n + '" style="margin-left:' + 2 * n + 'em"' : ''; };
-  var h = function (l) { return pastillesSansCouleur(l.html, idDoc); };
+  var h = function (l) { return rendreFormules(pastillesSansCouleur(l.html, idDoc), false); };   // formules en MathML annoté (05-formules.js)
   return lignesEnListes(lignes, nums || numerosDesLignes(lignes), {
     liste: function (tag, n, haut, num) {
       var att = !haut ? retrait(n) : n !== haut.lv + 1 ? ' data-lv="' + n + '"' : '';

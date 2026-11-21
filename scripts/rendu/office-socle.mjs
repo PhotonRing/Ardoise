@@ -36,6 +36,9 @@ export function verifierSocle(html, nom, couleursEnPlus = []) {
   for (const m of html.matchAll(/style="([^"]*)"/g)) vrai(!/(^|[\s:,(])\.\d/.test(m[1]), 'valeur commençant par un point « ' + m[1] + ' » (' + nom + ')');
   // Writer ignore vertical-align dans le style : seul l'attribut valign cale une cellule
   for (const m of html.matchAll(/<\w+[^>]*vertical-align[^>]*>/g)) vrai(/\svalign="/.test(m[0]), 'vertical-align sans valign ' + m[0] + ' (' + nom + ')');
+  // image dans le texte (formule, ligne de base en son milieu) : Writer ignore vertical-align sur une image ; align="middle" y pose
+  // le milieu sur la ligne de base, absmiddle plus haut quand une formule plus grande est sur la ligne (vu par soffice → PDF)
+  for (const m of html.matchAll(/<img[^>]*\salign="([^"]*)"/g)) vrai(m[1] === 'middle', 'image alignée par align="' + m[1] + '" (' + nom + ')');
   // Writer ignore text-transform (capitales par officeMajuscules) et dessine <hr> en trait noir épais (filet : paragraphe bordé en haut)
   vrai(!/text-transform/.test(html), 'text-transform dans le HTML (' + ou + ')');
   vrai(!/<hr[\s>/]/.test(html), '<hr> dans le HTML (' + ou + ')');

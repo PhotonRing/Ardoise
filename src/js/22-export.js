@@ -8,7 +8,7 @@ window.addEventListener('beforeprint', function () {
   $$('.kb[data-kb]', app).forEach(function (el) {
     var b = byId(el.dataset.kb); if (!b || !$('[data-red]', el)) return;
     var ctx = viewCtx(); ctx.kbCols = {}; b.cols.forEach(function (c) { ctx.kbCols[c.id] = { red: false, base: !!c.collapsed }; });
-    el.outerHTML = renderBlock(b, doc, ctx, null);
+    el.outerHTML = rendreFormules(renderBlock(b, doc, ctx, null), false);
   });
   Reader.printPrep(true);
 });
@@ -18,7 +18,7 @@ function exportStatic() {
   session.valider();
   var r = document.documentElement;
   var html = '<!doctype html>\n<html lang="fr" data-palette="' + esc(doc.palette) + '" data-typo="' + esc(doc.typo) + '"' + (doc.theme !== 'auto' ? ' data-theme="' + esc(doc.theme) + '"' : '') +
-    ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitle()) + '</title>\n' +
+    ' data-npages="' + doc.pages.length + '" data-nav="' + esc(doc.nav || 'auto') + '" data-w="' + (+doc.width || 820) + '" data-docid="' + esc(doc.id) + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n<title>' + esc(docTitreFenetre()) + '</title>\n' +
     $$('link[rel=icon], link[rel=stylesheet], link[rel=preconnect]').map(function (l) { return l.outerHTML; }).join('\n') + '\n<style>' + $('#page-css').textContent + '</style>\n</head>\n<body>\n' +
     navHTML(doc, { page: 0, view: 'export' }) + doc.pages.map(function (pg, i) {
       return '<div class="pg" data-pgi="' + i + '" data-pgid="' + esc(pg.id) + '"' + (i ? ' hidden' : '') + '>' + renderPage(doc, { page: i, view: 'export' }) + '</div>';

@@ -3,6 +3,13 @@ var tlTimers = {};
 app.addEventListener('input', function (e) {
   var el = e.target;
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
+  if (el.matches('textarea.formule-ta')) {
+    // bloc formule : l'aperçu suit la source sans rendre la page (07-rendu.js formuleBlocApercu)
+    var bf = byId(el.dataset.b); if (!bf) return;
+    bf.tex = el.value; autosize(el);
+    var fa = el.parentNode.querySelector('.formule-apercu'); if (fa) fa.innerHTML = formuleBlocApercu(bf.tex, true);
+    session.saisir(); return;
+  }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); session.saisir(); return; }
   if (el.matches('.map-q')) { mapSearch(el); return; }
   if (el.matches('.ch-q')) { chSearch(el); return; }
@@ -27,12 +34,12 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
-    var ct = curTitle(); document.title = ct;
+    var ct = curTitle(), nh = rendreFormules(paintPills(pageTitreHTML(doc.pages[doc.cur], doc.cur), doc), false); document.title = curTitreFenetre();
     var dn = $('#ui .doc-name'); if (dn) dn.textContent = ct;
-    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { x.textContent = ct; });
+    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nh) x.innerHTML = nh; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
-  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
+  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
   session.saisir();
   if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
@@ -282,7 +289,7 @@ function caretLine(el, dir) {
 }
 function leaveTable(el, b, dir) {
   // premier champ avant le tableau, ou après lui
-  var all = $$('.fld, textarea.code-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
+  var all = $$('.fld, textarea.code-ta, textarea.formule-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
   if (!cells.length) return;
   var n = all[all.indexOf(cells[dir < 0 ? 0 : cells.length - 1]) + dir]; if (!n) return;
   n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0);
@@ -359,6 +366,7 @@ app.addEventListener('paste', function (e) {
     if (!el.hasAttribute('data-ml')) clean = compacterLigne(clean);
     document.execCommand('insertHTML', false, clean);
     $$('span.pill', el).forEach(paintPill);   // couleur du registre posée aussitôt (un nom nouveau y est inscrit)
+    peindreFormulesDans(el);   // 15-formules.js
   } else {
     if (!el.hasAttribute('data-rich') || !el.hasAttribute('data-ml')) text = compacterTexte(text);
     document.execCommand('insertText', false, text);
@@ -389,16 +397,16 @@ function collerPlage(el, g) {
   session.modifier(function () { o.liste.splice(o.i, 1, nb); revealBlock(nb.id); });
   focusField(nb.id, null, false);
 }
-// Copie d'un passage qui contient des pastilles ou touche un bloc texte (édition et lecture) : text/html garde les pastilles, sans
-// couleur calculée et marquées du document d'origine ; text/plain les écrit « #nom ». Un bloc texte y passe par ses lignes
-// (copieDeSelection, 12-bloc-texte.js). Sinon, la copie reste celle du navigateur.
+// Copie d'un passage à pastilles ou à formules, ou qui touche un bloc texte (lignes : copieDeSelection, 12-bloc-texte.js) : text/html
+// garde les pastilles sans couleur calculée, marquées du document d'origine, et le MathML annoté des formules ; text/plain écrit
+// « #nom » et « $source$ ». Sinon, la copie reste celle du navigateur.
 function copierPastilles(e) {
   var sel = window.getSelection(), cd = e.clipboardData;
   if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
   var r = sel.getRangeAt(0);
   if (!app.contains(r.commonAncestorContainer)) return;
   var lignes = copieDeSelection(r, doc.id), boite = document.createElement('div'); boite.appendChild(r.cloneContents());
-  if (!lignes && !boite.querySelector('span.pill')) return;
+  if (!lignes && !boite.querySelector('span.pill, span.formule')) return;
   var html = lignes ? lignes.html : pastillesSansCouleur(boite.innerHTML, doc.id);
   e.preventDefault();
   cd.setData('text/html', html); cd.setData('text/plain', lignes ? lignes.texte : texteBrutDePresse(html));

@@ -443,13 +443,13 @@ window.addEventListener('resize', function () { if (!bmf.hidden && bmf.parentNod
 function fieldOf(n) { while (n && n !== app) { if (n.nodeType === 1 && n.classList.contains('fld')) return n; n = n.parentNode; } return null; }
 function unwrap(el) { var p = el.parentNode; while (el.firstChild) p.insertBefore(el.firstChild, el); p.removeChild(el); }
 /* Effacer : la forme (gras, italique, souligné, barré, code, lien, couleur, surlignage) n'est retirée que du texte sélectionné.
-   Une forme qui englobe la sélection est coupée en trois ; pastilles et sauts de ligne restent. Sans sélection, rien */
+   Une forme qui englobe la sélection est coupée en trois ; pastilles, formules et sauts de ligne restent. Sans sélection, rien */
 function deForme(n) {
   if (n.nodeType !== 1) return false;
   if (/^(B|I|U|S|STRIKE|CODE|A|STRONG|EM)$/.test(n.tagName)) return true;
   return n.tagName === 'SPAN' && (deLaFamille(n, 'couleur') || deLaFamille(n, 'surlignage'));
 }
-function intact(n) { return n.nodeType === 1 && n.tagName === 'SPAN' && n.classList.contains('pill'); }
+function intact(n) { return n.nodeType === 1 && n.tagName === 'SPAN' && (n.classList.contains('pill') || n.classList.contains('formule')); }   // pastille ou formule
 function sansForme(n) {
   if (intact(n)) return;   // pastille : intacte, contenu compris
   Array.prototype.slice.call(n.childNodes).forEach(function (x) { if (x.nodeType === 1) sansForme(x); });

@@ -309,3 +309,10 @@ test('copie puis collage d\'Ardoise à Ardoise : genres, niveaux et coches gard�
   const ls = [NU('c', 2), P('x', 4), NU('d', 2), CA('', true), { html: '', genre: 'soustitre' }, P('')];
   egal(brut('lignesDuCollage', contexte().lignesEnHtml(ls, 'd1')), ls);
 });
+
+test('copie : une formule d\'une ligne part en MathML annoté (HTML) et en $source$ (texte brut)', () => {
+  const ls = [{ html: 'Aire <span class="formule">\\pi r^2</span>' }];
+  const h = contexte().lignesEnHtml(ls, 'd1');
+  egal(/<math>[\s\S]*<annotation encoding="application\/x-tex">\\pi r\^2<\/annotation>/.test(h), true, h);
+  egal(contexte().lignesEnTexte(ls), 'Aire $\\pi r^2$');
+});

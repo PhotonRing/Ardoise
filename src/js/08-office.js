@@ -30,9 +30,10 @@ function officeVariables(d) {
   return v;
 }
 
-/* Texte enrichi assaini → segments { texte, gras, italique, souligne, barre, code, lien, interne, couleur, surlignage, pastille } ou { saut } */
+/* Texte enrichi assaini → segments { texte, gras, italique, souligne, barre, code, lien, interne, couleur, surlignage, pastille,
+   formule (source), image (de la formule, prise dans formules.ligne) } ou { saut } */
 var OFFICE_BALISE = /<(\/?)([a-z0-9]+)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/gi;
-function officeSegments(html, d) {
+function officeSegments(html, d, formules) {
   var s = String(html == null ? '' : html), out = [], pile = [], m;
   var etat = function (texte) { var e = { texte: texte }; pile.forEach(function (p) { for (var k in p.f) e[k] = p.f[k]; }); return e; };
   OFFICE_BALISE.lastIndex = 0;
@@ -50,6 +51,13 @@ function officeSegments(html, d) {
       p.pastille = c == null ? { fond: OFFICE_CLAIR.line, texte: OFFICE_CLAIR.fg } : officePastille(c);
       delete p.couleur; delete p.surlignage; if (nom) out.push(p);
       OFFICE_BALISE.lastIndex = fin + 7; continue;
+    }
+    if (tag === 'span' && /(^|\s)formule(\s|$)/.test(cls)) {
+      // formule (forme stockée, après R) : un segment à part, `$source$` en texte, la source dans formule (image : ticket 08)
+      var ff = s.indexOf('</span>', OFFICE_BALISE.lastIndex); if (ff < 0) ff = s.length;
+      var src = htmlText(s.slice(OFFICE_BALISE.lastIndex, ff).replace(/<[^>]*>/g, ''));
+      if (src.trim()) { var g = etat('$' + src + '$'); g.formule = src; if (formules && formules.ligne && formules.ligne[src]) g.image = formules.ligne[src]; out.push(g); }
+      OFFICE_BALISE.lastIndex = ff + 7; continue;
     }
     var f = {};
     if (tag === 'b' || tag === 'strong') f.gras = true;
@@ -71,12 +79,12 @@ function officeSegments(html, d) {
   while (out.length && out[out.length - 1].saut) out.pop();
   return officeFusion(out);
 }
-// segments voisins de même forme réunis (ni saut ni pastille), en copies : les segments reçus ne changent pas
+// segments voisins de même forme réunis (ni saut, ni pastille, ni formule), en copies : les segments reçus ne changent pas
 function officeFusion(segs) {
   var out = [];
   segs.forEach(function (g) {
     var der = out[out.length - 1], c = {}, k;
-    if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && memeForme(der, g)) { der.texte += g.texte; return; }
+    if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && !der.formule && !g.formule && memeForme(der, g)) { der.texte += g.texte; return; }
     for (k in g) c[k] = g[k];
     out.push(c);
   });
@@ -94,11 +102,12 @@ function officeChaleurTeinte(d, palier) {
 }
 function officeMettreForme(segs, k, v) { segs.forEach(function (g) { if (!g.saut && !g.pastille) g[k] = v; }); return segs; }
 
-/* Bloc → éléments neutres. opts : { page, images: { idBloc: { src, mime, l, h } } } (images préparées par l'appelant) */
+/* Bloc → éléments neutres. opts : { page, images: { idBloc: { src, mime, l, h } }, formules: { ligne|bloc: { source: { src, l, h } } } }
+   (images préparées par l'appelant : 22-copier-office.js) */
 function officeBloc(b, d, opts) {
   opts = opts || {};
   var pi = Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images = opts.images || {}, out = [];
-  var S = function (html) { return officeSegments(R(html), d); };
+  var S = function (html) { return officeSegments(R(html), d, opts.formules); };
   var txt = function (texte, f) { var g = { texte: String(texte == null ? '' : texte) }; for (var k in f) g[k] = f[k]; return g; };
   var para = function (segs, o) { var e = { t: 'para', segs: segs }; for (var k in o) e[k] = o[k]; return e; };
   var gras = function (segs) { return officeMettreForme(segs, 'gras', true); };
@@ -195,6 +204,10 @@ function officeBloc(b, d, opts) {
       var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
       out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
+    case 'formule':
+      var tex = String(b.tex || '').trim(), fi = opts.formules && opts.formules.bloc && opts.formules.bloc[tex];
+      if (tex) out.push(fi ? { t: 'formule', tex: tex, image: fi } : { t: 'formule', tex: tex });
+      break;
     case 'divider': out.push({ t: 'ligne' }); break;
     case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
     case 'map':
@@ -219,6 +232,20 @@ function officeBloc(b, d, opts) {
 }
 // blocs d'une page (ou un seul bloc) → éléments neutres, dans l'ordre ; les enfants d'un groupe suivent par le groupe
 function officeBlocs(blocs, d, opts) { return (blocs || []).reduce(function (a, b) { return a.concat(officeBloc(b, d, opts)); }, []); }
+// sources des formules d'éléments neutres (segments et blocs formule, à toute profondeur), une fois chacune : { ligne: [], bloc: [] }
+function officeFormulesDe(elts) {
+  var r = { ligne: [], bloc: [] }, vu = { ligne: {}, bloc: {} };
+  var mettre = function (mode, s) { if (!vu[mode][s]) { vu[mode][s] = true; r[mode].push(s); } };
+  var parcours = function (x) {
+    if (Array.isArray(x)) { x.forEach(parcours); return; }
+    if (!x || typeof x !== 'object') return;
+    if (x.t === 'formule') mettre('bloc', x.tex);
+    else if (typeof x.formule === 'string') mettre('ligne', x.formule);
+    for (var k in x) if (k !== 'image' && x[k] && typeof x[k] === 'object') parcours(x[k]);
+  };
+  parcours(elts);
+  return r;
+}
 // cartes d'une colonne de kanban : titre en gras, puis échéance, responsable et priorité
 function officeCartesKanban(cards, S, txt, para) {
   var out = [];
@@ -352,13 +379,13 @@ function officeRequete(b, d, pi, S, txt, para) {
 var OFFICE_POLICES = { texte: "'Segoe UI',sans-serif", titre: "'Segoe UI Semibold','Segoe UI',sans-serif", mono: 'Consolas,monospace' };
 var OFFICE_P = 'margin:0pt 0pt 6pt;';   // paragraphe du corps
 function officePt(px) { return Math.round(px * 75) / 100 + 'pt'; }   // 1 px = 0,75 pt
-// capitales écrites dans le texte (Writer ignore text-transform) ; copies : les segments reçus ne changent pas
-function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte) c.texte = c.texte.toUpperCase(); return c; }); }
+// capitales écrites dans le texte (Writer ignore text-transform), sauf la source d'une formule ; copies : les segments reçus ne changent pas
+function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte && !c.formule) c.texte = c.texte.toUpperCase(); return c; }); }
 // étiquette (clés, en-têtes, sommets, titres de sommaire et de requête, surtitre) : capitales écrites en police mono d'Ardoise, grise, espacement large
 // en dernier (Writer ignore ce qui suit letter-spacing) ; o : { px (11), couleur, espace, marges : style du paragraphe qui l'entoure, sans : en ligne }
 function officeEtiquette(segs, x, o) {
   o = o || {};
-  var t = officePt(o.px || 11), h = '<span style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + t + ';color:' + (o.couleur || x.C.muted) + ';letter-spacing:' + (o.espace || '0.5pt') + '">' + x.segs(officeMajuscules(segs)) + '</span>';
+  var t = officePt(o.px || 11), h = '<span style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + t + ';color:' + (o.couleur || x.C.muted) + ';letter-spacing:' + (o.espace || '0.5pt') + '">' + x.segs(officeMajuscules(segs), o.px || 11) + '</span>';
   return o.marges ? '<p style="' + o.marges + ';font-size:' + t + '">' + h + '</p>' : h;
 }
 // segments d'un texte simple (libellé, nom) pour officeEtiquette
@@ -371,11 +398,19 @@ function officeCellule(contenu, style, largeur, valign) {
   var v = valign || 'top';
   return '<td valign="' + v + '"' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';vertical-align:' + v + ';' + (style || '') + '">' + contenu + '</td>';
 }
-// segments → HTML : formes, couleur et surlignage, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte
-function officeSegmentsHtml(arr, d) {
+// segments → HTML : formes, couleur et surlignage, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte ;
+// formule en image à la taille du texte qui l'entoure (px, 15 par défaut)
+function officeSegmentsHtml(arr, d, px) {
   var C = OFFICE_CLAIR, acc = officeAccent(d);
   return arr.map(function (g) {
     if (g.saut) return '<br>';
+    if (g.image) {
+      // image dessinée pour 15 px, ligne de base en son milieu : align="middle" pose le milieu de l'image sur la ligne de base (Writer,
+      // Chromium) ; Writer ignore vertical-align sur une image, et absmiddle l'y pose plus haut, à côté d'une formule plus grande
+      var k = (px || 15) / 15, im = '<img src="' + esc(g.image.src) + '" alt="' + esc(g.formule) + '" width="' + Math.round(g.image.l * k) + '" height="' + Math.round(g.image.h * k) + '" align="middle">';
+      if (g.gras) im = '<b>' + im + '</b>';
+      return im;
+    }
     var h = esc(g.texte);
     if (g.pastille) return '<span style="background:' + g.pastille.fond + ';color:' + g.pastille.texte + ';font-family:' + OFFICE_POLICES.titre + ';font-weight:600;font-size:' + officePt(12) + ';padding:1px 6px">' + h + '</span>';
     if (g.code) h = '<code style="font-family:' + OFFICE_POLICES.mono + ';font-size:' + officePt(13) + ';background:' + acc[1] + ';color:' + C.fg + '">' + h + '</code>';
@@ -400,7 +435,7 @@ function officeHtmlContenu(b, d, opts) {
   if (!rendu) return officeHtmlElements(officeBloc(b, d, opts), d);
   var acc = officeAccent(d);
   return rendu(b, { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
-    S: function (html) { return officeSegments(R(html), d); }, segs: function (arr) { return officeSegmentsHtml(arr, d); } });
+    S: function (html) { return officeSegments(R(html), d, opts.formules); }, segs: function (arr, px) { return officeSegmentsHtml(arr, d, px); } });
 }
 // éléments neutres de la carte et de la chronologie → HTML : paragraphe, liste à puces, image fournie
 function officeHtmlElements(elts, d) {
@@ -415,7 +450,7 @@ function officeHtmlElements(elts, d) {
     return '';
   }).join('');
 }
-/* Éléments neutres → texte brut : pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
+/* Éléments neutres → texte brut : formules en $source$, bloc formule en $$source$$ sur sa ligne, pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
 function officeTexte(elts) {
   var lig = function (segs) { return segs.map(function (g) { return g.saut ? '\n' : g.pastille ? '#' + g.texte : g.texte; }).join(''); };
   var un = function (e) {
@@ -432,6 +467,7 @@ function officeTexte(elts) {
       case 'cadre': return tous(e.contenu);
       case 'code': return (e.nom ? e.nom + '\n' : '') + e.texte;
       case 'image': return '[Image' + (officeVide(e.legende) ? (e.alt ? ' : ' + e.alt : '') : ' : ' + lig(e.legende)) + ']';
+      case 'formule': return '$$' + e.tex + '$$';
       case 'ligne': return '———';
     }
     return '';

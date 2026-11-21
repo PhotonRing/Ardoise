@@ -10,17 +10,17 @@ OFFICE_RENDUS.header = function (b, x) {
   var h = '';
   if (!b.noEyebrow && !officeVide(x.S(b.eyebrow))) h += officeEtiquette(x.S(b.eyebrow), x, { px: 12, couleur: x.acc, espace: '0.72pt', marges: 'margin:0pt 0pt 6pt' });
   // h1 d'Ardoise : 800, 40 px au bureau
-  h += '<h1 style="margin:0pt 0pt 6pt;font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(40) + ';font-weight:bold;line-height:1.1;color:' + x.C.fg + '">' + x.segs(x.S(b.title)) + '</h1>';
+  h += '<h1 style="margin:0pt 0pt 6pt;font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(40) + ';font-weight:bold;line-height:1.1;color:' + x.C.fg + '">' + x.segs(x.S(b.title), 40) + '</h1>';
   if (!b.noLede && !officeVide(x.S(b.lede))) h += '<p style="' + OFFICE_P + 'font-size:' + officePt(15) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.lede)) + '</p>';
   return h;
 };
-OFFICE_RENDUS.h2 = function (b, x) { return officeTxtTitre('h1', 21, x.segs(x.S(b.html)), x); };
+OFFICE_RENDUS.h2 = function (b, x) { return officeTxtTitre('h1', 21, x.segs(x.S(b.html), 21), x); };
 OFFICE_RENDUS.h3 = function (b, x) { return officeTxtTitre('h2', 15, x.segs(x.S(b.html)), x); };
 OFFICE_RENDUS.subtitle = function (b, x) { return officeTxtTitre('h3', 15, x.segs(x.S(b.html)), x); };
 OFFICE_RENDUS.step = function (b, x) {
   // filet de section.step, puis numéro teinté à côté du titre (deux cellules ; Writer ignore le padding : la largeur de 6 % fait la pastille)
   var num = stepNums(x.d.pages[x.pi].blocks)[b.id], filet = officeTxtFilet(x, '12pt', '9pt');
-  var titre = officeTxtTitre('h1', 21, x.segs(x.S(b.title)), x, 'margin:0pt');
+  var titre = officeTxtTitre('h1', 21, x.segs(x.S(b.title), 21), x, 'margin:0pt');
   if (!num) return filet + titre;
   return filet + officeTable('<tr>' +
     officeCellule(esc(num), 'background:' + x.accSoft + ';color:' + x.acc + ';font-weight:bold;padding:4.5pt 6.75pt;text-align:center;white-space:nowrap', '6%', 'middle') +
@@ -37,7 +37,7 @@ OFFICE_RENDUS.texte = function (b, x) {
   // morceaux de style terminés par « ; »
   var retrait = function (l) { return niveauDe(l) ? 'margin-left:' + officePt(30 * niveauDe(l)) + ';' : ''; };   // niveau borné par normLignes
   var reglages = function (l) { return (l.align ? 'text-align:' + LIGNE_ALIGNEMENTS[l.align].css + ';' : '') + (l.taille ? 'font-size:' + officePt(LIGNE_TAILLES_PX[l.taille]) + ';' : ''); };
-  var contenu = function (l) { return x.segs(x.S(l.html)); };
+  var contenu = function (l) { return x.segs(x.S(l.html), l.taille ? LIGNE_TAILLES_PX[l.taille] : 15); };
   return lignesEnListes(ls, numerosDesLignes(ls), {
     liste: function (tag, n, haut, num) {
       var type = tag === 'ul' ? OFFICE_TEXTE_PUCES[n % 3] : '1';
@@ -55,12 +55,21 @@ OFFICE_RENDUS.texte = function (b, x) {
     }
   });
 };
-OFFICE_RENDUS.footer = function (b, x) { return '<p style="margin-top:12pt;margin-bottom:6pt;padding-top:12pt;border-top:1px solid ' + x.C.line + ';font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.html)) + '</p>'; };
+OFFICE_RENDUS.footer = function (b, x) { return '<p style="margin-top:12pt;margin-bottom:6pt;padding-top:12pt;border-top:1px solid ' + x.C.line + ';font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.html), 13) + '</p>'; };
 OFFICE_RENDUS.divider = function (b, x) { return officeTxtFilet(x, '6pt', '6pt'); };
 OFFICE_RENDUS.image = function (b, x) {
   if (!b.src) return '';
   var img = x.images[b.id] || { src: b.src }, l = img.l || 0, h = img.h || 0, leg = x.S(b.caption);
   var t = officeEchelle(l, h, OFFICE_LARGEUR); l = t[0]; h = t[1];
   return '<p align="center" style="' + OFFICE_P + 'text-align:center"><img src="' + esc(img.src) + '" alt="' + esc(b.alt || htmlText(b.caption)) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + ' style="border:1px solid ' + x.C.line + '"></p>' +
-    (officeVide(leg) ? '' : '<p style="' + OFFICE_P + 'text-align:center;font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(leg) + '</p>');
+    (officeVide(leg) ? '' : '<p style="' + OFFICE_P + 'text-align:center;font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(leg, 13) + '</p>');
+};
+// bloc formule : image centrée, ramenée à la largeur de la page ; sans image, $$source$$ centré
+OFFICE_RENDUS.formule = function (b, x) {
+  var tex = String(b.tex || '').trim(), im = x.opts.formules && x.opts.formules.bloc && x.opts.formules.bloc[tex];
+  if (!tex) return '';
+  var p = '<p align="center" style="' + OFFICE_P + 'text-align:center">';
+  if (!im) return p + esc('$$' + tex + '$$') + '</p>';
+  var t = officeEchelle(im.l, im.h, OFFICE_LARGEUR);
+  return p + '<img src="' + esc(im.src) + '" alt="' + esc(tex) + '" width="' + t[0] + '" height="' + t[1] + '"></p>';
 };

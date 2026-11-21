@@ -2,8 +2,8 @@
 // palettes de la barre de mise en forme : [classe, nom] ; Rouge garde la classe alert de l'ancien bouton « A » (aucune migration)
 var COULEURS_TEXTE = [['alert', 'Rouge'], ['c-orange', 'Orange'], ['c-vert', 'Vert'], ['c-bleu', 'Bleu'], ['c-violet', 'Violet'], ['c-gris', 'Gris']];
 var SURLIGNAGES = [['s-jaune', 'Jaune'], ['s-vert', 'Vert'], ['s-bleu', 'Bleu'], ['s-rose', 'Rose'], ['s-gris', 'Gris']];
-// pastille, couleurs et surlignages, et pc-N : couleur d'exception d'une pastille ; un ancien taquet (span.tab) est défait
-var SPAN_CLASSES = ['pill'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return x[0]; }));
+// pastille, formule, couleurs et surlignages, et pc-N : couleur d'exception d'une pastille ; un ancien taquet (span.tab) est défait
+var SPAN_CLASSES = ['pill', 'formule'].concat(COULEURS_TEXTE.concat(SURLIGNAGES).map(function (x) { return x[0]; }));
 var DROP = /^(script|style|iframe|object|embed|meta|link|title|head|template|svg|math|noscript|input|button|select|textarea|img|video|audio|canvas|form)$/;
 var BLOCKY = /^(div|p|li|h[1-6]|tr|blockquote|pre|dt|dd|section|article)$/;
 var sanCache = new Map();
@@ -36,6 +36,7 @@ function walk(src, dst) {
     if (n.nodeType === 3) { dst.appendChild(document.createTextNode(n.nodeValue)); continue; }
     if (n.nodeType !== 1) continue;
     var tag = n.tagName.toLowerCase(), el = null;
+    if (tag === 'math' || (tag === 'span' && n.classList.contains('formule'))) { formuleRelue(n, tag, dst); continue; }
     if (DROP.test(tag)) continue;
     if (tag === 'br') { dst.appendChild(document.createElement('br')); continue; }
     if (tag === 'b' || tag === 'strong') el = document.createElement('b');
@@ -63,7 +64,35 @@ function walk(src, dst) {
     if (BLOCKY.test(tag) && n.nextSibling && dst.lastChild && dst.lastChild.nodeName !== 'BR') dst.appendChild(document.createElement('br'));
   }
 }
+// formule (05-formules.js) : l'élément rendu, ou un <math> qui porte sa source LaTeX en annotation, est relu en
+// <span class="formule">source</span> ; la forme stockée garde son texte ; un <math> sans annotation est jeté
+function formuleRelue(n, tag, dst) {
+  var an = n.querySelector('annotation[encoding="application/x-tex"]');
+  var src = an ? an.textContent : (tag === 'span' && !n.querySelector('math') ? n.textContent : '');
+  if (!src.trim()) return;
+  var el = document.createElement('span'); el.className = 'formule'; el.textContent = src; dst.appendChild(el);
+}
 var R = sanitize;
 function textOf(html) { var d = document.createElement('div'); d.innerHTML = R(html); return d.textContent.replace(/\s+/g, ' ').trim(); }
 function isBlank(html) { return !textOf(html); }
+// titre lu en texte (menus, confirmations, nom du fichier, liens) : une formule s'y lit $source$
+function titreTexte(html) {
+  var d = document.createElement('div'); d.innerHTML = R(html);
+  Array.prototype.forEach.call(d.querySelectorAll('span.formule'), function (f) { f.replaceWith('$' + f.textContent + '$'); });
+  return d.textContent.replace(/\s+/g, ' ').trim();
+}
+// titre de la fenêtre (onglet du navigateur, <title>) : formules retirées, espaces resserrées ; un titre fait de formules
+// seules se lit par leurs sources, sans dollars (décision d9)
+function titreFenetre(html) {
+  var d = document.createElement('div'), src = []; d.innerHTML = R(html);
+  Array.prototype.forEach.call(d.querySelectorAll('span.formule'), function (x) { src.push(x.textContent.trim()); x.remove(); });
+  return d.textContent.replace(/\s+/g, ' ').trim() || src.join(' ').replace(/\s+/g, ' ').trim();
+}
+// titre dans une entrée du sommaire (un lien) : HTML assaini, ses liens défaits (leur texte reste)
+function titreHTML(html) {
+  var h = R(html); if (h.indexOf('<a') < 0) return h;
+  var d = document.createElement('div'); d.innerHTML = h;
+  Array.prototype.forEach.call(d.querySelectorAll('a'), function (a) { a.replaceWith.apply(a, Array.prototype.slice.call(a.childNodes)); });
+  return d.innerHTML;
+}
 

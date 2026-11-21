@@ -50,7 +50,7 @@ function renderPage(d, ctx) {
   });
   if (open) out.push('</section>');
   if (edit) out.push('<button class="add-end" type="button" data-act="add-end">+ Ajouter un bloc</button>');
-  return paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>', d);
+  return rendreFormules(paintPills('<div class="wrap" style="--w:' + (+d.width || 820) + 'px">' + out.join('\n') + '</div>', d), edit);   // 05-formules.js
 }
 // bloc d'ancrage de la bascule dans la vue ctx : le bloc, sinon le titre plié qui le masque, sinon (bloc qui n'affiche rien) le bloc affiché le plus proche, le précédent d'abord
 function anchorBlock(d, ctx, id) {
@@ -177,6 +177,12 @@ function renderBlock(b, d, ctx, num) {
         (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
         '<button class="copy" type="button" data-copy>Copier</button>' +
         (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
+    case 'formule':
+      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
+      var fap = formuleBlocApercu(b.tex, e);
+      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
+      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
+        '<div class="formule-apercu">' + fap + '</div></div>';
     case 'table':
       var rows = b.rows;
       return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
@@ -350,14 +356,14 @@ function summaryDepth(b) {
   return b.deep === false ? 1 : 0;
 }
 function summaryItems(b, d, pi) {
-  // entrées du bloc sommaire de la page pi : [{ t, n, href, kids }]
+  // entrées du bloc sommaire de la page pi : [{ t, h (HTML assaini du titre, formules rendues par l'appelant), n, href, kids }]
   var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
   if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
+    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), h: pageTitreHTML(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
     out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {
-      var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
+      var it = { t: x.t, h: x.h, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
       if (x.lv === 1 || !out.length) out.push(it); else if (dp !== 1) out[out.length - 1].kids.push(it);
     });
   }
@@ -366,7 +372,7 @@ function summaryItems(b, d, pi) {
 }
 function summaryList(b, d, pi) {
   var items = summaryItems(b, d, pi);
-  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + esc(it.t) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
+  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + (it.h != null ? it.h : esc(it.t)) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
   return items.length ? ol(items) : '';
 }
 function summaryEmpty(b) {
@@ -457,16 +463,25 @@ function wrapEdit(b, inner, nHidden, editorUi, nPages) {
 function pageHeader(pg) { return pg.blocks.filter(function (b) { return b.type === 'header'; })[0] || null; }
 function pageTitle(pg, i) {
   // le nom d'une page est le grand titre de son en-tête ; à défaut, le nom saisi ; sinon « Page N »
-  var h = pageHeader(pg), t = h ? textOf(h.title) : '';
+  var h = pageHeader(pg), t = h ? titreTexte(h.title) : '';
   return t || (pg.title || '').trim() || 'Page ' + (i + 1);
 }
+// nom d'une page dans les onglets de pages et le sommaire : HTML assaini du grand titre (formules rendues par navHTML)
+function pageTitreHTML(pg, i) { var h = pageHeader(pg); return h && titreTexte(h.title) ? titreHTML(h.title) : esc(pageTitle(pg, i)); }
+// nom d'une page dans le titre de la fenêtre : formules retirées (titreFenetre, 02-assainissement.js)
+function pageTitreFenetre(pg, i) { var h = pageHeader(pg), t = h ? titreFenetre(h.title) : ''; return t || pageTitle(pg, i); }
 function curTitle() { return pageTitle(doc.pages[doc.cur], doc.cur); }
+function curTitreFenetre() { return pageTitreFenetre(doc.pages[doc.cur], doc.cur); }
 function sectionsOf(pg) {
   var out = [], nums = stepNums(pg.blocks);
   pg.blocks.forEach(function (b) {
-    if (b.type === 'step') out.push({ id: b.id, t: textOf(b.title) || 'Étape', n: nums[b.id] || null, lv: 1 });
-    else if (b.type === 'h2') out.push({ id: b.id, t: textOf(b.html) || 'Section', lv: 1 });
-    else if (b.type === 'h3') out.push({ id: b.id, t: textOf(b.html) || 'Sous-section', lv: 2 });
+    // t : titre en texte (formule lue $source$) ; h : HTML assaini du titre pour le sommaire (formules rendues par navHTML)
+    var x = b.type === 'step' ? { id: b.id, src: b.title, def: 'Étape', n: nums[b.id] || null, lv: 1 } : b.type === 'h2' ? { id: b.id, src: b.html, def: 'Section', lv: 1 } :
+      b.type === 'h3' ? { id: b.id, src: b.html, def: 'Sous-section', lv: 2 } : null;
+    if (!x) return;
+    var t = titreTexte(x.src), it = { id: x.id, t: t || x.def, h: t ? titreHTML(x.src) : esc(x.def), lv: x.lv };
+    if (b.type === 'step') it.n = x.n;
+    out.push(it);
   });
   return out;
 }
@@ -513,7 +528,7 @@ function navHTML(d, ctx) {
   var pages = d.pages, cur = ctx.page, w = +d.width || 820, curRoot = pageRoot(pages, cur), anc = pageAncestors(pages, cur);
   var roots = pages.map(function (pg, i) { return i; }).filter(function (i) { return pageLv(pages, i) === 0; });
   var menu = function (i, always) { return edit && (always || i === cur) ? '<button type="button" class="pnav-m" data-pgm="' + i + '" title="Options de la page" aria-label="Options de la page">⋯</button>' : ''; };
-  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + '>' + esc(pageTitle(pages[i], i)) + '</button>'; };
+  var pgBtn = function (cls, i) { return '<button type="button" class="' + cls + '" data-pg="' + i + '" data-pgg="' + pageRoot(pages, i) + '"' + (i === cur ? ' aria-current="page"' : '') + ' data-titre="' + esc(pageTitreFenetre(pages[i], i)) + '">' + pageTitreHTML(pages[i], i) + '</button>'; };
   var tab = function (i) { var dl = pageLv(pages, i); return '<span class="ptab-w' + (i === cur || (i === curRoot && !all) ? ' on' : '') + (dl > 1 ? ' d' + Math.min(dl, 4) : '') + '">' + pgBtn('ptab', i) + menu(i) + '</span>'; };
   // onglets : pages de premier niveau, puis une seconde rangée avec toutes les sous-pages de la page affichée
   var tabs = '<nav class="pnav-tabs" aria-label="Pages"><div class="tabs-in" style="max-width:' + w + 'px">' + roots.map(tab).join('') +
@@ -532,13 +547,13 @@ function navHTML(d, ctx) {
       '<div class="toc-pr"' + (edit ? ' draggable="true"' : '') + '>' + fold + pgBtn('toc-pb', i) +
       (edit ? '<button type="button" class="toc-a" data-pgsub="' + i + '" title="Nouvelle sous-page" aria-label="Nouvelle sous-page">+</button>' + menu(i, true) : '') + '</div>' +
       (secs.length ? '<ol class="toc-s">' + secs.map(function (x) {
-        return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + esc(x.t) + '</span></a></li>';
+        return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + x.h + '</span></a></li>';
       }).join('') + '</ol>' : '') +
       (kids.length ? '<ol class="toc-c">' + kids.map(entry).join('') + '</ol>' : '') + '</li>';
   };
   var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + roots.map(entry).join('') + '</ol>' +
     (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
-  return tabs + side;
+  return rendreFormules(paintPills(tabs + side, d), false);   // titres du sommaire : pastilles et formules (05-formules.js)
 }
 function navReveal(keep) {
   // garde visible la page affichée dans le sommaire (qui défile) et dans les onglets
@@ -560,7 +575,7 @@ function applyTheme() {
   r.classList.toggle('is-edit', mode === 'edit');
   r.setAttribute('data-npages', doc.pages.length); r.setAttribute('data-nav', doc.nav || 'auto'); r.setAttribute('data-w', +doc.width || 820);
   Reader.navLayout(); paintFavicon();
-  document.title = curTitle();
+  document.title = curTitreFenetre();
 }
 var navSpyFn = null, lastNav = '', derivedT = 0;
 var pointerBusy = false, navPending = false;
@@ -597,7 +612,7 @@ function refreshDerived() {
     // en édition le bloc est dans .blk[data-id], en lecture dans .q-blk[data-qid]
     var box = $('.blk[data-id="' + b.id + '"] .q-res, .q-blk[data-qid="' + b.id + '"] > .q-res', app);
     if (box && !box.contains(document.activeElement)) {   // pas pendant la saisie d'un texte de carte
-      var h = paintPills(queryResult(b, doc, vc), doc); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); if (fen && fen.b === b.id) fenPlacer(); }   // filtre des lignes et fenêtre (accrochée aux puces des cartes) hors de .q-res : remis
+      var h = rendreFormules(paintPills(queryResult(b, doc, vc), doc), false); if (box.innerHTML !== h) { box.innerHTML = h; filtrerBloc(b.id); if (fen && fen.b === b.id) fenPlacer(); }   // filtre des lignes et fenêtre (accrochée aux puces des cartes) hors de .q-res : remis
     }
     var form = mode === 'edit' && $('.blk[data-id="' + b.id + '"] .q-puces:not(.q-cpuces)', app);
     if (form && !form.contains(document.activeElement)) {   // pas pendant que le focus est sur une puce
@@ -618,7 +633,7 @@ function refreshDerived() {
     var badge = $('.blk[data-id="' + id + '"] .num', app); if (badge && badge.getAttribute('data-ph') !== nums[id]) badge.setAttribute('data-ph', nums[id]);
   });
   chRefreshLinked();   // cartes dont les valeurs viennent d'un tableau
-  var ct = curTitle(); if (document.title !== ct) document.title = ct;
+  var ft = curTitreFenetre(), ct = curTitle(); if (document.title !== ft) document.title = ft;
   var dn = $('#ui .doc-name'); if (dn && dn.textContent !== ct) dn.textContent = ct;
 }
 function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }
@@ -643,7 +658,7 @@ function render(focus) {
   app.innerHTML = lastNav + renderPage(doc, vc);
   applyTheme();
   if (navSpyFn) navSpyFn();
-  if (mode === 'edit') $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); });
+  if (mode === 'edit') { $$('textarea.code-ta', app).forEach(function (t) { autosize(t); syncCodeLayer(t); }); $$('textarea.formule-ta', app).forEach(autosize); }
   mountMaps();
   Reader.tlFit(app);
   poserFiltres(fq);   // filtres des lignes de la session, réappliqués à chaque rendu
@@ -1015,6 +1030,10 @@ function syncCodeLayer(t) {
   pre.style.padding = cs.paddingTop + ' ' + cs.paddingRight + ' ' + cs.paddingBottom + ' ' + cs.paddingLeft;
   pre.style.font = cs.font; pre.style.tabSize = cs.tabSize; pre.style.letterSpacing = cs.letterSpacing;
   pre.scrollLeft = t.scrollLeft;
+}
+// aperçu d'un bloc formule (rendu, et saisie de la source : 12-saisie.js) ; source vide : une invite en édition, rien en lecture
+function formuleBlocApercu(tex, edition) {
+  return texEnMathML(tex, 'bloc') || (edition ? '<span class="formule-invite">Tapez une formule LaTeX, par exemple \\frac{a}{b}</span>' : '');
 }
 function autosize(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 

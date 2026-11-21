@@ -2,8 +2,8 @@
 // Une pastille copiée garde sa forme dans Ardoise (text/html) et devient « #nom » ailleurs (text/plain).
 var BLOC_FIN_RE = /<\/(p|div|li|h[1-6]|tr|blockquote|pre)>|<br\s*\/?>/gi;
 function texteBrutDePresse(html) {
-  // texte brut d'un fragment HTML copié : pastilles en #nom, blocs en lignes, cellules en tabulations
-  var s = String(html || '').replace(PILL_RE, function (m, cls, attrs, inner) { return '#' + htmlText(inner); })   // PILL_RE, htmlText : 05-migrations.js
+  // texte brut d'un fragment HTML copié : formules en $source$ (05-formules.js), pastilles en #nom, blocs en lignes, cellules en tabulations
+  var s = formulesEnTexte(String(html || '')).replace(PILL_RE, function (m, cls, attrs, inner) { return '#' + htmlText(inner); })   // PILL_RE, htmlText : 05-migrations.js
     .replace(/<\/t[dh]>\s*(?=<t[dh][\s>])/gi, '\t')
     .replace(BLOC_FIN_RE, '\n');
   return htmlText(s).replace(/[ \t]*\n[ \t]*\n+/g, '\n').replace(/^\n+|\n+$/g, '');

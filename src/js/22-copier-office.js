@@ -12,7 +12,7 @@ function copierPourOffice(b) {
   } else {
     // un groupe emporte en images les cartes et chronologies de ses blocs
     // HTML au style d'Ardoise (officeHtmlBloc) marqué, texte brut par les éléments neutres
-    var o = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return { page: doc.cur, images: r.images }; });
+    var o = imagesOffice([b], { cartes: b.type === 'group' }).then(function (r) { horsLigne = r.horsLigne; return { page: doc.cur, images: r.images, formules: r.formules }; });
     item = { 'text/html': o.then(function (x) { return new Blob([htmlCopieOffice(officeHtmlBloc(b, doc, x))], { type: 'text/html' }); }), 'text/plain': o.then(function (x) { return texte(officeTexte(officeBloc(b, doc, x))); }) };
   }
   return navigator.clipboard.write([new ClipboardItem(item)]).then(function () {
@@ -20,7 +20,7 @@ function copierPourOffice(b) {
     return true;
   }, function () { refus(); return false; });
 }
-/* Images des blocs pour l'export Office, enfants des groupes compris : { images: { idBloc: { src, mime, l, h } }, horsLigne }.
+/* Images des blocs pour l'export Office, enfants des groupes compris : { images: { idBloc: { src, mime, l, h } }, formules (imagesFormules), horsLigne }.
    o.png : une image ni PNG ni JPEG (WebP, GIF, SVG…) est redessinée en PNG (le .docx ne prend que ces deux formats) ;
    o.cartes : cartes et chronologies dessinées en PNG, l'une après l'autre (un seul montage hors écran à la fois). */
 function imagesOffice(blocs, o) {
@@ -34,7 +34,68 @@ function imagesOffice(blocs, o) {
       }, function () { /* dessin impossible : équivalent texte */ });
     });
   });
-  return suite.then(function () { return { images: images, horsLigne: horsLigne }; });
+  return suite.then(function () { return imagesFormules(officeBlocs(blocs, doc, { page: doc.cur })); })
+    .then(function (f) { return { images: images, formules: f, horsLigne: horsLigne }; });
+}
+
+/* Formules en images (PNG en data URL) pour Copier pour Office : { ligne: { source: { src, l, h } }, bloc: { … } }, d'après les
+   formules des éléments neutres. Le navigateur dessine lui-même le MathML : SVG foreignObject sur un canvas (le canvas reste lisible
+   dans Chromium, polices mathématiques du système), au thème clair. En ligne : dessinée à 15 px (taille du texte courant, l'appelant
+   met l'image à l'échelle du texte qui l'entoure), à l'échelle 4 pour rester nette jusqu'aux titres, et rehaussée de vide pour que
+   sa ligne de base soit au milieu de l'image (align="middle"). Bloc : à la taille du bloc formule, à l'échelle 2.
+   Une seule préparation par source et par mode (FORMULES_IMAGES) ; une formule qui ne se dessine pas n'a pas d'entrée ($source$). */
+var FORMULES_IMAGES = new Map();
+function imagesFormules(elts) {
+  var a = officeFormulesDe(elts), r = { ligne: {}, bloc: {} }, suite = Promise.resolve();
+  ['ligne', 'bloc'].forEach(function (mode) {
+    a[mode].forEach(function (src) {
+      suite = suite.then(function () { return imageFormule(src, mode); }).then(function (im) { if (im) r[mode][src] = im; });
+    });
+  });
+  return suite.then(function () { return r; });
+}
+function imageFormule(source, mode) {
+  var cle = mode + '\n' + source;
+  if (FORMULES_IMAGES.has(cle)) return Promise.resolve(FORMULES_IMAGES.get(cle));
+  var c = conteneurClairHtml(mode === 'bloc' ? '<div class="formule-bloc">' + texEnMathML(source, 'bloc') + '</div>'
+    : '<p style="margin:0">' + formuleHTML(source, false) + '<span style="display:inline-block;width:0;height:0"></span></p>');
+  var m = c.querySelector('math');
+  if (!m) { c.remove(); return Promise.resolve(null); }
+  if (mode === 'bloc') m.style.display = 'inline math';   // largeur de la formule, pas de la colonne
+  var pret = (document.fonts && document.fonts.ready) || Promise.resolve();
+  return pret.then(function () { return svgDeMath(m); }).then(function (sv) {
+    var r = m.getBoundingClientRect(), e = mode === 'bloc' ? 2 : 4, haut = r.height, dy = 0;
+    if (mode !== 'bloc') {
+      // ligne de base (sonde de hauteur nulle après la formule) mise au milieu : vide ajouté au-dessus ou au-dessous
+      var base = c.querySelector('p > span:last-child').getBoundingClientRect().bottom, asc = base - r.top, desc = r.bottom - base, demi = Math.max(asc, desc);
+      haut = 2 * demi; dy = demi - asc;
+    }
+    var l = r.width + 2 * sv.marge, h = haut + 2 * sv.marge, cv = document.createElement('canvas'), g = cv.getContext('2d');
+    cv.width = Math.ceil(l * e); cv.height = Math.ceil(h * e);
+    g.scale(e, e); g.drawImage(sv.img, 0, dy, l, r.height + 2 * sv.marge);
+    var im = { src: cv.toDataURL('image/png'), l: Math.ceil(l), h: Math.ceil(h) };
+    if (FORMULES_IMAGES.size > 500) FORMULES_IMAGES.clear();
+    FORMULES_IMAGES.set(cle, im);
+    return im;
+  }).catch(function () { return null; }).then(function (im) { c.remove(); return im; });
+}
+// <math> mis en page → Promise de { img (image SVG décodée, à la taille du math plus la marge), marge (px) } : MathML sérialisé dans un
+// foreignObject, avec la police, la taille et la couleur calculées, les variables du thème clair et les règles de page.css qui visent math ;
+// le conteneur est à police nulle : sinon la ligne qui porte le math le pousse vers le bas et le bas d'une petite formule est coupé
+var MATH_MARGE = 2;   // l'encre déborde un peu de la boîte (italiques, radical)
+function svgDeMath(m) {
+  var r = m.getBoundingClientRect(), cs = getComputedStyle(m), v = officeVariables(doc), k, vars = '';
+  for (k in v) vars += k + ':' + v[k] + ';';
+  var regles = '', feuille = $('#page-css') && $('#page-css').sheet;
+  if (feuille) Array.prototype.forEach.call(feuille.cssRules, function (x) { if (x.selectorText && /(^|[\s,])math\b/.test(x.selectorText)) regles += x.cssText; });
+  var l = r.width + 2 * MATH_MARGE, h = r.height + 2 * MATH_MARGE, clone = m.cloneNode(true);
+  clone.style.cssText = 'display:' + cs.display + ';font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize + ';color:' + cs.color + ';margin:0';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + l + '" height="' + h + '"><foreignObject x="0" y="0" width="100%" height="100%">' +
+    '<div xmlns="http://www.w3.org/1999/xhtml" style="' + vars + 'padding:' + MATH_MARGE + 'px;margin:0;font-size:0;line-height:0;white-space:nowrap"><style>' + regles.replace(/</g, '\\3c ') + '</style>' +
+    new XMLSerializer().serializeToString(clone) + '</div></foreignObject></svg>';
+  var img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  return img.decode().then(function () { return { img: img, marge: MATH_MARGE }; });
 }
 // image du document : dimensions lues au décodage (le collage et le .docx gardent la taille), PNG si demandé
 function imageDocument(b, png) {
@@ -52,11 +113,12 @@ function imageDocument(b, png) {
 }
 function enDataUrl(blob) { return new Promise(function (ok, ko) { var r = new FileReader(); r.onload = function () { ok(r.result); }; r.onerror = ko; r.readAsDataURL(blob); }); }
 // conteneur hors écran : variables du thème clair posées sur lui, donc styles calculés de son contenu en thème clair
-function conteneurClair(b) {
+function conteneurClair(b) { return conteneurClairHtml(rendreFormules(paintPills(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc), false)); }
+function conteneurClairHtml(html) {
   var c = document.createElement('div'), v = officeVariables(doc), k;
   c.style.cssText = 'position:fixed;left:-30000px;top:0;width:' + OFFICE_LARGEUR + 'px;padding:8px;box-sizing:content-box;background:#ffffff;color:' + OFFICE_CLAIR.fg + ';color-scheme:light;font:15px/1.6 var(--f-body)';
   for (k in v) c.style.setProperty(k, v[k]);
-  c.innerHTML = paintPills(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc);
+  c.innerHTML = html;
   document.body.appendChild(c);
   return c;
 }
@@ -82,18 +144,23 @@ function imageDeBloc(b) {
     return deuxImages();
   });
   var fin = function () { if (inst) inst.destroy(); c.remove(); };
+  var maths = new Map();   // formules (titres de la chronologie) dessinées par le navigateur, peintes telles quelles
+  pret = pret.then(function () {
+    return Promise.all(Array.prototype.map.call(c.querySelectorAll('math'), function (m) { return svgDeMath(m).then(function (sv) { maths.set(m, sv); }, function () { /* peinte par boîtes */ }); }));
+  });
   return pret.then(function () {
     if (inst) inst.print(true);   // dessin immédiat (comme à l'impression) : un redimensionnement en attente aurait vidé le canvas
     var r = c.getBoundingClientRect(), cv = document.createElement('canvas'), g = cv.getContext('2d');
     cv.width = Math.ceil(r.width * 2); cv.height = Math.ceil(r.height * 2);
     g.scale(2, 2); g.fillStyle = '#ffffff'; g.fillRect(0, 0, r.width, r.height);
-    peindreDom(g, c, { x: r.left, y: r.top, echelle: 2 });
+    peindreDom(g, c, { x: r.left, y: r.top, echelle: 2, maths: maths });
     return new Promise(function (ok, ko) { cv.toBlob(function (blob) { if (blob) ok({ blob: blob, l: Math.round(r.width), h: Math.round(r.height), horsLigne: horsLigne }); else ko(new Error('image vide')); }, 'image/png'); });
   }).then(function (r) { fin(); return r; }, function (e) { fin(); throw e; });
 }
 
 /* Peintre par boîtes : redessine sur un canvas un sous-arbre du DOM d'après sa mise en page calculée (fonds, bordures,
-   anneaux et ombres, texte mot par mot, images et canvas, transformations, découpe des débordements). */
+   anneaux et ombres, texte mot par mot, images et canvas, transformations, découpe des débordements). Un <math> préparé
+   (o.maths : élément → svgDeMath) est peint par son image : barres, radicaux et délimiteurs étirés ne sont ni boîtes ni texte. */
 function peindreDom(g, racine, o) { peindreElement(g, racine, o); }
 function officeTransparent(c) { return !c || c === 'transparent' || /^rgba\(.*,\s*0\)$/.test(c); }
 function officeRayons(cs, w, h) {
@@ -113,6 +180,11 @@ function officeOmbres(v) {
 }
 function peindreElement(g, el, o) {
   var cs = getComputedStyle(el); if (cs.display === 'none') return;
+  if (o.maths && o.maths.has(el)) {
+    var q = el.getBoundingClientRect(), sv = o.maths.get(el);
+    if (cs.visibility !== 'hidden') g.drawImage(sv.img, q.left - o.x - sv.marge, q.top - o.y - sv.marge, q.width + 2 * sv.marge, q.height + 2 * sv.marge);
+    return;
+  }
   var tr = cs.transform, avant = null, prio = '';
   g.save();
   if (tr && tr !== 'none') {

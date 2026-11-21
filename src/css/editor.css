@@ -236,6 +236,11 @@ span.fld,.facts .fld,.eyebrow.fld{display:inline-block}
 .code-ta.cmd{border:1px solid var(--line);background:var(--code-soft);border-radius:6px;padding:12px 14px;font-size:13.5px;color:var(--fg)}
 .code-ta:focus{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent);border-radius:8px}
 .ta-wrap{position:relative;min-width:0}
+/* bloc formule : champ de la source au-dessus de l'aperçu ; invite d'un bloc vide */
+.formule-ta{display:block;width:100%;resize:none;outline:none;border:1px solid var(--line);border-radius:6px;background:var(--code-soft);color:var(--fg);font:13.5px/1.55 var(--f-mono);padding:10px 12px;white-space:pre-wrap;overflow:hidden;min-height:0;text-align:left}
+.formule-ta:focus{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+.formule-apercu{margin-top:10px}
+.formule-invite{color:var(--muted);font-style:italic}
 .ta-wrap .ta-hl{position:absolute;inset:0;margin:0;overflow:hidden;pointer-events:none;white-space:pre;color:var(--fg)}
 .ta-wrap.v-dark .ta-hl{color:var(--code-fg)}
 .ta-wrap .code-ta{position:relative;background:transparent!important;border-color:transparent!important;color:transparent;-webkit-text-fill-color:transparent;caret-color:var(--fg)}
@@ -400,6 +405,12 @@ button.tl-dot:hover{transform:scale(1.2)}
 .link-pop .lk-lv1{padding-left:26px} .link-pop .lk-lv2{padding-left:44px}
 .link-pop .lk-lv1 .ic,.link-pop .lk-lv2 .ic{width:22px;height:22px;font-size:11px}
 .link-pop .mi.on .ic{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+/* fenêtre de la formule (15-formules.js) : source LaTeX, puis aperçu en direct ; une formule en édition s'ouvre au clic */
+.formule-pop{width:min(340px,calc(100vw - 16px));min-width:0;padding:8px}
+.formule-pop .menu-q{margin:0 0 6px;font-family:var(--f-mono)}
+.formule-pop .f-apercu{min-height:44px;display:flex;align-items:center;justify-content:center;padding:6px 8px;overflow-x:auto;font-size:22px;color:var(--fg)}
+.formule-pop .f-apercu .muted{font-size:12px}
+.fld .formule[contenteditable="false"]{cursor:pointer}
 
 .img-new{display:flex;flex-direction:column;gap:8px}
 .img-url{display:flex;gap:6px}
