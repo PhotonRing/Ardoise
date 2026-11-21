@@ -75,4 +75,17 @@ function formuleRelue(n, tag, dst) {
 var R = sanitize;
 function textOf(html) { var d = document.createElement('div'); d.innerHTML = R(html); return d.textContent.replace(/\s+/g, ' ').trim(); }
 function isBlank(html) { return !textOf(html); }
+// titre lu en texte (onglets, titre de la fenêtre, nom du fichier, liens) : une formule s'y lit $source$
+function titreTexte(html) {
+  var d = document.createElement('div'); d.innerHTML = R(html);
+  Array.prototype.forEach.call(d.querySelectorAll('span.formule'), function (f) { f.replaceWith('$' + f.textContent + '$'); });
+  return d.textContent.replace(/\s+/g, ' ').trim();
+}
+// titre dans une entrée du sommaire (un lien) : HTML assaini, ses liens défaits (leur texte reste)
+function titreHTML(html) {
+  var h = R(html); if (h.indexOf('<a') < 0) return h;
+  var d = document.createElement('div'); d.innerHTML = h;
+  Array.prototype.forEach.call(d.querySelectorAll('a'), function (a) { a.replaceWith.apply(a, Array.prototype.slice.call(a.childNodes)); });
+  return d.innerHTML;
+}
 

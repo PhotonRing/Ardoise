@@ -357,7 +357,7 @@ function summaryItems(b, d, pi) {
     out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
   } else {
     sectionsOf(pg).forEach(function (x) {
-      var it = { t: x.t, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
+      var it = { t: x.t, h: x.h, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
       if (x.lv === 1 || !out.length) out.push(it); else if (dp !== 1) out[out.length - 1].kids.push(it);
     });
   }
@@ -366,7 +366,7 @@ function summaryItems(b, d, pi) {
 }
 function summaryList(b, d, pi) {
   var items = summaryItems(b, d, pi);
-  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + esc(it.t) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
+  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + (it.h != null ? it.h : esc(it.t)) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
   return items.length ? ol(items) : '';
 }
 function summaryEmpty(b) {
@@ -457,16 +457,20 @@ function wrapEdit(b, inner, nHidden, editorUi, nPages) {
 function pageHeader(pg) { return pg.blocks.filter(function (b) { return b.type === 'header'; })[0] || null; }
 function pageTitle(pg, i) {
   // le nom d'une page est le grand titre de son en-tête ; à défaut, le nom saisi ; sinon « Page N »
-  var h = pageHeader(pg), t = h ? textOf(h.title) : '';
+  var h = pageHeader(pg), t = h ? titreTexte(h.title) : '';
   return t || (pg.title || '').trim() || 'Page ' + (i + 1);
 }
 function curTitle() { return pageTitle(doc.pages[doc.cur], doc.cur); }
 function sectionsOf(pg) {
   var out = [], nums = stepNums(pg.blocks);
   pg.blocks.forEach(function (b) {
-    if (b.type === 'step') out.push({ id: b.id, t: textOf(b.title) || 'Étape', n: nums[b.id] || null, lv: 1 });
-    else if (b.type === 'h2') out.push({ id: b.id, t: textOf(b.html) || 'Section', lv: 1 });
-    else if (b.type === 'h3') out.push({ id: b.id, t: textOf(b.html) || 'Sous-section', lv: 2 });
+    // t : titre en texte (formule lue $source$) ; h : HTML assaini du titre pour le sommaire (formules rendues par navHTML)
+    var x = b.type === 'step' ? { id: b.id, src: b.title, def: 'Étape', n: nums[b.id] || null, lv: 1 } : b.type === 'h2' ? { id: b.id, src: b.html, def: 'Section', lv: 1 } :
+      b.type === 'h3' ? { id: b.id, src: b.html, def: 'Sous-section', lv: 2 } : null;
+    if (!x) return;
+    var t = titreTexte(x.src), it = { id: x.id, t: t || x.def, h: t ? titreHTML(x.src) : esc(x.def), lv: x.lv };
+    if (b.type === 'step') it.n = x.n;
+    out.push(it);
   });
   return out;
 }
@@ -532,13 +536,13 @@ function navHTML(d, ctx) {
       '<div class="toc-pr"' + (edit ? ' draggable="true"' : '') + '>' + fold + pgBtn('toc-pb', i) +
       (edit ? '<button type="button" class="toc-a" data-pgsub="' + i + '" title="Nouvelle sous-page" aria-label="Nouvelle sous-page">+</button>' + menu(i, true) : '') + '</div>' +
       (secs.length ? '<ol class="toc-s">' + secs.map(function (x) {
-        return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + esc(x.t) + '</span></a></li>';
+        return '<li class="lv' + x.lv + '"><a href="#b-' + x.id + '" data-sec="' + x.id + '">' + (x.n ? '<span class="toc-n">' + esc(x.n) + '</span>' : '') + '<span>' + x.h + '</span></a></li>';
       }).join('') + '</ol>' : '') +
       (kids.length ? '<ol class="toc-c">' + kids.map(entry).join('') + '</ol>' : '') + '</li>';
   };
   var side = '<aside class="pnav-side" aria-label="Sommaire"><ol class="toc">' + roots.map(entry).join('') + '</ol>' +
     (edit ? '<button type="button" class="toc-add" data-pgadd>+ Page</button>' : '') + '</aside>';
-  return tabs + side;
+  return rendreFormules(paintPills(tabs + side, d), false);   // titres du sommaire : pastilles et formules (05-formules.js)
 }
 function navReveal(keep) {
   // garde visible la page affichée dans le sommaire (qui défile) et dans les onglets
