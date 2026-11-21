@@ -51,6 +51,13 @@ function officeSegments(html, d) {
       delete p.couleur; delete p.surlignage; if (nom) out.push(p);
       OFFICE_BALISE.lastIndex = fin + 7; continue;
     }
+    if (tag === 'span' && /(^|\s)formule(\s|$)/.test(cls)) {
+      // formule (forme stockée, après R) : un segment à part, `$source$` en texte, la source dans formule (image : ticket 08)
+      var ff = s.indexOf('</span>', OFFICE_BALISE.lastIndex); if (ff < 0) ff = s.length;
+      var src = htmlText(s.slice(OFFICE_BALISE.lastIndex, ff).replace(/<[^>]*>/g, ''));
+      if (src.trim()) { var g = etat('$' + src + '$'); g.formule = src; out.push(g); }
+      OFFICE_BALISE.lastIndex = ff + 7; continue;
+    }
     var f = {};
     if (tag === 'b' || tag === 'strong') f.gras = true;
     else if (tag === 'i' || tag === 'em') f.italique = true;
@@ -71,12 +78,12 @@ function officeSegments(html, d) {
   while (out.length && out[out.length - 1].saut) out.pop();
   return officeFusion(out);
 }
-// segments voisins de même forme réunis (ni saut ni pastille), en copies : les segments reçus ne changent pas
+// segments voisins de même forme réunis (ni saut, ni pastille, ni formule), en copies : les segments reçus ne changent pas
 function officeFusion(segs) {
   var out = [];
   segs.forEach(function (g) {
     var der = out[out.length - 1], c = {}, k;
-    if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && memeForme(der, g)) { der.texte += g.texte; return; }
+    if (der && !der.saut && !g.saut && !der.pastille && !g.pastille && !der.formule && !g.formule && memeForme(der, g)) { der.texte += g.texte; return; }
     for (k in g) c[k] = g[k];
     out.push(c);
   });
@@ -195,6 +202,7 @@ function officeBloc(b, d, opts) {
       var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
       out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
+    case 'formule': if (String(b.tex || '').trim()) out.push({ t: 'formule', tex: String(b.tex).trim() }); break;   // image : ticket 08
     case 'divider': out.push({ t: 'ligne' }); break;
     case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
     case 'map':
@@ -352,8 +360,8 @@ function officeRequete(b, d, pi, S, txt, para) {
 var OFFICE_POLICES = { texte: "'Segoe UI',sans-serif", titre: "'Segoe UI Semibold','Segoe UI',sans-serif", mono: 'Consolas,monospace' };
 var OFFICE_P = 'margin:0pt 0pt 6pt;';   // paragraphe du corps
 function officePt(px) { return Math.round(px * 75) / 100 + 'pt'; }   // 1 px = 0,75 pt
-// capitales écrites dans le texte (Writer ignore text-transform) ; copies : les segments reçus ne changent pas
-function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte) c.texte = c.texte.toUpperCase(); return c; }); }
+// capitales écrites dans le texte (Writer ignore text-transform), sauf la source d'une formule ; copies : les segments reçus ne changent pas
+function officeMajuscules(segs) { return segs.map(function (g) { var c = {}, k; for (k in g) c[k] = g[k]; if (c.texte && !c.formule) c.texte = c.texte.toUpperCase(); return c; }); }
 // étiquette (clés, en-têtes, sommets, titres de sommaire et de requête, surtitre) : capitales écrites en police mono d'Ardoise, grise, espacement large
 // en dernier (Writer ignore ce qui suit letter-spacing) ; o : { px (11), couleur, espace, marges : style du paragraphe qui l'entoure, sans : en ligne }
 function officeEtiquette(segs, x, o) {
@@ -415,7 +423,7 @@ function officeHtmlElements(elts, d) {
     return '';
   }).join('');
 }
-/* Éléments neutres → texte brut : pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
+/* Éléments neutres → texte brut : formules en $source$, bloc formule en $$source$$ sur sa ligne, pastilles en #nom (comme la copie d'une plage), cellules en tabulations */
 function officeTexte(elts) {
   var lig = function (segs) { return segs.map(function (g) { return g.saut ? '\n' : g.pastille ? '#' + g.texte : g.texte; }).join(''); };
   var un = function (e) {
@@ -432,6 +440,7 @@ function officeTexte(elts) {
       case 'cadre': return tous(e.contenu);
       case 'code': return (e.nom ? e.nom + '\n' : '') + e.texte;
       case 'image': return '[Image' + (officeVide(e.legende) ? (e.alt ? ' : ' + e.alt : '') : ' : ' + lig(e.legende)) + ']';
+      case 'formule': return '$$' + e.tex + '$$';
       case 'ligne': return '———';
     }
     return '';

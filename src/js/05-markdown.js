@@ -107,6 +107,21 @@ function decouperMarkdown(lignes) {
     return MD_CLOTURE.test(x) || MD_TITRE.test(x) || MD_SEPARATEUR.test(x) || MD_CITATION.test(x) || MD_ELEMENT.test(x) || debutDeTableau(k);
   }
   function debutDeTableau(k) { return lignes[k].indexOf('|') >= 0 && k + 1 < n && lignes[k + 1].indexOf('-') >= 0 && MD_DELIMITEURS.test(lignes[k + 1]) && (lignes[k + 1].indexOf('|') >= 0 || /^\s*\|/.test(lignes[k])); }
+  // paragraphe $$…$$ : la ligne k commence par $$ et le premier $$ suivant, avant une ligne vide, finit une ligne ;
+  // lecture dédiée (les lignes du milieu ne sont pas relues comme liste ou tableau) ; { tex, suite } ou null
+  function formuleMd(k) {
+    if (!/^\s*\$\$/.test(lignes[k])) return null;
+    var t = lignes[k].replace(/^\s*\$\$/, ''), parts = [];
+    for (var j = k; j < n && (j === k || lignes[j].trim()); j++) {
+      var x = j === k ? t : lignes[j], p = x.indexOf('$$');
+      if (p < 0) { parts.push(x); continue; }
+      if (x.slice(p + 2).trim()) return null;
+      parts.push(x.slice(0, p));
+      var tex = parts.join('\n').trim();
+      return tex ? { tex: tex, suite: j + 1 } : null;
+    }
+    return null;
+  }
   while (i < n) {
     l = lignes[i];
     if (!l.trim()) { i++; continue; }
@@ -115,6 +130,8 @@ function decouperMarkdown(lignes) {
       for (i++; i < n && !fin.test(lignes[i]); i++) code.push(lignes[i]);
       i++; out.push({ sorte: 'code', langue: m[2], code: code.join('\n') }); continue;
     }
+    var fl = formuleMd(i);
+    if (fl) { out.push({ sorte: 'formule', tex: fl.tex }); i = fl.suite; continue; }
     if ((m = l.match(MD_TITRE))) { out.push({ sorte: 'titre', niveau: m[1].length, texte: (m[2] || '').replace(/[ \t]+#+$/, '').replace(/^#+$/, '') }); i++; continue; }
     if (MD_SEPARATEUR.test(l)) { out.push({ sorte: 'separateur' }); i++; continue; }
     if (debutDeTableau(i)) {
@@ -142,6 +159,7 @@ function decouperMarkdown(lignes) {
 }
 function blocDuGroupe(g) {
   if (g.sorte === 'separateur') return { type: 'divider' };
+  if (g.sorte === 'formule') return { type: 'formule', tex: g.tex };
   if (g.sorte === 'paragraphe') return texteDuHtml(enLigneMd(g.lignes.join('\n')));
   if (g.sorte === 'code') {
     var c = { type: 'code', variant: 'dark', name: g.langue, code: g.code, tall: false }, lg = LANGUES_MD[g.langue.toLowerCase()];
@@ -196,12 +214,14 @@ function cellulesMd(ligne) {
   out.push(cur);
   return out.map(function (c) { return enLigneMd(c.trim()); });
 }
-// mise en forme en ligne : code, échappements, HTML brut (assaini à l'appel), liens, gras, italique, barré, retours à la ligne
+// mise en forme en ligne : code, échappements, formules, HTML brut (assaini à l'appel), liens, gras, italique, barré, retours à la ligne
 function enLigneMd(texte) {
-  var gardes = [];
-  function garder(h) { gardes.push(h); return '\u0001' + (gardes.length - 1) + '\u0002'; }
-  var s = String(texte).replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, function (m, f, c) { return garder('<code>' + esc(c.replace(/^ ([\s\S]*) $/, '$1')) + '</code>'); });
-  s = s.replace(/\\([\\`*_{}\[\]()#+\-.!|~<>])/g, function (m, c) { return garder(esc(c)); });
+  var gardes = [], bruts = [];
+  // brut : texte d'origine d'une garde, rendu à la source d'une formule qui la contient
+  function garder(h, brut) { gardes.push(h); bruts.push(brut == null ? h : brut); return '\u0001' + (gardes.length - 1) + '\u0002'; }
+  var s = String(texte).replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, function (m, f, c) { return garder('<code>' + esc(c.replace(/^ ([\s\S]*) $/, '$1')) + '</code>', m); });
+  s = s.replace(/\\([\\`*_{}\[\]()#+\-.!|~<>$])/g, function (m, c) { return garder(esc(c), m); });
+  s = formulesMd(s, function (src) { return garder('<span class="formule">' + esc(src.replace(/\u0001(\d+)\u0002/g, function (m, k) { return bruts[+k]; })) + '</span>'); });
   s = s.replace(/!?\[\[([^\[\]\n]+)\]\]/g, function (m, cible) { var l = lienWikiMd(cible); return garder(l.href ? '<a href="' + l.href + '">' + esc(l.texte) + '</a>' : esc(l.texte)); });
   s = s.replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?\/?>/g, garder);   // balise HTML : laissée à l'assainisseur
   s = s.replace(/&(?!#\d+;|#x[0-9a-fA-F]+;|[A-Za-z][A-Za-z0-9]*;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -222,6 +242,18 @@ function enLigneMd(texte) {
   s = s.split('\n').map(function (l) { return l.replace(/^[ \t]+/, '').replace(/(\\|[ \t]+)$/, ''); }).join('<br>');   // chaque retour à la ligne est gardé, comme dans Obsidian
   while (/\u0001\d+\u0002/.test(s)) s = s.replace(/\u0001(\d+)\u0002/g, function (m, k) { return gardes[+k]; });
   return s.trim();
+}
+// formules d'un texte en ligne (gardes posées) : $$…$$ (source rognée, non vide), puis $…$ par la règle des dollars de la saisie
+// (dollarsFermes, 05-formules.js), lue de gauche à droite ; poser(source) rend ce qui remplace la formule
+function formulesMd(s, poser) {
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, function (m, src) { return src.trim() ? poser(src.trim()) : m; });
+  var out = '', debut = 0;
+  for (var i = s.indexOf('$'); i >= 0; i = s.indexOf('$', i + 1)) {
+    var x = dollarsFermes(s.slice(debut, i + 1), s.slice(i + 1));
+    if (!x) continue;
+    out += s.slice(debut, debut + x.debut) + poser(x.source); debut = i + 1;
+  }
+  return out + s.slice(debut);
 }
 // [[Page]], [[Page|texte]], [[Page#Section]] (^bloc : la page) → { href, texte } ; page cherchée sans casse ni accents par son
 // nom (pageTitle), avec ou sans dossier et .md ; section absente : la page ; sans page : href vide. Texte : l'alias, sinon « Page › Section »
