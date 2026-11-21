@@ -48,6 +48,7 @@ var TEMPLATES = {
       mk('image', { src: IMG, alt: 'Collines au soleil couchant', caption: 'Une image se choisit dans un fichier, se colle, se dépose ou se télécharge depuis une adresse : elle est toujours intégrée au document.' }),
       mk('texte', lignesEn('case', ['Clic droit (ou appui long) sur une case, en édition : « Cochées à la fin de la liste » range les cases cochées après les autres.',
         { html: 'Cette case est déjà cochée : essayez sur cette liste.', done: true }, 'Une case encore à faire.'])),
+      mk('formule', { tex: 'e^{i\\pi} + 1 = 0' }),
       mk('step', { title: 'Les blocs de code' }),
       mk('texte', texteDuHtml('Trois styles : sombre avec bouton copier, boîte avec nom de fichier et numéros de ligne, ou commande courte. La coloration s’adapte au langage : détecté automatiquement, ou choisi dans la barre du bloc.')),
       mk('code', { variant: 'dark', code: '#!/usr/bin/env bash\n# Exemple : les dix plus gros dossiers du répertoire courant\ndu -sh -- */ 2>/dev/null | sort -rh | head -n 10' }),

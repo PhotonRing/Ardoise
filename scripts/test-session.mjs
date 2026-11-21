@@ -865,6 +865,16 @@ test('libellé : un sommet du modèle diamant modifié, nommé par le titre seul
   m.s.modifier(() => { blocsDe(m)[1].victime = 'Mairie de X'; });
   egal(libelles(m)[0], 'Accueil · Modèle diamant « APT28 Mairie de X » : texte modifié', 'sans titre : les sommets');
 });
+// Origine : spec formules, ticket 05 : la source d'un bloc formule est un champ de texte (SYN_TEXT)
+test('libellé : la source d\'un bloc formule modifiée est un texte modifié, défait en un Ctrl+Z', () => {
+  const m = monter();
+  m.s.modifier(() => { blocsDe(m).push({ id: 'f1', type: 'formule', tex: 'x^2' }); });
+  m.s.saisir(() => { blocsDe(m)[1].tex = 'x^2\n+ y'; });
+  m.s.valider();
+  egal(libelles(m)[0], 'Accueil · Formule « x^2 + y » : texte modifié');
+  m.s.annuler();
+  egal(blocsDe(m)[1].tex, 'x^2', 'un seul Ctrl+Z défait la frappe');
+});
 test('libellé : une page nommée par son en-tête (sans nom saisi) porte le nom affiché, pas « Sans titre »', () => {
   const m = monter();
   m.s.remplacer({ title: 'Doc', pages: [{ id: 'p1', title: '', blocks: [{ id: 'hd', type: 'header', title: 'Visite <i>guidée</i>' }, { id: 'b1', type: 'texte', lignes: [{ html: 'a' }] }] }] }, 'demarrage');
