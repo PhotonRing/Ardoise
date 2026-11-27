@@ -38,12 +38,9 @@ function imagesOffice(blocs, o) {
     .then(function (f) { return { images: images, formules: f, horsLigne: horsLigne }; });
 }
 
-/* Formules en images (PNG en data URL) pour Copier pour Office : { ligne: { source: { src, l, h } }, bloc: { … } }, d'après les
-   formules des éléments neutres. Le navigateur dessine lui-même le MathML : SVG foreignObject sur un canvas (le canvas reste lisible
-   dans Chromium, polices mathématiques du système), au thème clair. En ligne : dessinée à 15 px (taille du texte courant, l'appelant
-   met l'image à l'échelle du texte qui l'entoure), à l'échelle 4 pour rester nette jusqu'aux titres, et rehaussée de vide pour que
-   sa ligne de base soit au milieu de l'image (align="middle"). Bloc : à la taille du bloc formule, à l'échelle 2.
-   Une seule préparation par source et par mode (FORMULES_IMAGES) ; une formule qui ne se dessine pas n'a pas d'entrée ($source$). */
+/* Formules des éléments neutres en PNG (data URL), dessinées par le navigateur au thème clair : { ligne: { source: { src, l, h } }, bloc }.
+   En ligne : 15 px à l'échelle 4, ligne de base au milieu de l'image (align="middle") ; bloc : taille du bloc formule, échelle 2.
+   Une préparation par source et par mode (FORMULES_IMAGES) ; une formule qui ne se dessine pas n'a pas d'entrée ($source$). */
 var FORMULES_IMAGES = new Map();
 function imagesFormules(elts) {
   var a = officeFormulesDe(elts), r = { ligne: {}, bloc: {} }, suite = Promise.resolve();

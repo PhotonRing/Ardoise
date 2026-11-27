@@ -53,7 +53,7 @@ function officeSegments(html, d, formules) {
       OFFICE_BALISE.lastIndex = fin + 7; continue;
     }
     if (tag === 'span' && /(^|\s)formule(\s|$)/.test(cls)) {
-      // formule (forme stockée, après R) : un segment à part, `$source$` en texte, la source dans formule (image : ticket 08)
+      // formule (forme stockée, après R) : un segment à part, `$source$` en texte, la source dans formule, son image dans image
       var ff = s.indexOf('</span>', OFFICE_BALISE.lastIndex); if (ff < 0) ff = s.length;
       var src = htmlText(s.slice(OFFICE_BALISE.lastIndex, ff).replace(/<[^>]*>/g, ''));
       if (src.trim()) { var g = etat('$' + src + '$'); g.formule = src; if (formules && formules.ligne && formules.ligne[src]) g.image = formules.ligne[src]; out.push(g); }

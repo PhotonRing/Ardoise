@@ -1,10 +1,7 @@
 /* ---------- Formules : moteur LaTeX → MathML (maison, sans dépendance : ADR 0001) ---------- */
-// Module pur, sans DOM. texEnMathML(source, mode) rend une chaîne <math> dont la source voyage dans une annotation
-// application/x-tex (relue par sanitize, 02-assainissement.js). Le navigateur fait la mise en page avec ses polices
-// mathématiques. Les lettres sont écrites directement en caractères mathématiques Unicode (𝑥, 𝛼) : le peintre de Copier
-// pour Office ne connaît pas l'italique automatique des <mi>.
-// Une commande inconnue devient un <mtext class="f-err"> rouge (page.css) et le reste est rendu ; une accolade, un \left
-// ou un environnement non fermé est fermé en fin de source. Le sous-ensemble s'étend par COMMANDES_TEX, sans toucher l'analyseur.
+// Module pur, sans DOM : texEnMathML(source, mode) rend un <math> annoté de sa source (application/x-tex), lettres en caractères
+// mathématiques Unicode (𝑥, 𝛼 : le peintre de Copier pour Office ignore l'italique des <mi>). Commande inconnue : <mtext class="f-err">
+// rouge, le reste est rendu ; accolade, \left ou environnement non fermé : fermé en fin de source. Extension par COMMANDES_TEX.
 
 // lettres en caractères mathématiques : [majuscule A, minuscule a, chiffre 0] de chaque variante, et les lettres qu'Unicode
 // a placées ailleurs (ℎ, ℝ, ℱ…) ; italique par défaut, \mathbb, \mathcal, \mathbf ; null : pas de chiffre propre
