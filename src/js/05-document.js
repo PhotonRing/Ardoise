@@ -163,7 +163,7 @@ function docTitle() {
   return (h && titreTexte(h.title)) || doc.title || 'Sans titre';   // formule lue $source$ (nom du fichier)
 }
 // titre du document dans le <title> du fichier enregistré et de la page exportée : formules retirées (titreFenetre)
-function docTitreFenetre() {
+function titreFenetreDocument() {
   var h = doc.pages[0].blocks.filter(function (b) { return b.type === 'header'; })[0];
   return (h && titreFenetre(h.title)) || doc.title || 'Sans titre';
 }

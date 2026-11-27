@@ -185,9 +185,9 @@ function analyseurTex(src, mode) {
     return base;
   }
   // marques posées par une commande sur la base qu'elle rend (bornes, fonction), lues par scripts() ; un argument les efface
-  function argument() { var r = argument0(); limites = fonction = false; return r; }
+  function argument() { var r = lireArgument(); limites = fonction = false; return r; }
   // argument d'une commande ou d'un indice : un groupe, une commande, ou un seul caractère (un seul chiffre)
-  function argument0() {
+  function lireArgument() {
     blancs();
     if (p >= src.length || src[p] === '}') return '<mrow></mrow>';
     var c = src[p];

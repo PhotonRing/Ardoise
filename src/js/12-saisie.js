@@ -5,9 +5,9 @@ app.addEventListener('input', function (e) {
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
   if (el.matches('textarea.formule-ta')) {
     // bloc formule : l'aperçu suit la source sans rendre la page (07-rendu.js formuleBlocApercu)
-    var bf = byId(el.dataset.b); if (!bf) return;
-    bf.tex = el.value; autosize(el);
-    var fa = el.parentNode.querySelector('.formule-apercu'); if (fa) fa.innerHTML = formuleBlocApercu(bf.tex, true);
+    var blocFormule = byId(el.dataset.b); if (!blocFormule) return;
+    blocFormule.tex = el.value; autosize(el);
+    var apercu = el.parentNode.querySelector('.formule-apercu'); if (apercu) apercu.innerHTML = formuleBlocApercu(blocFormule.tex, true);
     session.saisir(); return;
   }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); session.saisir(); return; }
@@ -34,9 +34,9 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
-    var ct = curTitle(), nh = rendreFormules(paintPills(pageTitreHTML(doc.pages[doc.cur], doc.cur), doc), false); document.title = curTitreFenetre();
-    var dn = $('#ui .doc-name'); if (dn) dn.textContent = ct;
-    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nh) x.innerHTML = nh; });
+    var nomPage = curTitle(), nomPageHTML = rendreFormules(paintPills(titrePageHTML(doc.pages[doc.cur], doc.cur), doc), false); document.title = titreFenetrePageCourante();
+    var champNom = $('#ui .doc-name'); if (champNom) champNom.textContent = nomPage;
+    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nomPageHTML) x.innerHTML = nomPageHTML; });
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
@@ -400,7 +400,7 @@ function collerPlage(el, g) {
 // Copie d'un passage à pastilles ou à formules, ou qui touche un bloc texte (lignes : copieDeSelection, 12-bloc-texte.js) : text/html
 // garde les pastilles sans couleur calculée, marquées du document d'origine, et le MathML annoté des formules ; text/plain écrit
 // « #nom » et « $source$ ». Sinon, la copie reste celle du navigateur.
-function copierPastilles(e) {
+function copierPastillesEtFormules(e) {
   var sel = window.getSelection(), cd = e.clipboardData;
   if (!cd || !sel || !sel.rangeCount || sel.isCollapsed) return;
   var r = sel.getRangeAt(0);
@@ -414,6 +414,6 @@ function copierPastilles(e) {
   if (fld && fld.hasAttribute('data-texte') && fld.contains(r.commonAncestorContainer)) couperLignes(fld, r);   // 12-bloc-texte.js
   else if (fld) document.execCommand('delete');
 }
-app.addEventListener('copy', copierPastilles);
-app.addEventListener('cut', copierPastilles);
+app.addEventListener('copy', copierPastillesEtFormules);
+app.addEventListener('cut', copierPastillesEtFormules);
 
