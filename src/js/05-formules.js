@@ -256,7 +256,7 @@ function analyseurTex(src, mode) {
     if (src[p] === '{') { p++; return liste('}').join('') || '<mrow></mrow>'; }
     return argument();
   }
-  a = { argument: argument, optionnel: optionnel, enfants: enfants, liste: liste, groupe: groupe, mode: mode,
+  a = { argument: argument, optionnel: optionnel, enfants: enfants, liste: liste,
     limites: function () { limites = true; }, fonction: function () { fonction = true; }, brut: brut, variante: avecVariante,
     vu: vu, avance: function (n) { p += n; }, delimiteur: delimiteur, lignes: function (env) { return lignesMtr(tableau(env)); }, formule: formule };
   return a;
