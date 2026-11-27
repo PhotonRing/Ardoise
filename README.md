@@ -16,6 +16,7 @@
 ## Fonctions
 
 - **Blocs** : en-tête, titres de section et sous-sections (repris dans le sommaire), blocs texte (lignes de texte, puces, numéros, cases à cocher et sous-titres hors sommaire mélangés dans un même bloc ; le genre se choisit en tapant `- `, `1. `, `[ ] ` ou `## ` en début de ligne, ou dans la barre de mise en forme ; `Entrée` crée une ligne du même genre, une seconde fois sur une ligne vide sort de la liste ou crée un nouveau bloc ; `Tab` / `Maj+Tab` changent le niveau des lignes sélectionnées ; alignement et taille par ligne ; les numéros se suivent à chaque niveau, un clic coche une case, et « Cochées à la fin de la liste » les range), étapes numérotées, fiche de faits, cartes, tableaux, encadrés, blocs dépliables, images intégrées (depuis un fichier, le presse-papiers ou une adresse web, toujours stockées dans le document), séparateurs, pied de page.
+- **Formules** (LaTeX) : taper `$x^2$` dans un texte crée une formule mathématique dès le `$` qui la ferme (Ctrl+Z rend la source ; « 5 $ » reste du texte) ; un clic ouvre sa source avec l'aperçu en direct. Dans tous les textes riches et les titres (rendues aussi dans le sommaire), et en **bloc formule** centré et en grand. Fractions, racines, indices, grec, sommes et intégrales, matrices, cas, alignements ; une commande inconnue s'affiche en rouge. Les formules passent dans la lecture, l'export, l'impression, les requêtes, l'import Markdown et le texte brut (`$…$`, `$$…$$`), et en images dans Copier pour Office et l'export Word (posées trop haut dans Google Docs et dans un .docx ouvert avec Writer).
 - **Mise en forme du texte** : une barre collée en haut du bloc où l'on écrit (gras, italique, souligné, barré, code, lien, lien vers une page, pastille, couleur du texte, surlignage, effacer), toujours visible en édition et aux couleurs du thème ; six couleurs de texte et cinq surlignages lisibles en thème clair comme sombre. Sous 600 px de large, elle se replie en un bouton « Aa » qui l'ouvre juste sous lui.
 - **Code** : trois styles (sombre, boîte avec nom de fichier et numéros de ligne, commande), coloration Bash, Python, PowerShell, JavaScript, JSON, YAML, SQL, HTML, C/Java/Go/Rust, détectée automatiquement.
 - **Chronologies** verticales ou horizontales (titres inclinés), styles et libellés des liens, bulles de description.
@@ -109,6 +110,7 @@ Pour faire évoluer le format :
 | 6 | 1.22 | Blocs « Groupe repliable » et « Modèle diamant » (nouveaux types de blocs), sans conversion |
 | 7 | 1.24 | Filtres d'une requête et de ses cartes de nombre rangés en liste (`filtres`, `tfiltres`), convertis à l'ouverture ; les anciens champs restent écrits en miroir pour les versions plus anciennes |
 | 8 | 1.27 | Bloc texte : les paragraphes deviennent des blocs texte (type `texte`) faits de lignes (`lignes`, avec genre, niveau, alignement, taille et coche), convertis à l'ouverture |
+| 9 | 1.28 | Formules : `<span class="formule">source</span>` dans les textes riches et bloc « Formule » (type `formule`, champ `tex`), étape vide |
 
 ## Assembler localement
 
