@@ -71,6 +71,20 @@ const ANCIENS = [
   }
   console.log('bancs navigateur : OK (aucune lecture de .hidden)');
 }
+// Bancs navigateur : une attente à durée fixe après une action échoue de temps en temps sous charge (ticket 13 du lot 9) ;
+// un nouveau sujet attend l'état avec jusqua (outils/attente.mjs). Les anciennes attentes sont plafonnées : le plafond
+// ne fait que baisser, il suit le compte exact quand on en retire.
+{
+  const PLAFOND_ATTENTES = 500;
+  const dossier = new URL('../scripts/navigateur/', import.meta.url);
+  let n = 0;
+  for (const f of readdirSync(dossier).filter((x) => x.endsWith('.mjs'))) {
+    n += (readFileSync(new URL(f, dossier), 'utf8').match(/\battendre\(\s*\d+\s*\)|\bsetTimeout\(\s*\w+\s*,\s*\d+\s*\)/g) ?? []).length;
+  }
+  if (n > PLAFOND_ATTENTES) throw new Error(`bancs navigateur : ${n} attentes à durée fixe pour un plafond de ${PLAFOND_ATTENTES} ; attendre l'état avec jusqua(evalue, expr) de scripts/navigateur/outils/attente.mjs`);
+  if (n < PLAFOND_ATTENTES) throw new Error(`bancs navigateur : ${n} attentes à durée fixe, moins que le plafond : baisser PLAFOND_ATTENTES à ${n} dans scripts/check.mjs`);
+  console.log(`bancs navigateur : OK (${n} attentes à durée fixe, plafond atteint, aucune nouvelle)`);
+}
 // Noms de premier niveau : tous les fichiers de src/js forment un seul script, un nom déclaré deux fois remplace le premier sans erreur
 {
   const vus = new Map();
