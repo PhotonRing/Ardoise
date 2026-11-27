@@ -1,13 +1,16 @@
 /* ---------- Formules dans un champ en édition ---------- */
 // Une formule insérée dans le DOM sous sa forme stockée (<span class="formule">source</span>, après un collage) est
 // remplacée sur place par son élément rendu, non éditable (05-formules.js), comme paintPill pour une pastille.
+// espace sans chasse, posé par exitInline au bord d'une formule ou d'une pastille : ignoré dans ce fichier
+var SANS_CHASSE_RE = /\u200B/g;
+// formule f redessinée d'après source, non éditable ; retirée si la source est vide
+function peindreFormule(f, source) {
+  var m = texEnMathML(source, 'ligne');
+  if (!m) { f.parentNode.removeChild(f); return; }
+  f.contentEditable = 'false'; f.innerHTML = m;
+}
 function peindreFormulesDans(el) {
-  $$('span.formule', el).forEach(function (f) {
-    if (f.querySelector('math')) return;
-    var m = texEnMathML(f.textContent, 'ligne');
-    if (!m) { f.parentNode.removeChild(f); return; }
-    f.contentEditable = 'false'; f.innerHTML = m;
-  });
+  $$('span.formule', el).forEach(function (f) { if (!f.querySelector('math')) peindreFormule(f, f.textContent); });
 }
 /* ---------- Saisie `$…$` ---------- */
 // Le `$` qui ferme `$…$` (règle des dollars, dollarsFermes) change la source en formule, dans un champ riche, hors code,
@@ -17,7 +20,7 @@ function saisieDollars(fld) {
   var n = s.anchorNode, off = s.anchorOffset; if (!n || n.nodeType !== 3 || !fld.contains(n)) return null;
   var dans = n.parentNode.closest('span.pill, span.formule, code, a'); if (dans && fld.contains(dans)) return null;
   var x = dollarsFermes(n.nodeValue.slice(0, off), n.nodeValue.slice(off)); if (!x) return null;
-  var source = x.source.replace(/​/g, ''); if (!source.trim()) return null;
+  var source = x.source.replace(SANS_CHASSE_RE, ''); if (!source.trim()) return null;
   return { noeud: n, debut: x.debut, fin: off, source: source };
 }
 function poserFormuleSaisie(fld) {
@@ -49,12 +52,12 @@ function formuleVoisine(fld, dir) {
   };
   if (n.nodeType === 3) {
     var a = dir > 0 ? off : 0, b = dir > 0 ? n.nodeValue.length : off;
-    if (n.nodeValue.slice(a, b).replace(/​/g, '')) return null;
+    if (n.nodeValue.slice(a, b).replace(SANS_CHASSE_RE, '')) return null;
     if (b > a) zw.push([n, a, b]);
     x = apres(n);
   } else x = (dir > 0 ? n.childNodes[off] : n.childNodes[off - 1]) || (n !== fld && ENVELOPPE_RE.test(n.nodeName) ? apres(n) : null);
   while (x) {
-    if (x.nodeType === 3) { if (x.nodeValue.replace(/​/g, '')) return null; zw.push([x, 0, x.nodeValue.length]); x = apres(x); continue; }
+    if (x.nodeType === 3) { if (x.nodeValue.replace(SANS_CHASSE_RE, '')) return null; zw.push([x, 0, x.nodeValue.length]); x = apres(x); continue; }
     if (x.nodeType !== 1) return null;
     if (x.matches('span.formule')) return { f: x, zw: zw };
     if (!ENVELOPPE_RE.test(x.nodeName) || x.matches('span.pill') || !x.firstChild) return null;
@@ -84,7 +87,7 @@ var FORME_BALISES = { formatBold: /^(B|STRONG)$/, formatItalic: /^(I|EM)$/, form
 function formulesDansLaForme(fld, balise) {
   var s = getSelection(); if (!s.rangeCount) return false;
   var voisin = function (n, dir) {   // élément voisin, espaces sans chasse passés
-    for (n = dir > 0 ? n.nextSibling : n.previousSibling; n && n.nodeType === 3 && !n.nodeValue.replace(/​/g, ''); n = dir > 0 ? n.nextSibling : n.previousSibling);
+    for (n = dir > 0 ? n.nextSibling : n.previousSibling; n && n.nodeType === 3 && !n.nodeValue.replace(SANS_CHASSE_RE, ''); n = dir > 0 ? n.nextSibling : n.previousSibling);
     return n && n.nodeType === 1 && balise.test(n.nodeName) ? n : null;
   };
   var change = false;
@@ -126,8 +129,7 @@ function validerFormule(el, fld, avant, source) {
   exitInline(el, 1);   // curseur juste après la formule, gardé si elle est retirée
   if (source === avant) return;
   session.valider();   // la frappe en attente dans le champ est une étape, la formule en est une autre
-  var m = texEnMathML(source, 'ligne');
-  if (m) el.innerHTML = m; else el.parentNode.removeChild(el);
+  peindreFormule(el, source);
   fire(fld);
   session.valider();
 }

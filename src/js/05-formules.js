@@ -152,11 +152,15 @@ function analyseurTex(src, mode) {
     if (cp > 0xFFFF) { c = String.fromCodePoint(cp); p++; }
     return operateurTex(c);
   }
-  function commande() {
+  // nom de la commande après sa barre oblique : des lettres, ou un seul autre caractère
+  function nomCommande() {
     p++;
     var nom = /[a-zA-Z]/.test(src[p] || '') ? src.slice(p).match(/^[a-zA-Z]+/)[0] : (src[p] || '');
     p += nom.length;
-    var f = Object.prototype.hasOwnProperty.call(COMMANDES_TEX, nom) && COMMANDES_TEX[nom];
+    return nom;
+  }
+  function commande() {
+    var nom = nomCommande(), f = Object.prototype.hasOwnProperty.call(COMMANDES_TEX, nom) && COMMANDES_TEX[nom];
     return f ? f(a) : '<mtext class="f-err">' + esc('\\' + nom) + '</mtext>';
   }
   // indices et exposants qui suivent une base, dans les deux ordres
@@ -200,9 +204,7 @@ function analyseurTex(src, mode) {
     blancs();
     if (p >= src.length) return '';
     if (src[p] !== '\\') { var c = src[p++]; return c === '.' ? '' : c; }
-    p++;
-    var nom = /[a-zA-Z]/.test(src[p] || '') ? src.slice(p).match(/^[a-zA-Z]+/)[0] : (src[p] || '');
-    p += nom.length;
+    var nom = nomCommande();
     return Object.prototype.hasOwnProperty.call(DELIMITEURS_TEX, nom) ? DELIMITEURS_TEX[nom] : '';
   }
   // lignes coupées par \\ (et cellules par & dans un environnement, arrêtées à \end) : les <mtr> d'un tableau ;

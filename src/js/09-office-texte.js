@@ -66,7 +66,7 @@ OFFICE_RENDUS.image = function (b, x) {
 };
 // bloc formule : image centrée, ramenée à la largeur de la page ; sans image, $$source$$ centré
 OFFICE_RENDUS.formule = function (b, x) {
-  var tex = String(b.tex || '').trim(), im = x.opts.formules && x.opts.formules.bloc && x.opts.formules.bloc[tex];
+  var tex = String(b.tex || '').trim(), im = officeImageFormule(x.opts.formules, 'bloc', tex);
   if (!tex) return '';
   var p = '<p align="center" style="' + OFFICE_P + 'text-align:center">';
   if (!im) return p + esc('$$' + tex + '$$') + '</p>';

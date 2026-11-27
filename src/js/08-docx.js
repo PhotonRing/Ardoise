@@ -73,6 +73,8 @@ function docxDimensions(img) {
   }
   return { l: 0, h: 0 };
 }
+// taille du texte de chaque style de docxStyles, en demi-points (Normal : 11 pt), reprise par les formules en ligne
+var DOCX_TAILLES = { Normal: 22, Title: 48, Heading1: 32, Heading2: 26, Heading3: 22, Code: 19, Caption: 18 };
 
 function docxDepuisElements(elts, d) {
   // nums : instances de numérotation { abs (1 puces, 2 numéros), ilvl, depart } ; suiteNum[niveau] : dernière instance de numéros
@@ -108,11 +110,10 @@ function docxDepuisElements(elts, d) {
     return h;
   };
   // formule en ligne (segment à image, 08-office.js) : image à la taille du texte du paragraphe (o.sz, sinon o.szImage, taille
-  // de son style ; Normal 22 demi-points pour 15 px), descendue de la moitié de sa hauteur (w:position, en demi-points) : la ligne
+  // de son style ; Normal pour 15 px), descendue de la moitié de sa hauteur (w:position, en demi-points) : la ligne
   // de base, au milieu de l'image, se pose sur celle du texte ; null sans image décodable (le texte $source$ suit)
   var formuleEnLigne = function (g, o) {
-    var k = (o.sz || o.szImage || 22) / 22, l = Math.max(1, Math.round(g.image.l * k)), h = Math.max(1, Math.round(g.image.h * k));
-    if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
+    var k = (o.sz || o.szImage || DOCX_TAILLES.Normal) / DOCX_TAILLES.Normal, l = Math.max(1, Math.round(g.image.l * k)), h = Math.max(1, Math.round(g.image.h * k));
     return dessin(g.image.src, l, h, g.formule, '<w:position w:val="' + -Math.round(0.75 * h) + '"/>');
   };
   var P = function (pPr, contenu) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + (contenu || '') + '</w:p>'; };
@@ -176,13 +177,13 @@ function docxDepuisElements(elts, d) {
     var img = docxImage(e.src);
     if (!img) return P('', runs([{ texte: officeTexte([e]) }]));
     var dim = e.l && e.h ? { l: e.l, h: e.h } : docxDimensions(img), l = dim.l || OFFICE_LARGEUR, h = dim.h || Math.round(l * 0.6);
-    return P('<w:keepNext/>', dessin(e.src, l, h, e.alt)) + (officeVide(e.legende) ? '' : P('<w:pStyle w:val="Caption"/>', runs(e.legende, { szImage: 18 })));
+    return P('<w:keepNext/>', dessin(e.src, l, h, e.alt)) + (officeVide(e.legende) ? '' : P('<w:pStyle w:val="Caption"/>', runs(e.legende, { szImage: DOCX_TAILLES.Caption })));
   };
   var un = function (e) {
     switch (e.t) {
       case 'titre':
-        var niv = e.niveau ? Math.min(3, e.niveau) : 0;   // taille du style (docxStyles) pour les formules du titre
-        return P('<w:pStyle w:val="' + (niv ? 'Heading' + niv : 'Title') + '"/>' + (e.retrait ? '<w:ind w:left="' + 480 * e.retrait + '"/>' : '') + jc(e), runs(e.segs, { szImage: [48, 32, 26, 22][niv] }));
+        var style = e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title';
+        return P('<w:pStyle w:val="' + style + '"/>' + (e.retrait ? '<w:ind w:left="' + 480 * e.retrait + '"/>' : '') + jc(e), runs(e.segs, { szImage: DOCX_TAILLES[style] }));
       case 'para':
         var st = STYLE[e.style] || {}, pp = e.style === 'pied' ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="' + docxCouleur(C.line) + '"/></w:pBdr>' : '';
         if (e.serre) pp += '<w:spacing w:after="0"/>';   // ligne d'un bloc texte suivie d'une autre (avant w:ind : ordre du schéma)
@@ -241,18 +242,19 @@ function docxDepuisElements(elts, d) {
 }
 // styles : Normal (Arial 11 pt), Title, Heading1 à 3 (niveaux de plan du volet de navigation), Code, Caption ; noms intégrés : Word les traduit
 function docxStyles() {
-  var C = OFFICE_CLAIR, s = function (id, nom, ppr, rpr, defaut) {
+  var C = OFFICE_CLAIR, T = DOCX_TAILLES, sz = function (id) { return '<w:sz w:val="' + T[id] + '"/><w:szCs w:val="' + T[id] + '"/>'; };
+  var s = function (id, nom, ppr, rpr, defaut) {
     return '<w:style w:type="paragraph"' + (defaut ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + nom + '"/>' + (defaut ? '' : '<w:basedOn w:val="Normal"/><w:next w:val="Normal"/>') + '<w:qFormat/>' +
       (ppr ? '<w:pPr>' + ppr + '</w:pPr>' : '') + (rpr ? '<w:rPr>' + rpr + '</w:rPr>' : '') + '</w:style>';
   };
-  var titre = function (n, sz, avant) { return s('Heading' + n, 'heading ' + n, '<w:keepNext/><w:keepLines/><w:spacing w:before="' + avant + '" w:after="120"/><w:outlineLvl w:val="' + (n - 1) + '"/>', '<w:b/><w:bCs/><w:sz w:val="' + sz + '"/><w:szCs w:val="' + sz + '"/>'); };
+  var titre = function (n, avant) { return s('Heading' + n, 'heading ' + n, '<w:keepNext/><w:keepLines/><w:spacing w:before="' + avant + '" w:after="120"/><w:outlineLvl w:val="' + (n - 1) + '"/>', '<w:b/><w:bCs/>' + sz('Heading' + n)); };
   return DOCX_XML + '<w:styles ' + DOCX_NS + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:color w:val="' + docxCouleur(C.fg) + '"/>' +
-    '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    sz('Normal') + '<w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
     s('Normal', 'Normal', '', '', true) +
-    s('Title', 'Title', '<w:keepNext/><w:spacing w:before="120" w:after="120"/><w:outlineLvl w:val="0"/>', '<w:b/><w:bCs/><w:sz w:val="48"/><w:szCs w:val="48"/>') +
-    titre(1, 32, 360) + titre(2, 26, 240) + titre(3, 22, 200) +
-    s('Code', 'Code', '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C['code-soft']) + '"/><w:spacing w:after="120" w:line="240" w:lineRule="auto"/>', '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/><w:sz w:val="19"/><w:szCs w:val="19"/>') +
-    s('Caption', 'caption', '<w:spacing w:after="160"/>', '<w:i/><w:iCs/><w:color w:val="' + docxCouleur(C.muted) + '"/><w:sz w:val="18"/><w:szCs w:val="18"/>') +
+    s('Title', 'Title', '<w:keepNext/><w:spacing w:before="120" w:after="120"/><w:outlineLvl w:val="0"/>', '<w:b/><w:bCs/>' + sz('Title')) +
+    titre(1, 360) + titre(2, 240) + titre(3, 200) +
+    s('Code', 'Code', '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C['code-soft']) + '"/><w:spacing w:after="120" w:line="240" w:lineRule="auto"/>', '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>' + sz('Code')) +
+    s('Caption', 'caption', '<w:spacing w:after="160"/>', '<w:i/><w:iCs/><w:color w:val="' + docxCouleur(C.muted) + '"/>' + sz('Caption')) +
     '</w:styles>';
 }
 // numérotation : 1 = puces, 2 = numéros (neuf niveaux) ; instances [{ abs, ilvl, depart }] : une par liste (départ 1 au premier

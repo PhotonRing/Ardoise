@@ -34,7 +34,7 @@ app.addEventListener('input', function (e) {
   if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
   if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
     // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
-    var nomPage = curTitle(), nomPageHTML = rendreFormules(paintPills(titrePageHTML(doc.pages[doc.cur], doc.cur), doc), false); document.title = titreFenetrePageCourante();
+    var nomPage = curTitle(), nomPageHTML = rendrePastillesEtFormules(titrePageHTML(doc.pages[doc.cur], doc.cur), doc, false); document.title = titreFenetrePageCourante();
     var champNom = $('#ui .doc-name'); if (champNom) champNom.textContent = nomPage;
     $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nomPageHTML) x.innerHTML = nomPageHTML; });
   }

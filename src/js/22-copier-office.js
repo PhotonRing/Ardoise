@@ -110,7 +110,7 @@ function imageDocument(b, png) {
 }
 function enDataUrl(blob) { return new Promise(function (ok, ko) { var r = new FileReader(); r.onload = function () { ok(r.result); }; r.onerror = ko; r.readAsDataURL(blob); }); }
 // conteneur hors écran : variables du thème clair posées sur lui, donc styles calculés de son contenu en thème clair
-function conteneurClair(b) { return conteneurClairHtml(rendreFormules(paintPills(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc), false)); }
+function conteneurClair(b) { return conteneurClairHtml(rendrePastillesEtFormules(renderBlock(b, doc, { page: doc.cur, view: 'export' }, null), doc, false)); }
 function conteneurClairHtml(html) {
   var c = document.createElement('div'), v = officeVariables(doc), k;
   c.style.cssText = 'position:fixed;left:-30000px;top:0;width:' + OFFICE_LARGEUR + 'px;padding:8px;box-sizing:content-box;background:#ffffff;color:' + OFFICE_CLAIR.fg + ';color-scheme:light;font:15px/1.6 var(--f-body)';

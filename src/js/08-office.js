@@ -30,6 +30,8 @@ function officeVariables(d) {
   return v;
 }
 
+// image d'une formule préparée par imagesFormules (22-copier-office.js) : formules[mode][source], ou null (texte $source$)
+function officeImageFormule(formules, mode, source) { return (formules && formules[mode] && formules[mode][source]) || null; }
 /* Texte enrichi assaini → segments { texte, gras, italique, souligne, barre, code, lien, interne, couleur, surlignage, pastille,
    formule (source), image (de la formule, prise dans formules.ligne) } ou { saut } */
 var OFFICE_BALISE = /<(\/?)([a-z0-9]+)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/gi;
@@ -56,7 +58,7 @@ function officeSegments(html, d, formules) {
       // formule (forme stockée, après R) : un segment à part, `$source$` en texte, la source dans formule, son image dans image
       var ff = s.indexOf('</span>', OFFICE_BALISE.lastIndex); if (ff < 0) ff = s.length;
       var src = htmlText(s.slice(OFFICE_BALISE.lastIndex, ff).replace(/<[^>]*>/g, ''));
-      if (src.trim()) { var g = etat('$' + src + '$'); g.formule = src; if (formules && formules.ligne && formules.ligne[src]) g.image = formules.ligne[src]; out.push(g); }
+      if (src.trim()) { var g = etat('$' + src + '$'); g.formule = src; var im = officeImageFormule(formules, 'ligne', src); if (im) g.image = im; out.push(g); }
       OFFICE_BALISE.lastIndex = ff + 7; continue;
     }
     var f = {};
@@ -205,7 +207,7 @@ function officeBloc(b, d, opts) {
       out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
     case 'formule':
-      var tex = String(b.tex || '').trim(), fi = opts.formules && opts.formules.bloc && opts.formules.bloc[tex];
+      var tex = String(b.tex || '').trim(), fi = officeImageFormule(opts.formules, 'bloc', tex);
       if (tex) out.push(fi ? { t: 'formule', tex: tex, image: fi } : { t: 'formule', tex: tex });
       break;
     case 'divider': out.push({ t: 'ligne' }); break;
