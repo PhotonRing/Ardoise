@@ -73,25 +73,6 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
-// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé,
-// coche, alignement et taille en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
-function lignesHTML(lignes) {
-  var ls = normLignes(lignes), nums = numerosDesLignes(ls);   // niveau borné (LIGNE_LV_MAX), genre, coche, alignement et taille validés
-  return ls.map(function (l, i) {
-    var h = R(l.html);
-    return '<div class="lg"' + (l.lv ? ' data-lv="' + l.lv + '"' : '') + (l.genre ? ' data-g="' + l.genre + '"' : '') +
-      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (l.done ? ' data-done' : '') +
-      (l.align ? ' data-align="' + l.align + '"' : '') + (l.taille ? ' data-taille="' + l.taille + '"' : '') + '>' + (h || '<br>') + '</div>';
-  }).join('');
-}
-// bloc vide : une seule ligne de texte (sans genre), vide et sans retrait
-function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && !lignes[0].genre && isBlank(lignes[0].html); }
-function texteHTML(b, e) {
-  var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
-  if (!e) return '<div data-tx="' + b.id + '" class="texte">' + lignesHTML(ls) + '</div>';   // data-tx : cases cochées de l'export statique (01-lecture.js)
-  return '<div class="texte fld soft" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="lignes" data-rich data-texte' + (texteVide(ls) ? ' data-vide' : '') +
-    ' data-ph="Écrire, ou taper / pour insérer un bloc">' + lignesHTML(ls) + '</div>';
-}
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
@@ -102,10 +83,10 @@ function renderBlock(b, d, ctx, num) {
       (rich ? ' data-rich' : '') + (o.li ? ' data-li' : '') + (o.cell ? ' data-cell' : '') + (o.ml ? ' data-ml' : '') + (o.nl ? ' data-nl' : '') +
       ' data-ph="' + esc(o.ph || '') + '">' + body + '</' + tag + '>';
   }
-  function checks(base, arr) {
+  // cases à cocher de arr ; ordre : indices dans l'ordre d'affichage (liste à cocher : ordreCases), l'ordre saisi par défaut
+  function checks(base, arr, ordre) {
     if (!arr.length) return e ? '<button class="mini-add" type="button" data-act="item-add" data-k="' + base + '">+ case à cocher</button>' : '';
-    // ordre d'affichage (liste à cocher) : l'ordre saisi reste celui du document ; les sous-éléments suivent leur parent
-    var order = b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast') ? checkOrder(arr, b.order) : arr.map(function (x, k) { return k; });
+    var order = ordre || arr.map(function (it, k) { return k; });
     return '<ul class="check">' + order.map(function (i) {
       var it = arr[i], id = b.id + '-' + base.replace(/\./g, '-') + '-' + i;
       return '<li' + (it.lv > 0 ? ' class="lv-' + Math.min(6, +it.lv) + '"' : '') + '><input type="checkbox" id="' + id + '" data-b="' + b.id + '" data-k="' + base + '.' + i + '.done"' + (it.done ? ' checked' : '') + '>' +
@@ -117,303 +98,18 @@ function renderBlock(b, d, ctx, num) {
     return '<div class="ta-wrap v-' + (cls || b.variant || 'dark') + '"><pre class="ta-hl" aria-hidden="true">' + HL.html(b.code, lg) + '\n</pre>' +
       '<textarea class="code-ta ' + (cls || '') + '" data-b="' + b.id + '" data-k="code" spellcheck="false" wrap="off" rows="1" placeholder="Coller ou écrire du code…">' + esc(b.code) + '</textarea></div>';
   }
-  switch (b.type) {
-    case 'header':
-      return '<header class="b-header">' +
-        (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { ph: 'Surtitre', nl: 1 }) : '') +
-        f('h1', '', 'title', b.title, { ph: 'Titre de la page', nl: 1 }) +
-        (!b.noLede && (e || !isBlank(b.lede)) ? f('p', 'lede', 'lede', b.lede, { ph: 'Chapeau : une ou deux phrases qui résument la page', nl: 1 }) : '') + '</header>';
-    case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
-    case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
-    case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'texte': return texteHTML(b, e);
-    case 'step':
-      var badge = '';
-      if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
-      return '<div class="step-head">' + badge + f('h2', '', 'title', b.title, { ph: 'Titre de l’étape', nl: 1 }) + '</div>';
-    case 'summary':
-      var sl = summaryList(b, d, ctx.page);
-      if (!e && !sl) return '';
-      return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
-    case 'kanban': return kanbanHTML(b, ctx, f);
-    case 'query':
-      return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
-    case 'facts':
-      return '<dl class="facts">' + b.items.map(function (it, i) {
-        return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
-          (e ? '<span class="itools"><button type="button" data-act="fact-alert" data-i="' + i + '" class="' + (it.alert ? 'on' : '') + '" title="Valeur en rouge">!</button><button type="button" data-act="fact-del" data-i="' + i + '" title="Supprimer">×</button></span>' : '') + '</div>';
-      }).join('') + (e ? '<button class="add-item" type="button" data-act="fact-add">+ Ajouter</button>' : '') + '</dl>';
-    case 'cards':
-      return '<div class="subs" style="--min:' + (+b.min || 340) + 'px">' + b.cards.map(function (c, i) {
-        return '<div class="sub">' + ((e || !isBlank(c.title)) ? f('h3', '', 'cards.' + i + '.title', c.title, { ph: 'Titre de la carte' }) : '') +
-          ((e || !isBlank(c.text)) ? f('p', 'sub-text', 'cards.' + i + '.text', c.text, { ph: 'Texte (optionnel)', ml: 1, soft: 1 }) : '') +
-          checks('cards.' + i + '.checks', c.checks) +
-          (e ? '<span class="itools"><button type="button" data-act="card-del" data-i="' + i + '" title="Supprimer la carte">×</button></span>' : '') + '</div>';
-      }).join('') + (e ? '<button class="add-item" type="button" data-act="card-add">+ Carte</button>' : '') + '</div>';
-    case 'check': return checks('items', b.items) || (e ? '' : '');
-    case 'list':
-      // éléments à plat avec un niveau (lv) : rendus en listes imbriquées
-      var tg = b.ordered ? 'ol' : 'ul', cur = -1, lo = '';
-      b.items.forEach(function (it, i) {
-        var lv = Math.max(0, Math.min(+it.lv || 0, cur + 1));
-        if (cur < 0) { lo += '<' + tg + ' class="list">'; cur = 0; }
-        else if (lv > cur) { lo += '<' + tg + '>'; cur = lv; }
-        else { lo += '</li>'; while (cur > lv) { lo += '</' + tg + '></li>'; cur--; } }
-        lo += '<li>' + (e ? f('span', '', 'items.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : R(it.html));
-      });
-      if (cur < 0) return '<' + tg + ' class="list"></' + tg + '>';
-      lo += '</li>'; while (cur > 0) { lo += '</' + tg + '></li>'; cur--; }
-      return lo + '</' + tg + '>';
-    case 'code':
-      var clang = HL.resolve(b.lang, b.code, b.name);
-      if (b.variant === 'box') {
-        var lines = HL.lines(String(b.code).replace(/\n$/, ''), clang);
-        return '<div class="codebox"><div class="bar">' + f('span', 'meta', 'name', b.name, { rich: false, ph: 'nom_du_fichier', nl: 1 }) +
-          '<button class="btn-copy" type="button" data-copy>Copier</button></div>' +
-          (e ? ta() : '<pre class="src' + (b.tall ? ' tall' : '') + '">' + lines.map(function (l) { return '<span class="l">' + l + '</span>'; }).join('') + '</pre>') + '</div>';
-      }
-      if (b.variant === 'cmd') return e ? ta('cmd') : '<pre class="cmd">' + HL.html(b.code, clang) + '</pre>';
-      return '<div class="code' + (b.tall ? ' tall' : '') + ((e || b.name) ? ' named' : '') + '">' +
-        (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
-        '<button class="copy" type="button" data-copy>Copier</button>' +
-        (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
-    case 'formule':
-      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
-      var fap = formuleBlocApercu(b.tex, e);
-      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
-      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
-        '<div class="formule-apercu">' + fap + '</div></div>';
-    case 'table':
-      var rows = b.rows;
-      return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
-        '</tr></thead><tbody>' + rows.slice(1).map(function (r, i) {
-          return '<tr>' + r.map(function (c, j) { return f('td', '', 'rows.' + (i + 1) + '.' + j, c, { cell: 1 }); }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
-    case 'note':
-      return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
-    case 'group':
-      // groupe repliable : son pli d'édition est enregistré (folded) ; en lecture, un <details> que chacun plie pour soi
-      var gk = b.blocks || [], gn = gk.length, gplie = e ? !!b.folded : ((ctx.folds || {})[b.id] != null ? !!ctx.folds[b.id] : !!b.folded);
-      if (e) return '<div class="grp grp-edit' + (gplie ? ' grp-plie' : '') + '"><div class="grp-head"><button type="button" class="grp-v" data-act="fold" aria-expanded="' + !gplie + '" title="' + (gplie ? 'Déplier' : 'Plier') + ' le groupe">›</button>' +
-        f('span', 'grp-t', 'title', b.title, { ph: 'Titre du groupe', nl: 1 }) +
-        (gplie ? '<button type="button" class="grp-n" data-act="fold" title="Déplier le groupe">' + (gn ? gn + ' bloc' + (gn > 1 ? 's' : '') : 'vide') + '</button>' : '') + '</div>' +
-        (gplie ? '' : '<div class="grp-body">' + gk.map(function (c) { return wrapEdit(c, renderBlock(c, d, ctx, null), 0, editorUi, d.pages.length); }).join('') +
-          (gn ? '' : '<div class="grp-vide">Glissez des blocs ici ou ajoutez-en un</div>') +
-          '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
-      return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
-        var ci = renderBlock(c, d, ctx, null);
-        // ancrage de la bascule (19-mode-lecture-edition.js) ; un bloc ancré garde sa cible de lien
-        var at = (blocAncre(c) ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
-        return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
-      }).join('') + '</div></details>';
-    case 'details':
-      if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
-      return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
-    case 'image':
-      if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
-        '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
-        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div>' +
-        (isBlank(b.caption) ? '' : f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 })) + '</div>' : '';   // légende : l'image à remettre (import Markdown)
-      return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
-        ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
-    case 'map':
-      var mh = +b.height || 420, mks = b.markers || [], zns = b.zones || [], rts = b.routes || [];
-      var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
-      var rdist = function (r) { if (!MapKit) MapKit = ardoiseMapKit(); return MapKit.fmtDist(MapKit.pathLen(r.pts)); };
-      var zdesc = function (z) { return z.shape === 'circle' ? 'cercle de ' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + ' km' : z.pts.length + ' sommets'; };
-      var mapEl = '<div class="map" data-mapid="' + b.id + '"' + (e ? '' : ' data-state="' + esc(JSON.stringify({ view: b.view, bg: b.bg, markers: mks, zones: zns, routes: rts, choro: chView(b, d) || undefined, cities: b.cities !== false, countries: b.countries !== false, lock: !!b.lock, hideBg: !!b.hideBg, key: d.mapKey || undefined })) + '"') +
-        ' tabindex="0" role="application" aria-label="Carte" style="height:' + mh + 'px"><div class="map-nojs">Carte interactive : JavaScript nécessaire pour l’afficher.</div></div>';
-      if (!e) {
-        var li = mks.map(function (m, i) { return '<li><button type="button" data-go="' + i + '"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' + esc(m.label || 'Point ' + (i + 1)) + '</button><span class="muted">' + mll(m) + '</span></li>'; })
-          .concat(zns.map(function (z, i) { return '<li><button type="button" data-gz="' + i + '"><span class="zdot c-' + esc(z.color || 'accent') + (z.shape === 'circle' ? ' round' : '') + '"></span>' + esc(z.label || 'Zone ' + (i + 1)) + '</button>' + (z.shape === 'circle' ? '<span class="muted">' + zdesc(z) + '</span>' : '') + '</li>'; }))
-          .concat(rts.map(function (r, i) {
-            var nm = (r.names || []).filter(function (n) { return n; });
-            return '<li><button type="button" data-gr="' + i + '"><span class="rdot c-' + esc(r.color || 'accent') + '"></span>' + esc(r.label || 'Itinéraire ' + (i + 1)) + '</button><span class="muted">' + [r.hideDist ? '' : rdist(r), nm.length ? esc(nm.join(' → ')) : ''].filter(Boolean).join(' · ') + '</span></li>';
-          }));
-        return '<div class="mapblk">' + mapEl + ((b.list && li.length) ? '<ol class="map-list">' + li.join('') + '</ol>' : '') + '</div>';
-      }
-      var colorSel = function (cls, attr, cur) { return '<select class="' + cls + '" data-b="' + b.id + '" ' + attr + ' title="Couleur">' + MK_COLORS.map(function (c) { return opt(c[0], cur || 'accent', c[1]); }).join('') + '</select>'; };
-      var mapState = editorUi.map || {}, dk = mapState.draw === b.id ? mapState.kind : null, ed = mapState.editOf === b.id && mapShapeAlive(b, mapState.edit) ? mapState.edit : null;
-      var tool = function (kind, label, title) { return '<button type="button" class="ub out" data-act="map-draw" data-kind="' + kind + '" aria-pressed="' + (dk === kind) + '" title="' + title + '">' + label + '</button>'; };
-      var rtp = editorUi.routePaste, rtOpen = function (i) { return !!rtp && rtp.b === b.id && rtp.i === i; };
-      var rtBox = function (i) {
-        // zone de collage ouverte par le contexte d'édition : un nouvel itinéraire (i = -1) ou le remplacement de l'itinéraire i
-        return rtOpen(i) ? '<div class="ch-paste rt-paste"><textarea class="ch-ta rt-ta" data-b="' + b.id + '" rows="5" spellcheck="false" placeholder="Une ligne par point : latitude, longitude (ex. 48.38, -4.47), puis un libellé facultatif après une tabulation ou un point-virgule. Un point sans libellé prend le nom d’un lieu de la carte à moins de 50 m."></textarea>' +
-          '<div class="ch-r"><button type="button" class="ub" data-act="rt-import" data-i="' + i + '">' + (i < 0 ? 'Créer l’itinéraire' : 'Remplacer les points') + '</button></div></div>' : '';
-      };
-      var edBtn = function (kind, i) { return '<button type="button" class="mk-b" data-act="shape-edit" data-kind="' + kind + '" data-i="' + i + '" aria-pressed="' + (!!ed && ed.kind === kind && ed.i === i) + '" title="Modifier sur la carte">✎</button>'; };
-      return '<div class="mapblk">' + mapEl +
-        '<div class="map-tools"><div class="map-search"><input type="text" class="map-q" data-b="' + b.id + '" placeholder="Ajouter un point : ville, port, ou « 48.38, -4.47 »" autocomplete="off" spellcheck="false"><div class="map-res" hidden></div></div>' +
-        '<button type="button" class="ub out" data-act="map-addmode" aria-pressed="' + (mapState.add === b.id) + '" title="Placer des points en cliquant sur la carte (Échap pour terminer)">＋ Point</button>' +
-        tool('poly', '▱ Zone', 'Dessiner une zone sommet par sommet') + tool('circle', '○ Cercle', 'Dessiner une zone circulaire : centre puis rayon') + tool('route', '⤳ Itinéraire', 'Tracer un itinéraire étape par étape') +
-        '<button type="button" class="ub out" data-act="ch-on" aria-pressed="' + !!b.choro + '" title="Colorer les pays selon une valeur (carte choroplèthe)">▦ Pays</button></div>' +
-        '<p class="muted map-sum">' + (mks.length + zns.length + rts.length ? [mks.length ? mks.length + ' point' + (mks.length > 1 ? 's' : '') : '', zns.length ? zns.length + ' zone' + (zns.length > 1 ? 's' : '') : '', rts.length ? rts.length + ' itinéraire' + (rts.length > 1 ? 's' : '') : ''].filter(Boolean).join(' · ') + ' — cliquez sur la carte pour afficher la liste à gauche.' : 'Rien sur la carte : cherchez une ville ou un port, placez un point, dessinez une zone, un cercle ou un itinéraire.') + '</p>' +
-        '<div class="mk-panel' + (editorUi.panelMin ? ' min' : '') + '" data-b="' + b.id + '"><div class="mk-panel-h"><span class="cheat-dot"></span><b>Éléments de la carte</b><span class="mk-cnt">' + (mks.length + zns.length + rts.length) + '</span><button type="button" data-act="panel-min" title="Réduire / afficher">' + (editorUi.panelMin ? '▸' : '–') + '</button></div>' +
-        '<div class="mk-list">' + ((mks.length || zns.length || rts.length || b.choro) ? '' : '<p class="muted">Aucun élément pour l’instant.</p>') + choroPanel(b, d, editorUi) +
-          (mks.length ? '<div class="mk-h">Points</div>' : '') + mks.map(function (m, i) {
-            return '<div class="mk-item' + (ed && ed.kind === 'marker' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="mdot c-' + esc(m.color || 'accent') + '"></span>' +
-              '<input class="mk-in" data-b="' + b.id + '" data-mk="' + i + '" data-p="label" value="' + esc(m.label) + '" placeholder="Libellé du point">' +
-              edBtn('marker', i) + '<button type="button" class="mk-b" data-go="' + i + '" title="Centrer la carte sur ce point">⌖</button><button type="button" class="mk-b" data-act="mk-del" data-i="' + i + '" title="Supprimer le point">×</button></div>' +
-              '<div class="mk-l2">' + colorSel('mk-color', 'data-mk="' + i + '"', m.color) +
-              '<input class="mk-in mk-ll" data-b="' + b.id + '" data-mk="' + i + '" data-p="ll" value="' + mll(m) + '" title="Latitude, longitude (Entrée pour valider)"></div></div>';
-          }).join('') +
-          (zns.length ? '<div class="mk-h">Zones</div>' : '') + zns.map(function (z, i) {
-            return '<div class="mk-item' + (ed && ed.kind === 'zone' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="zdot c-' + esc(z.color || 'accent') + (z.shape === 'circle' ? ' round' : '') + '"></span>' +
-              '<input class="mk-in zn-in" data-b="' + b.id + '" data-zn="' + i + '" value="' + esc(z.label) + '" placeholder="Nom de la zone">' +
-              edBtn('zone', i) + '<button type="button" class="mk-b" data-gz="' + i + '" title="Cadrer la carte sur cette zone">⌖</button><button type="button" class="mk-b" data-act="zone-del" data-i="' + i + '" title="Supprimer la zone">×</button></div>' +
-              '<div class="mk-l2">' + colorSel('zn-color', 'data-zn="' + i + '"', z.color) +
-              (z.shape === 'circle' ? '<span class="rd-u">rayon</span><input class="mk-in rd-in" data-b="' + b.id + '" data-zn="' + i + '" value="' + String(+(z.r / 1000).toFixed(2)).replace('.', ',') + '" title="Rayon en kilomètres (Entrée pour valider)"><span class="rd-u">km</span>'
-                : '<span class="mk-n">' + z.pts.length + ' sommets</span>') + '</div></div>';
-          }).join('') +
-          '<div class="mk-h">Itinéraires</div>' + '<div class="ch-r"><button type="button" class="mk-b mk-t" data-act="rt-paste" data-i="-1" aria-pressed="' + rtOpen(-1) + '" title="Créer un itinéraire à partir d’une liste de coordonnées collée">Coller un itinéraire…</button></div>' + rtBox(-1) + rts.map(function (r, i) {
-            return '<div class="mk-item' + (ed && ed.kind === 'route' && ed.i === i ? ' on' : '') + '"><div class="mk-l1"><span class="rdot c-' + esc(r.color || 'accent') + '"></span>' +
-              '<input class="mk-in rt-in" data-b="' + b.id + '" data-rt="' + i + '" value="' + esc(r.label) + '" placeholder="Nom de l’itinéraire">' +
-              edBtn('route', i) + '<button type="button" class="mk-b" data-gr="' + i + '" title="Cadrer la carte sur cet itinéraire">⌖</button><button type="button" class="mk-b" data-act="route-del" data-i="' + i + '" title="Supprimer l’itinéraire">×</button></div>' +
-              '<div class="mk-l2">' + colorSel('rt-color', 'data-rt="' + i + '"', r.color) + '<span class="mk-n">' + r.pts.length + ' étapes · ' + rdist(r) + '</span>' +
-              '<button type="button" class="mk-b mk-t" data-act="route-dist" data-i="' + i + '" aria-pressed="' + !r.hideDist + '" title="Afficher la distance sur la carte">km</button>' +
-              '<button type="button" class="mk-b mk-t" data-act="rt-paste" data-i="' + i + '" aria-pressed="' + rtOpen(i) + '" title="Remplacer les étapes par une liste de coordonnées collée (nom et couleur gardés)">Remplacer les points…</button></div>' + rtBox(i) +
-              ((ed && ed.kind === 'route' && ed.i === i) ? r.pts.map(function (pt, j) {
-                return '<div class="mk-row st-row"><span class="st-n">' + (j + 1) + '</span><input class="mk-in st-in" data-b="' + b.id + '" data-rt="' + i + '" data-s="' + j + '" value="' + esc((r.names || [])[j] || '') + '" placeholder="' + (j === 0 ? 'Départ' : j === r.pts.length - 1 ? 'Arrivée' : 'Étape ' + (j + 1)) + ' (facultatif)">' +
-                  '<span class="st-ll">' + (+pt[0]).toFixed(3) + ', ' + (+pt[1]).toFixed(3) + '</span></div>';
-              }).join('') : '') + '</div>';
-          }).join('') + '</div></div></div>';
-    case 'timeline':
-      var its = b.items || [];
-      var SEGS = [['solid', 'Plein'], ['dashed', 'Tirets'], ['dotted', 'Pointillés'], ['gap', 'Plein coupé'], ['dgap', 'Tirets coupés'], ['none', 'Aucune']];
-      var segOf = function (k) { var it = its[k] || {}; var st = it.segs || 'solid'; return { st: st, base: st === 'gap' ? 'solid' : st === 'dgap' ? 'dashed' : st, cut: st === 'gap' || st === 'dgap', label: it.segl || '' }; };
-      var segRow = function (k) {
-        // ligne entre l'événement k et le suivant (verticale)
-        var sg = segOf(k);
-        if (!e && !sg.label && !sg.cut) return '';
-        var rail = sg.cut ? '<span class="rl ca s-' + sg.base + '"></span><span class="rl cb s-' + sg.base + '"></span>' : '<span class="rl full s-' + sg.base + '"></span>';
-        var body = e ? '<select class="tl-seg-sel" data-b="' + b.id + '" data-i="' + k + '" title="Type de ligne vers l’événement suivant">' + SEGS.map(function (x) { return opt(x[0], sg.st, x[1]); }).join('') + '</select>' +
-            f('span', 'tl-seg-lbl', 'items.' + k + '.segl', sg.label, { rich: false, ph: 'Libellé du lien (facultatif)', nl: 1 })
-          : '';
-        return '<li class="tl-v-seg' + (sg.label || e ? ' has-l' : '') + '"><div class="tl-v-slab">' + (!e && sg.label ? '<span class="tl-seg-txt">' + esc(sg.label) + '</span>' : '') + '</div>' +
-          '<div class="tl-v-rail">' + rail + '</div><div class="tl-v-sbody">' + body + '</div></li>';
-      };
-      var tlv = '<ol class="tl-v">' + its.map(function (it, i) {
-        var up = i > 0 ? '<span class="rl up s-' + segOf(i - 1).base + '"></span>' : '', dn = i < its.length - 1 ? '<span class="rl dn s-' + segOf(i).base + '"></span>' : '';
-        return '<li class="tl-v-item c-' + esc(it.color || 'accent') + '">' +
-          ((e || it.date) ? f('div', 'tl-v-date', 'items.' + i + '.date', it.date, { rich: false, ph: 'Date', nl: 1 }) : '<div class="tl-v-date"></div>') +
-          '<div class="tl-v-rail">' + up + dn + (e ? '<button type="button" class="tl-dot" data-act="tl-color" data-i="' + i + '" title="Changer la couleur"></button>' : '<i class="tl-dot"></i>') + '</div>' +
-          '<div class="tl-v-body">' + f('div', 'tl-v-title', 'items.' + i + '.title', it.title, { ph: 'Titre de l’événement', nl: 1 }) +
-          ((e || !isBlank(it.text)) ? f('div', 'tl-v-text', 'items.' + i + '.text', it.text, { ph: 'Description (facultative)', ml: 1, soft: 1 }) : '') +
-          (e ? '<span class="tl-tools"><button type="button" data-act="tl-up" data-i="' + i + '" title="Monter">↑</button><button type="button" data-act="tl-down" data-i="' + i + '" title="Descendre">↓</button><button type="button" data-act="tl-ins" data-i="' + i + '" title="Insérer un événement dessous">+</button><button type="button" data-act="tl-del" data-i="' + i + '" title="Supprimer">×</button></span>' : '') +
-          '</div></li>' + (i < its.length - 1 ? segRow(i) : '');
-      }).join('') + '</ol>' + (e ? '<button class="add-item tl-add" type="button" data-act="tl-add">+ Événement</button>' : '');
-      if (b.orient !== 'h') return '<div class="tl">' + tlv + '</div>';
-      var det = its.filter(function (it) { return !isBlank(it.text); }), cardsOn = det.length && !b.noCards, tips = !e && !cardsOn;
-      var tlh = '<div class="tl-h' + (tips ? ' tl-tips' : '') + (b.segPos === 'below' ? ' lb-below' : ' lb-above') + '"><div class="tl-h-in" style="--n:' + Math.max(1, its.length) + '">' + its.map(function (it, i) {
-        var tt = textOf(it.title) || 'Événement ' + (i + 1);
-        return '<div class="tl-h-item c-' + esc(it.color || 'accent') + (i === 0 ? ' first' : '') + (i === its.length - 1 ? ' last' : '') + '"' + (tips ? ' tabindex="0" aria-label="' + esc(tt + (it.date ? ', ' + it.date : '')) + '"' : '') + '>' +
-          (!tips ? '' : '<div class="tl-h-tip" hidden>' + (it.date ? '<span class="tb-d">' + esc(it.date) + '</span>' : '') + '<b>' + (isBlank(it.title) ? esc(tt) : R(it.title)) + '</b>' + (isBlank(it.text) ? '' : '<div class="tb-x">' + R(it.text) + '</div>') + '</div>') +
-          (i > 0 ? '<span class="tl-sl s-' + segOf(i - 1).base + (segOf(i - 1).cut ? ' cut' : '') + '"></span>' : '') +
-          (i < its.length - 1 ? '<span class="tl-sr s-' + segOf(i).base + (segOf(i).cut ? ' cut' : '') + '"></span>' + (segOf(i).label ? '<span class="tl-h-seg" title="' + esc(segOf(i).label) + '">' + esc(segOf(i).label) + '</span>' : '') : '') +
-          '<span class="tl-h-title">' + (isBlank(it.title) ? esc(tt) : R(it.title)) + '</span><i class="tl-dot"></i><span class="tl-h-date">' + esc(it.date) + '</span></div>';
-      }).join('') + '</div></div>';
-      if (e) return '<div class="tl">' + tlh + '<div class="tl-edit-h"><div class="mk-h">Événements (à modifier ici)</div>' + tlv + '</div></div>';
-      return '<div class="tl">' + tlh + (cardsOn ? '<div class="tl-det">' + det.map(function (it) {
-        return '<div class="tl-card c-' + esc(it.color || 'accent') + '"><div class="tl-card-h"><i class="tl-dot"></i><span class="tl-h-date">' + esc(it.date) + '</span></div><div class="tl-card-t">' + R(it.title) + '</div><div class="tl-card-x">' + R(it.text) + '</div></div>';
-      }).join('') + '</div>' : '') + '</div>';
-    case 'diamond':
-      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
-      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
-      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
-      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
-        DIA_SOMMETS.map(function (s) {
-          var v = b[s.cle];
-          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
-            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
-        }).join('') + '</div></div>';
-    case 'divider': return '<hr class="sep">';
-    case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
-  }
-  return '';
-}
-function checkOrder(arr, order) {
-  // indices des éléments dans l'ordre d'affichage : à chaque niveau, cochés avant ou après les autres (tri stable)
-  var root = { kids: [] }, stack = [{ lv: -1, n: root }];
-  arr.forEach(function (it, i) {
-    var lv = +it.lv || 0, n = { i: i, done: !!it.done, kids: [] };
-    while (stack.length > 1 && stack[stack.length - 1].lv >= lv) stack.pop();
-    stack[stack.length - 1].n.kids.push(n); stack.push({ lv: lv, n: n });
-  });
-  var out = [];
-  (function walk(list) {
-    list.map(function (n, k) { return { n: n, k: k }; }).sort(function (x, y) {
-      var dx = x.n.done ? 1 : 0, dy = y.n.done ? 1 : 0; if (order === 'doneFirst') { dx = 1 - dx; dy = 1 - dy; }
-      return dx - dy || x.k - y.k;
-    }).forEach(function (x) { out.push(x.n.i); walk(x.n.kids); });
-  })(root.kids);
-  return out;
-}
-function summaryDepth(b) {
-  // nombre de niveaux affichés (0 : tous) ; blocs plus anciens : « deep » (sous-niveaux oui / non)
-  if (b.depth != null && b.depth !== '') return Math.max(0, +b.depth || 0);
-  return b.deep === false ? 1 : 0;
-}
-function summaryItems(b, d, pi) {
-  // entrées du bloc sommaire de la page pi : [{ t, h (HTML assaini du titre, formules rendues par l'appelant), n, href, kids }]
-  var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
-  if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), h: titrePageHTML(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
-    out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
-  } else {
-    sectionsOf(pg).forEach(function (x) {
-      var it = { t: x.t, h: x.h, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
-      if (x.lv === 1 || !out.length) out.push(it); else if (dp !== 1) out[out.length - 1].kids.push(it);
-    });
-  }
-  if (b.sort === 'alpha') (function srt(arr) { arr.sort(cmp); arr.forEach(function (it) { srt(it.kids); }); })(out);
-  return out;
-}
-function summaryList(b, d, pi) {
-  var items = summaryItems(b, d, pi);
-  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + (it.h != null ? it.h : esc(it.t)) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
-  return items.length ? ol(items) : '';
-}
-function summaryEmpty(b) {
-  return '<p class="muted toc-blk-e">' + (b.src === 'pages' ? 'Cette page n’a pas encore de sous-pages : « + » à côté de son nom dans le sommaire, ou glissez-y une page.'
-    : 'Aucune section dans cette page : ajoutez des titres de section, des étapes ou des sous-sections.') + '</p>';
+  // contexte x du rendu : ce que lit un rendu, sans globale ; la facette rendu du type est le seul aiguillage (type inconnu, d'une
+  // version plus récente : rien)
+  var x = { edit: e, editor: editorUi, ctx: ctx, d: d, num: num, f: f, checks: checks, ta: ta }, rb = facette(b.type, 'rendu');
+  return rb ? rb(b, x) : '';
 }
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
 function settings(b) {
-  switch (b.type) {
-    case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
-    case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
-    case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
-      '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
-      '<select data-act="set" data-prop="depth" title="Nombre de niveaux affichés">' + (b.src === 'pages'
-        ? opt(1, summaryDepth(b), '1 niveau') + opt(2, summaryDepth(b), '2 niveaux') + opt(3, summaryDepth(b), '3 niveaux') + opt(0, summaryDepth(b), 'Tous les niveaux')
-        : opt(1, summaryDepth(b) === 1 ? 1 : 0, 'Sections seules') + opt(0, summaryDepth(b) === 1 ? 1 : 0, 'Sections et sous-sections')) + '</select>';
-    case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
-    case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
-    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
-      '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
-    case 'list': return tog('ordered', b.ordered, '1.', 'Liste numérotée');
-    case 'code': return '<select data-act="set" data-prop="variant" title="Style">' + opt('dark', b.variant, 'Sombre') + opt('box', b.variant, 'Boîte + fichier') + opt('cmd', b.variant, 'Commande') + '</select>' +
-      '<select data-act="set" data-prop="lang" title="Langage pour la coloration">' + Object.keys(HL.names).map(function (k) {
-        return opt(k, b.lang || 'auto', k === 'auto' ? 'Auto (' + HL.names[HL.detect(String(b.code || ''), b.name)] + ')' : HL.names[k]);
-      }).join('') + '</select>' +
-      (b.variant !== 'cmd' ? tog('tall', b.tall, '↕', 'Limiter la hauteur (défilement)') : '');
-    case 'table': return act('row-add', '+L', 'Ajouter une ligne') + act('col-add', '+C', 'Ajouter une colonne') + act('row-del', '−L', 'Supprimer la ligne active') + act('col-del', '−C', 'Supprimer la colonne active');
-    case 'note': return '<select data-act="set" data-prop="variant" title="Style">' + opt('warn', b.variant, 'Attention') + opt('info', b.variant, 'Info') + opt('bad', b.variant, 'Alerte') + opt('ok', b.variant, 'Succès') + opt('line', b.variant, 'Trait seul') + '</select>';
-    case 'details': return tog('open', b.open, 'Ouvert', 'Ouvert par défaut en lecture');
-    case 'timeline': return '<select data-act="set" data-prop="orient" title="Orientation">' + opt('v', b.orient || 'v', 'Verticale') + opt('h', b.orient || 'v', 'Horizontale (45°)') + '</select>' + (b.orient === 'h' ? '<select data-act="set" data-prop="segPos" title="Position des libellés de liens">' + opt('above', b.segPos || 'above', 'Libellés au-dessus') + opt('below', b.segPos || 'above', 'Libellés en dessous') + '</select>' + tog('noCards', !b.noCards, 'Fiches', 'Afficher les fiches de description sous la frise') : '') + act('tl-add', '+ événement', 'Ajouter un événement à la fin');
-    case 'map': return '<select data-act="set" data-prop="height" title="Hauteur">' + opt(300, b.height, 'Petite') + opt(420, b.height, 'Moyenne') + opt(560, b.height, 'Grande') + '</select>' +
-      '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
-      tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('countries', b.countries !== false, 'Pays', 'Afficher les noms des pays sur le fond simplifié (avec des données par pays, le réglage « Étiquettes » peut les afficher sur les pays colorés)') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
-      tog('lock', b.lock, 'Figée', 'Lecture : empêcher de déplacer et de zoomer la carte') + tog('hideBg', b.hideBg, 'Fond fixe', 'Lecture : masquer le bouton de changement de fond');
-    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
-  }
-  return '';
+  // réglages du type : facette reglages ; absence déclarée ou type inconnu : aucun
+  var rg = facette(b.type, 'reglages');
+  return rg ? rg(b) : '';
 }
 function foldLevel(b) { return b.type === 'step' || b.type === 'h2' ? 1 : b.type === 'h3' ? 2 : b.type === 'header' || b.type === 'footer' ? 0 : -1; }
 function foldRegions(blocks) {
@@ -1032,10 +728,6 @@ function syncCodeLayer(t) {
   pre.style.padding = cs.paddingTop + ' ' + cs.paddingRight + ' ' + cs.paddingBottom + ' ' + cs.paddingLeft;
   pre.style.font = cs.font; pre.style.tabSize = cs.tabSize; pre.style.letterSpacing = cs.letterSpacing;
   pre.scrollLeft = t.scrollLeft;
-}
-// aperçu d'un bloc formule (rendu, et saisie de la source : 12-saisie.js) ; source vide : une invite en édition, rien en lecture
-function formuleBlocApercu(tex, edition) {
-  return texEnMathML(tex, 'bloc') || (edition ? '<span class="formule-invite">Tapez une formule LaTeX, par exemple \\frac{a}{b}</span>' : '');
 }
 function autosize(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 

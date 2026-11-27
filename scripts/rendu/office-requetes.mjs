@@ -1,4 +1,4 @@
-// Copier pour Office, famille Kanban et requêtes (src/js/09-office-requetes.js) : kanban, Bloc requête dans chacune de ses vues.
+// Copier pour Office, famille Kanban et requêtes (src/js/06-bloc-requete.js) : kanban, Bloc requête dans chacune de ses vues.
 import { test, egal, vrai, monter } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';
 

@@ -55,42 +55,12 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
-// bloc sans ses filtres, premier niveau seulement : les filtres des cartes de nombre restent comparés
-function libelleSansFiltres(b) { var o = {}; for (var k in b) if (k !== 'filtres') o[k] = b[k]; return JSON.stringify(o); }
-// tableau : une ligne ou une colonne ajoutée vide, ou retirée, et rien d'autre ; sinon null (collage et vidage d'une plage donnent leur nature)
-function libelleGrille(ra, rb) {
-  var J = JSON.stringify, i;
-  var sansLigne = function (g, k) { return J(g.slice(0, k).concat(g.slice(k + 1))); };
-  var sansCol = function (g, k) { return J(g.map(function (l) { return l.slice(0, k).concat(l.slice(k + 1)); })); };
-  var colonne = function (g, k) { return g.map(function (l) { return l[k]; }); };
-  var la = ra.length, lb = rb.length, ca = ra[0].length, cb = rb[0].length;
-  if (ca === cb && lb === la + 1) for (i = 1; i < lb; i++) if (ligneVide(rb[i]) && sansLigne(rb, i) === J(ra)) return 'ligne ajoutée';
-  if (ca === cb && la === lb + 1) for (i = 1; i < la; i++) if (sansLigne(ra, i) === J(rb)) return 'ligne supprimée';
-  if (la === lb && cb === ca + 1) for (i = 0; i < cb; i++) if (ligneVide(colonne(rb, i).slice(1)) && sansCol(rb, i) === J(ra)) return 'colonne ajoutée';
-  if (la === lb && ca === cb + 1) for (i = 0; i < ca; i++) if (sansCol(ra, i) === J(rb)) return 'colonne supprimée';
-  return null;
-}
-// mêmes éléments dans un ordre quelconque : même valeur
-function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }).sort().join('\n'); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return b.type === 'texte' && /^(list|check|subtitle)$/.test(ba.type) ? 'converti en texte' : 'bloc modifié';   // 10-operations-blocs.js
-  if (b.type === 'texte' && Array.isArray(ba.lignes) && Array.isArray(b.lignes) && libelleSans(ba, 'lignes') === libelleSans(b, 'lignes') &&
-    ba.lignes.length === b.lignes.length && JSON.stringify(ba.lignes) !== JSON.stringify(b.lignes) &&
-    libelleTri(ba.lignes) === libelleTri(b.lignes)) return 'lignes réordonnées';   // cochées à la fin
-  if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
-  if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
-    // une seule colonne bascule par étape : réduite si l'une l'est devenue
-    var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
-    return reduite ? 'colonne réduite' : 'colonne affichée';
-  }
-  if (b.type === 'kanban' && libelleSans(ba, 'dep') === libelleSans(b, 'dep')) return 'dépendance modifiée';
-  if (b.type === 'query' && libelleSans(ba, 'colonnes') === libelleSans(b, 'colonnes')) return 'colonnes modifiées';   // choix des colonnes (07-requetes.js)
-  if (b.type === 'query' && libelleSans(ba, 'champs') === libelleSans(b, 'champs')) return 'champs des cartes modifiés';
-  if (b.type === 'query' && libelleSansFiltres(ba) === libelleSansFiltres(b)) return 'filtres modifiés';   // filtres du bloc (pas ceux des cartes de nombre)
-  if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
-    var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
-  }
+  // libellé propre au type : facette libelle de l'inscription ; null ou absence déclarée : libellé générique
+  var lb = facette(b.type, 'libelle'), lt = lb ? lb(ba, b) : null;
+  if (lt) return lt;
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';

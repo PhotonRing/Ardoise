@@ -31,6 +31,8 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '05-migrations.js',
     '05-presse-papier.js',
     '05-tableau.js',
+    // familles de types de blocs (06-bloc-<famille>.js) : chargées toutes, dans l'ordre de build.mjs ; une nouvelle famille n'oblige pas à modifier le banc
+    ...readdirSync(new URL('../../src/js/', import.meta.url)).filter((f) => /^06-bloc-.*\.js$/.test(f)).sort(),
     '06-coloration-syntaxique.js',
     '07-kanban.js',
     '07-rendu.js',
@@ -38,8 +40,6 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '08-docx.js',
     '08-office.js',
     '09-adresse.js',
-    // familles du style de Copier pour Office : chacune dans son fichier, chargées toutes (ordre de build.mjs)
-    ...readdirSync(new URL('../../src/js/', import.meta.url)).filter((f) => /^09-office-.*\.js$/.test(f)).sort(),
     '22-exporter-word.js',   // nom du fichier Word (nomExportWord) ; rien d'autre n'y tourne au chargement
   ].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });

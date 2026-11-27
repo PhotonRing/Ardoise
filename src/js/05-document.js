@@ -14,18 +14,9 @@ function normBlocks(arr, newer) {
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
-    // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
-    if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) { nb.cards = [qDefCard(nb)]; delete nb.cards[0].id; }   // sans id, comme en 1.23 (qNormFiltres)
-    // requête : le miroir des anciens filtres (05-migrations.js) n'est jamais repris en mémoire ; listes de filtres assainies
-    if (nb.type === 'query' && !newer) { oterAnciensFiltres(nb); qNormFiltres(nb); }
-    if (nb.type === 'kanban') nb.cols = (Array.isArray(nb.cols) ? nb.cols : []).filter(function (c) { return c && typeof c === 'object'; }).map(function (c) {
-      var o = {}; for (var ck in c) o[ck] = c[ck]; o.id = c.id || uid(); o.title = String(c.title || '');
-      o.cards = (Array.isArray(c.cards) ? c.cards : []).filter(function (k) { return k && typeof k === 'object'; }).map(function (k) { var q = kbNewCard(); for (var kk in k) q[kk] = k[kk]; return q; });
-      return o;
-    });
-    if (nb.type === 'kanban') kbCleanDeps(nb);
-    if (nb.type === 'texte') nb.lignes = normLignes(nb.lignes);   // au moins une ligne (05-lignes.js)
-    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
+    // normalisation propre au type : facette normaliser de l'inscription (absence déclarée : rien)
+    var nz = facette(nb.type, 'normaliser');
+    if (nz) nz(nb, b, newer);
     nb.id = b.id || uid(); out.push(nb);
     if (nb.type === 'group') {
       // groupe : ses blocs, un seul niveau ; un bloc refusé dans un groupe est remis dans la page juste après lui
@@ -36,17 +27,6 @@ function normBlocks(arr, newer) {
     }
   });
   return out;
-}
-// dépendances d'une carte : une liste vide retire la clé, pour qu'un fichier sans dépendances reste inchangé
-function kbSetDeps(k, list) { if (list.length) k.dep = list; else delete k.dep; }
-// dépendances d'un kanban : identifiants uniques de cartes du même kanban, sans la carte elle-même ; liste vide retirée
-function kbCleanDeps(b) {
-  var ids = {}; b.cols.forEach(function (c) { c.cards.forEach(function (k) { ids['$' + k.id] = 1; }); });
-  b.cols.forEach(function (c) { c.cards.forEach(function (k) {
-    if (!('dep' in k)) return;
-    var seen = {}, list = (Array.isArray(k.dep) ? k.dep : []).filter(function (d) { var ok = typeof d === 'string' && d !== k.id && ids['$' + d] && !seen['$' + d]; if (ok) seen['$' + d] = 1; return ok; });
-    kbSetDeps(k, list);
-  }); });
 }
 function normalize(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return null;

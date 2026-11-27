@@ -98,6 +98,24 @@ const ANCIENS = [
   }
   console.log(`noms : OK (${vus.size} noms de premier niveau, aucun en double)`);
 }
+// Types de blocs : l'inscription T est le seul aiguillage. Pas de switch par type ni de ligne de famille dans les six points
+// d'entrée communs, plus d'OFFICE_RENDUS ni de fichier 09-office-*.js (lot types-de-blocs, ticket 08)
+{
+  const fichiers = readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js'));
+  const office = fichiers.filter((f) => /^09-office-.*\.js$/.test(f));
+  if (office.length) throw new Error(`types de blocs : fichiers 09-office-*.js revenus (${office.join(', ')})`);
+  for (const f of fichiers) if (/\bOFFICE_RENDUS\b/.test(sansTextes(js(f)))) throw new Error(`types de blocs : OFFICE_RENDUS revenu dans ${f}`);
+  if (/\/\/ famille /.test(js('03-types-de-blocs.js'))) throw new Error('types de blocs : ligne de séparation de famille dans 03-types-de-blocs.js');
+  const POINTS = [['07-rendu.js', 'renderBlock'], ['07-rendu.js', 'settings'], ['08-office.js', 'officeBloc'], ['08-office.js', 'officeHtmlContenu'],
+    ['05-document.js', 'normBlocks'], ['05-libelle-etape.js', 'libelleNature']];
+  for (const [f, nom] of POINTS) {
+    const src = js(f), i = src.indexOf('\nfunction ' + nom + '(');
+    if (i < 0) throw new Error(`types de blocs : ${nom} introuvable dans ${f}, adapter la vérification`);
+    const corps = src.slice(i, src.indexOf('\n}\n', i));
+    if (/switch\s*\(b\.type\)|\bcase '|\/\/ famille /.test(corps)) throw new Error(`types de blocs : switch, case ou ligne de famille dans ${nom} (${f})`);
+  }
+  console.log('types de blocs : OK (inscription seul aiguillage des six points d\'entrée)');
+}
 for (const f of readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js') && x !== '05-session.js')) {
   sansTextes(js(f)).split('\n').forEach((ligne, i) => {
     for (const [re, quoi] of ANCIENS) if (re.test(ligne)) throw new Error(`session : ${quoi} dans ${f}:${i + 1} : ${ligne.trim()}`);

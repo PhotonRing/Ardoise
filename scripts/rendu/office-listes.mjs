@@ -1,4 +1,4 @@
-// Copier pour Office, famille Listes (src/js/09-office-listes.js) : listes à puces et numérotées, listes à cocher, sommaire.
+// Copier pour Office, famille listes et tableaux (src/js/06-bloc-listes.js ; officeListeCases : 08-office.js) : listes à puces et numérotées, listes à cocher, sommaire.
 import { monter, test, egal, vrai } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';
 
