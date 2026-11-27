@@ -11,10 +11,6 @@ var T = {
   summary: { label: 'Sommaire', ic: '☰', desc: 'Sections ou sous-pages de la page, tenu à jour', kw: 'sommaire table des matieres toc index sections sous-pages plan', make: function () { return { title: 'Sommaire', src: 'sec', sort: 'doc' }; }, sans: ['normaliser', 'libelle'] },
   table:   { label: 'Tableau', ic: '▥', desc: 'Tableau avec ligne d’en-tête', kw: 'tableau table', make: function () { return { rows: [['Colonne', 'Colonne', 'Colonne'], ['', '', ''], ['', '', '']] }; }, sans: ['normaliser'] },
   // famille requête et kanban (ticket 06)
-  query:   { label: 'Requête', ic: '⌕', desc: 'Fiches de faits, lignes de tableaux ou cases à cocher filtrées par pastilles : tableau, liste ou nombre', kw: 'requete query dataview filtre recherche pastille tag compteur widget tableau liste nombre',
-    make: function () { return { title: '', src: 'facts', scope: 'doc', view: 'table', cards: [{ id: uid(), label: '', total: 'none' }] }; }, sans: ['reglages'] },
-  kanban:  { label: 'Kanban', ic: '▥', desc: 'Colonnes de cartes à déplacer (échéance et responsable facultatifs)', kw: 'kanban tableau taches suivi colonnes cartes trello projet',
-    make: function () { return { cols: [{ id: uid(), title: 'À faire', cards: [] }, { id: uid(), title: 'En cours', cards: [] }, { id: uid(), title: 'Fait', cards: [] }] }; }, sans: ['reglages'] },
   // famille médias (ticket 07)
   image:   { label: 'Image', ic: '▣', desc: 'Intégrée au fichier', kw: 'image photo capture', make: function () { return { src: '', caption: '', alt: '' }; }, sans: ['normaliser', 'libelle'] },
   code:    { label: 'Bloc de code', ic: '{}', desc: 'Sombre, boîte avec fichier, ou commande', kw: 'code script commande terminal', make: function () { return { variant: 'dark', name: '', code: '', tall: false }; }, sans: ['normaliser', 'libelle'] },

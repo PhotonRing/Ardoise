@@ -132,10 +132,6 @@ function renderBlock(b, d, ctx, num) {
           return '<tr>' + r.map(function (c, j) { return f('td', '', 'rows.' + (i + 1) + '.' + j, c, { cell: 1 }); }).join('') + '</tr>';
         }).join('') + '</tbody></table></div>';
     // famille requête et kanban (ticket 06)
-    case 'query':
-      return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
-    case 'kanban': return kanbanHTML(b, ctx, f);
     // famille médias (ticket 07)
     case 'image':
       if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
