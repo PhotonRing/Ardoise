@@ -13,6 +13,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # police mathématique (table MATH) : sans elle, Chromium n'étire pas les délimiteurs (\left( du banc formules-office)
+      - name: Police mathématique
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends fonts-noto-core
+          fc-list | grep -i 'sans math'
       - name: Assemblage et vérifications (npm run check)
         run: npm run check
       - uses: actions/upload-artifact@v4
