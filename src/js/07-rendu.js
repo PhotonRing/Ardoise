@@ -98,18 +98,10 @@ function renderBlock(b, d, ctx, num) {
     return '<div class="ta-wrap v-' + (cls || b.variant || 'dark') + '"><pre class="ta-hl" aria-hidden="true">' + HL.html(b.code, lg) + '\n</pre>' +
       '<textarea class="code-ta ' + (cls || '') + '" data-b="' + b.id + '" data-k="code" spellcheck="false" wrap="off" rows="1" placeholder="Coller ou écrire du code…">' + esc(b.code) + '</textarea></div>';
   }
-  // contexte x du rendu : ce que lit un rendu, sans globale ; la facette rendu du type l'emporte sur l'ancien case (repli jusqu'au ticket 08)
+  // contexte x du rendu : ce que lit un rendu, sans globale ; la facette rendu du type est le seul aiguillage (type inconnu, d'une
+  // version plus récente : rien)
   var x = { edit: e, editor: editorUi, ctx: ctx, d: d, num: num, f: f, checks: checks, ta: ta }, rb = facette(b.type, 'rendu');
-  if (rb) return rb(b, x);
-  switch (b.type) {
-    // famille texte et titres (ticket 02)
-    // famille cadres (ticket 03)
-    // famille carte et chronologie (ticket 04)
-    // famille listes et tableaux (ticket 05)
-    // famille requête et kanban (ticket 06)
-    // famille médias (ticket 07)
-  }
-  return '';
+  return rb ? rb(b, x) : '';
 }
 function checkOrder(arr, order) {
   // indices des éléments dans l'ordre d'affichage : à chaque niveau, cochés avant ou après les autres (tri stable)
@@ -132,16 +124,9 @@ function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) 
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
 function settings(b) {
+  // réglages du type : facette reglages ; absence déclarée ou type inconnu : aucun
   var rg = facette(b.type, 'reglages');
-  if (rg) return rg(b);
-  switch (b.type) {
-    // famille texte et titres (ticket 02)
-    // famille cadres (ticket 03)
-    // famille carte et chronologie (ticket 04)
-    // famille listes et tableaux (ticket 05)
-    // famille médias (ticket 07)
-  }
-  return '';
+  return rg ? rg(b) : '';
 }
 function foldLevel(b) { return b.type === 'step' || b.type === 'h2' ? 1 : b.type === 'h3' ? 2 : b.type === 'header' || b.type === 'footer' ? 0 : -1; }
 function foldRegions(blocks) {

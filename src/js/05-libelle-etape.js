@@ -60,13 +60,9 @@ function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return b.type === 'texte' && /^(list|check|subtitle)$/.test(ba.type) ? 'converti en texte' : 'bloc modifié';   // 10-operations-blocs.js
-  // libellé propre au type : facette libelle de l'inscription (null : libellé générique), sinon les anciennes branches (repli jusqu'au ticket 08)
+  // libellé propre au type : facette libelle de l'inscription ; null ou absence déclarée : libellé générique
   var lb = facette(b.type, 'libelle'), lt = lb ? lb(ba, b) : null;
   if (lt) return lt;
-  // famille texte et titres (ticket 02)
-  // famille cadres (ticket 03)
-  // famille listes et tableaux (ticket 05)
-  // famille requête et kanban (ticket 06)
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';

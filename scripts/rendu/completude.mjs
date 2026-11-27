@@ -1,11 +1,12 @@
 // Complétude des types de blocs (src/js/03-types-de-blocs.js et familles 06-bloc-*.js) : chaque type inscrit dans T porte
 // ce que les points d'entrée communs lisent. Obligatoires : label, ic, desc, kw, make, rendu, elements. Facultatives :
-// office, reglages, normaliser, libelle, chacune présente ou déclarée absente dans sans: [...].
-// STRICT = false tant que des familles restent à migrer (repli sur les anciens case) : rendu, elements et une facette
-// facultative ni présente ni déclarée sont listés sans échec. Le ticket 08 passe STRICT à true.
-import { contexte, test, vrai } from './commun.mjs';
+// office, reglages, normaliser, libelle, chacune présente ou déclarée absente dans sans: [...]. Le banc échoue sur un type de
+// ORDER non inscrit, une facette obligatoire manquante, une absence non déclarée, et sur le retour d'un ancien aiguillage
+// (switch par type dans un point d'entrée, OFFICE_RENDUS, fichier 09-office-*.js).
+import { readdirSync } from 'node:fs';
+import vm from 'node:vm';
+import { contexte, js, test, vrai, egal } from './commun.mjs';
 
-const STRICT = false;
 const NOMS = ['label', 'ic', 'desc', 'kw', 'make'];
 const OBLIGATOIRES = ['rendu', 'elements'];
 const FACULTATIVES = ['office', 'reglages', 'normaliser', 'libelle'];
@@ -33,11 +34,19 @@ test('complétude : chaque inscription de T porte ses noms, ses facettes obligat
   const ctx = contexte(), erreurs = [], manques = [];
   for (const type of Object.keys(ctx.T)) { const m = manquesDe(type, ctx.T[type]); erreurs.push(...m.erreurs); manques.push(...m.manques); }
   vrai(!erreurs.length, 'inscriptions incomplètes :\n  ' + erreurs.join('\n  '));
-  if (STRICT) vrai(!manques.length, 'facettes manquantes :\n  ' + manques.join('\n  '));
-  else if (manques.length) {
-    const migres = Object.keys(ctx.T).filter((type) => !manques.some((m) => m.startsWith(type + ' :')));
-    console.log(`complétude (tolérant) : ${manques.length} manques dans ${Object.keys(ctx.T).length - migres.length} types non migrés` + (migres.length ? ` ; migrés : ${migres.join(', ')}` : ''));
-  }
+  vrai(!manques.length, 'facettes manquantes :\n  ' + manques.join('\n  '));
+});
+
+// l'inscription est le seul aiguillage : ni switch par type dans les six points d'entrée, ni OFFICE_RENDUS, ni 09-office-*.js
+test('complétude : plus aucun ancien aiguillage dans les points d\'entrée communs', () => {
+  const ctx = contexte();
+  vm.runInContext(js('05-synchro-moteur.js') + '\n' + js('05-libelle-etape.js'), ctx);
+  const anciens = ['renderBlock', 'settings', 'officeBloc', 'officeHtmlContenu', 'normBlocks', 'libelleNature']
+    .filter((f) => /switch\s*\(b\.type\)|case '|\/\/ famille /.test(ctx[f].toString()));
+  egal(anciens, [], 'points d\'entrée avec un switch, un case ou une ligne de famille');
+  egal(typeof ctx.OFFICE_RENDUS, 'undefined', 'OFFICE_RENDUS existe encore');
+  egal(readdirSync(new URL('../../src/js/', import.meta.url)).filter((f) => /^09-office-.*\.js$/.test(f)), [], 'fichiers 09-office-*.js');
+  vrai(!/\/\/ famille /.test(js('03-types-de-blocs.js')), '03-types-de-blocs.js : lignes de séparation des familles');
 });
 
 // le banc lui-même : une inscription fautive est bien signalée

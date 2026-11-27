@@ -1,5 +1,5 @@
 /* ---------- Famille texte et titres : en-tête, titre de section, sous-section, sous-titre, étape numérotée, texte, pied de page ----------
-   Inscriptions complètes (T, 03-types-de-blocs.js) : rendu (point d'entrée renderBlock, 07-rendu.js), elements et office (officeBloc
+   Inscriptions (T) et leurs facettes : rendu (point d'entrée renderBlock, 07-rendu.js), elements et office (officeBloc
    et officeHtmlContenu, 08-office.js), reglages, normaliser et libelle selon le type. Le sous-titre est hérité : le bloc texte le
    remplace (« Convertir en texte »), il reste rendu, modifiable et exporté mais ne s'insère plus. */
 T.header = {

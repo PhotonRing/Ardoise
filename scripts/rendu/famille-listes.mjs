@@ -1,5 +1,5 @@
 // Famille listes et tableaux (src/js/06-bloc-listes.js) : liste, liste à cocher, sommaire et tableau portent toutes leurs facettes,
-// sans repli sur un ancien case ni sur OFFICE_RENDUS (09-office-listes.js, part tableau de 09-office-tableaux.js).
+// et leur ancien rendu Office (09-office-listes.js, part tableau de 09-office-tableaux.js) est fondu dans la famille.
 // La sortie elle-même est prouvée par le relevé et par office-listes.mjs, office-tableaux.mjs.
 import { existsSync } from 'node:fs';
 import { contexte, monter, test, egal } from './commun.mjs';
@@ -13,9 +13,7 @@ test('famille listes : aucune facette ne manque à ses quatre types', () => {
   egal(r, TYPES.map((t) => [t, []]), 'manques par type');
 });
 
-test('famille listes : plus aucun ancien rendu Office, 09-office-listes.js supprimé', () => {
-  const ctx = contexte();
-  egal(TYPES.filter((t) => ctx.OFFICE_RENDUS[t]), [], 'types encore dans OFFICE_RENDUS');
+test('famille listes : 09-office-listes.js supprimé', () => {
   egal(existsSync(new URL('../../src/js/09-office-listes.js', import.meta.url)), false, '09-office-listes.js existe encore');
 });
 

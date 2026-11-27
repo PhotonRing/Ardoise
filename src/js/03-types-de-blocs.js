@@ -1,14 +1,12 @@
 /* ---------- Types de blocs ---------- */
 // sommets du modèle diamant : clé du champ et nom, dans l'ordre de la pile (Adversaire, Capacité, Infrastructure, Victime)
 var DIA_SOMMETS = [{ cle: 'adversaire', nom: 'Adversaire' }, { cle: 'capacite', nom: 'Capacité' }, { cle: 'infrastructure', nom: 'Infrastructure' }, { cle: 'victime', nom: 'Victime' }];
-var T = {
-  // famille texte et titres (ticket 02)
-  // famille cadres (ticket 03)
-  // famille carte et chronologie (ticket 04)
-  // famille listes et tableaux (ticket 05)
-  // famille requête et kanban (ticket 06)
-  // famille médias (ticket 07)
-};
+/* Ajouter un type : écrire son inscription T.<type> = { … } dans une famille src/js/06-bloc-<famille>.js (nouvelle ou existante),
+   sans toucher aux points d'entrée communs (renderBlock, settings, officeBloc, officeHtmlContenu, normBlocks, libelleNature), puis
+   l'ajouter à ORDER pour le menu. Obligatoires : label, ic, desc, kw, make, rendu(b, x), elements(b, x). Facultatives, chacune
+   présente ou déclarée absente dans sans: [...] : office(b, x), reglages(b), normaliser(nb, b, newer), libelle(ba, b). Le banc
+   scripts/rendu/completude.mjs refuse une inscription incomplète. Exemple de famille complète à copier : 06-bloc-listes.js. */
+var T = {};
 // Liste, Liste à cocher et Sous-titre restent dans T (rendus, modifiables, exportés, requêtés) mais ne s'insèrent plus : le bloc
 // texte les remplace (« Convertir en texte », 16-menu-bloc.js)
 var ORDER = ['texte', 'h2', 'h3', 'step', 'summary', 'query', 'kanban', 'header', 'facts', 'cards', 'code', 'formule', 'table', 'timeline', 'note', 'details', 'image', 'map', 'divider', 'footer', 'diamond', 'group'];

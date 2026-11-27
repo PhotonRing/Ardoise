@@ -1,6 +1,6 @@
-// Aiguillage des points d'entrée communs par l'inscription des types (T, src/js/03-types-de-blocs.js) : une facette inscrite
-// l'emporte sur l'ancien case (renderBlock, settings, officeBloc, officeHtmlContenu, normBlocks, libelleNature) et reçoit
-// son contexte x. Les facettes d'essai sont posées dans un contexte neuf, jamais dans le vrai fichier.
+// Aiguillage des points d'entrée communs par l'inscription des types (T, familles src/js/06-bloc-*.js) : la facette inscrite
+// est le seul aiguillage (renderBlock, settings, officeBloc, officeHtmlContenu, normBlocks, libelleNature) et reçoit son
+// contexte x ; un type inconnu (bloc d'une version plus récente) ne rend rien. Les facettes d'essai sont posées dans un contexte neuf, jamais dans le vrai fichier.
 import vm from 'node:vm';
 import { monter, js, test, egal, vrai } from './commun.mjs';
 
@@ -25,10 +25,11 @@ test('aiguillage : renderBlock prend la facette rendu et lui passe le contexte x
   vrai(ctx.renderPage(d, { page: 0, view: 'read' }).includes('<span class="k">Titre <b>gras</b></span>'), 'renderPage passe par la facette');
 });
 
-test('aiguillage : settings prend la facette reglages ; sans elle, le repli reste', () => {
+test('aiguillage : settings prend la facette reglages ; une absence déclarée ne donne aucun réglage', () => {
   const { ctx, d } = monter(DOC);
   const avant = ctx.settings(bloc(d, 'm1'));
   vrai(/data-prop="height"/.test(avant), 'réglages de la carte : ' + avant);
+  egal(ctx.settings(bloc(d, 'h1')), '', 'titre de section (reglages déclarée absente)');
   ctx.T.h2.reglages = (b) => '<button>' + b.id + '</button>';
   egal(ctx.settings(bloc(d, 'h1')), '<button>h1</button>', 'réglages de la facette');
   egal(ctx.settings(bloc(d, 'm1')), avant, 'autre type inchangé');
@@ -46,16 +47,16 @@ test('aiguillage : officeBloc prend la facette elements avec le contexte x des �
   egal(ctx.officeTexte(ctx.officeBlocs(d.pages[0].blocks, d, opts)).split('\n')[1], 'Titre gras', 'officeBlocs passe par la facette');
 });
 
-test('aiguillage : officeHtmlContenu prend la facette office, sinon OFFICE_RENDUS, sinon les éléments neutres', () => {
+test('aiguillage : officeHtmlContenu prend la facette office, sinon les éléments neutres', () => {
   const { ctx, d } = monter(DOC);
   const carte = ctx.officeHtmlContenu(bloc(d, 'm1'), d, { page: 0 });
   egal(carte, ctx.officeHtmlElements(ctx.officeBloc(bloc(d, 'm1'), d, { page: 0 }), d), 'carte sans facette office : éléments neutres');
   let vu = null;
   ctx.T.h2.office = (b, x) => { vu = x; return '<p>' + x.segs(x.S(b.html)) + '</p>'; };
-  egal(ctx.officeHtmlContenu(bloc(d, 'h1'), d, { page: 0 }), '<p>Titre <b>gras</b></p>', 'HTML de la facette, avant OFFICE_RENDUS.h2');
+  egal(ctx.officeHtmlContenu(bloc(d, 'h1'), d, { page: 0 }), '<p>Titre <b>gras</b></p>', 'HTML de la facette');
   egal(Object.keys(vu).sort(), ['C', 'S', 'acc', 'accSoft', 'd', 'images', 'opts', 'pi', 'segs'], 'clés du contexte x');
   ctx.T.map.office = () => '<p>carte</p>';
-  egal(ctx.officeHtmlContenu(bloc(d, 'm1'), d, { page: 0 }), '<p>carte</p>', 'facette office d\'un type sans ancien rendu');
+  egal(ctx.officeHtmlContenu(bloc(d, 'm1'), d, { page: 0 }), '<p>carte</p>', 'facette office posée sur un type qui la déclarait absente');
 });
 
 test('aiguillage : normBlocks passe la facette normaliser après la copie sur make, avec newer', () => {
@@ -75,4 +76,19 @@ test('aiguillage : libelleNature prend la facette libelle ; null donne le libell
   egal(ctx.libelleNature(a, b), 'titre réécrit', 'libellé de la facette');
   egal(ctx.libelleNature(a, { id: 'a', type: 'h2', html: 'trois' }), 'texte modifié', 'facette qui rend null : libellé générique');
   egal(ctx.libelleNature({ id: 'a', type: 'list', items: [] }, { id: 'a', type: 'texte', lignes: [] }), 'converti en texte', 'changement de type : avant toute facette');
+});
+
+test('aiguillage : un type inconnu (version plus récente) ne rend rien à chaque point d\'entrée', () => {
+  const { ctx, d } = monter(DOC);
+  vm.runInContext(js('05-synchro-moteur.js') + '\n' + js('05-libelle-etape.js'), ctx);
+  const b = { id: 'z1', type: 'futur', x: 1 };
+  egal(ctx.renderBlock(b, d, ctx.renderCtx(d, { page: 0, view: 'read' }), null), '', 'renderBlock en lecture');
+  egal(ctx.renderBlock(b, d, ctx.renderCtx(d, { page: 0, view: 'edit' }), null), '', 'renderBlock en édition');
+  egal(ctx.settings(b), '', 'settings');
+  egal(JSON.stringify(ctx.officeBloc(b, d, { page: 0 })), '[]', 'officeBloc');
+  egal(ctx.officeHtmlContenu(b, d, { page: 0 }), '', 'officeHtmlContenu');
+  egal(ctx.libelleNature(b, { ...b, x: 2 }), 'bloc modifié', 'libelleNature');
+  const brut = { title: 'Doc', pages: [{ id: 'p', title: '', blocks: [b] }] };
+  egal(JSON.stringify(ctx.normalize({ ...brut, v: 999 }).pages[0].blocks), JSON.stringify([b]), 'normBlocks (newer) : gardé intact');
+  egal(ctx.normalize(brut).pages[0].blocks, [], 'normBlocks : écarté');
 });

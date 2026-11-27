@@ -14,12 +14,9 @@ function normBlocks(arr, newer) {
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
-    // normalisation propre au type : facette normaliser de l'inscription, sinon les anciennes branches (repli jusqu'au ticket 08)
+    // normalisation propre au type : facette normaliser de l'inscription (absence déclarée : rien)
     var nz = facette(nb.type, 'normaliser');
     if (nz) nz(nb, b, newer);
-    // famille texte et titres (ticket 02)
-    // famille listes et tableaux (ticket 05)
-    // famille requête et kanban (ticket 06)
     nb.id = b.id || uid(); out.push(nb);
     if (nb.type === 'group') {
       // groupe : ses blocs, un seul niveau ; un bloc refusé dans un groupe est remis dans la page juste après lui

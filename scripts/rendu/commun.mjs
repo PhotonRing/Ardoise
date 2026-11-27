@@ -40,8 +40,6 @@ const SOURCE = entete.slice(OUVERTURE.length) + PURS +
     '08-docx.js',
     '08-office.js',
     '09-adresse.js',
-    // familles du style de Copier pour Office : chacune dans son fichier, chargées toutes (ordre de build.mjs)
-    ...readdirSync(new URL('../../src/js/', import.meta.url)).filter((f) => /^09-office-.*\.js$/.test(f)).sort(),
     '22-exporter-word.js',   // nom du fichier Word (nomExportWord) ; rien d'autre n'y tourne au chargement
   ].map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'rendu.js' });

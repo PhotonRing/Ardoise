@@ -1,4 +1,4 @@
-/* ---------- Copier pour Office : HTML au style d'Ardoise et marqué (08-office.js, 09-office-*.js) et texte brut, hors historique ----------
+/* ---------- Copier pour Office : HTML au style d'Ardoise et marqué (08-office.js et facettes office des familles 06-bloc-*.js) et texte brut, hors historique ----------
    Sans image à côté (Writer sous Linux ne collerait que l'image) ; carte et chronologie partent en PNG et texte brut,
    dessinées hors écran en thème clair à la largeur de la page imprimée. */
 function copierPourOffice(b) {
