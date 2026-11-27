@@ -35,6 +35,16 @@ jobs:
         with:
           node-version: 22
 
+      # police mathématique (table MATH), comme ci.yml : sans elle, Chromium n'étire pas les délimiteurs et le check échoue
+      - name: Police mathématique
+        run: |
+          curl -sSL -o /tmp/math.zip https://github.com/notofonts/math/releases/download/NotoSansMath-v3.000/NotoSansMath-v3.000.zip
+          echo "ac351837b41f8a897f020b97fb0f075ad574c1e9669fb5839ada1f92fd748356  /tmp/math.zip" | sha256sum -c -
+          mkdir -p ~/.local/share/fonts
+          unzip -j -o /tmp/math.zip 'NotoSansMath/hinted/ttf/NotoSansMath-Regular.ttf' -d ~/.local/share/fonts
+          fc-cache -f ~/.local/share/fonts
+          fc-list | grep -i 'sans math'
+
       - name: Assemblage et vérifications (npm run check)
         run: npm run check
 
@@ -66,9 +76,10 @@ jobs:
             echo "Le tag $TAG existe déjà : pas de nouvelle release (augmentez la version dans package.json)."
             exit 0
           fi
-          # notes de version : le corps du commit « Ardoise X.Y.Z » (fusion en squash) ; à défaut, la liste générée par GitHub
+          # notes de version : le corps du dernier commit « Ardoise X.Y.Z » (fusion en squash), même si un correctif l'a suivi ;
+          # à défaut, la liste générée par GitHub
           notes="$RUNNER_TEMP/notes.md"
-          git log -1 --format=%b "$GITHUB_SHA" > "$notes"
+          git log -1 --format=%b --grep="^Ardoise ${TAG#v}\$" "$GITHUB_SHA" > "$notes"
           if grep -q '[^[:space:]]' "$notes"; then source_notes=(--notes-file "$notes"); else source_notes=(--generate-notes); fi
           gh release create "$TAG" dist/ardoise.html dist/ardoise-relais.mjs \
             --target "$GITHUB_SHA" \
