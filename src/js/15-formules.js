@@ -69,11 +69,13 @@ app.addEventListener('keydown', function (e) {
   var v = formuleVoisine(el, dir); if (!v) return;
   e.preventDefault(); e.stopPropagation();   // ni le geste du navigateur, ni la sortie d'une pastille (12-saisie.js)
   if (dir === (k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0)) { exitInline(v.f, dir); return; }
+  session.valider();   // la frappe d'avant est une étape, la suppression de la formule en est une autre
   v.zw.forEach(function (z) { z[0].deleteData(z[1], z[2] - z[1]); });
   var p = v.f.parentNode, i = Array.prototype.indexOf.call(p.childNodes, v.f); p.removeChild(v.f);
   var r = document.createRange(); r.setStart(p, i); r.collapse(true);
   var s = getSelection(); s.removeAllRanges(); s.addRange(r);
   fire(el);
+  session.valider();
 }, true);
 /* ---------- Gras, italique, souligné, barré autour d'une formule ---------- */
 // La forme posée par le navigateur (execCommand ou raccourci) s'arrête aux bords d'un élément non éditable :

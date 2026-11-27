@@ -107,6 +107,10 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   attendu('flèche gauche après la formule', (await evalue(LIGNES('nav'))) === 'aW' + F('y') + 'b', await evalue(LIGNES('nav')));
   await charge(); await evalue(NAV('apres')); await touche('Backspace', 'Backspace', 8);
   attendu('Retour arrière après la formule', (await evalue(LIGNES('nav'))) === 'ab', await evalue(LIGNES('nav')));
+  // suppression d'une formule : une étape à part, Ctrl+Z la rend sans défaire la frappe d'avant
+  await charge(); await evalue(NAV('apres')); await taper('Q'); await touche('ArrowLeft', 'ArrowLeft', 37); await touche('Backspace', 'Backspace', 8);
+  await touche('z', 'KeyZ', 90, 2); await attendre(150);
+  attendu('Ctrl+Z après Retour arrière sur une formule', (await evalue(LIGNES('nav'))) === 'a' + F('y') + 'Qb', await evalue(LIGNES('nav')));
   await charge(); await evalue(NAV('avant')); await touche('Delete', 'Delete', 46);
   attendu('Suppr avant la formule', (await evalue(LIGNES('nav'))) === 'ab', await evalue(LIGNES('nav')));
 
