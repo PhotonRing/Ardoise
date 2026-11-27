@@ -19,7 +19,6 @@ function normBlocks(arr, newer) {
     if (nz) nz(nb, b, newer);
     // famille texte et titres (ticket 02)
     // famille listes et tableaux (ticket 05)
-    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     // famille requête et kanban (ticket 06)
     nb.id = b.id || uid(); out.push(nb);
     if (nb.type === 'group') {

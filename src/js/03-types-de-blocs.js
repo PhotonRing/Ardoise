@@ -6,10 +6,6 @@ var T = {
   // famille cadres (ticket 03)
   // famille carte et chronologie (ticket 04)
   // famille listes et tableaux (ticket 05)
-  list:    { label: 'Liste', ic: '•', desc: 'Liste à puces ou numérotée', kw: 'liste puces numerotee', make: function () { return { ordered: false, items: [{ html: '' }] }; }, sans: ['libelle'] },
-  check:   { label: 'Liste à cocher', ic: '☑', desc: 'Cases enregistrées dans le fichier', kw: 'checklist cases cocher todo', make: function () { return { items: [{ html: '', done: false }] }; }, sans: ['normaliser', 'libelle'] },
-  summary: { label: 'Sommaire', ic: '☰', desc: 'Sections ou sous-pages de la page, tenu à jour', kw: 'sommaire table des matieres toc index sections sous-pages plan', make: function () { return { title: 'Sommaire', src: 'sec', sort: 'doc' }; }, sans: ['normaliser', 'libelle'] },
-  table:   { label: 'Tableau', ic: '▥', desc: 'Tableau avec ligne d’en-tête', kw: 'tableau table', make: function () { return { rows: [['Colonne', 'Colonne', 'Colonne'], ['', '', ''], ['', '', '']] }; }, sans: ['normaliser'] },
   // famille requête et kanban (ticket 06)
   // famille médias (ticket 07)
   image:   { label: 'Image', ic: '▣', desc: 'Intégrée au fichier', kw: 'image photo capture', make: function () { return { src: '', caption: '', alt: '' }; }, sans: ['normaliser', 'libelle'] },

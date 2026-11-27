@@ -118,19 +118,6 @@ function officeBloc(b, d, opts) {
     // famille cadres (ticket 03)
     // famille carte et chronologie (ticket 04)
     // famille listes et tableaux (ticket 05)
-    case 'list':
-      out.push({ t: 'liste', ordonnee: !!b.ordered, items: b.items.map(function (it) { return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html) }; }) }); break;
-    case 'check':
-      if (b.items.length) out.push(cases(b.items, b.order === 'doneFirst' || b.order === 'doneLast' ? checkOrder(b.items, b.order) : b.items.map(function (x, k) { return k; })));
-      break;
-    case 'summary':
-      if (b.title) out.push(para([txt(b.title, { gras: true })]));
-      var entrees = [], parcours = function (arr, lv) { arr.forEach(function (it) { entrees.push({ niveau: lv, segs: [txt((it.n ? it.n + ' ' : '') + it.t, { interne: true, souligne: true })] }); parcours(it.kids, lv + 1); }); };
-      parcours(summaryItems(b, d, pi), 0);
-      if (entrees.length) out.push({ t: 'liste', ordonnee: false, items: entrees });
-      break;
-    case 'table':
-      out.push({ t: 'tableau', entete: true, lignes: b.rows.map(function (r) { return r.map(function (c) { return [para(S(c))]; }); }) }); break;
     // famille requête et kanban (ticket 06)
     // famille médias (ticket 07)
     case 'image':
@@ -188,6 +175,38 @@ function officeCellule(contenu, style, largeur, valign) {
 }
 // filet fin (étape, séparateur) : paragraphe vide bordé en haut (Writer dessine un <hr> en trait sombre, sans sa couleur)
 function officeTxtFilet(x, avant, apres) { return '<p style="margin-top:' + avant + ';margin-bottom:' + apres + ';border-top:1px solid ' + x.C.line + ';font-size:1pt;line-height:1pt">&nbsp;</p>'; }
+// cases à cocher (liste à cocher, cartes) : un paragraphe par case, jamais de <li> (Writer remet des puces à partir de la 2e ligne) ;
+// case cochée en accent, libellé coché en gris (ul.check input:checked+label), retrait de 26 px par niveau (ul.check li.lv-N), 6 px entre les cases
+function officeListeCases(arr, ordre, x) {
+  return ordre.map(function (i) {
+    var it = arr[i], lv = Math.min(6, Math.max(0, +it.lv || 0)), libelle = x.segs(x.S(it.html));
+    return '<p style="margin-top:0pt;margin-bottom:' + officePt(6) + (lv ? ';margin-left:' + officePt(26 * lv) : '') + '">' +
+      (it.done ? '<span style="color:' + x.acc + '">☑</span> <span style="color:' + x.C.muted + '">' + libelle + '</span>' : '<span style="color:' + x.C.muted + '">☐</span> ' + libelle) + '</p>';
+  }).join('');
+}
+/* Tableau d'Ardoise (aussi vues en tableau du Bloc requête) : entetes en segments (null : sans), lignes en HTML rendu ; bordures sur les cellules,
+   en-tête en <td> (Writer centre et graisse un <th>) ; o : { taille (px, 15 ; 14 pour .q-table), attenues: [lignes en gris], fonds: [[teinte|null]] } */
+function officeTabTableau(entetes, lignes, x, o) {
+  o = o || {};
+  var trait = '1px solid ' + x.C.line, toutes = (entetes ? [null] : []).concat(lignes), n = toutes.length;
+  if (!n) return '';
+  var taille = officePt(o.taille || 15), attenues = o.attenues || [], fonds = o.fonds || [];
+  var bords = function (i, j, nc) {
+    return (i === 0 ? 'border-top:' + trait + ';' : '') + (j === 0 ? 'border-left:' + trait + ';' : '') + (j === nc - 1 ? 'border-right:' + trait + ';' : '') + 'border-bottom:' + trait + ';';
+  };
+  var html = toutes.map(function (l, i) {
+    if (entetes && i === 0) return '<tr>' + entetes.map(function (segs, j) {
+      // taille de l'étiquette aussi sur la cellule : la ligne d'en-tête garde sa hauteur
+      return officeCellule(officeEtiquette(segs, x), 'font-size:' + officePt(11) + ';background:' + x.C.surface + ';padding:6.75pt 9pt;text-align:left;' + bords(0, j, entetes.length));
+    }).join('') + '</tr>';
+    var k = i - (entetes ? 1 : 0), fd = fonds[k] || [];
+    return '<tr>' + l.map(function (c, j) {
+      return officeCellule(c, 'font-size:' + taille + ';background:' + (fd[j] || x.C.surface) + ';padding:6.75pt 9pt;text-align:left;' +
+        (attenues.indexOf(k) >= 0 ? 'color:' + x.C.muted + ';' : '') + bords(i, j, l.length));
+    }).join('') + '</tr>';
+  }).join('');
+  return officeTable(html, 'margin:0 0 6pt');
+}
 // segments → HTML : formes, couleur et surlignage, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte ;
 // formule en image à la taille du texte qui l'entoure (px, 15 par défaut)
 function officeSegmentsHtml(arr, d, px) {
