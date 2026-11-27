@@ -120,14 +120,6 @@ function officeBloc(b, d, opts) {
     // famille listes et tableaux (ticket 05)
     // famille requête et kanban (ticket 06)
     // famille médias (ticket 07)
-    case 'image':
-      if (b.src) out.push(image(images[b.id] || { src: b.src }, b.alt || htmlText(b.caption), S(b.caption))); break;
-    case 'code': out.push({ t: 'code', texte: String(b.code || '').replace(/\n$/, ''), nom: String(b.name || '') }); break;
-    case 'formule':
-      var tex = String(b.tex || '').trim(), fi = officeImageFormule(opts.formules, 'bloc', tex);
-      if (tex) out.push(fi ? { t: 'formule', tex: tex, image: fi } : { t: 'formule', tex: tex });
-      break;
-    case 'divider': out.push({ t: 'ligne' }); break;
   }
   return out;
 }

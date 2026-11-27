@@ -108,33 +108,6 @@ function renderBlock(b, d, ctx, num) {
     // famille listes et tableaux (ticket 05)
     // famille requête et kanban (ticket 06)
     // famille médias (ticket 07)
-    case 'image':
-      if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
-        '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
-        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div>' +
-        (isBlank(b.caption) ? '' : f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 })) + '</div>' : '';   // légende : l'image à remettre (import Markdown)
-      return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
-        ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
-    case 'code':
-      var clang = HL.resolve(b.lang, b.code, b.name);
-      if (b.variant === 'box') {
-        var lines = HL.lines(String(b.code).replace(/\n$/, ''), clang);
-        return '<div class="codebox"><div class="bar">' + f('span', 'meta', 'name', b.name, { rich: false, ph: 'nom_du_fichier', nl: 1 }) +
-          '<button class="btn-copy" type="button" data-copy>Copier</button></div>' +
-          (e ? ta() : '<pre class="src' + (b.tall ? ' tall' : '') + '">' + lines.map(function (l) { return '<span class="l">' + l + '</span>'; }).join('') + '</pre>') + '</div>';
-      }
-      if (b.variant === 'cmd') return e ? ta('cmd') : '<pre class="cmd">' + HL.html(b.code, clang) + '</pre>';
-      return '<div class="code' + (b.tall ? ' tall' : '') + ((e || b.name) ? ' named' : '') + '">' +
-        (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
-        '<button class="copy" type="button" data-copy>Copier</button>' +
-        (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
-    case 'formule':
-      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
-      var fap = formuleBlocApercu(b.tex, e);
-      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
-      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
-        '<div class="formule-apercu">' + fap + '</div></div>';
-    case 'divider': return '<hr class="sep">';
   }
   return '';
 }
@@ -167,12 +140,6 @@ function settings(b) {
     // famille carte et chronologie (ticket 04)
     // famille listes et tableaux (ticket 05)
     // famille médias (ticket 07)
-    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
-    case 'code': return '<select data-act="set" data-prop="variant" title="Style">' + opt('dark', b.variant, 'Sombre') + opt('box', b.variant, 'Boîte + fichier') + opt('cmd', b.variant, 'Commande') + '</select>' +
-      '<select data-act="set" data-prop="lang" title="Langage pour la coloration">' + Object.keys(HL.names).map(function (k) {
-        return opt(k, b.lang || 'auto', k === 'auto' ? 'Auto (' + HL.names[HL.detect(String(b.code || ''), b.name)] + ')' : HL.names[k]);
-      }).join('') + '</select>' +
-      (b.variant !== 'cmd' ? tog('tall', b.tall, '↕', 'Limiter la hauteur (défilement)') : '');
   }
   return '';
 }
@@ -793,10 +760,6 @@ function syncCodeLayer(t) {
   pre.style.padding = cs.paddingTop + ' ' + cs.paddingRight + ' ' + cs.paddingBottom + ' ' + cs.paddingLeft;
   pre.style.font = cs.font; pre.style.tabSize = cs.tabSize; pre.style.letterSpacing = cs.letterSpacing;
   pre.scrollLeft = t.scrollLeft;
-}
-// aperçu d'un bloc formule (rendu, et saisie de la source : 12-saisie.js) ; source vide : une invite en édition, rien en lecture
-function formuleBlocApercu(tex, edition) {
-  return texEnMathML(tex, 'bloc') || (edition ? '<span class="formule-invite">Tapez une formule LaTeX, par exemple \\frac{a}{b}</span>' : '');
 }
 function autosize(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 

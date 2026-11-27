@@ -1,4 +1,4 @@
-// Copier pour Office, tableau (src/js/06-bloc-listes.js ; officeTabTableau : 08-office.js) et bloc de code (src/js/09-office-tableaux.js) : tableau, bloc de code par variante.
+// Copier pour Office, tableau (src/js/06-bloc-listes.js ; officeTabTableau : 08-office.js) et bloc de code (src/js/06-bloc-medias.js) : tableau, bloc de code par variante.
 import { readFileSync } from 'node:fs';
 import { test, egal, vrai } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';
@@ -49,8 +49,8 @@ const TK_SOMBRE = jetons(/^\.code\{(--tk-[^}]*)\}/m), TK_CLAIR = jetons(/^:root\
 
 test('office (code) : couleurs des jetons reprises de page.css (bloc sombre et thème clair)', () => {
   const { ctx } = monterOffice(DOC, 'k1');
-  egal(JSON.parse(JSON.stringify(ctx.OFFICE_TAB_TK_SOMBRE)), TK_SOMBRE);
-  egal(JSON.parse(JSON.stringify(ctx.OFFICE_TAB_TK_CLAIR)), TK_CLAIR);
+  egal(JSON.parse(JSON.stringify(ctx.officeCodeJetons(true))), TK_SOMBRE);
+  egal(JSON.parse(JSON.stringify(ctx.officeCodeJetons(false))), TK_CLAIR);
   egal(Object.keys(TK_SOMBRE).length, 8);
 });
 

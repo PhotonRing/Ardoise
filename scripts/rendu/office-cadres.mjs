@@ -115,6 +115,6 @@ test('office (cadres) : un groupe rend ses tableaux, cases et code dans le style
   const { html } = office('gx');
   vrai(/letter-spacing:0\.5pt">NOM</.test(html), 'en-tête du tableau en étiquette (officeTabTableau, 08-office.js) : ' + html);
   vrai(/<span style="color:#4848c0">☑<\/span>/.test(html) && !/<li/.test(html), 'case en paragraphe (officeListeCases, 08-office.js) : ' + html);
-  vrai(html.includes('#14202b'), 'code sombre (09-office-tableaux.js) : ' + html);
+  vrai(html.includes('#14202b'), 'code sombre (06-bloc-medias.js) : ' + html);
   vrai(!/<\/table><table/.test(html), 'tableaux voisins séparés');
 });

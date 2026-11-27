@@ -4,7 +4,7 @@ app.addEventListener('input', function (e) {
   var el = e.target;
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
   if (el.matches('textarea.formule-ta')) {
-    // bloc formule : l'aperçu suit la source sans rendre la page (07-rendu.js formuleBlocApercu)
+    // bloc formule : l'aperçu suit la source sans rendre la page (06-bloc-medias.js formuleBlocApercu)
     var blocFormule = byId(el.dataset.b); if (!blocFormule) return;
     blocFormule.tex = el.value; autosize(el);
     var apercu = el.parentNode.querySelector('.formule-apercu'); if (apercu) apercu.innerHTML = formuleBlocApercu(blocFormule.tex, true);

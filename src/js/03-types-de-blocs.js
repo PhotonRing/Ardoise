@@ -8,10 +8,6 @@ var T = {
   // famille listes et tableaux (ticket 05)
   // famille requête et kanban (ticket 06)
   // famille médias (ticket 07)
-  image:   { label: 'Image', ic: '▣', desc: 'Intégrée au fichier', kw: 'image photo capture', make: function () { return { src: '', caption: '', alt: '' }; }, sans: ['normaliser', 'libelle'] },
-  code:    { label: 'Bloc de code', ic: '{}', desc: 'Sombre, boîte avec fichier, ou commande', kw: 'code script commande terminal', make: function () { return { variant: 'dark', name: '', code: '', tall: false }; }, sans: ['normaliser', 'libelle'] },
-  formule: { label: 'Formule', ic: '∑', desc: 'Une formule LaTeX seule, centrée et en grand', kw: 'formule equation maths mathematiques latex tex', make: function () { return { tex: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  divider: { label: 'Séparateur', ic: '—', desc: 'Ligne horizontale', kw: 'separateur ligne hr', make: function () { return {}; }, sans: ['reglages', 'normaliser', 'libelle'] }
 };
 // Liste, Liste à cocher et Sous-titre restent dans T (rendus, modifiables, exportés, requêtés) mais ne s'insèrent plus : le bloc
 // texte les remplace (« Convertir en texte », 16-menu-bloc.js)
