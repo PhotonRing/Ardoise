@@ -1,7 +1,6 @@
 /* ---------- Famille carte et chronologie (types map et timeline) ---------- */
-// Rendu, réglages et éléments neutres de la carte et de la chronologie. Pas de facette office : Copier pour Office passe par
-// les éléments neutres (officeHtmlElements) ou par l'image préparée. Les aides partagées avec le moteur de carte (chView,
-// choroPanel, mapShapeAlive, MapKit, MK_COLORS) et opt, tog, act restent dans 07-rendu.js.
+// Pas de facette office : Copier pour Office passe par les éléments neutres (officeHtmlElements) ou l'image préparée. Les aides
+// partagées avec le moteur de carte (chView, choroPanel, mapShapeAlive, MapKit, MK_COLORS) et opt, tog, act restent dans 07-rendu.js.
 
 // carte : conteneur de la carte, liste des éléments en lecture ; outils et panneau « Éléments de la carte » en édition
 function carteRendu(b, x) {

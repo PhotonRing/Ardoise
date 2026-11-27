@@ -1,8 +1,6 @@
 /* ---------- Famille médias : image, bloc de code, formule, séparateur ----------
-   Inscriptions (T) et leurs facettes : rendu, reglages (image, code), elements (éléments neutres), office (Copier pour Office,
-   d'après page.css : .fig, .code, .codebox, pre.cmd, .formule-bloc, hr.sep ; tailles en points). Restent au socle, partagés :
-   l'aide ta du contexte x, opt, tog, act (07-rendu.js), officeTxtFilet, officeEchelle, officeImageFormule, officeTable, officeCellule,
-   officeEtiquette (08-office.js). */
+   Office d'après page.css (.fig, .code, .codebox, pre.cmd, .formule-bloc, hr.sep), tailles en points. Restent au socle : l'aide ta,
+   opt, tog, act (07-rendu.js), officeTxtFilet, officeEchelle, officeImageFormule, officeTable, officeCellule, officeEtiquette (08-office.js). */
 
 T.image = { label: 'Image', ic: '▣', desc: 'Intégrée au fichier', kw: 'image photo capture', make: function () { return { src: '', caption: '', alt: '' }; }, sans: ['normaliser', 'libelle'],
   rendu: function (b, x) {

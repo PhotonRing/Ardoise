@@ -83,10 +83,10 @@ function renderBlock(b, d, ctx, num) {
       (rich ? ' data-rich' : '') + (o.li ? ' data-li' : '') + (o.cell ? ' data-cell' : '') + (o.ml ? ' data-ml' : '') + (o.nl ? ' data-nl' : '') +
       ' data-ph="' + esc(o.ph || '') + '">' + body + '</' + tag + '>';
   }
-  function checks(base, arr) {
+  // cases à cocher de arr ; ordre : indices dans l'ordre d'affichage (liste à cocher : ordreCases), l'ordre saisi par défaut
+  function checks(base, arr, ordre) {
     if (!arr.length) return e ? '<button class="mini-add" type="button" data-act="item-add" data-k="' + base + '">+ case à cocher</button>' : '';
-    // ordre d'affichage (liste à cocher) : l'ordre saisi reste celui du document ; les sous-éléments suivent leur parent
-    var order = b.type === 'check' && (b.order === 'doneFirst' || b.order === 'doneLast') ? checkOrder(arr, b.order) : arr.map(function (x, k) { return k; });
+    var order = ordre || arr.map(function (it, k) { return k; });
     return '<ul class="check">' + order.map(function (i) {
       var it = arr[i], id = b.id + '-' + base.replace(/\./g, '-') + '-' + i;
       return '<li' + (it.lv > 0 ? ' class="lv-' + Math.min(6, +it.lv) + '"' : '') + '><input type="checkbox" id="' + id + '" data-b="' + b.id + '" data-k="' + base + '.' + i + '.done"' + (it.done ? ' checked' : '') + '>' +
@@ -102,23 +102,6 @@ function renderBlock(b, d, ctx, num) {
   // version plus récente : rien)
   var x = { edit: e, editor: editorUi, ctx: ctx, d: d, num: num, f: f, checks: checks, ta: ta }, rb = facette(b.type, 'rendu');
   return rb ? rb(b, x) : '';
-}
-function checkOrder(arr, order) {
-  // indices des éléments dans l'ordre d'affichage : à chaque niveau, cochés avant ou après les autres (tri stable)
-  var root = { kids: [] }, stack = [{ lv: -1, n: root }];
-  arr.forEach(function (it, i) {
-    var lv = +it.lv || 0, n = { i: i, done: !!it.done, kids: [] };
-    while (stack.length > 1 && stack[stack.length - 1].lv >= lv) stack.pop();
-    stack[stack.length - 1].n.kids.push(n); stack.push({ lv: lv, n: n });
-  });
-  var out = [];
-  (function walk(list) {
-    list.map(function (n, k) { return { n: n, k: k }; }).sort(function (x, y) {
-      var dx = x.n.done ? 1 : 0, dy = y.n.done ? 1 : 0; if (order === 'doneFirst') { dx = 1 - dx; dy = 1 - dy; }
-      return dx - dy || x.k - y.k;
-    }).forEach(function (x) { out.push(x.n.i); walk(x.n.kids); });
-  })(root.kids);
-  return out;
 }
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }

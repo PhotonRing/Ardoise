@@ -55,8 +55,6 @@ function libelleFeuilles(a, b, k, rows, out) {
 }
 // bloc sans une clé, à toute profondeur (dépendances des cartes, état réduit des colonnes) : une liste qui change de longueur perd sa clé dans libelleFeuilles
 function libelleSans(b, cle) { return JSON.stringify(b, function (k, v) { return k === cle ? undefined : v; }); }
-// mêmes éléments dans un ordre quelconque : même valeur
-function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }).sort().join('\n'); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return b.type === 'texte' && /^(list|check|subtitle)$/.test(ba.type) ? 'converti en texte' : 'bloc modifié';   // 10-operations-blocs.js

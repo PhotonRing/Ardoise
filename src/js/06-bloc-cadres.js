@@ -1,7 +1,6 @@
 /* ---------- Famille cadres : encadré, fiche de faits, cartes, bloc dépliable, groupe repliable, modèle diamant ----------
-   Inscriptions (T) et leurs facettes : rendu, reglages, elements (éléments neutres), office (Copier pour Office), libelle.
-   Le groupe rend ses blocs par les points d'entrée communs (renderBlock, wrapEdit, officeBloc, officeHtmlContenu), sans connaître
-   les autres types ; sa normalisation (blocs refusés remis dans la page) reste dans normBlocks (05-document.js). */
+   Le groupe rend ses blocs par les points d'entrée communs (renderBlock, wrapEdit, officeBloc, officeHtmlContenu) sans connaître les
+   autres types ; sa normalisation (blocs refusés remis dans la page) reste dans normBlocks (05-document.js). */
 
 /* Copier pour Office : d'après page.css (.note, .facts, .subs, .fold, .grp, .dia), reconstruits en tableaux. Writer n'applique le
    retrait intérieur qu'à une cellule bordée : bordure de la couleur du fond au besoin. */
@@ -105,7 +104,7 @@ T.cards = { label: 'Cartes', ic: '▦', desc: 'Grille de cartes avec texte et ca
       var ct = [];
       if (!officeVide(S(c.title))) ct.push(para(gras(S(c.title))));
       if (!officeVide(S(c.text))) ct.push(para(S(c.text)));
-      if ((c.checks || []).length) ct.push(cases(c.checks, c.checks.map(function (x, k) { return k; })));
+      if ((c.checks || []).length) ct.push(cases(c.checks, c.checks.map(function (it, k) { return k; })));
       out.push({ t: 'cadre', fond: OFFICE_CLAIR.surface, barre: null, contenu: ct });
     });
     return out;

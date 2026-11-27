@@ -99,12 +99,16 @@ function officeVide(segs) { return !officeTexteDe(segs).trim(); }
 // forme k (gras, couleur) posée sur les segments de texte, ni saut ni pastille ; rend les segments
 function officeMettreForme(segs, k, v) { segs.forEach(function (g) { if (!g.saut && !g.pastille) g[k] = v; }); return segs; }
 
+// base commune des contextes x (éléments neutres et HTML stylé) : document, options, page, images préparées, segments d'un HTML
+function officeContexte(d, opts) {
+  return { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {},
+    S: function (html) { return officeSegments(R(html), d, opts.formules); } };
+}
 /* Bloc → éléments neutres. opts : { page, images: { idBloc: { src, mime, l, h } }, formules: { ligne|bloc: { source: { src, l, h } } } }
    (images préparées par l'appelant : 22-copier-office.js) */
 function officeBloc(b, d, opts) {
   opts = opts || {};
-  var pi = Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images = opts.images || {};
-  var S = function (html) { return officeSegments(R(html), d, opts.formules); };
+  var x = officeContexte(d, opts), S = x.S;
   var txt = function (texte, f) { var g = { texte: String(texte == null ? '' : texte) }; for (var k in f) g[k] = f[k]; return g; };
   var para = function (segs, o) { var e = { t: 'para', segs: segs }; for (var k in o) e[k] = o[k]; return e; };
   var gras = function (segs) { return officeMettreForme(segs, 'gras', true); };
@@ -112,7 +116,8 @@ function officeBloc(b, d, opts) {
   var image = function (img, alt, legende) { return { t: 'image', src: img.src, mime: img.mime || '', l: img.l || 0, h: img.h || 0, alt: alt || '', legende: legende || [] }; };
   // contexte x des éléments neutres ; la facette elements du type est le seul aiguillage (type inconnu : aucun élément)
   var el = facette(b.type, 'elements');
-  return el ? el(b, { d: d, opts: opts, pi: pi, images: images, S: S, txt: txt, para: para, gras: gras, cases: cases, image: image }) : [];
+  x.txt = txt; x.para = para; x.gras = gras; x.cases = cases; x.image = image;
+  return el ? el(b, x) : [];
 }
 // blocs d'une page (ou un seul bloc) → éléments neutres, dans l'ordre ; les enfants d'un groupe suivent par le groupe
 function officeBlocs(blocs, d, opts) { return (blocs || []).reduce(function (a, b) { return a.concat(officeBloc(b, d, opts)); }, []); }
@@ -220,19 +225,19 @@ function officeSegmentsHtml(arr, d, px) {
 function officeEnveloppe(h) { return '<div style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';line-height:1.6;color:' + OFFICE_CLAIR.fg + ';max-width:' + OFFICE_LARGEUR + 'px">' + h + '</div>'; }
 // point d'entrée du HTML de Copier pour Office ; carte et chronologie (office déclarée absente) passent par leurs éléments neutres
 function officeHtmlBloc(b, d, opts) { return officeEnveloppe(officeHtmlContenu(b, d, opts)); }
-// contexte x du HTML stylé : document, options, page, images préparées, couleurs claires, accent, segments
+// contexte x du HTML stylé : la base commune, couleurs claires, accent, segments → HTML
 function officeContexteHtml(d, opts) {
-  var acc = officeAccent(d);
-  return { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
-    S: function (html) { return officeSegments(R(html), d, opts.formules); }, segs: function (arr, px) { return officeSegmentsHtml(arr, d, px); } };
+  var x = officeContexte(d, opts), acc = officeAccent(d);
+  x.C = OFFICE_CLAIR; x.acc = acc[0]; x.accSoft = acc[1]; x.segs = function (arr, px) { return officeSegmentsHtml(arr, d, px); };
+  return x;
 }
 function officeHtmlContenu(b, d, opts) {
   opts = opts || {};
   // rendu stylé du type, function (b, x) → HTML sans enveloppe : facette office de l'inscription (T) ; sans elle (carte et
   // chronologie, office déclarée absente ; type inconnu) : ses éléments neutres
-  var rendu = facette(b.type, 'office');
-  if (!rendu) return officeHtmlElements(officeBloc(b, d, opts), d);
-  return rendu(b, officeContexteHtml(d, opts));
+  var office = facette(b.type, 'office');
+  if (!office) return officeHtmlElements(officeBloc(b, d, opts), d);
+  return office(b, officeContexteHtml(d, opts));
 }
 // éléments neutres de la carte et de la chronologie → HTML : paragraphe, liste à puces, image fournie
 function officeHtmlElements(elts, d) {

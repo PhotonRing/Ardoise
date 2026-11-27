@@ -1,10 +1,8 @@
-/* ---------- Famille listes et tableaux : liste, liste à cocher, sommaire, tableau ----------
-   Inscriptions (T) et leurs facettes : rendu, reglages, elements (éléments neutres), office (Copier pour Office, d'après page.css :
-   .list, ul.check, .toc-blk, .tablewrap ; tailles en points), normaliser (liste) et libelle (tableau). Restent au socle, partagées :
-   checkOrder et l'aide checks (07-rendu.js, aussi pour les cartes), officeListeCases et officeTabTableau (08-office.js, aussi pour
-   les cartes et le Bloc requête). */
+/* ---------- Famille listes et tableaux : liste (héritée), liste à cocher (héritée), sommaire, tableau ----------
+   Les six facettes y figurent (exemple à copier). Office d'après page.css (.list, ul.check, .toc-blk, .tablewrap), tailles en points.
+   Restent au socle, partagées avec les cartes et le Bloc requête : l'aide checks, officeListeCases, officeTabTableau. */
 
-/* ---------- Liste ---------- */
+/* ---------- Liste (héritée : le bloc texte la remplace, « Convertir en texte ») ---------- */
 // balise ouvrante d'une liste : attribut type (Writer, Word) et list-style-type (Google Docs) ; .list ul : 6 px au-dessus ;
 // puce de chaque profondeur (ul.list ul, ol.list ol… dans page.css), la dernière valant pour les suivantes : [attribut type, list-style-type]
 function officeListeOuvre(tag, profondeur) {
@@ -56,20 +54,39 @@ T.list = { label: 'Liste', ic: '•', desc: 'Liste à puces ou numérotée', kw:
   }
 };
 
-/* ---------- Liste à cocher ---------- */
+/* ---------- Liste à cocher (héritée : le bloc texte la remplace, « Convertir en texte ») ---------- */
+function checkOrder(arr, order) {
+  // indices des éléments dans l'ordre d'affichage : à chaque niveau, cochés avant ou après les autres (tri stable)
+  var root = { kids: [] }, stack = [{ lv: -1, n: root }];
+  arr.forEach(function (it, i) {
+    var lv = +it.lv || 0, n = { i: i, done: !!it.done, kids: [] };
+    while (stack.length > 1 && stack[stack.length - 1].lv >= lv) stack.pop();
+    stack[stack.length - 1].n.kids.push(n); stack.push({ lv: lv, n: n });
+  });
+  var out = [];
+  (function walk(list) {
+    list.map(function (n, k) { return { n: n, k: k }; }).sort(function (x, y) {
+      var dx = x.n.done ? 1 : 0, dy = y.n.done ? 1 : 0; if (order === 'doneFirst') { dx = 1 - dx; dy = 1 - dy; }
+      return dx - dy || x.k - y.k;
+    }).forEach(function (x) { out.push(x.n.i); walk(x.n.kids); });
+  })(root.kids);
+  return out;
+}
+// indices des cases dans l'ordre d'affichage choisi (order) : l'ordre saisi reste celui du document, les sous-cases suivent leur parent
+function ordreCases(arr, order) { return order === 'doneFirst' || order === 'doneLast' ? checkOrder(arr, order) : arr.map(function (it, k) { return k; }); }
 T.check = { label: 'Liste à cocher', ic: '☑', desc: 'Cases enregistrées dans le fichier', kw: 'checklist cases cocher todo', make: function () { return { items: [{ html: '', done: false }] }; }, sans: ['normaliser', 'libelle'],
-  rendu: function (b, x) { return x.checks('items', b.items) || (x.edit ? '' : ''); },
+  rendu: function (b, x) { return x.checks('items', b.items, ordreCases(b.items, b.order)); },
   reglages: function (b) {
     return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
       '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
   },
   elements: function (b, x) {
     var out = [];
-    if (b.items.length) out.push(x.cases(b.items, b.order === 'doneFirst' || b.order === 'doneLast' ? checkOrder(b.items, b.order) : b.items.map(function (x, k) { return k; })));
+    if (b.items.length) out.push(x.cases(b.items, ordreCases(b.items, b.order)));
     return out;
   },
   office: function (b, x) {
-    return officeListeCases(b.items, b.order === 'doneFirst' || b.order === 'doneLast' ? checkOrder(b.items, b.order) : b.items.map(function (it, k) { return k; }), x);
+    return officeListeCases(b.items, ordreCases(b.items, b.order), x);
   }
 };
 

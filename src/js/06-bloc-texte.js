@@ -1,7 +1,6 @@
 /* ---------- Famille texte et titres : en-tête, titre de section, sous-section, sous-titre, étape numérotée, texte, pied de page ----------
-   Inscriptions (T) et leurs facettes : rendu (point d'entrée renderBlock, 07-rendu.js), elements et office (officeBloc
-   et officeHtmlContenu, 08-office.js), reglages, normaliser et libelle selon le type. Le sous-titre est hérité : le bloc texte le
-   remplace (« Convertir en texte »), il reste rendu, modifiable et exporté mais ne s'insère plus. */
+   Le sous-titre est hérité : le bloc texte le remplace (« Convertir en texte ») ; il reste rendu, modifiable et exporté mais ne
+   s'insère plus. */
 T.header = {
   label: 'En-tête', ic: 'H1', desc: 'Surtitre, grand titre et chapeau', kw: 'titre entete header', make: function () { return { eyebrow: '', title: '', lede: '' }; }, sans: ['normaliser', 'libelle'],
   rendu: function (b, x) {
@@ -69,6 +68,8 @@ T.step = {
       officeCellule(titre, 'border:1px solid ' + x.C.surface + ';padding:0pt 0pt 0pt 9pt', '94%', 'middle') + '</tr>', 'margin:0 0 6pt');
   }
 };
+// mêmes éléments dans un ordre quelconque : même valeur (libellé « lignes réordonnées » du bloc texte)
+function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }).sort().join('\n'); }
 T.texte = {
   label: 'Texte', ic: '≡', desc: 'Texte courant, ligne par ligne', kw: 'texte paragraphe ligne liste puces numerotee cases cocher sous-titre', make: function () { return { lignes: [{ html: '' }] }; }, sans: ['reglages'],
   rendu: function (b, x) { return texteHTML(b, x.edit); },

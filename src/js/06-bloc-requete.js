@@ -1,6 +1,5 @@
-/* ---------- Famille requête et kanban : Bloc requête et Kanban ----------
-   Inscriptions (T) et leurs facettes : rendu, elements (éléments neutres), office (Copier pour Office), normaliser, libelle ; pas de réglages.
-   Les sources et les vues de la requête (07-requetes.js, queryResult), l'interface du kanban (07-kanban.js, kanbanHTML), les colonnes
+/* ---------- Famille requête et kanban : Bloc requête et Kanban, sans réglages ----------
+   Les sources et vues de la requête (07-requetes.js, queryResult), l'interface du kanban (07-kanban.js, kanbanHTML), les colonnes
    (14-colonnes-requete.js) et les puces (16-puces-requete.js) restent dans leurs modules. */
 
 /* Copier pour Office : kanban (.kb-*) et Bloc requête dans chacune de ses vues (.q-*), d'après page.css. Les résultats et les comptes
