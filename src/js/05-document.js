@@ -18,7 +18,6 @@ function normBlocks(arr, newer) {
     var nz = facette(nb.type, 'normaliser');
     if (nz) nz(nb, b, newer);
     // famille texte et titres (ticket 02)
-    if (nb.type === 'texte') nb.lignes = normLignes(nb.lignes);   // au moins une ligne (05-lignes.js)
     // famille listes et tableaux (ticket 05)
     if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     // famille requête et kanban (ticket 06)
