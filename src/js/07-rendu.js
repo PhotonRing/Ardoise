@@ -73,25 +73,6 @@ function anchorBlock(d, ctx, id) {
   for (j = i + 1; j < blocks.length; j++) if (shown(blocks[j])) return blocks[j].id;
   return a;
 }
-// bloc texte : un seul champ, un élément par ligne (une ligne vide garde sa hauteur par un <br>) ; genre, numéro calculé,
-// coche, alignement et taille en attributs : puce, numéro et case sont dessinés par page.css (::before), hors du texte éditable
-function lignesHTML(lignes) {
-  var ls = normLignes(lignes), nums = numerosDesLignes(ls);   // niveau borné (LIGNE_LV_MAX), genre, coche, alignement et taille validés
-  return ls.map(function (l, i) {
-    var h = R(l.html);
-    return '<div class="lg"' + (l.lv ? ' data-lv="' + l.lv + '"' : '') + (l.genre ? ' data-g="' + l.genre + '"' : '') +
-      (nums[i] ? ' data-n="' + nums[i] + '"' : '') + (l.done ? ' data-done' : '') +
-      (l.align ? ' data-align="' + l.align + '"' : '') + (l.taille ? ' data-taille="' + l.taille + '"' : '') + '>' + (h || '<br>') + '</div>';
-  }).join('');
-}
-// bloc vide : une seule ligne de texte (sans genre), vide et sans retrait
-function texteVide(lignes) { return lignes.length === 1 && !(lignes[0].lv > 0) && !lignes[0].genre && isBlank(lignes[0].html); }
-function texteHTML(b, e) {
-  var ls = b.lignes && b.lignes.length ? b.lignes : [{ html: '' }];
-  if (!e) return '<div data-tx="' + b.id + '" class="texte">' + lignesHTML(ls) + '</div>';   // data-tx : cases cochées de l'export statique (01-lecture.js)
-  return '<div class="texte fld soft" contenteditable="true" spellcheck="true" data-b="' + b.id + '" data-k="lignes" data-rich data-texte' + (texteVide(ls) ? ' data-vide' : '') +
-    ' data-ph="Écrire, ou taper / pour insérer un bloc">' + lignesHTML(ls) + '</div>';
-}
 function renderBlock(b, d, ctx, num) {
   var e = ctx.edit, editorUi = ctx.editor;
   function f(tag, cls, k, val, o) {
@@ -122,20 +103,6 @@ function renderBlock(b, d, ctx, num) {
   if (rb) return rb(b, x);
   switch (b.type) {
     // famille texte et titres (ticket 02)
-    case 'header':
-      return '<header class="b-header">' +
-        (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { ph: 'Surtitre', nl: 1 }) : '') +
-        f('h1', '', 'title', b.title, { ph: 'Titre de la page', nl: 1 }) +
-        (!b.noLede && (e || !isBlank(b.lede)) ? f('p', 'lede', 'lede', b.lede, { ph: 'Chapeau : une ou deux phrases qui résument la page', nl: 1 }) : '') + '</header>';
-    case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
-    case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
-    case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'step':
-      var badge = '';
-      if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
-      return '<div class="step-head">' + badge + f('h2', '', 'title', b.title, { ph: 'Titre de l’étape', nl: 1 }) + '</div>';
-    case 'texte': return texteHTML(b, e);
-    case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
     // famille cadres (ticket 03)
     case 'note':
       return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
@@ -398,8 +365,6 @@ function settings(b) {
   if (rg) return rg(b);
   switch (b.type) {
     // famille texte et titres (ticket 02)
-    case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
-    case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
     // famille cadres (ticket 03)
     case 'note': return '<select data-act="set" data-prop="variant" title="Style">' + opt('warn', b.variant, 'Attention') + opt('info', b.variant, 'Info') + opt('bad', b.variant, 'Alerte') + opt('ok', b.variant, 'Succès') + opt('line', b.variant, 'Trait seul') + '</select>';
     case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');

@@ -3,13 +3,6 @@
 var DIA_SOMMETS = [{ cle: 'adversaire', nom: 'Adversaire' }, { cle: 'capacite', nom: 'Capacité' }, { cle: 'infrastructure', nom: 'Infrastructure' }, { cle: 'victime', nom: 'Victime' }];
 var T = {
   // famille texte et titres (ticket 02)
-  header:  { label: 'En-tête', ic: 'H1', desc: 'Surtitre, grand titre et chapeau', kw: 'titre entete header', make: function () { return { eyebrow: '', title: '', lede: '' }; }, sans: ['normaliser', 'libelle'] },
-  h2:      { label: 'Titre de section', ic: 'H2', desc: 'Titre intermédiaire', kw: 'titre heading', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  h3:      { label: 'Sous-section', ic: 'H3', desc: 'Niveau sous la section, repris dans le sommaire', kw: 'titre heading sous-section sous section', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  subtitle: { label: 'Sous-titre', ic: 'T', desc: 'Petit titre, hors du sommaire', kw: 'titre sous-titre intertitre', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  step:    { label: 'Étape numérotée', ic: '1.', desc: 'Ouvre une section avec pastille de numéro', kw: 'etape section numero step', make: function () { return { num: '', title: '', nonum: false }; }, sans: ['normaliser', 'libelle'] },
-  texte:   { label: 'Texte', ic: '≡', desc: 'Texte courant, ligne par ligne', kw: 'texte paragraphe ligne liste puces numerotee cases cocher sous-titre', make: function () { return { lignes: [{ html: '' }] }; }, sans: ['reglages'] },
-  footer:  { label: 'Pied de page', ic: '§', desc: 'Sources, auteur, date', kw: 'pied footer sources', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
   // famille cadres (ticket 03)
   note:    { label: 'Encadré', ic: '!', desc: 'Attention, info, alerte, succès', kw: 'note encadre callout alerte', make: function () { return { variant: 'warn', html: '' }; }, sans: ['normaliser', 'libelle'] },
   facts:   { label: 'Fiche de faits', ic: '▤', desc: 'Grille clé / valeur en carte', kw: 'faits cle valeur facts resume', make: function () { return { items: [{ k: 'Clé', v: '', alert: false }, { k: 'Clé', v: '', alert: false }, { k: 'Clé', v: '', alert: false }] }; }, sans: ['normaliser', 'libelle'] },
