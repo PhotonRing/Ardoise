@@ -1,34 +1,5 @@
-/* ---------- Copier pour Office : famille Tableaux et code (socle et point d'entrée : 08-office.js) ----------
-   Tableau (.tablewrap) et bloc de code par variante (.code, .codebox, pre.cmd), d'après page.css. */
-
-/* Tableau d'Ardoise (aussi vues en tableau du Bloc requête) : entetes en segments (null : sans), lignes en HTML rendu ; bordures sur les cellules,
-   en-tête en <td> (Writer centre et graisse un <th>) ; o : { taille (px, 15 ; 14 pour .q-table), attenues: [lignes en gris], fonds: [[teinte|null]] } */
-function officeTabTableau(entetes, lignes, x, o) {
-  o = o || {};
-  var trait = '1px solid ' + x.C.line, toutes = (entetes ? [null] : []).concat(lignes), n = toutes.length;
-  if (!n) return '';
-  var taille = officePt(o.taille || 15), attenues = o.attenues || [], fonds = o.fonds || [];
-  var bords = function (i, j, nc) {
-    return (i === 0 ? 'border-top:' + trait + ';' : '') + (j === 0 ? 'border-left:' + trait + ';' : '') + (j === nc - 1 ? 'border-right:' + trait + ';' : '') + 'border-bottom:' + trait + ';';
-  };
-  var html = toutes.map(function (l, i) {
-    if (entetes && i === 0) return '<tr>' + entetes.map(function (segs, j) {
-      // taille de l'étiquette aussi sur la cellule : la ligne d'en-tête garde sa hauteur
-      return officeCellule(officeEtiquette(segs, x), 'font-size:' + officePt(11) + ';background:' + x.C.surface + ';padding:6.75pt 9pt;text-align:left;' + bords(0, j, entetes.length));
-    }).join('') + '</tr>';
-    var k = i - (entetes ? 1 : 0), fd = fonds[k] || [];
-    return '<tr>' + l.map(function (c, j) {
-      return officeCellule(c, 'font-size:' + taille + ';background:' + (fd[j] || x.C.surface) + ';padding:6.75pt 9pt;text-align:left;' +
-        (attenues.indexOf(k) >= 0 ? 'color:' + x.C.muted + ';' : '') + bords(i, j, l.length));
-    }).join('') + '</tr>';
-  }).join('');
-  return officeTable(html, 'margin:0 0 6pt');
-}
-OFFICE_RENDUS.table = function (b, x) {
-  var rows = b.rows || [];
-  if (!rows.length) return '';
-  return officeTabTableau(rows[0].map(function (c) { return x.S(c); }), rows.slice(1).map(function (r) { return r.map(function (c) { return x.segs(x.S(c)); }); }), x);
-};
+/* ---------- Copier pour Office : bloc de code (socle et point d'entrée : 08-office.js) ----------
+   Bloc de code par variante (.code, .codebox, pre.cmd), d'après page.css (le tableau : 06-bloc-listes.js, officeTabTableau : 08-office.js). */
 
 /* Bloc de code : le code reste du texte modifiable, en Consolas, espaces et retours gardés (<pre> à white-space:pre-wrap),
    dans une cellule teintée pleine largeur (Google Docs ne teinte un <pre> que sous le texte). */

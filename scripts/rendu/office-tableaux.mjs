@@ -1,4 +1,4 @@
-// Copier pour Office, famille Tableaux et code (src/js/09-office-tableaux.js) : tableau, bloc de code par variante.
+// Copier pour Office, tableau (src/js/06-bloc-listes.js ; officeTabTableau : 08-office.js) et bloc de code (src/js/09-office-tableaux.js) : tableau, bloc de code par variante.
 import { readFileSync } from 'node:fs';
 import { test, egal, vrai } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';

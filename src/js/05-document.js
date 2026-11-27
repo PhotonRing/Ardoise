@@ -19,7 +19,6 @@ function normBlocks(arr, newer) {
     if (nz) nz(nb, b, newer);
     // famille texte et titres (ticket 02)
     // famille listes et tableaux (ticket 05)
-    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     // famille requête et kanban (ticket 06)
     // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
     if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) { nb.cards = [qDefCard(nb)]; delete nb.cards[0].id; }   // sans id, comme en 1.23 (qNormFiltres)

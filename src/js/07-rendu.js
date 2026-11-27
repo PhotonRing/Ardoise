@@ -106,31 +106,6 @@ function renderBlock(b, d, ctx, num) {
     // famille cadres (ticket 03)
     // famille carte et chronologie (ticket 04)
     // famille listes et tableaux (ticket 05)
-    case 'list':
-      // éléments à plat avec un niveau (lv) : rendus en listes imbriquées
-      var tg = b.ordered ? 'ol' : 'ul', cur = -1, lo = '';
-      b.items.forEach(function (it, i) {
-        var lv = Math.max(0, Math.min(+it.lv || 0, cur + 1));
-        if (cur < 0) { lo += '<' + tg + ' class="list">'; cur = 0; }
-        else if (lv > cur) { lo += '<' + tg + '>'; cur = lv; }
-        else { lo += '</li>'; while (cur > lv) { lo += '</' + tg + '></li>'; cur--; } }
-        lo += '<li>' + (e ? f('span', '', 'items.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : R(it.html));
-      });
-      if (cur < 0) return '<' + tg + ' class="list"></' + tg + '>';
-      lo += '</li>'; while (cur > 0) { lo += '</' + tg + '></li>'; cur--; }
-      return lo + '</' + tg + '>';
-    case 'check': return checks('items', b.items) || (e ? '' : '');
-    case 'summary':
-      var sl = summaryList(b, d, ctx.page);
-      if (!e && !sl) return '';
-      return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
-    case 'table':
-      var rows = b.rows;
-      return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
-        '</tr></thead><tbody>' + rows.slice(1).map(function (r, i) {
-          return '<tr>' + r.map(function (c, j) { return f('td', '', 'rows.' + (i + 1) + '.' + j, c, { cell: 1 }); }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
     // famille requête et kanban (ticket 06)
     case 'query':
       return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
@@ -184,35 +159,6 @@ function checkOrder(arr, order) {
   })(root.kids);
   return out;
 }
-function summaryDepth(b) {
-  // nombre de niveaux affichés (0 : tous) ; blocs plus anciens : « deep » (sous-niveaux oui / non)
-  if (b.depth != null && b.depth !== '') return Math.max(0, +b.depth || 0);
-  return b.deep === false ? 1 : 0;
-}
-function summaryItems(b, d, pi) {
-  // entrées du bloc sommaire de la page pi : [{ t, h (HTML assaini du titre, formules rendues par l'appelant), n, href, kids }]
-  var pages = d.pages, pg = pages[pi], cmp = function (x, y) { return x.t.localeCompare(y.t, 'fr', { numeric: true, sensitivity: 'base' }); }, out = [], dp = summaryDepth(b);
-  if (b.src === 'pages') {
-    var mkp = function (j, lv) { return { t: pageTitle(pages[j], j), h: titrePageHTML(pages[j], j), href: '#pg-' + pages[j].id, kids: !dp || lv < dp ? pageKids(pages, j).map(function (k) { return mkp(k, lv + 1); }) : [] }; };
-    out = pageKids(pages, pi).map(function (j) { return mkp(j, 1); });
-  } else {
-    sectionsOf(pg).forEach(function (x) {
-      var it = { t: x.t, h: x.h, n: x.n, href: '#pg-' + pg.id + '/' + x.id, kids: [] };
-      if (x.lv === 1 || !out.length) out.push(it); else if (dp !== 1) out[out.length - 1].kids.push(it);
-    });
-  }
-  if (b.sort === 'alpha') (function srt(arr) { arr.sort(cmp); arr.forEach(function (it) { srt(it.kids); }); })(out);
-  return out;
-}
-function summaryList(b, d, pi) {
-  var items = summaryItems(b, d, pi);
-  function ol(arr) { return '<ol>' + arr.map(function (it) { return '<li><a href="' + esc(it.href) + '">' + (it.n ? '<span class="toc-n">' + esc(it.n) + '</span>' : '') + '<span>' + (it.h != null ? it.h : esc(it.t)) + '</span></a>' + (it.kids.length ? ol(it.kids) : '') + '</li>'; }).join('') + '</ol>'; }
-  return items.length ? ol(items) : '';
-}
-function summaryEmpty(b) {
-  return '<p class="muted toc-blk-e">' + (b.src === 'pages' ? 'Cette page n’a pas encore de sous-pages : « + » à côté de son nom dans le sommaire, ou glissez-y une page.'
-    : 'Aucune section dans cette page : ajoutez des titres de section, des étapes ou des sous-sections.') + '</p>';
-}
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
@@ -224,15 +170,6 @@ function settings(b) {
     // famille cadres (ticket 03)
     // famille carte et chronologie (ticket 04)
     // famille listes et tableaux (ticket 05)
-    case 'list': return tog('ordered', b.ordered, '1.', 'Liste numérotée');
-    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
-      '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
-    case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
-      '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
-      '<select data-act="set" data-prop="depth" title="Nombre de niveaux affichés">' + (b.src === 'pages'
-        ? opt(1, summaryDepth(b), '1 niveau') + opt(2, summaryDepth(b), '2 niveaux') + opt(3, summaryDepth(b), '3 niveaux') + opt(0, summaryDepth(b), 'Tous les niveaux')
-        : opt(1, summaryDepth(b) === 1 ? 1 : 0, 'Sections seules') + opt(0, summaryDepth(b) === 1 ? 1 : 0, 'Sections et sous-sections')) + '</select>';
-    case 'table': return act('row-add', '+L', 'Ajouter une ligne') + act('col-add', '+C', 'Ajouter une colonne') + act('row-del', '−L', 'Supprimer la ligne active') + act('col-del', '−C', 'Supprimer la colonne active');
     // famille médias (ticket 07)
     case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
     case 'code': return '<select data-act="set" data-prop="variant" title="Style">' + opt('dark', b.variant, 'Sombre') + opt('box', b.variant, 'Boîte + fichier') + opt('cmd', b.variant, 'Commande') + '</select>' +
