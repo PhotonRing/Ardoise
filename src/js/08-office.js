@@ -406,8 +406,9 @@ function officeSegmentsHtml(arr, d, px) {
     if (g.saut) return '<br>';
     if (g.image) {
       // image dessinée pour 15 px, ligne de base en son milieu : align="middle" pose le milieu de l'image sur la ligne de base (Writer,
-      // Chromium) ; Writer ignore vertical-align sur une image, et absmiddle l'y pose plus haut, à côté d'une formule plus grande
-      var k = (px || 15) / 15, im = '<img src="' + esc(g.image.src) + '" alt="' + esc(g.formule) + '" width="' + Math.round(g.image.l * k) + '" height="' + Math.round(g.image.h * k) + '" align="middle">';
+      // Chromium) ; Writer ignore vertical-align sur une image, et absmiddle l'y pose plus haut, à côté d'une formule plus grande ;
+      // Google Docs ignore align : vertical-align d'une demi-hauteur affichée y descend le milieu sur la ligne de base (même place dans Chromium)
+      var k = (px || 15) / 15, hi = Math.round(g.image.h * k), im = '<img src="' + esc(g.image.src) + '" alt="' + esc(g.formule) + '" width="' + Math.round(g.image.l * k) + '" height="' + hi + '" align="middle" style="vertical-align:-' + hi / 2 + 'px">';
       if (g.gras) im = '<b>' + im + '</b>';
       return im;
     }

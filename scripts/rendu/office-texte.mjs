@@ -119,13 +119,14 @@ test('office (texte) : formule d\'un en-tête de tableau gardée telle quelle, h
 });
 
 // Formules en images (lot 9, ticket 08) : opts.formules = { ligne: { source: image }, bloc: { source: image } }, images préparées
-// par Copier pour Office (22-copier-office.js) ; image en ligne { src, l, h } à 15 px, ligne de base au milieu (align="middle")
+// par Copier pour Office (22-copier-office.js) ; image en ligne { src, l, h } à 15 px, ligne de base au milieu (align="middle", et
+// vertical-align d'une demi-hauteur affichée pour Google Docs, ticket 12)
 const IMG = (n) => ({ src: 'data:image/png;base64,' + n, l: 30, h: 24 });
 const FORMULES = { ligne: { 'x^2': IMG('X2'), '\\frac{a}{b}': IMG('FR'), '\\alpha': IMG('AL') }, bloc: { '\\frac{a}{b}': { src: 'data:image/png;base64,BL', l: 900, h: 90 } } };
 const officeF = (id) => { const r = monterOffice(DOCF, id, { page: 0, formules: FORMULES }); verifierSocle(r.html, id); return r; };
 test('office (texte) : formule en ligne en image à sa place dans le texte, source en texte de remplacement, ligne de base au milieu', () => {
   const r = officeF('fp');
-  vrai(r.html.includes('Aire <img src="data:image/png;base64,X2" alt="x^2" width="30" height="24" align="middle"> et <b><img src="data:image/png;base64,FR" alt="\\frac{a}{b}" width="30" height="24" align="middle"></b> fin'), 'HTML : ' + r.html);
+  vrai(r.html.includes('Aire <img src="data:image/png;base64,X2" alt="x^2" width="30" height="24" align="middle" style="vertical-align:-12px"> et <b><img src="data:image/png;base64,FR" alt="\\frac{a}{b}" width="30" height="24" align="middle" style="vertical-align:-12px"></b> fin'), 'HTML : ' + r.html);
   egal(r.texte, 'Aire $x^2$ et $\\frac{a}{b}$ fin', 'texte brut inchangé');
 });
 test('office (texte) : formule sans image dessinée en $source$', () => {
@@ -145,18 +146,20 @@ test('office (texte) : formule d\'un titre à la taille du titre, d\'une ligne G
     { id: 'hd', type: 'header', title: 'Aire ' + FO('x^2'), eyebrow: '', lede: '' }, { id: 'h2', type: 'h2', html: FO('x^2') },
     { id: 'tg', type: 'texte', lignes: [{ html: FO('x^2'), taille: 'grand' }] }] }] };
   const img = (id) => { const r = monterOffice(d, id, { page: 0, formules: FORMULES }); verifierSocle(r.html, id); return (r.html.match(/<img[^>]*>/) || [''])[0]; };
-  vrai(/width="80" height="64"/.test(img('hd')), 'en-tête 40 px : ' + img('hd'));
-  vrai(/width="42" height="34"/.test(img('h2')), 'section 21 px : ' + img('h2'));
-  vrai(/width="36" height="29"/.test(img('tg')), 'ligne Grand 18 px : ' + img('tg'));
+  // décalage d'une demi-hauteur affichée (Google Docs ignore align="middle")
+  vrai(/width="80" height="64" align="middle" style="vertical-align:-32px"/.test(img('hd')), 'en-tête 40 px : ' + img('hd'));
+  vrai(/width="42" height="34" align="middle" style="vertical-align:-17px"/.test(img('h2')), 'section 21 px : ' + img('h2'));
+  vrai(/width="36" height="29" align="middle" style="vertical-align:-14.5px"/.test(img('tg')), 'ligne Grand 18 px : ' + img('tg'));
 });
 test('office (texte) : formules d\'éléments neutres, une fois par source et par mode', () => {
   const { ctx, d } = monterOffice(DOCF, 'fp');
   const e = ctx.officeBlocs(d.pages[0].blocks.concat(d.pages[0].blocks), d, { page: 0 });
   egal(ctx.officeFormulesDe(e), { ligne: ['x^2', '\\frac{a}{b}', 'a < b', '\\alpha'], bloc: ['\\frac{a}{b}'] });
 });
-test('office (socle) : une image dans le texte se centre par align="middle" (Writer ignore vertical-align, absmiddle la pose plus haut)', () => {
+test('office (socle) : une image dans le texte se centre par align="middle" (Writer ignore vertical-align, absmiddle la pose plus haut), vertical-align en plus pour Google Docs', () => {
   const refuse = (html) => { try { verifierSocle(html, 'essai'); return false; } catch (_) { return true; } };
   vrai(refuse('<p style="margin:0pt">a <img src="x" alt="y" width="1" height="1" align="absmiddle"></p>'), 'align="absmiddle" accepté');
   vrai(refuse('<p style="margin:0pt">a <img src="x" alt="y" width="1" height="1" style="vertical-align:-3pt"></p>'), 'vertical-align accepté');
   vrai(!refuse('<p style="margin:0pt">a <img src="x" alt="y" width="1" height="1" align="middle"></p>'), 'middle refusé');
+  vrai(!refuse('<p style="margin:0pt">a <img src="x" alt="y" width="2" height="2" align="middle" style="vertical-align:-1px"></p>'), 'middle et vertical-align refusé');
 });

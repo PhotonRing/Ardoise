@@ -61,6 +61,19 @@ export default async function ({ ecran, charger, cdp, evalue, attendre, mesure, 
   else {
     if (!/Moyenne <img[^>]*>, norme <img[^>]*>, rapport <img[^>]*> et <img[^>]*>, indice <img[^>]*>, lettre <img[^>]*> fin/.test(h1)) echec('images hors de leur place : ' + h1.slice(0, 600));
     if (!i1.every((x) => /^data:image\/png;base64,/.test(x.src) && / align="middle"/.test(x.reste))) echec('images en PNG, align="middle" : ' + JSON.stringify(i1.map((x) => [x.src.slice(0, 30), x.reste])));
+    // décalage pour Google Docs (ticket 12) : vertical-align d'une demi-hauteur, et l'aperçu Chromium du collage reste centré sur le
+    // texte : milieu de chaque image sur la ligne de base (repère en ligne de hauteur nulle), à la même place qu'avec align="middle" seul
+    mesure();
+    if (!i1.every((x) => x.reste.includes(' style="vertical-align:-' + x.h / 2 + 'px"'))) echec('vertical-align d\'une demi-hauteur : ' + JSON.stringify(i1.map((x) => [x.h, x.reste])));
+    const place = (html) => evalue(`(async () => { const z = document.createElement('div'); z.style.cssText = 'position:absolute;left:0;top:0;width:680px;background:#fff';
+      z.innerHTML = ${JSON.stringify(html)}; document.body.appendChild(z);
+      await Promise.all([...z.querySelectorAll('img')].map((im) => im.decode().catch(() => null)));
+      const r = [...z.querySelectorAll('img')].map((im) => { const b = document.createElement('span'); b.style.cssText = 'display:inline-block;width:0;height:0'; im.after(b);
+        const ri = im.getBoundingClientRect(), base = b.getBoundingClientRect().bottom; b.remove(); return { haut: ri.top, ecart: ri.top + ri.height / 2 - base }; });
+      z.remove(); return r; })()`);
+    const [avec, sans] = [await place(h1), await place(h1.replace(/ style="vertical-align:[^"]*"/g, ''))];
+    if (!avec.every((x) => Math.abs(x.ecart) <= 1)) echec('aperçu Chromium : milieu des images hors de la ligne de base : ' + JSON.stringify(avec));
+    if (avec.some((x, i) => Math.abs(x.haut - sans[i].haut) > 0.5)) echec('aperçu Chromium déplacé par vertical-align : ' + JSON.stringify({ avec, sans }));
     // à la hauteur du texte (15 px, ligne de 24 px) : une parenthèse simple tient dans la ligne, une fraction un peu plus
     const [fr, rac, del, par] = i1;
     if (!(par.h >= 15 && par.h <= 30 && fr.h <= 50 && fr.l < 60)) echec('tailles des images en ligne : ' + JSON.stringify(i1.map((x) => [x.alt, x.l, x.h])));
