@@ -117,7 +117,11 @@ function renderBlock(b, d, ctx, num) {
     return '<div class="ta-wrap v-' + (cls || b.variant || 'dark') + '"><pre class="ta-hl" aria-hidden="true">' + HL.html(b.code, lg) + '\n</pre>' +
       '<textarea class="code-ta ' + (cls || '') + '" data-b="' + b.id + '" data-k="code" spellcheck="false" wrap="off" rows="1" placeholder="Coller ou écrire du code…">' + esc(b.code) + '</textarea></div>';
   }
+  // contexte x du rendu : ce que lit un rendu, sans globale ; la facette rendu du type l'emporte sur l'ancien case (repli jusqu'au ticket 08)
+  var x = { edit: e, editor: editorUi, ctx: ctx, d: d, num: num, f: f, checks: checks, ta: ta }, rb = facette(b.type, 'rendu');
+  if (rb) return rb(b, x);
   switch (b.type) {
+    // famille texte et titres (ticket 02)
     case 'header':
       return '<header class="b-header">' +
         (!b.noEyebrow && (e || b.eyebrow) ? f('span', 'eyebrow', 'eyebrow', b.eyebrow, { ph: 'Surtitre', nl: 1 }) : '') +
@@ -126,20 +130,15 @@ function renderBlock(b, d, ctx, num) {
     case 'h2': return f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 });
     case 'h3': return f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 });
     case 'subtitle': return f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 });
-    case 'texte': return texteHTML(b, e);
     case 'step':
       var badge = '';
       if (num !== null) badge = e ? '<span class="num fld" contenteditable="true" data-b="' + b.id + '" data-k="num" data-nl data-ph="' + esc(num) + '">' + esc(b.num) + '</span>' : '<span class="num">' + esc(num) + '</span>';
       return '<div class="step-head">' + badge + f('h2', '', 'title', b.title, { ph: 'Titre de l’étape', nl: 1 }) + '</div>';
-    case 'summary':
-      var sl = summaryList(b, d, ctx.page);
-      if (!e && !sl) return '';
-      return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
-    case 'kanban': return kanbanHTML(b, ctx, f);
-    case 'query':
-      return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
+    case 'texte': return texteHTML(b, e);
+    case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
+    // famille cadres (ticket 03)
+    case 'note':
+      return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
     case 'facts':
       return '<dl class="facts">' + b.items.map(function (it, i) {
         return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
@@ -152,47 +151,9 @@ function renderBlock(b, d, ctx, num) {
           checks('cards.' + i + '.checks', c.checks) +
           (e ? '<span class="itools"><button type="button" data-act="card-del" data-i="' + i + '" title="Supprimer la carte">×</button></span>' : '') + '</div>';
       }).join('') + (e ? '<button class="add-item" type="button" data-act="card-add">+ Carte</button>' : '') + '</div>';
-    case 'check': return checks('items', b.items) || (e ? '' : '');
-    case 'list':
-      // éléments à plat avec un niveau (lv) : rendus en listes imbriquées
-      var tg = b.ordered ? 'ol' : 'ul', cur = -1, lo = '';
-      b.items.forEach(function (it, i) {
-        var lv = Math.max(0, Math.min(+it.lv || 0, cur + 1));
-        if (cur < 0) { lo += '<' + tg + ' class="list">'; cur = 0; }
-        else if (lv > cur) { lo += '<' + tg + '>'; cur = lv; }
-        else { lo += '</li>'; while (cur > lv) { lo += '</' + tg + '></li>'; cur--; } }
-        lo += '<li>' + (e ? f('span', '', 'items.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : R(it.html));
-      });
-      if (cur < 0) return '<' + tg + ' class="list"></' + tg + '>';
-      lo += '</li>'; while (cur > 0) { lo += '</' + tg + '></li>'; cur--; }
-      return lo + '</' + tg + '>';
-    case 'code':
-      var clang = HL.resolve(b.lang, b.code, b.name);
-      if (b.variant === 'box') {
-        var lines = HL.lines(String(b.code).replace(/\n$/, ''), clang);
-        return '<div class="codebox"><div class="bar">' + f('span', 'meta', 'name', b.name, { rich: false, ph: 'nom_du_fichier', nl: 1 }) +
-          '<button class="btn-copy" type="button" data-copy>Copier</button></div>' +
-          (e ? ta() : '<pre class="src' + (b.tall ? ' tall' : '') + '">' + lines.map(function (l) { return '<span class="l">' + l + '</span>'; }).join('') + '</pre>') + '</div>';
-      }
-      if (b.variant === 'cmd') return e ? ta('cmd') : '<pre class="cmd">' + HL.html(b.code, clang) + '</pre>';
-      return '<div class="code' + (b.tall ? ' tall' : '') + ((e || b.name) ? ' named' : '') + '">' +
-        (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
-        '<button class="copy" type="button" data-copy>Copier</button>' +
-        (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
-    case 'formule':
-      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
-      var fap = formuleBlocApercu(b.tex, e);
-      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
-      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
-        '<div class="formule-apercu">' + fap + '</div></div>';
-    case 'table':
-      var rows = b.rows;
-      return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
-        '</tr></thead><tbody>' + rows.slice(1).map(function (r, i) {
-          return '<tr>' + r.map(function (c, j) { return f('td', '', 'rows.' + (i + 1) + '.' + j, c, { cell: 1 }); }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
-    case 'note':
-      return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
+    case 'details':
+      if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
+      return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
     case 'group':
       // groupe repliable : son pli d'édition est enregistré (folded) ; en lecture, un <details> que chacun plie pour soi
       var gk = b.blocks || [], gn = gk.length, gplie = e ? !!b.folded : ((ctx.folds || {})[b.id] != null ? !!ctx.folds[b.id] : !!b.folded);
@@ -208,16 +169,19 @@ function renderBlock(b, d, ctx, num) {
         var at = (blocAncre(c) ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
         return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
       }).join('') + '</div></details>';
-    case 'details':
-      if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
-      return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
-    case 'image':
-      if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
-        '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
-        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div>' +
-        (isBlank(b.caption) ? '' : f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 })) + '</div>' : '';   // légende : l'image à remettre (import Markdown)
-      return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
-        ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
+    case 'diamond':
+      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
+      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
+      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
+      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
+        DIA_SOMMETS.map(function (s) {
+          var v = b[s.cle];
+          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
+            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
+        }).join('') + '</div></div>';
+    // famille carte et chronologie (ticket 04)
     case 'map':
       var mh = +b.height || 420, mks = b.markers || [], zns = b.zones || [], rts = b.routes || [];
       var mll = function (m) { return (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4); };
@@ -318,20 +282,65 @@ function renderBlock(b, d, ctx, num) {
       return '<div class="tl">' + tlh + (cardsOn ? '<div class="tl-det">' + det.map(function (it) {
         return '<div class="tl-card c-' + esc(it.color || 'accent') + '"><div class="tl-card-h"><i class="tl-dot"></i><span class="tl-h-date">' + esc(it.date) + '</span></div><div class="tl-card-t">' + R(it.title) + '</div><div class="tl-card-x">' + R(it.text) + '</div></div>';
       }).join('') + '</div>' : '') + '</div>';
-    case 'diamond':
-      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
-      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
-      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
-      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
-        DIA_SOMMETS.map(function (s) {
-          var v = b[s.cle];
-          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
-            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
-        }).join('') + '</div></div>';
+    // famille listes et tableaux (ticket 05)
+    case 'list':
+      // éléments à plat avec un niveau (lv) : rendus en listes imbriquées
+      var tg = b.ordered ? 'ol' : 'ul', cur = -1, lo = '';
+      b.items.forEach(function (it, i) {
+        var lv = Math.max(0, Math.min(+it.lv || 0, cur + 1));
+        if (cur < 0) { lo += '<' + tg + ' class="list">'; cur = 0; }
+        else if (lv > cur) { lo += '<' + tg + '>'; cur = lv; }
+        else { lo += '</li>'; while (cur > lv) { lo += '</' + tg + '></li>'; cur--; } }
+        lo += '<li>' + (e ? f('span', '', 'items.' + i + '.html', it.html, { li: 1, ph: 'Élément' }) : R(it.html));
+      });
+      if (cur < 0) return '<' + tg + ' class="list"></' + tg + '>';
+      lo += '</li>'; while (cur > 0) { lo += '</' + tg + '></li>'; cur--; }
+      return lo + '</' + tg + '>';
+    case 'check': return checks('items', b.items) || (e ? '' : '');
+    case 'summary':
+      var sl = summaryList(b, d, ctx.page);
+      if (!e && !sl) return '';
+      return '<nav class="toc-blk">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        '<div class="toc-blk-l">' + (sl || summaryEmpty(b)) + '</div></nav>';
+    case 'table':
+      var rows = b.rows;
+      return '<div class="tablewrap"><table><thead><tr>' + rows[0].map(function (c, j) { return f('th', '', 'rows.0.' + j, c, { ph: 'En-tête', cell: 1 }); }).join('') +
+        '</tr></thead><tbody>' + rows.slice(1).map(function (r, i) {
+          return '<tr>' + r.map(function (c, j) { return f('td', '', 'rows.' + (i + 1) + '.' + j, c, { cell: 1 }); }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>';
+    // famille requête et kanban (ticket 06)
+    case 'query':
+      return '<div class="q-blk" data-qid="' + b.id + '">' + ((e || b.title) ? f('p', 'toc-blk-t', 'title', b.title, { rich: false, ph: 'Titre (facultatif)', nl: 1 }) : '') +
+        (e ? qLignePuces(b, d, ctx.page) : '') + '<div class="q-res">' + queryResult(b, d, ctx) + '</div></div>';
+    case 'kanban': return kanbanHTML(b, ctx, f);
+    // famille médias (ticket 07)
+    case 'image':
+      if (!b.src) return e ? '<div class="img-new"><div class="img-drop" data-act="img-pick" data-b="' + b.id + '">Cliquer, déposer ou coller une image</div>' +
+        '<div class="img-url"><input class="menu-q img-url-in" data-b="' + b.id + '" placeholder="… ou l’adresse d’une image : https://…" spellcheck="false" autocomplete="off" inputmode="url">' +
+        '<button type="button" class="ub" data-act="img-url" title="Télécharger l’image et l’intégrer au document">Intégrer</button></div>' +
+        (isBlank(b.caption) ? '' : f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 })) + '</div>' : '';   // légende : l'image à remettre (import Markdown)
+      return '<figure class="fig"><img src="' + esc(b.src) + '" alt="' + esc(b.alt || textOf(b.caption)) + '">' +
+        ((e || !isBlank(b.caption)) ? f('figcaption', '', 'caption', b.caption, { ph: 'Légende (optionnelle)', nl: 1 }) : '') + '</figure>';
+    case 'code':
+      var clang = HL.resolve(b.lang, b.code, b.name);
+      if (b.variant === 'box') {
+        var lines = HL.lines(String(b.code).replace(/\n$/, ''), clang);
+        return '<div class="codebox"><div class="bar">' + f('span', 'meta', 'name', b.name, { rich: false, ph: 'nom_du_fichier', nl: 1 }) +
+          '<button class="btn-copy" type="button" data-copy>Copier</button></div>' +
+          (e ? ta() : '<pre class="src' + (b.tall ? ' tall' : '') + '">' + lines.map(function (l) { return '<span class="l">' + l + '</span>'; }).join('') + '</pre>') + '</div>';
+      }
+      if (b.variant === 'cmd') return e ? ta('cmd') : '<pre class="cmd">' + HL.html(b.code, clang) + '</pre>';
+      return '<div class="code' + (b.tall ? ' tall' : '') + ((e || b.name) ? ' named' : '') + '">' +
+        (e ? f('span', 'code-name', 'name', b.name, { rich: false, ph: 'Nom (optionnel)', nl: 1 }) : (b.name ? '<span class="code-name">' + esc(b.name) + '</span>' : '')) +
+        '<button class="copy" type="button" data-copy>Copier</button>' +
+        (e ? ta() : '<pre>' + HL.html(b.code, clang) + '</pre>') + '</div>';
+    case 'formule':
+      // bloc formule : en édition, la source au-dessus de l'aperçu ; en lecture, la formule seule, rien si la source est vide
+      var fap = formuleBlocApercu(b.tex, e);
+      if (!e) return fap ? '<div class="formule-bloc">' + fap + '</div>' : '';
+      return '<div class="formule-bloc"><textarea class="formule-ta" data-b="' + b.id + '" data-k="tex" spellcheck="false" rows="1" placeholder="Source LaTeX">' + esc(b.tex) + '</textarea>' +
+        '<div class="formule-apercu">' + fap + '</div></div>';
     case 'divider': return '<hr class="sep">';
-    case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
   }
   return '';
 }
@@ -385,33 +394,40 @@ function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) 
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
 function settings(b) {
+  var rg = facette(b.type, 'reglages');
+  if (rg) return rg(b);
   switch (b.type) {
+    // famille texte et titres (ticket 02)
     case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
+    // famille cadres (ticket 03)
+    case 'note': return '<select data-act="set" data-prop="variant" title="Style">' + opt('warn', b.variant, 'Attention') + opt('info', b.variant, 'Info') + opt('bad', b.variant, 'Alerte') + opt('ok', b.variant, 'Succès') + opt('line', b.variant, 'Trait seul') + '</select>';
+    case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
+    case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
+    case 'details': return tog('open', b.open, 'Ouvert', 'Ouvert par défaut en lecture');
+    // famille carte et chronologie (ticket 04)
+    case 'map': return '<select data-act="set" data-prop="height" title="Hauteur">' + opt(300, b.height, 'Petite') + opt(420, b.height, 'Moyenne') + opt(560, b.height, 'Grande') + '</select>' +
+      '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
+      tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('countries', b.countries !== false, 'Pays', 'Afficher les noms des pays sur le fond simplifié (avec des données par pays, le réglage « Étiquettes » peut les afficher sur les pays colorés)') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
+      tog('lock', b.lock, 'Figée', 'Lecture : empêcher de déplacer et de zoomer la carte') + tog('hideBg', b.hideBg, 'Fond fixe', 'Lecture : masquer le bouton de changement de fond');
+    case 'timeline': return '<select data-act="set" data-prop="orient" title="Orientation">' + opt('v', b.orient || 'v', 'Verticale') + opt('h', b.orient || 'v', 'Horizontale (45°)') + '</select>' + (b.orient === 'h' ? '<select data-act="set" data-prop="segPos" title="Position des libellés de liens">' + opt('above', b.segPos || 'above', 'Libellés au-dessus') + opt('below', b.segPos || 'above', 'Libellés en dessous') + '</select>' + tog('noCards', !b.noCards, 'Fiches', 'Afficher les fiches de description sous la frise') : '') + act('tl-add', '+ événement', 'Ajouter un événement à la fin');
+    // famille listes et tableaux (ticket 05)
+    case 'list': return tog('ordered', b.ordered, '1.', 'Liste numérotée');
+    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
+      '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
     case 'summary': return '<select data-act="set" data-prop="src" title="Contenu du sommaire">' + opt('sec', b.src, 'Sections') + opt('pages', b.src, 'Sous-pages') + '</select>' +
       '<select data-act="set" data-prop="sort" title="Ordre">' + opt('doc', b.sort, 'Ordre de la page') + opt('alpha', b.sort, 'Alphabétique') + '</select>' +
       '<select data-act="set" data-prop="depth" title="Nombre de niveaux affichés">' + (b.src === 'pages'
         ? opt(1, summaryDepth(b), '1 niveau') + opt(2, summaryDepth(b), '2 niveaux') + opt(3, summaryDepth(b), '3 niveaux') + opt(0, summaryDepth(b), 'Tous les niveaux')
         : opt(1, summaryDepth(b) === 1 ? 1 : 0, 'Sections seules') + opt(0, summaryDepth(b) === 1 ? 1 : 0, 'Sections et sous-sections')) + '</select>';
-    case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
-    case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
-    case 'check': return act('item-add', '+ case', 'Ajouter une case', ' data-k="items"') + act('check-reset', '↺', 'Tout décocher') +
-      '<select data-act="set" data-prop="order" title="Ordre d’affichage (l’ordre saisi est conservé)">' + opt('manual', b.order || 'manual', 'Ordre saisi') + opt('doneFirst', b.order, 'Cochées en premier') + opt('doneLast', b.order, 'Cochées à la fin') + '</select>';
-    case 'list': return tog('ordered', b.ordered, '1.', 'Liste numérotée');
+    case 'table': return act('row-add', '+L', 'Ajouter une ligne') + act('col-add', '+C', 'Ajouter une colonne') + act('row-del', '−L', 'Supprimer la ligne active') + act('col-del', '−C', 'Supprimer la colonne active');
+    // famille médias (ticket 07)
+    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
     case 'code': return '<select data-act="set" data-prop="variant" title="Style">' + opt('dark', b.variant, 'Sombre') + opt('box', b.variant, 'Boîte + fichier') + opt('cmd', b.variant, 'Commande') + '</select>' +
       '<select data-act="set" data-prop="lang" title="Langage pour la coloration">' + Object.keys(HL.names).map(function (k) {
         return opt(k, b.lang || 'auto', k === 'auto' ? 'Auto (' + HL.names[HL.detect(String(b.code || ''), b.name)] + ')' : HL.names[k]);
       }).join('') + '</select>' +
       (b.variant !== 'cmd' ? tog('tall', b.tall, '↕', 'Limiter la hauteur (défilement)') : '');
-    case 'table': return act('row-add', '+L', 'Ajouter une ligne') + act('col-add', '+C', 'Ajouter une colonne') + act('row-del', '−L', 'Supprimer la ligne active') + act('col-del', '−C', 'Supprimer la colonne active');
-    case 'note': return '<select data-act="set" data-prop="variant" title="Style">' + opt('warn', b.variant, 'Attention') + opt('info', b.variant, 'Info') + opt('bad', b.variant, 'Alerte') + opt('ok', b.variant, 'Succès') + opt('line', b.variant, 'Trait seul') + '</select>';
-    case 'details': return tog('open', b.open, 'Ouvert', 'Ouvert par défaut en lecture');
-    case 'timeline': return '<select data-act="set" data-prop="orient" title="Orientation">' + opt('v', b.orient || 'v', 'Verticale') + opt('h', b.orient || 'v', 'Horizontale (45°)') + '</select>' + (b.orient === 'h' ? '<select data-act="set" data-prop="segPos" title="Position des libellés de liens">' + opt('above', b.segPos || 'above', 'Libellés au-dessus') + opt('below', b.segPos || 'above', 'Libellés en dessous') + '</select>' + tog('noCards', !b.noCards, 'Fiches', 'Afficher les fiches de description sous la frise') : '') + act('tl-add', '+ événement', 'Ajouter un événement à la fin');
-    case 'map': return '<select data-act="set" data-prop="height" title="Hauteur">' + opt(300, b.height, 'Petite') + opt(420, b.height, 'Moyenne') + opt(560, b.height, 'Grande') + '</select>' +
-      '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
-      tog('list', b.list, 'Liste', 'Afficher la liste des points et zones en lecture') + tog('countries', b.countries !== false, 'Pays', 'Afficher les noms des pays sur le fond simplifié (avec des données par pays, le réglage « Étiquettes » peut les afficher sur les pays colorés)') + tog('cities', b.cities !== false, 'Villes', 'Afficher les villes sur le fond simplifié') +
-      tog('lock', b.lock, 'Figée', 'Lecture : empêcher de déplacer et de zoomer la carte') + tog('hideBg', b.hideBg, 'Fond fixe', 'Lecture : masquer le bouton de changement de fond');
-    case 'image': return b.src ? act('img-pick', 'Remplacer', 'Remplacer l’image par un fichier') + act('img-url', 'Adresse…', 'Remplacer l’image par une image en ligne (téléchargée et intégrée au document)') + act('img-alt', 'Alt', 'Texte alternatif') : '';
   }
   return '';
 }

@@ -14,6 +14,14 @@ function normBlocks(arr, newer) {
     if (!T[b.type]) { if (newer) out.push(b); return; }   // bloc d'une version plus récente : gardé intact (lecture seule)
     var nb = T[b.type].make();
     for (var k in b) nb[k] = b[k];
+    // normalisation propre au type : facette normaliser de l'inscription, sinon les anciennes branches (repli jusqu'au ticket 08)
+    var nz = facette(nb.type, 'normaliser');
+    if (nz) nz(nb, b, newer);
+    // famille texte et titres (ticket 02)
+    if (nb.type === 'texte') nb.lignes = normLignes(nb.lignes);   // au moins une ligne (05-lignes.js)
+    // famille listes et tableaux (ticket 05)
+    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
+    // famille requête et kanban (ticket 06)
     // vue nombre d'Ardoise 1.7 (pas de cartes enregistrées) : carte équivalente à l'ancien affichage
     if (nb.type === 'query' && !(Array.isArray(b.cards) && b.cards.length)) { nb.cards = [qDefCard(nb)]; delete nb.cards[0].id; }   // sans id, comme en 1.23 (qNormFiltres)
     // requête : le miroir des anciens filtres (05-migrations.js) n'est jamais repris en mémoire ; listes de filtres assainies
@@ -24,8 +32,6 @@ function normBlocks(arr, newer) {
       return o;
     });
     if (nb.type === 'kanban') kbCleanDeps(nb);
-    if (nb.type === 'texte') nb.lignes = normLignes(nb.lignes);   // au moins une ligne (05-lignes.js)
-    if (nb.type === 'list' && Array.isArray(nb.items)) nb.items = nb.items.map(function (h) { return h && typeof h === 'object' ? h : { html: String(h == null ? '' : h) }; });   // JSON écrit à la main
     nb.id = b.id || uid(); out.push(nb);
     if (nb.type === 'group') {
       // groupe : ses blocs, un seul niveau ; un bloc refusé dans un groupe est remis dans la page juste après lui

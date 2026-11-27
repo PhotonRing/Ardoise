@@ -3,7 +3,7 @@
 // document, les types de blocs, les migrations, l'adaptateur et le moteur de synchronisation, les requêtes (noms des pastilles des libellés), un faux `document`, une
 // horloge factice et de faux abonnés ; soit avec un faux adaptateur qui enregistre ses appels, soit, à deux copies,
 // avec le vrai adaptateur et un faux relais. Les tests ne passent que par l'interface de la session.  node scripts/test-session.mjs
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 
 const js = (f) => readFileSync(new URL('../src/js/' + f, import.meta.url), 'utf8');
@@ -12,7 +12,9 @@ const OUVERTURE = '\n(function () {\n';
 const entete = js('00-entete.js');
 if (!entete.startsWith(OUVERTURE)) throw new Error('00-entete.js : ouverture de l\'IIFE introuvable, adapter le banc');
 const SOURCE = entete.slice(OUVERTURE.length) +
-  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-lignes.js', '05-markdown.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '05-tableau.js', '07-requetes.js'].map(js).join('\n');
+  ['03-types-de-blocs.js', '05-document.js', '05-libelle-etape.js', '05-lignes.js', '05-markdown.js', '05-migrations.js', '05-session.js', '05-synchro-adaptateur.js', '05-synchro-moteur.js', '05-tableau.js', '07-requetes.js']
+    // familles de types de blocs (06-bloc-<famille>.js) : leurs inscriptions portent make, normaliser et libelle
+    .concat(readdirSync(new URL('../src/js/', import.meta.url)).filter((f) => /^06-bloc-.*\.js$/.test(f)).sort()).map(js).join('\n');
 const SCRIPT = new vm.Script(SOURCE, { filename: 'session.js' });
 
 // Un contexte neuf : faux document, horloge factice ; toast et synFlush appartiennent à l'interface (17, 24)

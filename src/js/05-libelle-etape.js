@@ -75,10 +75,20 @@ function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }
 // nature de la modification d'un bloc resté du même identifiant
 function libelleNature(ba, b) {
   if (ba.type !== b.type) return b.type === 'texte' && /^(list|check|subtitle)$/.test(ba.type) ? 'converti en texte' : 'bloc modifié';   // 10-operations-blocs.js
+  // libellé propre au type : facette libelle de l'inscription (null : libellé générique), sinon les anciennes branches (repli jusqu'au ticket 08)
+  var lb = facette(b.type, 'libelle'), lt = lb ? lb(ba, b) : null;
+  if (lt) return lt;
+  // famille texte et titres (ticket 02)
   if (b.type === 'texte' && Array.isArray(ba.lignes) && Array.isArray(b.lignes) && libelleSans(ba, 'lignes') === libelleSans(b, 'lignes') &&
     ba.lignes.length === b.lignes.length && JSON.stringify(ba.lignes) !== JSON.stringify(b.lignes) &&
     libelleTri(ba.lignes) === libelleTri(b.lignes)) return 'lignes réordonnées';   // cochées à la fin
+  // famille cadres (ticket 03)
   if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
+  // famille listes et tableaux (ticket 05)
+  if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
+    var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
+  }
+  // famille requête et kanban (ticket 06)
   if (b.type === 'kanban' && libelleSans(ba, 'collapsed') === libelleSans(b, 'collapsed')) {
     // une seule colonne bascule par étape : réduite si l'une l'est devenue
     var reduite = (b.cols || []).some(function (c, ci) { return c.collapsed && !(ba.cols[ci] || {}).collapsed; });
@@ -88,9 +98,6 @@ function libelleNature(ba, b) {
   if (b.type === 'query' && libelleSans(ba, 'colonnes') === libelleSans(b, 'colonnes')) return 'colonnes modifiées';   // choix des colonnes (07-requetes.js)
   if (b.type === 'query' && libelleSans(ba, 'champs') === libelleSans(b, 'champs')) return 'champs des cartes modifiés';
   if (b.type === 'query' && libelleSansFiltres(ba) === libelleSansFiltres(b)) return 'filtres modifiés';   // filtres du bloc (pas ceux des cartes de nombre)
-  if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
-    var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
-  }
   var f = []; libelleFeuilles(ba, b, '', false, f);
   if (f.every(function (x) { return x.rows; })) return 'cellule modifiée';
   if (f.length === 1 && f[0].k === 'done') return f[0].v ? 'case cochée' : 'case décochée';

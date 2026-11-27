@@ -115,7 +115,11 @@ function officeBloc(b, d, opts) {
   var gras = function (segs) { return officeMettreForme(segs, 'gras', true); };
   var cases = function (arr, ordre) { return { t: 'liste', ordonnee: false, items: ordre.map(function (i) { var it = arr[i]; return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html), coche: !!it.done }; }) }; };
   var image = function (img, alt, legende) { return { t: 'image', src: img.src, mime: img.mime || '', l: img.l || 0, h: img.h || 0, alt: alt || '', legende: legende || [] }; };
+  // contexte x des éléments neutres ; la facette elements du type l'emporte sur l'ancien case (repli jusqu'au ticket 08)
+  var el = facette(b.type, 'elements');
+  if (el) return el(b, { d: d, opts: opts, pi: pi, images: images, S: S, txt: txt, para: para, gras: gras, cases: cases, image: image });
   switch (b.type) {
+    // famille texte et titres (ticket 02)
     case 'header':
       if (!b.noEyebrow && !officeVide(S(b.eyebrow))) out.push(para(S(b.eyebrow), { style: 'surtitre' }));
       out.push({ t: 'titre', niveau: 0, segs: S(b.title) });
@@ -152,41 +156,17 @@ function officeBloc(b, d, opts) {
         out.push(para(S(l.html), o));
       });
       break;
-    case 'summary':
-      if (b.title) out.push(para([txt(b.title, { gras: true })]));
-      var entrees = [], parcours = function (arr, lv) { arr.forEach(function (it) { entrees.push({ niveau: lv, segs: [txt((it.n ? it.n + ' ' : '') + it.t, { interne: true, souligne: true })] }); parcours(it.kids, lv + 1); }); };
-      parcours(summaryItems(b, d, pi), 0);
-      if (entrees.length) out.push({ t: 'liste', ordonnee: false, items: entrees });
-      break;
-    case 'list':
-      out.push({ t: 'liste', ordonnee: !!b.ordered, items: b.items.map(function (it) { return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html) }; }) }); break;
-    case 'check':
-      if (b.items.length) out.push(cases(b.items, b.order === 'doneFirst' || b.order === 'doneLast' ? checkOrder(b.items, b.order) : b.items.map(function (x, k) { return k; })));
-      break;
-    case 'table':
-      out.push({ t: 'tableau', entete: true, lignes: b.rows.map(function (r) { return r.map(function (c) { return [para(S(c))]; }); }) }); break;
+    case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
+    // famille cadres (ticket 03)
+    case 'note':
+      var nv = ['warn', 'info', 'bad', 'ok'].indexOf(b.variant) >= 0 ? b.variant : 'warn';
+      out.push({ t: 'cadre', fond: OFFICE_CLAIR[nv + '-soft'], barre: OFFICE_CLAIR[nv], contenu: [para(S(b.html))] }); break;
     case 'facts':
       out.push({ t: 'tableau', entete: false, lignes: b.items.map(function (it) {
         var v = S(it.v); if (it.alert) officeMettreForme(v, 'couleur', OFFICE_CLAIR.bad);
         return [[para([txt(it.k, { gras: true })])], [para(v)]];
       }) });
       break;
-    case 'note':
-      var nv = ['warn', 'info', 'bad', 'ok'].indexOf(b.variant) >= 0 ? b.variant : 'warn';
-      out.push({ t: 'cadre', fond: OFFICE_CLAIR[nv + '-soft'], barre: OFFICE_CLAIR[nv], contenu: [para(S(b.html))] }); break;
-    case 'code': out.push({ t: 'code', texte: String(b.code || '').replace(/\n$/, ''), nom: String(b.name || '') }); break;
-    case 'kanban':
-      var cols = b.cols || [];
-      out.push({ t: 'tableau', entete: true, lignes: [cols.map(function (c, ci) { return [para([txt(c.title || 'Colonne ' + (ci + 1))])]; }),
-        cols.map(function (c) { return officeCartesKanban(c.cards || [], S, txt, para); })] });
-      break;
-    case 'query': out = out.concat(officeRequete(b, d, pi, S, txt, para)); break;
-    case 'details':
-      out.push(para(gras(S(b.title))));
-      if (!officeVide(S(b.html))) out.push(para(S(b.html)));
-      break;
-    case 'image':
-      if (b.src) out.push(image(images[b.id] || { src: b.src }, b.alt || htmlText(b.caption), S(b.caption))); break;
     case 'cards':
       b.cards.forEach(function (c) {
         var ct = [];
@@ -195,6 +175,10 @@ function officeBloc(b, d, opts) {
         if ((c.checks || []).length) ct.push(cases(c.checks, c.checks.map(function (x, k) { return k; })));
         out.push({ t: 'cadre', fond: OFFICE_CLAIR.surface, barre: null, contenu: ct });
       });
+      break;
+    case 'details':
+      out.push(para(gras(S(b.title))));
+      if (!officeVide(S(b.html))) out.push(para(S(b.html)));
       break;
     case 'group':
       // groupe : toujours ouvert (comme à l'impression), titre en gras puis ses blocs
@@ -206,12 +190,7 @@ function officeBloc(b, d, opts) {
       var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
       out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
-    case 'formule':
-      var tex = String(b.tex || '').trim(), fi = officeImageFormule(opts.formules, 'bloc', tex);
-      if (tex) out.push(fi ? { t: 'formule', tex: tex, image: fi } : { t: 'formule', tex: tex });
-      break;
-    case 'divider': out.push({ t: 'ligne' }); break;
-    case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
+    // famille carte et chronologie (ticket 04)
     case 'map':
       if (images[b.id]) { out.push(image(images[b.id], 'Carte')); break; }
       var pts = (b.markers || []).map(function (m, i) { return { niveau: 0, segs: [txt(m.label || 'Point ' + (i + 1)), txt(' (' + (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4) + ')', { couleur: OFFICE_CLAIR.muted })] }; })
@@ -229,6 +208,36 @@ function officeBloc(b, d, opts) {
       });
       if (evs.length) out.push({ t: 'liste', ordonnee: false, items: evs });
       break;
+    // famille listes et tableaux (ticket 05)
+    case 'list':
+      out.push({ t: 'liste', ordonnee: !!b.ordered, items: b.items.map(function (it) { return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html) }; }) }); break;
+    case 'check':
+      if (b.items.length) out.push(cases(b.items, b.order === 'doneFirst' || b.order === 'doneLast' ? checkOrder(b.items, b.order) : b.items.map(function (x, k) { return k; })));
+      break;
+    case 'summary':
+      if (b.title) out.push(para([txt(b.title, { gras: true })]));
+      var entrees = [], parcours = function (arr, lv) { arr.forEach(function (it) { entrees.push({ niveau: lv, segs: [txt((it.n ? it.n + ' ' : '') + it.t, { interne: true, souligne: true })] }); parcours(it.kids, lv + 1); }); };
+      parcours(summaryItems(b, d, pi), 0);
+      if (entrees.length) out.push({ t: 'liste', ordonnee: false, items: entrees });
+      break;
+    case 'table':
+      out.push({ t: 'tableau', entete: true, lignes: b.rows.map(function (r) { return r.map(function (c) { return [para(S(c))]; }); }) }); break;
+    // famille requête et kanban (ticket 06)
+    case 'query': out = out.concat(officeRequete(b, d, pi, S, txt, para)); break;
+    case 'kanban':
+      var cols = b.cols || [];
+      out.push({ t: 'tableau', entete: true, lignes: [cols.map(function (c, ci) { return [para([txt(c.title || 'Colonne ' + (ci + 1))])]; }),
+        cols.map(function (c) { return officeCartesKanban(c.cards || [], S, txt, para); })] });
+      break;
+    // famille médias (ticket 07)
+    case 'image':
+      if (b.src) out.push(image(images[b.id] || { src: b.src }, b.alt || htmlText(b.caption), S(b.caption))); break;
+    case 'code': out.push({ t: 'code', texte: String(b.code || '').replace(/\n$/, ''), nom: String(b.name || '') }); break;
+    case 'formule':
+      var tex = String(b.tex || '').trim(), fi = officeImageFormule(opts.formules, 'bloc', tex);
+      if (tex) out.push(fi ? { t: 'formule', tex: tex, image: fi } : { t: 'formule', tex: tex });
+      break;
+    case 'divider': out.push({ t: 'ligne' }); break;
   }
   return out;
 }
@@ -428,17 +437,22 @@ function officeSegmentsHtml(arr, d, px) {
   }).join('');
 }
 function officeEnveloppe(h) { return '<div style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';line-height:1.6;color:' + OFFICE_CLAIR.fg + ';max-width:' + OFFICE_LARGEUR + 'px">' + h + '</div>'; }
-// rendu stylé par type de bloc : chaque famille (09-office-*.js) inscrit ses types, function (b, x) → HTML sans enveloppe
+// rendu stylé par type de bloc, function (b, x) → HTML sans enveloppe : facette office de l'inscription (T), sinon ancien rendu
+// d'une famille 09-office-*.js (repli jusqu'au ticket 08)
 var OFFICE_RENDUS = {};
-// point d'entrée du HTML de Copier pour Office ; carte et chronologie (sans rendu inscrit) passent par leurs éléments neutres
+// point d'entrée du HTML de Copier pour Office ; carte et chronologie (office déclarée absente) passent par leurs éléments neutres
 function officeHtmlBloc(b, d, opts) { return officeEnveloppe(officeHtmlContenu(b, d, opts)); }
+// contexte x du HTML stylé : document, options, page, images préparées, couleurs claires, accent, segments
+function officeContexteHtml(d, opts) {
+  var acc = officeAccent(d);
+  return { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
+    S: function (html) { return officeSegments(R(html), d, opts.formules); }, segs: function (arr, px) { return officeSegmentsHtml(arr, d, px); } };
+}
 function officeHtmlContenu(b, d, opts) {
   opts = opts || {};
-  var rendu = OFFICE_RENDUS[b.type];
+  var rendu = facette(b.type, 'office') || OFFICE_RENDUS[b.type];
   if (!rendu) return officeHtmlElements(officeBloc(b, d, opts), d);
-  var acc = officeAccent(d);
-  return rendu(b, { d: d, opts: opts, pi: Math.max(0, Math.min(d.pages.length - 1, +opts.page || 0)), images: opts.images || {}, C: OFFICE_CLAIR, acc: acc[0], accSoft: acc[1],
-    S: function (html) { return officeSegments(R(html), d, opts.formules); }, segs: function (arr, px) { return officeSegmentsHtml(arr, d, px); } });
+  return rendu(b, officeContexteHtml(d, opts));
 }
 // éléments neutres de la carte et de la chronologie → HTML : paragraphe, liste à puces, image fournie
 function officeHtmlElements(elts, d) {
