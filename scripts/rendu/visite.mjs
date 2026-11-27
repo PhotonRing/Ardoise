@@ -131,3 +131,22 @@ test('visite guidée : la requête « cases à cocher » de Contrôles compte de
   const h = ctx.queryResult(q, d, { page: i, view: 'read' });
   egal([(h.match(/aria-pressed="true"/g) || []).length, (h.match(/aria-pressed="false"/g) || []).length], [1, 1], 'une cochée, une non cochée');
 });
+
+// Origine : spec formules, ticket 10 (user story 55) : l'étape Écrire présente les formules ; une formule dans un titre
+// de section la montre dans le sommaire
+test('visite guidée : la section Écrire présente les formules en ligne, la fenêtre, une commande inconnue, un bloc par cas et un titre', () => {
+  const { ctx, brut } = visite();
+  const d = ctx.normalize(brut);
+  const pg = d.pages.find((p) => p.id === 'visite');
+  const debut = pg.blocks.findIndex((b) => b.id === 'ecrire'), fin = pg.blocks.findIndex((b, i) => i > debut && b.type === 'step');
+  const section = pg.blocks.slice(debut, fin), lignes = section.filter((b) => b.type === 'texte').flatMap((b) => b.lignes).map((l) => l.html);
+  const sources = (h) => [...h.matchAll(/<span class="formule">([^<]*)<\/span>/g)].map((m) => m[1]);
+  vrai(lignes.some((h) => /<code>\$x\^2\$<\/code>/.test(h) && sources(h).length), 'frappe des dollars expliquée à côté d\'une formule');
+  vrai(lignes.some((h) => /[Cc]liquez sur une formule/.test(h) && sources(h).length), 'fenêtre de la source présentée sur une formule');
+  const inconnue = lignes.flatMap(sources).map((s) => ctx.texEnMathML(s, 'ligne')).find((m) => /class="f-err"/.test(m));
+  vrai(inconnue && /<msqrt>/.test(inconnue), 'une commande inconnue en rouge, le reste rendu');
+  const bloc = section.find((b) => b.type === 'formule');
+  vrai(bloc && /<mtable[^>]*class="f-cases"/.test(ctx.texEnMathML(bloc.tex, 'bloc')), 'bloc formule : une définition par cas');
+  egal(section.filter((b) => b.type === 'formule').length, 1, 'un seul bloc formule');
+  vrai(section.some((b) => ['h2', 'h3', 'step'].includes(b.type) && sources(b.html || b.title || '').length), 'une formule dans un titre de section');
+});
