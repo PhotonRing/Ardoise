@@ -125,3 +125,6 @@ test('collage : seul un HTML copié pour Office par Ardoise est reconnu (il se r
   egal(ctx.copieOffice('<p>data-ardoise-office="1"</p>'), false, 'texte qui cite la marque');
   egal(ctx.copieOffice(''), false, 'pas de HTML');
 });
+test('texte brut : une formule copiée (élément rendu) devient $source$, à côté d\'une pastille', () => {
+  egal(ctx.texteBrutDePresse('<p>Aire ' + ctx.formuleHTML('\\pi r^2', true) + ' <span class="pill">Maths</span></p>'), 'Aire $\\pi r^2$ #Maths');
+});

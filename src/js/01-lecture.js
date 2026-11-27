@@ -226,7 +226,7 @@ function ardoiseReader() {
       pages.forEach(function (p, k) { p.hidden = k !== i; });
       Array.prototype.forEach.call(document.querySelectorAll('[data-pg]'), function (b) {
         var on = +b.getAttribute('data-pg') === i, w = b.closest('.ptab-w,.toc-p');
-        if (w) w.classList.toggle('on', on); if (on) { b.setAttribute('aria-current', 'page'); document.title = b.textContent; } else b.removeAttribute('aria-current');
+        if (w) w.classList.toggle('on', on); if (on) { b.setAttribute('aria-current', 'page'); document.title = b.getAttribute('data-titre') || b.textContent; } else b.removeAttribute('aria-current');
       });
       // sous-page : onglet du groupe surligné, rangée de ses sous-pages visible, groupe déplié dans le sommaire
       var cb = document.querySelector('[data-pg="' + i + '"]'), g = cb ? cb.getAttribute('data-pgg') : String(i);

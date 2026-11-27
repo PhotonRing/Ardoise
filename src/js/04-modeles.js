@@ -13,6 +13,7 @@ var TEMPLATES = {
   tour: function () {
     // visite guidée : écrite au format TEMPLATES_V (05-document.js), sur plusieurs pages
     var P = function (t) { return '<span class="pill">' + t + '</span>'; };
+    var F = function (t) { return '<span class="formule">' + t + '</span>'; };
     var IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABaCAIAAAAJsExNAAADb0lEQVR42u3SxZIUURCF4fM4vAEb1jwET3K2uA3O4O5uY4y74O7uDoPLBhYdMdHRTVvVre7KrBPxbftWZ+aPPxMUcQO/xyniBn6NUcQN/ByliBv4MUIRN/B9mCJu4NsQRdzA10GKuIEvAxRxA5/7KeIGJvso4gY+9VLEDXzsoYgb+NBNETfwvosibuBdJ0XcwNvTFHEDbzoo4gZet1PEDbxqo4gbeNlKETfwooWSHX8nJ8qzPiCen6JkQcWU89kdE89OUtyrqeYco5Pi6QmKYxFSzmduXjw5TvEqZs05tkbG42MUr4IEbWtkPDpKcSlIzTmGpsbDIxR/AtacY2VwPDhM8Sd40FYGx/1DFGeC15xjYnbcO0hxJqGgTcyOuwcoziQUtInZcWc/xZmEgjYxO27voziTUNAmZsetvRRnEgraxOy4uYfiTEJBm5gdN3ZTnEkoaBOz4/ouijMJBW1idlzbSXEmoaBNzI6rOyjOJBS0idlxZTvFn+A1Wxkcl7dR/AketJXBcWkrxaWANRuaGhe3ULwKUrOtkXFhM8WrIEHbGhnnN1Eci1mzuXlxbiPFvQgpG50UZzdQsqCmmu2OiTPrKfXBWTPii/kfKqZsfcmYWEdJSJCCy9OSC2C8mRJQHSIuRcsfbybG1lLia2DHxbJ8CIyuoUSWqo6LZfAiGFlNqVXKOy6WndNgeBWlSuY6LpCFG2FoJaUi6ykXcHwpDK6glOEs5Xwu74WB5ZRijjsu5ulw6F9GyZeplPP5OB/6mih9TdntuID1O2Jqkt6lzCZF/F9Gr4mCMXqWMDtUbUXmbopSk3QvplfKNAIrx0X5MboW0RN1GVP6T4wqJ+lcyAaaOX1arfJ/rhAjLDC1MZSHmvZyegHrJsINItxGEcdZYD17qBKiLatjPhMS8AzZLLshC0yuh1oh5vra5zGURC+RhazTsMCAPUSDUNtsm8to6nYGr2Wnc4GRe4gJSay4dQ6r0cBL+MjaygKr7CGOqW+hDntvmc0CKbmE3axNL7C4hwhKPQ5dwlbWWmB50CWsZK0FpiVoQ5dIYdnaXlqCtnuJlGStBaYlaDeXaNRVtMBUBO3yDPU8jBYYf4HQGRp+GC0w4AIR+enMniHUYbS3OAss9RS0TfFEQYuCFlHQIgpaREGLghZR0CIKWkRBi1TpH6CTzu9yeVEmAAAAAElFTkSuQmCC';
     var cours = uid();   // cartes reliées par « Dépend de… » (page Suivi de projet)
     return { title: 'Ardoise', palette: 'ambre', typo: 'display', width: 820, theme: 'auto',
@@ -48,6 +49,12 @@ var TEMPLATES = {
       mk('image', { src: IMG, alt: 'Collines au soleil couchant', caption: 'Une image se choisit dans un fichier, se colle, se dépose ou se télécharge depuis une adresse : elle est toujours intégrée au document.' }),
       mk('texte', lignesEn('case', ['Clic droit (ou appui long) sur une case, en édition : « Cochées à la fin de la liste » range les cases cochées après les autres.',
         { html: 'Cette case est déjà cochée : essayez sur cette liste.', done: true }, 'Une case encore à faire.'])),
+      mk('h3', { html: 'Des formules, comme ' + F('E = mc^2') }),
+      mk('texte', { lignes: [{ html: 'Tapez <code>$x^2$</code> : le second <code>$</code> change la source LaTeX en formule, comme ' + F('\\sqrt{a^2 + b^2}') + '. <b>Ctrl+Z</b> juste après rend la source et ses dollars, pour garder un vrai texte entre dollars ; un prix comme 5 $ reste du texte.' },
+        { html: 'Cliquez sur une formule, comme ' + F('\\frac{1}{2}') + ', pour ouvrir sa source et son aperçu en direct ; <b>Entrée</b> ou <b>Échap</b> referme.' },
+        { html: 'Une commande inconnue s’affiche en rouge et le reste est rendu : ' + F('\\vecteur{u} + \\sqrt{2}') + '.' },
+        { html: 'Le bloc <b>Formule</b> (<code>/</code> puis « formule ») montre une formule seule, centrée et en grand :' }] }),
+      mk('formule', { tex: 'f(x) = \\begin{cases} x^2 & \\text{si } x \\geq 0 \\\\ -x & \\text{sinon} \\end{cases}' }),
       mk('step', { title: 'Les blocs de code' }),
       mk('texte', texteDuHtml('Trois styles : sombre avec bouton copier, boîte avec nom de fichier et numéros de ligne, ou commande courte. La coloration s’adapte au langage : détecté automatiquement, ou choisi dans la barre du bloc.')),
       mk('code', { variant: 'dark', code: '#!/usr/bin/env bash\n# Exemple : les dix plus gros dossiers du répertoire courant\ndu -sh -- */ 2>/dev/null | sort -rh | head -n 10' }),

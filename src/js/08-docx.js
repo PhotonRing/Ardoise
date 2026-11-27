@@ -73,6 +73,8 @@ function docxDimensions(img) {
   }
   return { l: 0, h: 0 };
 }
+// taille du texte de chaque style de docxStyles, en demi-points (Normal : 11 pt), reprise par les formules en ligne
+var DOCX_TAILLES = { Normal: 22, Title: 48, Heading1: 32, Heading2: 26, Heading3: 22, Code: 19, Caption: 18 };
 
 function docxDepuisElements(elts, d) {
   // nums : instances de numérotation { abs (1 puces, 2 numéros), ilvl, depart } ; suiteNum[niveau] : dernière instance de numéros
@@ -101,10 +103,18 @@ function docxDepuisElements(elts, d) {
     for (var i = 0; i < fus.length; i++) {
       var g = fus[i];
       if (g.saut) { h += '<w:r><w:br/></w:r>'; continue; }
-      var r = '<w:r>' + rPr(g, o) + t(String(g.texte).replace(/[\r\n]+/g, ' ')) + '</w:r>';
+      var r = g.image ? formuleEnLigne(g, o) : null;
+      if (!r) r = '<w:r>' + rPr(g, o) + t(String(g.texte).replace(/[\r\n]+/g, ' ')) + '</w:r>';
       h += g.lien ? '<w:hyperlink r:id="' + rel('hyperlink', g.lien, true) + '" w:history="1">' + r + '</w:hyperlink>' : r;
     }
     return h;
+  };
+  // formule en ligne (segment à image, 08-office.js) : image à la taille du texte du paragraphe (o.sz, sinon o.szImage, taille
+  // de son style ; Normal pour 15 px), descendue de la moitié de sa hauteur (w:position, en demi-points) : la ligne
+  // de base, au milieu de l'image, se pose sur celle du texte ; null sans image décodable (le texte $source$ suit)
+  var formuleEnLigne = function (g, o) {
+    var k = (o.sz || o.szImage || DOCX_TAILLES.Normal) / DOCX_TAILLES.Normal, l = Math.max(1, Math.round(g.image.l * k)), h = Math.max(1, Math.round(g.image.h * k));
+    return dessin(g.image.src, l, h, g.formule, '<w:position w:val="' + -Math.round(0.75 * h) + '"/>');
   };
   var P = function (pPr, contenu) { return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + (contenu || '') + '</w:p>'; };
   var STYLE = { surtitre: { caps: true, sz: 18, couleur: '#' + acc }, chapeau: { sz: 24, couleur: C.muted }, pied: { sz: 18, couleur: C.muted } };
@@ -143,23 +153,37 @@ function docxDepuisElements(elts, d) {
       return P('<w:numPr><w:ilvl w:val="' + lv + '"/><w:numId w:val="' + nid + '"/></w:numPr>' + serre + jc(it), runs(it.segs, o));
     }).join('');
   };
+  // run d'une image en ligne (wp:inline), l × h en px ; une image par source (médias partagés : une formule répétée n'en fait
+  // qu'un), un docPr par occurrence ; rpr : propriétés du run (décalage vertical d'une formule) ; null si l'image ne se décode pas
+  var parSource = {};
+  var dessin = function (src, l, h, alt, rpr) {
+    var m = parSource[src];
+    if (!m) {
+      var img = docxImage(src); if (!img) return null;
+      medias.push(img);
+      var nom = 'image' + medias.length + '.' + img.ext;
+      m = parSource[src] = { img: img, nom: nom, rid: rel('image', 'media/' + nom) };
+    }
+    if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
+    docPr++;
+    var cx = l * DOCX_EMU, cy = h * DOCX_EMU;
+    return '<w:r>' + (rpr ? '<w:rPr>' + rpr + '</w:rPr>' : '') + '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/>' +
+      '<wp:docPr id="' + docPr + '" name="Image ' + docPr + '" descr="' + xmlAttr(alt) + '"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>' +
+      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:nvPicPr><pic:cNvPr id="' + docPr + '" name="' + m.nom + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + m.rid + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  };
   var image = function (e) {
     var img = docxImage(e.src);
     if (!img) return P('', runs([{ texte: officeTexte([e]) }]));
     var dim = e.l && e.h ? { l: e.l, h: e.h } : docxDimensions(img), l = dim.l || OFFICE_LARGEUR, h = dim.h || Math.round(l * 0.6);
-    if (l > OFFICE_LARGEUR) { h = Math.round(h * OFFICE_LARGEUR / l); l = OFFICE_LARGEUR; }
-    medias.push(img); docPr++;
-    var nom = 'image' + medias.length + '.' + img.ext, rid = rel('image', 'media/' + nom), cx = l * DOCX_EMU, cy = h * DOCX_EMU;
-    var dessin = '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/>' +
-      '<wp:docPr id="' + docPr + '" name="Image ' + docPr + '" descr="' + xmlAttr(e.alt) + '"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>' +
-      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
-      '<pic:nvPicPr><pic:cNvPr id="' + docPr + '" name="' + nom + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + rid + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
-      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
-    return P('<w:keepNext/>', dessin) + (officeVide(e.legende) ? '' : P('<w:pStyle w:val="Caption"/>', runs(e.legende)));
+    return P('<w:keepNext/>', dessin(e.src, l, h, e.alt)) + (officeVide(e.legende) ? '' : P('<w:pStyle w:val="Caption"/>', runs(e.legende, { szImage: DOCX_TAILLES.Caption })));
   };
   var un = function (e) {
     switch (e.t) {
-      case 'titre': return P('<w:pStyle w:val="' + (e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title') + '"/>' + (e.retrait ? '<w:ind w:left="' + 480 * e.retrait + '"/>' : '') + jc(e), runs(e.segs));
+      case 'titre':
+        var style = e.niveau ? 'Heading' + Math.min(3, e.niveau) : 'Title';
+        return P('<w:pStyle w:val="' + style + '"/>' + (e.retrait ? '<w:ind w:left="' + 480 * e.retrait + '"/>' : '') + jc(e), runs(e.segs, { szImage: DOCX_TAILLES[style] }));
       case 'para':
         var st = STYLE[e.style] || {}, pp = e.style === 'pied' ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="' + docxCouleur(C.line) + '"/></w:pBdr>' : '';
         if (e.serre) pp += '<w:spacing w:after="0"/>';   // ligne d'un bloc texte suivie d'une autre (avant w:ind : ordre du schéma)
@@ -182,6 +206,10 @@ function docxDepuisElements(elts, d) {
         return (e.nom ? P('<w:keepNext/>', '<w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/><w:color w:val="' + docxCouleur(C.muted) + '"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>' + t(e.nom) + '</w:r>') : '') +
           P('<w:pStyle w:val="Code"/>', lignes.map(function (l, i) { return '<w:r>' + (i ? '<w:br/>' : '') + t(l) + '</w:r>'; }).join(''));
       case 'image': return image(e);
+      // bloc formule : image centrée (ramenée à la largeur de la page), sinon $$source$$ centré (comme le texte brut, 08-office.js)
+      case 'formule':
+        var fb = e.image && dessin(e.image.src, e.image.l, e.image.h, e.tex);
+        return P('<w:jc w:val="center"/>', fb || runs([{ texte: '$$' + e.tex + '$$' }]));
       case 'ligne': return P('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="' + docxCouleur(C.line) + '"/></w:pBdr>');
     }
     return '';
@@ -214,18 +242,19 @@ function docxDepuisElements(elts, d) {
 }
 // styles : Normal (Arial 11 pt), Title, Heading1 à 3 (niveaux de plan du volet de navigation), Code, Caption ; noms intégrés : Word les traduit
 function docxStyles() {
-  var C = OFFICE_CLAIR, s = function (id, nom, ppr, rpr, defaut) {
+  var C = OFFICE_CLAIR, T = DOCX_TAILLES, sz = function (id) { return '<w:sz w:val="' + T[id] + '"/><w:szCs w:val="' + T[id] + '"/>'; };
+  var s = function (id, nom, ppr, rpr, defaut) {
     return '<w:style w:type="paragraph"' + (defaut ? ' w:default="1"' : '') + ' w:styleId="' + id + '"><w:name w:val="' + nom + '"/>' + (defaut ? '' : '<w:basedOn w:val="Normal"/><w:next w:val="Normal"/>') + '<w:qFormat/>' +
       (ppr ? '<w:pPr>' + ppr + '</w:pPr>' : '') + (rpr ? '<w:rPr>' + rpr + '</w:rPr>' : '') + '</w:style>';
   };
-  var titre = function (n, sz, avant) { return s('Heading' + n, 'heading ' + n, '<w:keepNext/><w:keepLines/><w:spacing w:before="' + avant + '" w:after="120"/><w:outlineLvl w:val="' + (n - 1) + '"/>', '<w:b/><w:bCs/><w:sz w:val="' + sz + '"/><w:szCs w:val="' + sz + '"/>'); };
+  var titre = function (n, avant) { return s('Heading' + n, 'heading ' + n, '<w:keepNext/><w:keepLines/><w:spacing w:before="' + avant + '" w:after="120"/><w:outlineLvl w:val="' + (n - 1) + '"/>', '<w:b/><w:bCs/>' + sz('Heading' + n)); };
   return DOCX_XML + '<w:styles ' + DOCX_NS + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:color w:val="' + docxCouleur(C.fg) + '"/>' +
-    '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    sz('Normal') + '<w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
     s('Normal', 'Normal', '', '', true) +
-    s('Title', 'Title', '<w:keepNext/><w:spacing w:before="120" w:after="120"/><w:outlineLvl w:val="0"/>', '<w:b/><w:bCs/><w:sz w:val="48"/><w:szCs w:val="48"/>') +
-    titre(1, 32, 360) + titre(2, 26, 240) + titre(3, 22, 200) +
-    s('Code', 'Code', '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C['code-soft']) + '"/><w:spacing w:after="120" w:line="240" w:lineRule="auto"/>', '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/><w:sz w:val="19"/><w:szCs w:val="19"/>') +
-    s('Caption', 'caption', '<w:spacing w:after="160"/>', '<w:i/><w:iCs/><w:color w:val="' + docxCouleur(C.muted) + '"/><w:sz w:val="18"/><w:szCs w:val="18"/>') +
+    s('Title', 'Title', '<w:keepNext/><w:spacing w:before="120" w:after="120"/><w:outlineLvl w:val="0"/>', '<w:b/><w:bCs/>' + sz('Title')) +
+    titre(1, 360) + titre(2, 240) + titre(3, 200) +
+    s('Code', 'Code', '<w:shd w:val="clear" w:color="auto" w:fill="' + docxCouleur(C['code-soft']) + '"/><w:spacing w:after="120" w:line="240" w:lineRule="auto"/>', '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>' + sz('Code')) +
+    s('Caption', 'caption', '<w:spacing w:after="160"/>', '<w:i/><w:iCs/><w:color w:val="' + docxCouleur(C.muted) + '"/>' + sz('Caption')) +
     '</w:styles>';
 }
 // numérotation : 1 = puces, 2 = numéros (neuf niveaux) ; instances [{ abs, ilvl, depart }] : une par liste (départ 1 au premier

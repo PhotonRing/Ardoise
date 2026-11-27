@@ -27,6 +27,8 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
 
   // export depuis l'éditeur : le fichier téléchargé est lu au passage
   await ecran(1000, false);
+  // l'historique de l'onglet plafonne à 50 entrées : les sujets d'avant ne doivent pas l'avoir rempli
+  await cdp('Page.resetNavigationHistory');
   await charger();
   await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await attendre(50);
   const html = await evalue(`new Promise((r) => {

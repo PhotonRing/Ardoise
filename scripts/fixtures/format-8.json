@@ -1,0 +1,16 @@
+{
+  "v": 8,
+  "title": "Document 1.27",
+  "pages": [
+    {
+      "id": "a",
+      "title": "Formules",
+      "blocks": [
+        { "id": "t", "type": "texte", "lignes": [{ "html": "L’aire du disque vaut <span class=\"formule\">\\pi r^2</span>." }, { "html": "<b>Racine <span class=\"formule\">\\sqrt[3]{x}</span></b>", "lv": 1 }] },
+        { "id": "c", "type": "table", "rows": [["Grandeur", "Formule"], ["Énergie", "<span class=\"formule\">E=mc^2</span>"]] },
+        { "id": "f", "type": "facts", "items": [{ "k": "Moyenne", "v": "<span class=\"formule\">\\frac{1}{n}\\sum x_i</span>" }] },
+        { "id": "fb", "type": "formule", "tex": "a < b\n\\frac{1}{2}" }
+      ]
+    }
+  ]
+}
