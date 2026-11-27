@@ -191,23 +191,6 @@ function officeBloc(b, d, opts) {
       out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
       break;
     // famille carte et chronologie (ticket 04)
-    case 'map':
-      if (images[b.id]) { out.push(image(images[b.id], 'Carte')); break; }
-      var pts = (b.markers || []).map(function (m, i) { return { niveau: 0, segs: [txt(m.label || 'Point ' + (i + 1)), txt(' (' + (+m.lat).toFixed(4) + ', ' + (+m.lon).toFixed(4) + ')', { couleur: OFFICE_CLAIR.muted })] }; })
-        .concat((b.zones || []).map(function (z, i) { return { niveau: 0, segs: [txt(z.label || 'Zone ' + (i + 1))] }; }))
-        .concat((b.routes || []).map(function (r, i) { return { niveau: 0, segs: [txt(r.label || 'Itinéraire ' + (i + 1))] }; }));
-      out.push(para([txt('Carte', { gras: true })]));
-      if (pts.length) out.push({ t: 'liste', ordonnee: false, items: pts });
-      break;
-    case 'timeline':
-      if (images[b.id]) { out.push(image(images[b.id], 'Chronologie')); break; }
-      var evs = (b.items || []).map(function (it) {
-        var segs = (it.date ? [txt(it.date + ' — ', { couleur: OFFICE_CLAIR.muted })] : []).concat(gras(S(it.title)));
-        if (!officeVide(S(it.text))) segs = segs.concat([txt(' : ')], S(it.text));
-        return { niveau: 0, segs: segs };
-      });
-      if (evs.length) out.push({ t: 'liste', ordonnee: false, items: evs });
-      break;
     // famille listes et tableaux (ticket 05)
     case 'list':
       out.push({ t: 'liste', ordonnee: !!b.ordered, items: b.items.map(function (it) { return { niveau: Math.max(0, +it.lv || 0), segs: S(it.html) }; }) }); break;

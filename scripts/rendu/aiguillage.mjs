@@ -28,7 +28,7 @@ test('aiguillage : renderBlock prend la facette rendu et lui passe le contexte x
 test('aiguillage : settings prend la facette reglages ; sans elle, le repli reste', () => {
   const { ctx, d } = monter(DOC);
   const avant = ctx.settings(bloc(d, 'm1'));
-  vrai(/data-prop="height"/.test(avant), 'réglages de la carte par le repli : ' + avant);
+  vrai(/data-prop="height"/.test(avant), 'réglages de la carte : ' + avant);
   ctx.T.h2.reglages = (b) => '<button>' + b.id + '</button>';
   egal(ctx.settings(bloc(d, 'h1')), '<button>h1</button>', 'réglages de la facette');
   egal(ctx.settings(bloc(d, 'm1')), avant, 'autre type inchangé');

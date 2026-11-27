@@ -19,9 +19,6 @@ var T = {
   diamond: { label: 'Modèle diamant', ic: '◇', desc: 'Adversaire, capacité, infrastructure et victime en losange', kw: 'diamant diamond modele intrusion adversaire capacite infrastructure victime cti menace evenement',
     make: function () { var o = { title: '' }; DIA_SOMMETS.forEach(function (s) { o[s.cle] = ''; }); return o; }, sans: ['reglages', 'normaliser', 'libelle'] },
   // famille carte et chronologie (ticket 04)
-  map:     { label: 'Carte', ic: '◎', desc: 'Points, zones, cercles, itinéraires · hors ligne ou plan / satellite', kw: 'carte map geo port ville zone cercle itineraire route trajet distance localisation monde', make: function () { return { height: 420, bg: 'vector', view: { lat: 30, lon: 10, z: 1.6 }, markers: [], zones: [], routes: [], list: true, cities: true, lock: false, hideBg: false }; }, sans: ['office', 'normaliser', 'libelle'] },
-  timeline: { label: 'Chronologie', ic: '⟿', desc: 'Événements datés, verticale ou horizontale', kw: 'timeline chronologie frise evenements dates historique deroule',
-    make: function () { return { orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] }; }, sans: ['office', 'normaliser', 'libelle'] },
   // famille listes et tableaux (ticket 05)
   list:    { label: 'Liste', ic: '•', desc: 'Liste à puces ou numérotée', kw: 'liste puces numerotee', make: function () { return { ordered: false, items: [{ html: '' }] }; }, sans: ['libelle'] },
   check:   { label: 'Liste à cocher', ic: '☑', desc: 'Cases enregistrées dans le fichier', kw: 'checklist cases cocher todo', make: function () { return { items: [{ html: '', done: false }] }; }, sans: ['normaliser', 'libelle'] },
