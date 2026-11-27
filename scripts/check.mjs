@@ -75,7 +75,7 @@ const ANCIENS = [
 // un nouveau sujet attend l'état avec jusqua (outils/attente.mjs). Les anciennes attentes sont plafonnées : le plafond
 // ne fait que baisser, il suit le compte exact quand on en retire.
 {
-  const PLAFOND_ATTENTES = 500;
+  const PLAFOND_ATTENTES = 491;
   const dossier = new URL('../scripts/navigateur/', import.meta.url);
   let n = 0;
   for (const f of readdirSync(dossier).filter((x) => x.endsWith('.mjs'))) {
@@ -84,6 +84,21 @@ const ANCIENS = [
   if (n > PLAFOND_ATTENTES) throw new Error(`bancs navigateur : ${n} attentes à durée fixe pour un plafond de ${PLAFOND_ATTENTES} ; attendre l'état avec jusqua(evalue, expr) de scripts/navigateur/outils/attente.mjs`);
   if (n < PLAFOND_ATTENTES) throw new Error(`bancs navigateur : ${n} attentes à durée fixe, moins que le plafond : baisser PLAFOND_ATTENTES à ${n} dans scripts/check.mjs`);
   console.log(`bancs navigateur : OK (${n} attentes à durée fixe, plafond atteint, aucune nouvelle)`);
+}
+// Commentaires de src/js : trois lignes au plus (agents/standards.md). Les anciens plus longs sont plafonnés comme les
+// attentes : le plafond ne fait que baisser, il suit le compte exact quand on en raccourcit un.
+{
+  const PLAFOND_COMMENTAIRES = 12;
+  const longs = [];
+  for (const f of readdirSync(new URL('../src/js/', import.meta.url)).filter((x) => x.endsWith('.js'))) {
+    const s = js(f), ligne = (i) => s.slice(0, i).split('\n').length;
+    for (const m of s.matchAll(/\/\*[\s\S]*?\*\//g)) if (m[0].split('\n').length > 3) longs.push(`${f}:${ligne(m.index)}`);
+    let suite = 0;
+    s.split('\n').forEach((l, i) => { if (/^\s*\/\//.test(l)) { if (++suite === 4) longs.push(`${f}:${i - 2}`); } else suite = 0; });
+  }
+  if (longs.length > PLAFOND_COMMENTAIRES) throw new Error(`commentaires : ${longs.length} de plus de trois lignes pour un plafond de ${PLAFOND_COMMENTAIRES} ; raccourcir le nouveau (${longs.join(', ')})`);
+  if (longs.length < PLAFOND_COMMENTAIRES) throw new Error(`commentaires : ${longs.length} de plus de trois lignes, moins que le plafond : baisser PLAFOND_COMMENTAIRES à ${longs.length} dans scripts/check.mjs`);
+  console.log(`commentaires : OK (${longs.length} anciens de plus de trois lignes, plafond atteint, aucun nouveau)`);
 }
 // Noms de premier niveau : tous les fichiers de src/js forment un seul script, un nom déclaré deux fois remplace le premier sans erreur
 {

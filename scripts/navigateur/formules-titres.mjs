@@ -18,6 +18,8 @@ const DOC = { title: 'Titres', pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 'p3', title: 'Trois', blocks: [{ id: 'h3', type: 'header', title: ' ' + F('\\pi r^2') + ' ' }] }] };
 const SOUS_PAGES = { title: 'Sous-pages', pages: [{ id: 'q1', blocks: [{ id: 'hq', type: 'header', title: 'Parent' }, { id: 'sp', type: 'summary', src: 'pages' }] },
   { id: 'q2', lv: 1, blocks: [{ id: 'hq2', type: 'header', title: 'Aire ' + F('x^2') }] }, { id: 'q3', lv: 1, title: 'Trois', blocks: [{ id: 'hq3', type: 'header', title: 'Sous ' + F('\\beta') }] }] };
+import { jusqua } from './outils/attente.mjs';
+
 const BASCULER = `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))`;
 // formules visibles d'un conteneur : présence du MathML annoté et source
 const SOURCES = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].map((a) => [...a.querySelectorAll('.formule')].filter((x) => x.getClientRects().length)
@@ -27,20 +29,23 @@ const GUET = `(() => { window.__export = null; window.__nom = null; const o = UR
   HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__nom = this.download; window.__blob.text().then((t) => { window.__export = t; }); return; } return c.call(this); }; return true; })()`;
 
 export const nom = 'formules dans les titres';
-export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, echec }) {
+export default async function ({ ecran, charger, evalue, cdp, mesure, echec }) {
   const attendu = (cas, ok, vu) => { mesure(); if (!ok) echec(cas + ' : ' + JSON.stringify(vu)); };
+  // attend que l'expression vaille `val` (comparée en JSON), au plus 5 s
+  const egal = (expr, val) => jusqua(evalue, `JSON.stringify(${expr}) === ${JSON.stringify(JSON.stringify(val))}`);
+  const ENTREES = [['E=mc^2'], ['x_1'], ['\\alpha'], [], []];
   await ecran(1400, false);
   await charger();
   // bloc sommaire en sous-pages : le nom de chaque sous-page y est rendu avec ses formules, comme dans le sommaire de gauche
-  await evalue(`window.ardoise.load(${JSON.stringify(SOUS_PAGES)})`); await attendre(150);
+  await evalue(`window.ardoise.load(${JSON.stringify(SOUS_PAGES)})`); await egal(SOURCES('.blk[data-id="sp"] .toc-blk-l a'), [['x^2'], ['\\beta']]);
   const sp = await evalue(SOURCES('.blk[data-id="sp"] .toc-blk-l a'));
   const spt = await evalue(`[...document.querySelectorAll('.blk[data-id="sp"] .toc-blk-l a')].map((a) => a.textContent.slice(0, 4))`);
   attendu('bloc sommaire en sous-pages : noms des pages rendus', JSON.stringify(sp) === JSON.stringify([['x^2'], ['\\beta']]) && spt[0] === 'Aire' && spt[1] === 'Sous', [sp, spt]);
-  await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await attendre(150);
+  await evalue(`window.ardoise.load(${JSON.stringify(DOC)})`); await egal(SOURCES('.pnav-side a[data-sec]'), ENTREES);
 
   // sommaire latéral en édition : formules des titres rendues, entrées dans l'ordre de la page
   const ed = await evalue(SOURCES('.pnav-side a[data-sec]'));
-  attendu('édition : formules du sommaire latéral', JSON.stringify(ed) === JSON.stringify([['E=mc^2'], ['x_1'], ['\\alpha'], [], []]), ed);
+  attendu('édition : formules du sommaire latéral', JSON.stringify(ed) === JSON.stringify(ENTREES), ed);
   const blk = await evalue(SOURCES('.blk[data-id="sm"] .toc-blk-l a'));
   attendu('édition : formules du bloc sommaire', JSON.stringify(blk) === JSON.stringify([['E=mc^2'], ['x_1'], ['\\alpha'], [], []]), blk);
 
@@ -56,28 +61,28 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   attendu('onglets de pages et pages du sommaire : formules rendues', JSON.stringify(ong) === JSON.stringify(PAGES) && JSON.stringify(som) === JSON.stringify(PAGES) &&
     txt.debut[0] === 'Aire' && txt.debut[1] === 'Page' && txt.debut[3] === 'Aire', [ong, som, txt.debut]);
   attendu('titre de la fenêtre sans la formule, nom à côté du logo en $source$', txt.titre === 'Aire' && txt.nom === 'Aire $\\pi r^2$', txt);
-  const onglet = async (i) => { await evalue(`document.querySelector('[data-pg="${i}"]').click(), true`); await attendre(200); return evalue('document.title'); };
-  const fen = [await onglet(1), await onglet(2), await onglet(0)];
+  const onglet = async (i, titre) => { await evalue(`document.querySelector('[data-pg="${i}"]').click(), true`); await egal('document.title', titre); return evalue('document.title'); };
+  const fen = [await onglet(1, 'Page'), await onglet(2, '\\pi r^2'), await onglet(0, 'Aire')];
   attendu('titre de la fenêtre par page : formule retirée, ou sa source sans dollars si le titre n\'est qu\'une formule', JSON.stringify(fen) === JSON.stringify(['Page', '\\pi r^2', 'Aire']), fen);
 
   // frappe dans un titre : le sommaire suit (mise à jour en place)
   await evalue(`(() => { const f = document.querySelector('.blk[data-id="s1"] h2[contenteditable="true"]'); f.focus(); const r = document.createRange(); r.setStart(f.firstChild, 0); r.collapse(true);
     const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`);
-  await evalue(`document.execCommand('insertText', false, 'Z ')`); await attendre(500);
+  await evalue(`document.execCommand('insertText', false, 'Z ')`); await jusqua(evalue, `document.querySelector('.pnav-side a[data-sec="s1"]').textContent.slice(0, 2) === 'Z '`);
   const suit = await evalue(`(() => { const a = document.querySelector('.pnav-side a[data-sec="s1"]'); return [a.textContent.slice(0, 2), !!a.querySelector('.formule math annotation')]; })()`);
   attendu('frappe dans un titre : le sommaire suit, formule gardée', suit[0] === 'Z ' && suit[1], suit);
 
   // lecture : mêmes formules dans le sommaire latéral et le bloc sommaire
-  await evalue(BASCULER); await attendre(250);
+  await evalue(BASCULER); await jusqua(evalue, `!document.documentElement.classList.contains('is-edit')`); await egal(SOURCES('.toc-blk-l a'), ENTREES);
   const lec = await evalue(SOURCES('.pnav-side a[data-sec]'));
   const lecb = await evalue(SOURCES('.toc-blk-l a'));
   attendu('lecture : formules du sommaire', JSON.stringify(lec) === JSON.stringify([['E=mc^2'], ['x_1'], ['\\alpha'], [], []]) && JSON.stringify(lecb) === JSON.stringify(lec), [lec, lecb]);
-  await evalue(BASCULER); await attendre(250);
+  await evalue(BASCULER); await jusqua(evalue, `document.documentElement.classList.contains('is-edit')`);
 
   // page exportée : MathML dans le sommaire, titre et nom du fichier tirés du titre en $source$
   await evalue(GUET);
   await evalue(`document.querySelector('[data-ui="file"]').click(), document.querySelector('[data-f="export"]').click(), true`);
-  for (let i = 0; i < 50 && !(await evalue('!!window.__export')); i++) await attendre(100);
+  await jusqua(evalue, '!!window.__export');
   const ex = await evalue(`(() => { const d = new DOMParser().parseFromString(window.__export || '', 'text/html');
     return { titre: d.title, nom: window.__nom, toc: [...d.querySelectorAll('.pnav-side a[data-sec]')].map((a) => [...a.querySelectorAll('.formule math annotation')].map((x) => x.textContent)),
       img: d.querySelectorAll('.pnav-side img').length }; })()`);
@@ -86,14 +91,14 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   const exporte = await evalue('window.__export');
   await evalue(`window.__nom = null, document.querySelector('.blk[data-id="s1"] [data-act="menu-bloc"]').click(),
     [...document.querySelectorAll('.menu-bloc .mi')].find((m) => m.textContent.includes('Exporter en Word (.docx)')).click(), true`);
-  for (let i = 0; i < 50 && !(await evalue('!!window.__nom')); i++) await attendre(100);
+  await jusqua(evalue, '!!window.__nom');
   const word = await evalue('window.__nom');
   attendu('nom proposé du .docx d\'un titre à formule', word === 'Z-Energie-E-mc-2.docx', word);
 
   // page exportée ouverte : nom des pages rendu, titre de la fenêtre sans formule à chaque page
-  await cdp('Page.navigate', { url: 'data:text/html;base64,' + Buffer.from(exporte).toString('base64') }); await attendre(400);
+  await cdp('Page.navigate', { url: 'data:text/html;base64,' + Buffer.from(exporte).toString('base64') }); await egal(SOURCES('.pnav-side [data-pg]'), PAGES);
   const exo = await evalue(SOURCES('.pnav-side [data-pg]'));
-  const exf = [await evalue('document.title'), await onglet(1), await onglet(2)];
+  const exf = [await evalue('document.title'), await onglet(1, 'Page'), await onglet(2, '\\pi r^2')];
   attendu('page exportée ouverte : pages du sommaire rendues, titre de la fenêtre par page', JSON.stringify(exo) === JSON.stringify(PAGES) &&
     JSON.stringify(exf) === JSON.stringify(['Aire', 'Page', '\\pi r^2']), [exo, exf]);
 }
