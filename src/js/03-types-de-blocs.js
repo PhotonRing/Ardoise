@@ -3,21 +3,7 @@
 var DIA_SOMMETS = [{ cle: 'adversaire', nom: 'Adversaire' }, { cle: 'capacite', nom: 'Capacité' }, { cle: 'infrastructure', nom: 'Infrastructure' }, { cle: 'victime', nom: 'Victime' }];
 var T = {
   // famille texte et titres (ticket 02)
-  header:  { label: 'En-tête', ic: 'H1', desc: 'Surtitre, grand titre et chapeau', kw: 'titre entete header', make: function () { return { eyebrow: '', title: '', lede: '' }; }, sans: ['normaliser', 'libelle'] },
-  h2:      { label: 'Titre de section', ic: 'H2', desc: 'Titre intermédiaire', kw: 'titre heading', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  h3:      { label: 'Sous-section', ic: 'H3', desc: 'Niveau sous la section, repris dans le sommaire', kw: 'titre heading sous-section sous section', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  subtitle: { label: 'Sous-titre', ic: 'T', desc: 'Petit titre, hors du sommaire', kw: 'titre sous-titre intertitre', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
-  step:    { label: 'Étape numérotée', ic: '1.', desc: 'Ouvre une section avec pastille de numéro', kw: 'etape section numero step', make: function () { return { num: '', title: '', nonum: false }; }, sans: ['normaliser', 'libelle'] },
-  texte:   { label: 'Texte', ic: '≡', desc: 'Texte courant, ligne par ligne', kw: 'texte paragraphe ligne liste puces numerotee cases cocher sous-titre', make: function () { return { lignes: [{ html: '' }] }; }, sans: ['reglages'] },
-  footer:  { label: 'Pied de page', ic: '§', desc: 'Sources, auteur, date', kw: 'pied footer sources', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'] },
   // famille cadres (ticket 03)
-  note:    { label: 'Encadré', ic: '!', desc: 'Attention, info, alerte, succès', kw: 'note encadre callout alerte', make: function () { return { variant: 'warn', html: '' }; }, sans: ['normaliser', 'libelle'] },
-  facts:   { label: 'Fiche de faits', ic: '▤', desc: 'Grille clé / valeur en carte', kw: 'faits cle valeur facts resume', make: function () { return { items: [{ k: 'Clé', v: '', alert: false }, { k: 'Clé', v: '', alert: false }, { k: 'Clé', v: '', alert: false }] }; }, sans: ['normaliser', 'libelle'] },
-  cards:   { label: 'Cartes', ic: '▦', desc: 'Grille de cartes avec texte et cases', kw: 'cartes grille cards', make: function () { return { min: 340, cards: [{ title: '', text: '', checks: [{ html: '', done: false }] }, { title: '', text: '', checks: [{ html: '', done: false }] }] }; }, sans: ['normaliser', 'libelle'] },
-  details: { label: 'Bloc dépliable', ic: '▸', desc: 'Titre cliquable qui révèle un texte', kw: 'details depliable accordeon', make: function () { return { title: '', html: '', open: false }; }, sans: ['normaliser', 'libelle'] },
-  group:   { label: 'Groupe repliable', ic: '⊟', desc: 'Titre cliquable qui plie quelques blocs, hors du sommaire', kw: 'groupe repliable plier replier accordeon conteneur blocs', make: function () { return { title: '', folded: false, blocks: [] }; }, sans: ['reglages', 'normaliser'] },
-  diamond: { label: 'Modèle diamant', ic: '◇', desc: 'Adversaire, capacité, infrastructure et victime en losange', kw: 'diamant diamond modele intrusion adversaire capacite infrastructure victime cti menace evenement',
-    make: function () { var o = { title: '' }; DIA_SOMMETS.forEach(function (s) { o[s.cle] = ''; }); return o; }, sans: ['reglages', 'normaliser', 'libelle'] },
   // famille carte et chronologie (ticket 04)
   // famille listes et tableaux (ticket 05)
   list:    { label: 'Liste', ic: '•', desc: 'Liste à puces ou numérotée', kw: 'liste puces numerotee', make: function () { return { ordered: false, items: [{ html: '' }] }; }, sans: ['libelle'] },

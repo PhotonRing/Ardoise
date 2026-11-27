@@ -120,76 +120,7 @@ function officeBloc(b, d, opts) {
   if (el) return el(b, { d: d, opts: opts, pi: pi, images: images, S: S, txt: txt, para: para, gras: gras, cases: cases, image: image });
   switch (b.type) {
     // famille texte et titres (ticket 02)
-    case 'header':
-      if (!b.noEyebrow && !officeVide(S(b.eyebrow))) out.push(para(S(b.eyebrow), { style: 'surtitre' }));
-      out.push({ t: 'titre', niveau: 0, segs: S(b.title) });
-      if (!b.noLede && !officeVide(S(b.lede))) out.push(para(S(b.lede), { style: 'chapeau' }));
-      break;
-    case 'h2': out.push({ t: 'titre', niveau: 1, segs: S(b.html) }); break;
-    case 'h3': out.push({ t: 'titre', niveau: 2, segs: S(b.html) }); break;
-    case 'subtitle': out.push({ t: 'titre', niveau: 3, segs: S(b.html) }); break;
-    case 'step':
-      var num = stepNums(d.pages[pi].blocks)[b.id];
-      out.push({ t: 'titre', niveau: 1, segs: (num ? [txt(num + ' ')] : []).concat(S(b.title)) }); break;
-    case 'texte':
-      // texte → paragraphe à son retrait ; sous-titre → titre de niveau 3 ; suite de puces, numéros et cases → un élément liste
-      // (items à genre et numéro affiché). serre : pas d'espace après (sauf la dernière ligne, comme .texte .lg) ; ligne : gardée
-      // vide dans le texte brut ; alignement et taille : réglages de la ligne
-      var ls = normLignes(b.lignes), nums = numerosDesLignes(ls), suite = null;
-      ls.forEach(function (l, i) {
-        var o = {}, lv = Math.min(LIGNE_LV_MAX, niveauDe(l)), dernier = i === ls.length - 1;
-        if (l.align) o.alignement = l.align;
-        if (l.taille) o.taille = l.taille;
-        if (GENRES_LISTE.indexOf(l.genre) >= 0) {
-          var it = { niveau: lv, segs: S(l.html), genre: l.genre }; for (var k in o) it[k] = o[k];
-          if (l.genre === 'numero') it.n = nums[i];
-          if (l.genre === 'case') it.coche = !!l.done;
-          if (!suite) { suite = { t: 'liste', ordonnee: false, items: [] }; out.push(suite); }
-          suite.items.push(it); suite.serre = !dernier;
-          return;
-        }
-        suite = null;
-        if (lv) o.retrait = lv;
-        if (!dernier) o.serre = true;
-        o.ligne = true;
-        if (l.genre === 'soustitre') { o.t = 'titre'; o.niveau = 3; o.segs = S(l.html); out.push(o); return; }
-        out.push(para(S(l.html), o));
-      });
-      break;
-    case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
     // famille cadres (ticket 03)
-    case 'note':
-      var nv = ['warn', 'info', 'bad', 'ok'].indexOf(b.variant) >= 0 ? b.variant : 'warn';
-      out.push({ t: 'cadre', fond: OFFICE_CLAIR[nv + '-soft'], barre: OFFICE_CLAIR[nv], contenu: [para(S(b.html))] }); break;
-    case 'facts':
-      out.push({ t: 'tableau', entete: false, lignes: b.items.map(function (it) {
-        var v = S(it.v); if (it.alert) officeMettreForme(v, 'couleur', OFFICE_CLAIR.bad);
-        return [[para([txt(it.k, { gras: true })])], [para(v)]];
-      }) });
-      break;
-    case 'cards':
-      b.cards.forEach(function (c) {
-        var ct = [];
-        if (!officeVide(S(c.title))) ct.push(para(gras(S(c.title))));
-        if (!officeVide(S(c.text))) ct.push(para(S(c.text)));
-        if ((c.checks || []).length) ct.push(cases(c.checks, c.checks.map(function (x, k) { return k; })));
-        out.push({ t: 'cadre', fond: OFFICE_CLAIR.surface, barre: null, contenu: ct });
-      });
-      break;
-    case 'details':
-      out.push(para(gras(S(b.title))));
-      if (!officeVide(S(b.html))) out.push(para(S(b.html)));
-      break;
-    case 'group':
-      // groupe : toujours ouvert (comme à l'impression), titre en gras puis ses blocs
-      if (!officeVide(S(b.title))) out.push(para(gras(S(b.title))));
-      (b.blocks || []).forEach(function (c) { out = out.concat(officeBloc(c, d, opts)); });
-      break;
-    case 'diamond':
-      // modèle diamant : tableau à deux colonnes, titre puis les sommets dans l'ordre de l'écran (DIA_SOMMETS : 03-types-de-blocs.js)
-      var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
-      out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
-      break;
     // famille carte et chronologie (ticket 04)
     // famille listes et tableaux (ticket 05)
     case 'list':
@@ -392,6 +323,8 @@ function officeCellule(contenu, style, largeur, valign) {
   var v = valign || 'top';
   return '<td valign="' + v + '"' + (largeur ? ' width="' + largeur + '"' : '') + ' style="font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(15) + ';vertical-align:' + v + ';' + (style || '') + '">' + contenu + '</td>';
 }
+// filet fin (étape, séparateur) : paragraphe vide bordé en haut (Writer dessine un <hr> en trait sombre, sans sa couleur)
+function officeTxtFilet(x, avant, apres) { return '<p style="margin-top:' + avant + ';margin-bottom:' + apres + ';border-top:1px solid ' + x.C.line + ';font-size:1pt;line-height:1pt">&nbsp;</p>'; }
 // segments → HTML : formes, couleur et surlignage, code en ligne sur accent-soft (page.css), liens accent, lien interne souligné sans adresse, pastilles en texte ;
 // formule en image à la taille du texte qui l'entoure (px, 15 par défaut)
 function officeSegmentsHtml(arr, d, px) {

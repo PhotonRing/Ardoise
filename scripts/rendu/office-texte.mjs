@@ -1,4 +1,4 @@
-// Copier pour Office, famille Texte (src/js/09-office-texte.js) : en-tête, titres, étape, paragraphe, pastilles, pied, séparateur, image.
+// Copier pour Office, famille Texte (src/js/06-bloc-texte.js ; séparateur et image : 09-office-texte.js jusqu'au ticket 07) : en-tête, titres, étape, paragraphe, pastilles, pied, séparateur, image.
 import { test, egal, vrai } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';
 

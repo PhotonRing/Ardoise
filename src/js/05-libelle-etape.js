@@ -79,11 +79,7 @@ function libelleNature(ba, b) {
   var lb = facette(b.type, 'libelle'), lt = lb ? lb(ba, b) : null;
   if (lt) return lt;
   // famille texte et titres (ticket 02)
-  if (b.type === 'texte' && Array.isArray(ba.lignes) && Array.isArray(b.lignes) && libelleSans(ba, 'lignes') === libelleSans(b, 'lignes') &&
-    ba.lignes.length === b.lignes.length && JSON.stringify(ba.lignes) !== JSON.stringify(b.lignes) &&
-    libelleTri(ba.lignes) === libelleTri(b.lignes)) return 'lignes réordonnées';   // cochées à la fin
   // famille cadres (ticket 03)
-  if (b.type === 'group' && libelleSans(ba, 'folded') === libelleSans(b, 'folded')) return b.folded ? 'groupe plié' : 'groupe déplié';
   // famille listes et tableaux (ticket 05)
   if (b.type === 'table' && Array.isArray(ba.rows) && Array.isArray(b.rows) && ba.rows.length && b.rows.length) {
     var nt = libelleGrille(ba.rows, b.rows); if (nt) return nt;
