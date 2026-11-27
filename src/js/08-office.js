@@ -158,38 +158,6 @@ function officeBloc(b, d, opts) {
       break;
     case 'footer': out.push(para(S(b.html), { style: 'pied' })); break;
     // famille cadres (ticket 03)
-    case 'note':
-      var nv = ['warn', 'info', 'bad', 'ok'].indexOf(b.variant) >= 0 ? b.variant : 'warn';
-      out.push({ t: 'cadre', fond: OFFICE_CLAIR[nv + '-soft'], barre: OFFICE_CLAIR[nv], contenu: [para(S(b.html))] }); break;
-    case 'facts':
-      out.push({ t: 'tableau', entete: false, lignes: b.items.map(function (it) {
-        var v = S(it.v); if (it.alert) officeMettreForme(v, 'couleur', OFFICE_CLAIR.bad);
-        return [[para([txt(it.k, { gras: true })])], [para(v)]];
-      }) });
-      break;
-    case 'cards':
-      b.cards.forEach(function (c) {
-        var ct = [];
-        if (!officeVide(S(c.title))) ct.push(para(gras(S(c.title))));
-        if (!officeVide(S(c.text))) ct.push(para(S(c.text)));
-        if ((c.checks || []).length) ct.push(cases(c.checks, c.checks.map(function (x, k) { return k; })));
-        out.push({ t: 'cadre', fond: OFFICE_CLAIR.surface, barre: null, contenu: ct });
-      });
-      break;
-    case 'details':
-      out.push(para(gras(S(b.title))));
-      if (!officeVide(S(b.html))) out.push(para(S(b.html)));
-      break;
-    case 'group':
-      // groupe : toujours ouvert (comme à l'impression), titre en gras puis ses blocs
-      if (!officeVide(S(b.title))) out.push(para(gras(S(b.title))));
-      (b.blocks || []).forEach(function (c) { out = out.concat(officeBloc(c, d, opts)); });
-      break;
-    case 'diamond':
-      // modèle diamant : tableau à deux colonnes, titre puis les sommets dans l'ordre de l'écran (DIA_SOMMETS : 03-types-de-blocs.js)
-      var dl = function (nom, html) { var v = S(html); return [[para([txt(nom, { gras: true })])], [para(officeVide(v) ? [txt('—', { couleur: OFFICE_CLAIR.muted })] : v)]]; };
-      out.push({ t: 'tableau', entete: false, lignes: (officeVide(S(b.title)) ? [] : [dl('Titre', b.title)]).concat(DIA_SOMMETS.map(function (s) { return dl(s.nom, b[s.cle]); })) });
-      break;
     // famille carte et chronologie (ticket 04)
     case 'map':
       if (images[b.id]) { out.push(image(images[b.id], 'Carte')); break; }

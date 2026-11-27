@@ -1,4 +1,4 @@
-// Copier pour Office, famille Cadres (src/js/09-office-cadres.js) : encadré, fiche de faits, cartes, bloc dépliable, groupe repliable, modèle diamant.
+// Copier pour Office, famille Cadres (src/js/06-bloc-cadres.js) : encadré, fiche de faits, cartes, bloc dépliable, groupe repliable, modèle diamant.
 import { readFileSync } from 'node:fs';
 import { test, egal, vrai } from './commun.mjs';
 import { monterOffice, verifierSocle } from './office-socle.mjs';

@@ -137,50 +137,6 @@ function renderBlock(b, d, ctx, num) {
     case 'texte': return texteHTML(b, e);
     case 'footer': return '<footer class="b-foot">' + f('div', '', 'html', b.html, { ph: 'Sources, auteur, date…', ml: 1 }) + '</footer>';
     // famille cadres (ticket 03)
-    case 'note':
-      return '<div class="note n-' + esc(b.variant || 'warn') + '">' + f('p', '', 'html', b.html, { ph: 'Texte de l’encadré', ml: 1 }) + '</div>';
-    case 'facts':
-      return '<dl class="facts">' + b.items.map(function (it, i) {
-        return '<div class="fact">' + f('dt', '', 'items.' + i + '.k', it.k, { rich: false, ph: 'Clé' }) + f('dd', it.alert ? 'alert' : '', 'items.' + i + '.v', it.v, { ph: 'Valeur' }) +
-          (e ? '<span class="itools"><button type="button" data-act="fact-alert" data-i="' + i + '" class="' + (it.alert ? 'on' : '') + '" title="Valeur en rouge">!</button><button type="button" data-act="fact-del" data-i="' + i + '" title="Supprimer">×</button></span>' : '') + '</div>';
-      }).join('') + (e ? '<button class="add-item" type="button" data-act="fact-add">+ Ajouter</button>' : '') + '</dl>';
-    case 'cards':
-      return '<div class="subs" style="--min:' + (+b.min || 340) + 'px">' + b.cards.map(function (c, i) {
-        return '<div class="sub">' + ((e || !isBlank(c.title)) ? f('h3', '', 'cards.' + i + '.title', c.title, { ph: 'Titre de la carte' }) : '') +
-          ((e || !isBlank(c.text)) ? f('p', 'sub-text', 'cards.' + i + '.text', c.text, { ph: 'Texte (optionnel)', ml: 1, soft: 1 }) : '') +
-          checks('cards.' + i + '.checks', c.checks) +
-          (e ? '<span class="itools"><button type="button" data-act="card-del" data-i="' + i + '" title="Supprimer la carte">×</button></span>' : '') + '</div>';
-      }).join('') + (e ? '<button class="add-item" type="button" data-act="card-add">+ Carte</button>' : '') + '</div>';
-    case 'details':
-      if (e) return '<div class="fold fold-edit"><div class="sum">' + f('span', '', 'title', b.title, { ph: 'Titre cliquable', nl: 1 }) + '</div>' + f('div', 'fold-body', 'html', b.html, { ph: 'Contenu révélé au clic', ml: 1 }) + '</div>';
-      return '<details class="fold"' + (b.open ? ' open' : '') + '><summary>' + R(b.title) + '</summary><div class="fold-body">' + R(b.html) + '</div></details>';
-    case 'group':
-      // groupe repliable : son pli d'édition est enregistré (folded) ; en lecture, un <details> que chacun plie pour soi
-      var gk = b.blocks || [], gn = gk.length, gplie = e ? !!b.folded : ((ctx.folds || {})[b.id] != null ? !!ctx.folds[b.id] : !!b.folded);
-      if (e) return '<div class="grp grp-edit' + (gplie ? ' grp-plie' : '') + '"><div class="grp-head"><button type="button" class="grp-v" data-act="fold" aria-expanded="' + !gplie + '" title="' + (gplie ? 'Déplier' : 'Plier') + ' le groupe">›</button>' +
-        f('span', 'grp-t', 'title', b.title, { ph: 'Titre du groupe', nl: 1 }) +
-        (gplie ? '<button type="button" class="grp-n" data-act="fold" title="Déplier le groupe">' + (gn ? gn + ' bloc' + (gn > 1 ? 's' : '') : 'vide') + '</button>' : '') + '</div>' +
-        (gplie ? '' : '<div class="grp-body">' + gk.map(function (c) { return wrapEdit(c, renderBlock(c, d, ctx, null), 0, editorUi, d.pages.length); }).join('') +
-          (gn ? '' : '<div class="grp-vide">Glissez des blocs ici ou ajoutez-en un</div>') +
-          '<button class="grp-add" type="button" data-act="grp-add">+ Ajouter dans le groupe</button></div>') + '</div>';
-      return '<details class="grp"' + (gplie ? '' : ' open') + '><summary>' + R(b.title) + '</summary><div class="grp-body">' + gk.map(function (c) {
-        var ci = renderBlock(c, d, ctx, null);
-        // ancrage de la bascule (19-mode-lecture-edition.js) ; un bloc ancré garde sa cible de lien
-        var at = (blocAncre(c) ? ' id="b-' + c.id + '"' : '') + (ctx.static ? '' : ' data-bid="' + c.id + '"');
-        return ci && at ? ci.replace(/^<(\w+)/, '<$1' + at) : ci;
-      }).join('') + '</div></details>';
-    case 'diamond':
-      // losange : traits derrière les sommets (centres des cases d'une grille 3 × 3) ; ordre des sommets = celui de la pile sur écran étroit
-      var dl = function (cls, a, z) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + z[0] + '" y2="' + z[1] + '" vector-effect="non-scaling-stroke"/>'; };
-      var hA = [50, 16.7], hI = [16.7, 50], hC = [83.3, 50], hV = [50, 83.3];
-      return '<div class="dia">' + ((e || !isBlank(b.title)) ? f('p', 'dia-t', 'title', b.title, { ph: 'Titre (facultatif)', nl: 1 }) : '') +
-        '<div class="dia-g"><svg class="dia-traits" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        dl('dia-cote', hA, hC) + dl('dia-cote', hC, hV) + dl('dia-cote', hV, hI) + dl('dia-cote', hI, hA) + dl('dia-axe', hA, hV) + dl('dia-axe', hI, hC) + '</svg>' +
-        DIA_SOMMETS.map(function (s) {
-          var v = b[s.cle];
-          return '<div class="dia-s dia-' + s.cle + '"><span class="dia-n">' + s.nom + '</span>' +
-            (e || !isBlank(v) ? f('div', 'dia-v', s.cle, v, { ph: s.nom, ml: 1 }) : '<div class="dia-v"><span class="dia-vide">—</span></div>') + '</div>';
-        }).join('') + '</div></div>';
     // famille carte et chronologie (ticket 04)
     case 'map':
       var mh = +b.height || 420, mks = b.markers || [], zns = b.zones || [], rts = b.routes || [];
@@ -401,10 +357,6 @@ function settings(b) {
     case 'header': return tog('noEyebrow', !b.noEyebrow, 'Surtitre', 'Afficher le surtitre (son texte est conservé quand il est masqué)') + tog('noLede', !b.noLede, 'Chapeau', 'Afficher le chapeau (son texte est conservé quand il est masqué)');
     case 'step': return tog('nonum', !b.nonum, '#', 'Afficher le numéro') ;
     // famille cadres (ticket 03)
-    case 'note': return '<select data-act="set" data-prop="variant" title="Style">' + opt('warn', b.variant, 'Attention') + opt('info', b.variant, 'Info') + opt('bad', b.variant, 'Alerte') + opt('ok', b.variant, 'Succès') + opt('line', b.variant, 'Trait seul') + '</select>';
-    case 'facts': return act('fact-add', '+ fait', 'Ajouter un fait');
-    case 'cards': return act('card-add', '+ carte', 'Ajouter une carte') + '<select data-act="set" data-prop="min" title="Largeur des cartes">' + opt(340, b.min, 'Larges') + opt(220, b.min, 'Étroites') + opt(600, b.min, 'Pleine') + '</select>';
-    case 'details': return tog('open', b.open, 'Ouvert', 'Ouvert par défaut en lecture');
     // famille carte et chronologie (ticket 04)
     case 'map': return '<select data-act="set" data-prop="height" title="Hauteur">' + opt(300, b.height, 'Petite') + opt(420, b.height, 'Moyenne') + opt(560, b.height, 'Grande') + '</select>' +
       '<select data-act="set" data-prop="bg" title="Fond affiché à l’ouverture">' + opt('vector', b.bg, 'Simplifié') + opt('plan', b.bg, 'Plan') + opt('sat', b.bg, 'Satellite') + '</select>' +
