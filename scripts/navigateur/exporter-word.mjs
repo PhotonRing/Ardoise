@@ -1,11 +1,17 @@
 // Sujet : « Exporter en Word (.docx) » : menu Fichier, menu Lecture et menu ⋯ d'un bloc téléchargent un .docx dont le zip
 // est valide (relu par son répertoire central), nommé d'après le titre, sans modifier le document ni l'historique ;
 // une carte au fond hors ligne y entre en image PNG. Origine : spec groupe-office-diamant, ticket 05.
+// Formules (lot 9, ticket 09) : formule en ligne en image dans le paragraphe, décalée vers le bas, bloc formule en image centrée.
 const DOC = { v: 6, id: 'doc-exporter-word', title: 'Word', pages: [{ id: 'p1', title: 'Accueil', blocks: [
   { id: 'hd', type: 'header', title: 'Rapport d’incident' },
   { id: 'x1', type: 'p', html: 'Texte <b>gras</b>' },
   { id: 'g1', type: 'group', title: 'Événement', folded: true, blocks: [{ id: 'dm', type: 'diamond', title: 'Campagne X', adversaire: 'APT', capacite: '', infrastructure: '', victime: '' }] },
   { id: 'mp', type: 'map', height: 300, bg: 'vector', view: { lat: 48, lon: 2, z: 4 }, markers: [{ lat: 48.85, lon: 2.35, label: 'Paris', color: 'bad' }], zones: [], routes: [], list: false },
+] }] };
+
+const DOCF = { v: 6, id: 'doc-exporter-word-formules', title: 'Formules', pages: [{ id: 'p1', title: 'Formules', blocks: [
+  { id: 'fp', type: 'p', html: 'Moyenne <span class="formule">\\frac{a+b}{2}</span> et encore <span class="formule">\\frac{a+b}{2}</span> fin' },
+  { id: 'fb', type: 'formule', tex: 'x_{n+1}' },
 ] }] };
 
 // téléchargement intercepté : type, nom, octets (en base64) et liste des parties du zip relue dans la page
@@ -69,4 +75,18 @@ export default async function ({ ecran, charger, evalue, cdp, attendre, mesure, 
   mesure();
   if ((await evalue('JSON.stringify(window.ardoise.doc)')) !== avant) echec('le document a changé');
   if ((await evalue(`document.querySelector('[data-ui=undo]').title`)) !== annuler) echec('une étape d\'annulation est apparue');
+
+  // formules : les images de Copier pour Office, en PNG dans le .docx
+  await evalue(`window.ardoise.load(${JSON.stringify(DOCF)})`); await attendre(200);
+  mesure();
+  const fo = await telecharge(`(() => { document.querySelector('[data-ui=file]').click(); const x = document.querySelector('.pop [data-f=word]'); if (x) x.click(); return !!x; })()`);
+  if (!fo) echec('formules : aucun téléchargement');
+  else {
+    const p = (fo.doc.match(/<w:p>(?:(?!<w:p>)[\s\S])*?Moyenne[\s\S]*?<\/w:p>/) || [''])[0];
+    if (!/Moyenne <\/w:t><\/w:r><w:r><w:rPr><w:position w:val="-\d+"\/><\/w:rPr><w:drawing><wp:inline/.test(p)) echec('formule en ligne : image décalée dans le paragraphe attendue : ' + p.slice(0, 300));
+    if (!/<w:jc w:val="center"\/><\/w:pPr><w:r><w:drawing><wp:inline[^>]*>[\s\S]*?descr="x_\{n\+1\}"/.test(fo.doc)) echec('bloc formule : image centrée attendue');
+    if (/\$\\frac|\$\$x_/.test(fo.doc)) echec('formule restée en texte $source$');
+    const medias = fo.noms.filter((n) => /^word\/media\/image\d+\.png$/.test(n));
+    if (medias.length !== 2) echec('deux images PNG attendues (une par formule) : ' + fo.noms.join(', '));
+  }
 }

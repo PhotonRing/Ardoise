@@ -250,3 +250,52 @@ test('docx : bloc texte mêlé, numérotation Word aux numéros d\'Ardoise, puce
   const [p1, p2] = ['premier', 'second'].map(numId);
   egal(p1[1], p2[1], 'liste numérotée : une numérotation'); egal(inst(p1[1]), [2, 0, 1], 'qui part de 1');
 });
+
+// Formules (lot 9, ticket 09) : mêmes images que Copier pour Office (opts.formules, 22-copier-office.js). En ligne : { src, l, h } en
+// px pour un texte de 15 px (Normal, 22 demi-points), ligne de base au milieu de l'image ; bloc : { src, l, h } à sa taille.
+const FIMG = { src: 'data:image/png;base64,' + PNG, l: 30, h: 24 };
+const DOCF = { v: 6, title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+  { id: 'fp', type: 'p', html: 'Moyenne <span class="formule">\\frac{a}{b}</span> fin' },
+] }] };
+function produireF(doc, formules) {
+  const { ctx, d } = monter(doc);
+  const z = ctx.docxDepuisElements(ctx.officeBlocs(d.pages[0].blocks, d, { page: 0, images: {}, formules }), d);
+  const parts = lireZip(z, ctx.crc32), t = {};
+  for (const k in parts) if (/\.(xml|rels)$/.test(k)) t[k] = texte(parts[k]);
+  for (const k in t) bienForme(t[k], k);
+  return { parts, t, doc: t['word/document.xml'] };
+}
+test('docx : formule en ligne, image wp:inline dans le paragraphe du texte, ligne de base suivie par le décalage du run', () => {
+  const { doc, t, parts } = produireF(DOCF, { ligne: { '\\frac{a}{b}': FIMG }, bloc: {} });
+  const p = para(doc, 'Moyenne');
+  vrai(/>Moyenne <\/w:t><\/w:r><w:r><w:rPr><w:position w:val="-18"\/><\/w:rPr><w:drawing><wp:inline[^>]*><wp:extent cx="285750" cy="228600"\/>/.test(p), 'run image après le texte, décalé de la moitié de sa hauteur : ' + p);
+  vrai(/<\/w:drawing><\/w:r><w:r><w:t xml:space="preserve"> fin<\/w:t>/.test(p), 'texte après l\'image dans le même paragraphe : ' + p);
+  vrai(p.includes('descr="\\frac{a}{b}"'), 'source en texte de remplacement');
+  vrai(!doc.includes('$\\frac'), 'pas de $source$ en texte');
+  const e = p.match(/<a:blip r:embed="(rId\d+)"\/>/); vrai(e, 'image');
+  vrai(new RegExp('Id="' + e[1] + '" Type="[^"]*/image" Target="media/image1.png"').test(t['word/_rels/document.xml.rels']), 'relation de l\'image');
+  egal([...parts['word/media/image1.png'].subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'octets PNG');
+});
+test('docx : formule répétée, une seule image dans le fichier ; formule de titre à la taille du titre ; sans image, $source$ en texte', () => {
+  const d = { v: 6, title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'hd', type: 'header', title: 'Loi <span class="formule">x</span>' },
+    { id: 's1', type: 'h2', html: 'Section <span class="formule">x</span>' },
+    { id: 'f2', type: 'p', html: 'Deux <span class="formule">x</span> et <span class="formule">x</span>, puis <span class="formule">a &lt; b</span>' },
+  ] }] };
+  const { doc, parts } = produireF(d, { ligne: { x: FIMG }, bloc: {} });
+  egal(Object.keys(parts).filter((k) => k.startsWith('word/media/')), ['word/media/image1.png'], 'un seul média');
+  egal([...doc.matchAll(/<wp:docPr id="(\d+)"/g)].map((m) => m[1]), ['1', '2', '3', '4'], 'un docPr par occurrence');
+  vrai(/<w:pStyle w:val="Title"\/>[\s\S]*?<w:position w:val="-39"\/>[\s\S]*?<wp:extent cx="619125" cy="495300"\/>/.test(para(doc, 'Loi')), 'titre (48) : ' + para(doc, 'Loi'));
+  vrai(/<w:position w:val="-26"\/>[\s\S]*?<wp:extent cx="419100" cy="333375"\/>/.test(para(doc, 'Section')), 'Titre 1 (32) : ' + para(doc, 'Section'));
+  vrai(!/<w:sz /.test(para(doc, 'Section')), 'texte du titre sans taille écrite');
+  vrai(para(doc, 'Deux').includes('>$a &lt; b$<'), 'sans image : $source$');
+});
+test('docx : bloc formule en image centrée ramenée à la largeur de la page ; sans image, $$source$$ centré', () => {
+  const d = { v: 6, title: 'Doc', pages: [{ id: 'p1', title: 'Accueil', blocks: [
+    { id: 'fb', type: 'formule', tex: '\\sum_i x_i' }, { id: 'fs', type: 'formule', tex: 'a < b' },
+  ] }] };
+  const { doc } = produireF(d, { ligne: {}, bloc: { '\\sum_i x_i': { src: 'data:image/png;base64,' + PNG, l: 900, h: 90 } } });
+  const b = para(doc, 'descr="\\\\sum_i x_i"');
+  vrai(/^<w:p><w:pPr><w:jc w:val="center"\/><\/w:pPr><w:r><w:drawing><wp:inline[^>]*><wp:extent cx="6477000" cy="647700"\/>/.test(b), 'image centrée, 680 × 68 px : ' + b);
+  vrai(/<w:p><w:pPr><w:jc w:val="center"\/><\/w:pPr><w:r><w:t xml:space="preserve">\$\$a &lt; b\$\$<\/w:t><\/w:r><\/w:p>/.test(doc), 'sans image : ' + doc);
+});
