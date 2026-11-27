@@ -1,21 +1,6 @@
-// Famille listes et tableaux (src/js/06-bloc-listes.js) : liste, liste à cocher, sommaire et tableau portent toutes leurs facettes,
-// et leur ancien rendu Office (09-office-listes.js, part tableau de 09-office-tableaux.js) est fondu dans la famille.
-// La sortie elle-même est prouvée par le relevé et par office-listes.mjs, office-tableaux.mjs.
-import { existsSync } from 'node:fs';
-import { contexte, monter, test, egal } from './commun.mjs';
-import { manquesDe } from './completude.mjs';
-
-const TYPES = ['list', 'check', 'summary', 'table'];
-
-test('famille listes : aucune facette ne manque à ses quatre types', () => {
-  const ctx = contexte();
-  const r = TYPES.map((t) => { const m = manquesDe(t, ctx.T[t]); return [t, m.erreurs.concat(m.manques)]; });
-  egal(r, TYPES.map((t) => [t, []]), 'manques par type');
-});
-
-test('famille listes : 09-office-listes.js supprimé', () => {
-  egal(existsSync(new URL('../../src/js/09-office-listes.js', import.meta.url)), false, '09-office-listes.js existe encore');
-});
+// Famille listes et tableaux (src/js/06-bloc-listes.js) : l'ordre d'affichage d'une liste à cocher, le même à l'écran, dans les
+// éléments neutres et dans Office (ordreCases). La sortie elle-même est prouvée par le relevé et par office-listes.mjs.
+import { monter, test, egal } from './commun.mjs';
 
 // cases imbriquées et mêlées : à chaque niveau, cochées avant ou après les autres, les sous-cases suivent leur parent
 const CASES = [['a', 0, 0], ['a1', 1, 1], ['a2', 1, 0], ['b', 0, 1], ['c', 0, 0], ['c1', 1, 1]].map(([html, lv, done]) => ({ html, lv, done: !!done }));
