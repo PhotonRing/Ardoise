@@ -1,5 +1,4 @@
 /* ---------- Saisie ---------- */
-var tlTimers = {};
 // bloc visé par un champ : data-b, sinon le .blk le plus proche (celui du bloc dans un groupe, pas celui du groupe)
 function blocVise(el) { if (el.dataset && el.dataset.b) return byId(el.dataset.b); var k = el.closest && el.closest('.blk'); return k ? byId(k.dataset.id) : null; }
 // gestionnaire evt de la facette saisie du type visé (saisieDe), avant le chemin commun : vrai s'il a traité l'évènement
@@ -7,24 +6,10 @@ function saisieParType(evt, e) { var el = e.target, b = el && el.nodeType === 1 
 app.addEventListener('input', function (e) {
   if (saisieParType('input', e)) return;
   var el = e.target;
-  if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); session.saisir(); return; }
-  if (el.matches('.map-q')) { mapSearch(el); return; }
-  if (el.matches('.ch-q')) { chSearch(el); return; }
-  if (el.matches('.ch-txt')) {
-    // titre et unité : appliqués en direct (le centre, un nombre, à la validation)
-    if (el.dataset.p === 'mid') return;
-    var bt0 = byId(el.dataset.b); bt0.choro[el.dataset.p] = el.value; chRefresh(bt0); session.saisir(); return;
-  }
-  if (el.matches('.ch-v') || el.matches('.ch-ta')) return;
-  if (el.matches('.rt-in')) { var br = byId(el.dataset.b); br.routes[+el.dataset.rt].label = el.value; var mr = mapOf(br.id); if (mr) mr.setRoutes(br.routes); session.saisir(); return; }
-  if (el.matches('.rd-in')) return;
-  if (el.matches('.st-in')) { var bs = byId(el.dataset.b), rr = bs.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(bs.id); if (ms) ms.setRoutes(bs.routes); session.saisir(); return; }
-  if (el.matches('.zn-in')) { var bz = byId(el.dataset.b); bz.zones[+el.dataset.zn].label = el.value; var mz = mapOf(bz.id); if (mz) mz.setZones(bz.zones); session.saisir(); return; }
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img') && !el.hasAttribute('data-texte')) el.innerHTML = '';   // bloc texte : reparerLignes garde une ligne
   var bl = byId(el.dataset.b); if (!bl) return;
   setPath(bl, el.dataset.k, fieldValue(el));
-  if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (saisieRelanceDerives(bl)) refreshDerivedSoon();
   session.saisir();
   var champ = saisieDe(bl.type, 'champ'); if (champ) champ(el, bl, e);   // effets du type, après le modèle et l'étape d'historique
@@ -35,29 +20,9 @@ app.addEventListener('beforeinput', function (e) {
   if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
-// nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid
-function reglerNombre(blk, prop, v, fid) {
-  var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
-  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var t = qTrouverFiltre(blk, fid); if (t) t.f.n = n; });   // filtre de la requête ou d'une carte
-}
-function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
   if (saisieParType('change', e)) return;
   var el = e.target;
-  if (el.matches('input.q-num[data-prop]')) {
-    // nombre d'un filtre de requête (échéance dans les N jours…)
-    reglerNombre(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value); return;
-  }
-  if (el.matches('select.kb-prio-in')) { var bp = byId(el.dataset.b); if (bp) { var pv = el.value || ''; session.modifier(function () { if (pv) setPath(bp, el.dataset.k, pv); else { var o = getPath(bp, el.dataset.k.replace(/\.prio$/, '')); if (o) delete o.prio; } }); } return; }
-  if (el.matches('input.kb-due-in, input.kb-due-pick')) {
-    // échéance : texte jj/mm/aaaa validé à la sortie du champ (ou sélecteur natif, ISO) ; le fichier garde l'ISO
-    var bk = byId(el.dataset.b); if (!bk) return;
-    var oldDue = getPath(bk, el.dataset.k) || '', newDue = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
-    if (newDue === null) { el.value = kbDate(oldDue); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return; }
-    if (newDue === oldDue) { el.value = kbDate(oldDue); return; }
-    session.modifier(function () { if (newDue) setPath(bk, el.dataset.k, newDue); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
-  }
-  if (el.matches('input[data-qsub]')) { reglerSousPages(byId(el.closest('.blk').dataset.id), el.checked); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
@@ -65,57 +30,12 @@ app.addEventListener('change', function (e) {
     rafraichirRequetes();
     return;
   }
-  if (el.matches('.ch-v')) {
-    var bv = byId(el.dataset.b), vid = el.dataset.id, nv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
-    if (nv === null && el.value.trim() !== '') { toast('Valeur non reconnue : indiquez un nombre (ex. 12,5 ou 1 250)'); el.value = chRaw(bv.choro.data[vid]); return; }
-    session.saisir(function () { bv.choro.data[vid] = nv; }); session.valider(); el.value = chRaw(nv); chRefresh(bv); return;
-  }
-  if (el.matches('.ch-txt[data-p=mid]')) {
-    var bmid = byId(el.dataset.b), mv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
-    if (mv === null && el.value.trim() !== '') { toast('Centre non reconnu : indiquez un nombre, ou laissez vide'); el.value = chRaw(bmid.choro.mid); return; }
-    keepView(bmid); session.modifier(function () { if (mv === null) delete bmid.choro.mid; else bmid.choro.mid = mv; }); return;
-  }
-  if (el.matches('.ch-txt')) { session.valider(); return; }
-  if (el.matches('.ch-set')) {
-    var bset = byId(el.dataset.b), sp = el.dataset.p, sv = el.value;
-    keepView(bset); session.modifier(function () {
-      if (sp === 'src.k' || sp === 'src.v') { bset.choro.src[sp.slice(4)] = +sv; return; }
-      bset.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) bset.choro.cols = [];
-    }); return;
-  }
-  if (el.matches('.ch-src')) {
-    // source des valeurs : saisie dans la liste, ou un tableau du document (colonnes devinées)
-    var bsrc = byId(el.dataset.b), tid = el.value, tb = null;
-    doc.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) { if (x.id === tid) tb = x; }); });
-    keepView(bsrc); chPaste = null;
-    session.modifier(function () { if (!tid || !tb) delete bsrc.choro.src; else { var g = chGuessCols(tb); bsrc.choro.src = { b: tid, k: g.k, v: g.v }; } }); return;
-  }
-  if (el.matches('.ch-col')) {
-    var bcol = byId(el.dataset.b), ck = +el.dataset.k, cv0 = el.value;
-    keepView(bcol); session.modifier(function () { var a = (bcol.choro.cols || []).slice(); while (a.length <= ck) a.push(null); a[ck] = cv0; bcol.choro.cols = a; }); return;
-  }
-  if (el.matches('.rt-color')) { var brc = byId(el.dataset.b); keepView(brc); session.modifier(function () { brc.routes[+el.dataset.rt].color = el.value; }); return; }
-  if (el.matches('.rd-in')) {
-    var bd = byId(el.dataset.b), zi = +el.dataset.zn, km = parseFloat(el.value.replace(',', '.'));
-    if (!(km > 0)) { toast('Rayon non reconnu : indiquez un nombre de kilomètres'); el.value = String(+(bd.zones[zi].r / 1000).toFixed(2)).replace('.', ','); return; }
-    keepView(bd); session.modifier(function () { bd.zones[zi].r = Math.round(km * 1000); }); return;
-  }
-  if (el.matches('.tl-seg-sel')) { var bt = byId(el.dataset.b), ti = +el.dataset.i; session.modifier(function () { if (el.value === 'solid') delete bt.items[ti].segs; else bt.items[ti].segs = el.value; }); return; }
-  if (el.matches('.zn-color')) { var bzc = byId(el.dataset.b); keepView(bzc); session.modifier(function () { bzc.zones[+el.dataset.zn].color = el.value; }); return; }
-  if (el.matches('.mk-color')) { var bc = byId(el.dataset.b); keepView(bc); session.modifier(function () { bc.markers[+el.dataset.mk].color = el.value; }); return; }
-  if (el.matches('.mk-in[data-p=ll]')) {
-    var bl2 = byId(el.dataset.b), i2 = +el.dataset.mk, cc = parseLL(el.value);
-    if (!cc) { toast('Coordonnées non reconnues. Format : latitude, longitude (ex. 48.38, -4.47)'); el.value = bl2.markers[i2].lat + ', ' + bl2.markers[i2].lon; return; }
-    keepView(bl2); session.modifier(function () { bl2.markers[i2].lat = cc.lat; bl2.markers[i2].lon = cc.lon; }); return;
-  }
   if (el.matches('select[data-act=set]')) reglerBloc(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value);
 });
 app.addEventListener('scroll', function (e) { saisieParType('scroll', e); }, true);
 app.addEventListener('focusout', function (e) {
   if (saisieParType('focusout', e)) return;
   if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
-  if (e.target.matches && e.target.matches('.ch-q')) { var cr0 = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { cr0.hidden = true; }, 150); }
-  if (e.target.matches && e.target.matches('.map-q')) { var res = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); }
 });
 app.addEventListener('focusin', function (e) {
   var el = e.target;
@@ -126,35 +46,6 @@ var lastCell = null;
 app.addEventListener('keydown', function (e) {
   if (saisieParType('keydown', e)) return;
   var el = e.target;
-  if (el.matches('.map-q')) {
-    var res = el.parentNode.querySelector('.map-res'), n = (res._items || []).length;
-    if (e.key === 'Enter') { e.preventDefault(); if (n) pickResult(el, res._cur || 0); }
-    else if (e.key === 'Escape') { el.value = ''; res.hidden = true; }
-    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
-      e.preventDefault(); res._cur = Math.max(0, Math.min(n - 1, (res._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
-      $$('.mi', res).forEach(function (m, j) { m.classList.toggle('act', j === res._cur); });
-    }
-    return;
-  }
-  if (el.matches('.ch-q')) {
-    var cres = el.parentNode.querySelector('.map-res'), cn = (cres._items || []).length;
-    if (e.key === 'Enter') { e.preventDefault(); if (cn) chPick(el, cres._cur || 0); }
-    else if (e.key === 'Escape') { el.value = ''; cres.hidden = true; }
-    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cn) {
-      e.preventDefault(); cres._cur = Math.max(0, Math.min(cn - 1, (cres._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
-      $$('.mi', cres).forEach(function (m, j) { m.classList.toggle('act', j === cres._cur); });
-    }
-    return;
-  }
-  if (el.matches('.ch-v') && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
-    // passer d'une valeur à l'autre au clavier (la valeur est validée en quittant le champ)
-    e.preventDefault();
-    var all = $$('.ch-v[data-b="' + el.dataset.b + '"]', app), ix = all.indexOf(el) + (e.key === 'ArrowUp' ? -1 : 1), nx = all[ix];
-    if (nx) { nx.focus(); nx.select(); } else el.blur();
-    return;
-  }
-  if (el.matches('input.kb-due-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.preventDefault(); var bd0 = byId(el.dataset.b); el.value = kbDate(bd0 && getPath(bd0, el.dataset.k)); el.blur(); } return; }
-  if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
   if (!el.classList || !el.classList.contains('fld')) return;
   var b = byId(el.dataset.b), k = el.dataset.k;
   if (!b) return;

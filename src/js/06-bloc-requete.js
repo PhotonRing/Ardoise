@@ -405,9 +405,37 @@ function kanbanLibelle(ba, b) {
   return null;
 }
 
+/* Saisie (12-saisie.js) : réglages de la requête et champs d'une carte du kanban */
+// nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid (fenêtre des puces, 16-puces-requete.js)
+function reglerNombre(blk, prop, v, fid) {
+  var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
+  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var t = qTrouverFiltre(blk, fid); if (t) t.f.n = n; });   // filtre de la requête ou d'une carte
+}
+function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
+// priorité ou échéance d'une carte : vide, le champ est retiré de la carte
+function kanbanPoser(b, k, v, cle) { session.modifier(function () { if (v) setPath(b, k, v); else { var o = getPath(b, k.slice(0, -cle.length - 1)); if (o) delete o[cle]; } }); }
+var kanbanSaisie = {
+  change: function (el, b) {
+    if (el.matches('select.kb-prio-in')) { kanbanPoser(b, el.dataset.k, el.value || '', 'prio'); return true; }
+    if (!el.matches('input.kb-due-in, input.kb-due-pick')) return false;
+    // échéance : texte jj/mm/aaaa validé à la sortie du champ (ou sélecteur natif, ISO) ; le fichier garde l'ISO
+    var avant = getPath(b, el.dataset.k) || '', apres = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
+    if (apres === null) { el.value = kbDate(avant); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return true; }
+    if (apres === avant) { el.value = kbDate(avant); return true; }
+    kanbanPoser(b, el.dataset.k, apres, 'due'); return true;
+  },
+  // Entrée valide (sortie du champ), Échap rend la valeur enregistrée
+  keydown: function (el, b, e) {
+    if (!el.matches('input.kb-due-in')) return false;
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); el.value = kbDate(getPath(b, el.dataset.k)); el.blur(); }
+    return true;
+  }
+};
+
 T.query = { label: 'Requête', ic: '⌕', desc: 'Fiches de faits, lignes de tableaux ou cases à cocher filtrées par pastilles : tableau, liste ou nombre', kw: 'requete query dataview filtre recherche pastille tag compteur widget tableau liste nombre',
     make: function () { return { title: '', src: 'facts', scope: 'doc', view: 'table', cards: [{ id: uid(), label: '', total: 'none' }] }; }, sans: ['reglages'],
   rendu: requeteRendu, elements: requeteElements, office: requeteOffice, normaliser: requeteNormaliser, libelle: requeteLibelle };
 T.kanban = { label: 'Kanban', ic: '▥', desc: 'Colonnes de cartes à déplacer (échéance et responsable facultatifs)', kw: 'kanban tableau taches suivi colonnes cartes trello projet',
     make: function () { return { cols: [{ id: uid(), title: 'À faire', cards: [] }, { id: uid(), title: 'En cours', cards: [] }, { id: uid(), title: 'Fait', cards: [] }] }; }, sans: ['reglages'],
-  rendu: kanbanRendu, elements: kanbanElements, office: kanbanOffice, normaliser: kanbanNormaliser, libelle: kanbanLibelle };
+  rendu: kanbanRendu, elements: kanbanElements, office: kanbanOffice, normaliser: kanbanNormaliser, libelle: kanbanLibelle, saisie: kanbanSaisie };
