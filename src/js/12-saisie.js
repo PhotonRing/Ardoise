@@ -56,29 +56,9 @@ app.addEventListener('beforeinput', function (e) {
   if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
-// nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid
-function reglerNombre(blk, prop, v, fid) {
-  var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
-  session.modifier(function () { if (prop !== 'kbDueN') { blk[prop] = n; return; } var t = qTrouverFiltre(blk, fid); if (t) t.f.n = n; });   // filtre de la requête ou d'une carte
-}
-function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
   if (saisieParType('change', e)) return;
   var el = e.target;
-  if (el.matches('input.q-num[data-prop]')) {
-    // nombre d'un filtre de requête (échéance dans les N jours…)
-    reglerNombre(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value); return;
-  }
-  if (el.matches('select.kb-prio-in')) { var bp = byId(el.dataset.b); if (bp) { var pv = el.value || ''; session.modifier(function () { if (pv) setPath(bp, el.dataset.k, pv); else { var o = getPath(bp, el.dataset.k.replace(/\.prio$/, '')); if (o) delete o.prio; } }); } return; }
-  if (el.matches('input.kb-due-in, input.kb-due-pick')) {
-    // échéance : texte jj/mm/aaaa validé à la sortie du champ (ou sélecteur natif, ISO) ; le fichier garde l'ISO
-    var bk = byId(el.dataset.b); if (!bk) return;
-    var oldDue = getPath(bk, el.dataset.k) || '', newDue = el.matches('.kb-due-pick') ? el.value || '' : kbParseDate(el.value, kbToday());
-    if (newDue === null) { el.value = kbDate(oldDue); el.classList.remove('refus'); void el.offsetWidth; el.classList.add('refus'); return; }
-    if (newDue === oldDue) { el.value = kbDate(oldDue); return; }
-    session.modifier(function () { if (newDue) setPath(bk, el.dataset.k, newDue); else { var o = getPath(bk, el.dataset.k.replace(/\.due$/, '')); if (o) delete o.due; } }); return;
-  }
-  if (el.matches('input[data-qsub]')) { reglerSousPages(byId(el.closest('.blk').dataset.id), el.checked); return; }
   if (el.matches('input[type=checkbox][data-k]')) {
     var b = byId(el.dataset.b); if (!b) return;
     session.saisir(function () { setPath(b, el.dataset.k, el.checked); }); session.valider();
@@ -186,7 +166,6 @@ app.addEventListener('keydown', function (e) {
     if (nx) { nx.focus(); nx.select(); } else el.blur();
     return;
   }
-  if (el.matches('input.kb-due-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.preventDefault(); var bd0 = byId(el.dataset.b); el.value = kbDate(bd0 && getPath(bd0, el.dataset.k)); el.blur(); } return; }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
   if (el.matches('.img-url-in')) { if (e.key === 'Enter') { e.preventDefault(); var bi = byId(el.dataset.b); if (bi) imageUrlAction(bi, el); } return; }
   if (!el.classList || !el.classList.contains('fld')) return;
