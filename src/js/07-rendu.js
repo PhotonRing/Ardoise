@@ -106,6 +106,20 @@ function renderBlock(b, d, ctx, num) {
 function opt(v, cur, label) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>'; }
 function tog(prop, on, label, title) { return '<button type="button" data-act="toggle" data-prop="' + prop + '" aria-pressed="' + (on ? 'true' : 'false') + '" title="' + (title || '') + '">' + label + '</button>'; }
 function act(a, label, title, extra) { return '<button type="button" data-act="' + a + '" title="' + (title || '') + '"' + (extra || '') + '>' + label + '</button>'; }
+// réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
+// requête : les filtres (du bloc et des cartes de nombre) se règlent dans la fenêtre de leur puce, 16-puces-requete.js ;
+// « Sans tri » supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
+function reglerBloc(blk, prop, v, dansFenetre) {
+  holdBar(blk.id); keepView(blk); session.modifier(function () {
+    if (blk.type === 'query' && /^cards\.\d+\./.test(prop) && !(blk.cards && blk.cards.length)) blk.cards = [qDefCard(blk)];   // « sur » d'une carte pas encore enregistrée
+    if (blk.type === 'query' && prop === 'sortBy' && v === '') { delete blk.sortBy; delete blk.sortDir; return; }
+    var avant = blk.src || 'facts';
+    if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
+    // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
+    if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
+    if (blk.type === 'query' && prop === 'src' && v !== avant) qCartesNouvelleSource(blk, avant, v);
+  }, dansFenetre ? null : { b: blk.id });
+}
 function settings(b) {
   // réglages du type : facette reglages ; absence déclarée ou type inconnu : aucun
   var rg = facette(b.type, 'reglages');
@@ -335,6 +349,8 @@ function refreshDerived() {
   var dn = $('#ui .doc-name'); if (dn && dn.textContent !== ct) dn.textContent = ct;
 }
 function refreshDerivedSoon() { clearTimeout(derivedT); derivedT = setTimeout(refreshDerived, 250); }
+// saisie d'un champ de b : relancer les blocs dérivés ? (titres, présence d'une requête, tableau lié à une carte de chaleur)
+function saisieRelanceDerives(b) { return b.type === 'step' || b.type === 'h2' || b.type === 'h3' || b.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (b.type === 'table' && chLinked(b.id)); }
 function fileAppHTML(d, page) {
   // aperçu de la page enregistré dans le fichier (#app) : vue de lecture sans plis ni tris de session, quel que soit le mode
   var ctx = { page: page, view: 'read' };

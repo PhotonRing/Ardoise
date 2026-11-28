@@ -141,8 +141,113 @@ function chronologieElements(b, x) {
   return out;
 }
 
+// saisie de la carte (facette saisie, 12-saisie.js) : libellés appliqués en direct, valeurs validées à la sortie (change) ;
+// aucun champ de la carte n'est un .fld : ceux qu'aucune branche ne traitait restent ignorés (vrai rendu)
+function carteSaisieInput(el, b) {
+  if (el.matches('.mk-in[data-p=label]')) { b.markers[+el.dataset.mk].label = el.value; var mm = mapOf(b.id); if (mm) mm.setMarkers(b.markers); session.saisir(); return true; }
+  if (el.matches('.map-q')) { mapSearch(el); return true; }
+  if (el.matches('.ch-q')) { chSearch(el); return true; }
+  if (el.matches('.ch-txt')) {
+    // titre et unité : appliqués en direct (le centre, un nombre, à la validation)
+    if (el.dataset.p === 'mid') return true;
+    b.choro[el.dataset.p] = el.value; chRefresh(b); session.saisir(); return true;
+  }
+  if (el.matches('.ch-v') || el.matches('.ch-ta')) return true;
+  if (el.matches('.rt-in')) { b.routes[+el.dataset.rt].label = el.value; var mr = mapOf(b.id); if (mr) mr.setRoutes(b.routes); session.saisir(); return true; }
+  if (el.matches('.rd-in')) return true;
+  if (el.matches('.st-in')) { var rr = b.routes[+el.dataset.rt]; if (!rr.names) rr.names = rr.pts.map(function () { return ''; }); rr.names[+el.dataset.s] = el.value; var ms = mapOf(b.id); if (ms) ms.setRoutes(b.routes); session.saisir(); return true; }
+  if (el.matches('.zn-in')) { b.zones[+el.dataset.zn].label = el.value; var mz = mapOf(b.id); if (mz) mz.setZones(b.zones); session.saisir(); return true; }
+  return false;
+}
+function carteSaisieChange(el, b) {
+  if (el.matches('.ch-v')) {
+    var vid = el.dataset.id, nv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (nv === null && el.value.trim() !== '') { toast('Valeur non reconnue : indiquez un nombre (ex. 12,5 ou 1 250)'); el.value = chRaw(b.choro.data[vid]); return true; }
+    session.saisir(function () { b.choro.data[vid] = nv; }); session.valider(); el.value = chRaw(nv); chRefresh(b); return true;
+  }
+  if (el.matches('.ch-txt[data-p=mid]')) {
+    var mv = el.value.trim() === '' ? null : MapKit.choro.num(el.value);
+    if (mv === null && el.value.trim() !== '') { toast('Centre non reconnu : indiquez un nombre, ou laissez vide'); el.value = chRaw(b.choro.mid); return true; }
+    keepView(b); session.modifier(function () { if (mv === null) delete b.choro.mid; else b.choro.mid = mv; }); return true;
+  }
+  if (el.matches('.ch-txt')) { session.valider(); return true; }
+  if (el.matches('.ch-set')) {
+    var sp = el.dataset.p, sv = el.value;
+    keepView(b); session.modifier(function () {
+      if (sp === 'src.k' || sp === 'src.v') { b.choro.src[sp.slice(4)] = +sv; return; }
+      b.choro[sp] = sp === 'classes' ? +sv : sv; if (sp === 'pal' && (sv === 'perso' || sv === 'perso3')) b.choro.cols = [];
+    }); return true;
+  }
+  if (el.matches('.ch-src')) {
+    // source des valeurs : saisie dans la liste, ou un tableau du document (colonnes devinées)
+    var tid = el.value, tb = null;
+    doc.pages.forEach(function (pg) { blocsDe(pg.blocks, function (x) { if (x.id === tid) tb = x; }); });
+    keepView(b); chPaste = null;
+    session.modifier(function () { if (!tid || !tb) delete b.choro.src; else { var g = chGuessCols(tb); b.choro.src = { b: tid, k: g.k, v: g.v }; } }); return true;
+  }
+  if (el.matches('.ch-col')) {
+    var ck = +el.dataset.k, cv0 = el.value;
+    keepView(b); session.modifier(function () { var a = (b.choro.cols || []).slice(); while (a.length <= ck) a.push(null); a[ck] = cv0; b.choro.cols = a; }); return true;
+  }
+  if (el.matches('.rt-color')) { keepView(b); session.modifier(function () { b.routes[+el.dataset.rt].color = el.value; }); return true; }
+  if (el.matches('.rd-in')) {
+    var zi = +el.dataset.zn, km = parseFloat(el.value.replace(',', '.'));
+    if (!(km > 0)) { toast('Rayon non reconnu : indiquez un nombre de kilomètres'); el.value = String(+(b.zones[zi].r / 1000).toFixed(2)).replace('.', ','); return true; }
+    keepView(b); session.modifier(function () { b.zones[zi].r = Math.round(km * 1000); }); return true;
+  }
+  if (el.matches('.zn-color')) { keepView(b); session.modifier(function () { b.zones[+el.dataset.zn].color = el.value; }); return true; }
+  if (el.matches('.mk-color')) { keepView(b); session.modifier(function () { b.markers[+el.dataset.mk].color = el.value; }); return true; }
+  if (el.matches('.mk-in[data-p=ll]')) {
+    var i2 = +el.dataset.mk, cc = parseLL(el.value);
+    if (!cc) { toast('Coordonnées non reconnues. Format : latitude, longitude (ex. 48.38, -4.47)'); el.value = b.markers[i2].lat + ', ' + b.markers[i2].lon; return true; }
+    keepView(b); session.modifier(function () { b.markers[i2].lat = cc.lat; b.markers[i2].lon = cc.lon; }); return true;
+  }
+  return false;   // réglages de la carte (select data-act=set…) : chemin commun
+}
+// résultats d'une recherche (lieux de .map-q, pays de .ch-q) : Entrée choisit, Échap vide, flèches parcourent
+function carteRechercheTouche(el, e, choisir) {
+  var res = el.parentNode.querySelector('.map-res'), n = (res._items || []).length;
+  if (e.key === 'Enter') { e.preventDefault(); if (n) choisir(el, res._cur || 0); }
+  else if (e.key === 'Escape') { el.value = ''; res.hidden = true; }
+  else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && n) {
+    e.preventDefault(); res._cur = Math.max(0, Math.min(n - 1, (res._cur || 0) + (e.key === 'ArrowDown' ? 1 : -1)));
+    $$('.mi', res).forEach(function (m, j) { m.classList.toggle('act', j === res._cur); });
+  }
+  return true;
+}
+function carteSaisieKeydown(el, b, e) {
+  if (el.matches('.map-q')) return carteRechercheTouche(el, e, pickResult);
+  if (el.matches('.ch-q')) return carteRechercheTouche(el, e, chPick);
+  if (el.matches('.ch-v') && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+    // passer d'une valeur à l'autre au clavier (la valeur est validée en quittant le champ)
+    e.preventDefault();
+    var all = $$('.ch-v[data-b="' + el.dataset.b + '"]', app), ix = all.indexOf(el) + (e.key === 'ArrowUp' ? -1 : 1), nx = all[ix];
+    if (nx) { nx.focus(); nx.select(); } else el.blur();
+    return true;
+  }
+  if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return true; }
+  return false;
+}
+// quitter une recherche masque ses résultats (après le clic sur un résultat)
+function carteSaisieFocusout(el) {
+  if (!el.matches('.ch-q, .map-q')) return false;
+  var res = el.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); return true;
+}
+// chronologie : style de la ligne vers l'événement suivant ; frise horizontale redessinée par minuteur pendant la frappe
+function chronologieSaisieChange(el, b) {
+  if (!el.matches('.tl-seg-sel')) return false;
+  var ti = +el.dataset.i; session.modifier(function () { if (el.value === 'solid') delete b.items[ti].segs; else b.items[ti].segs = el.value; }); return true;
+}
+var tlTimers = {};
+function chronologieSaisieChamp(el, bl) {
+  if (bl.orient !== 'h') return;
+  clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250);
+}
+
 T.map = { label: 'Carte', ic: '◎', desc: 'Points, zones, cercles, itinéraires · hors ligne ou plan / satellite', kw: 'carte map geo port ville zone cercle itineraire route trajet distance localisation monde', make: function () { return { height: 420, bg: 'vector', view: { lat: 30, lon: 10, z: 1.6 }, markers: [], zones: [], routes: [], list: true, cities: true, lock: false, hideBg: false }; }, sans: ['office', 'normaliser', 'libelle'],
-  rendu: carteRendu, reglages: carteReglages, elements: carteElements };
+  rendu: carteRendu, reglages: carteReglages, elements: carteElements,
+  saisie: { input: carteSaisieInput, change: carteSaisieChange, keydown: carteSaisieKeydown, focusout: carteSaisieFocusout } };
 T.timeline = { label: 'Chronologie', ic: '⟿', desc: 'Événements datés, verticale ou horizontale', kw: 'timeline chronologie frise evenements dates historique deroule',
     make: function () { return { orient: 'v', items: [{ date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }, { date: '', title: '', text: '', color: 'accent' }] }; }, sans: ['office', 'normaliser', 'libelle'],
-  rendu: chronologieRendu, reglages: chronologieReglages, elements: chronologieElements };
+  rendu: chronologieRendu, reglages: chronologieReglages, elements: chronologieElements,
+  saisie: { change: chronologieSaisieChange, champ: chronologieSaisieChamp } };

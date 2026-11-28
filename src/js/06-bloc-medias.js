@@ -24,6 +24,14 @@ T.image = { label: 'Image', ic: '▣', desc: 'Intégrée au fichier', kw: 'image
     var t = officeEchelle(l, h, OFFICE_LARGEUR); l = t[0]; h = t[1];
     return '<p align="center" style="' + OFFICE_P + 'text-align:center"><img src="' + esc(img.src) + '" alt="' + esc(b.alt || htmlText(b.caption)) + '"' + (l && h ? ' width="' + l + '" height="' + h + '"' : '') + ' style="border:1px solid ' + x.C.line + '"></p>' +
       (officeVide(leg) ? '' : '<p style="' + OFFICE_P + 'text-align:center;font-size:' + officePt(13) + ';color:' + x.C.muted + '">' + x.segs(leg, 13) + '</p>');
+  },
+  // adresse d'une image : Entrée la charge (imageUrlAction, 13-actions-blocs.js) ; le champ garde toutes ses touches
+  saisie: {
+    keydown: function (el, b, e) {
+      if (!el.matches('.img-url-in')) return false;
+      if (e.key === 'Enter') { e.preventDefault(); imageUrlAction(b, el); }
+      return true;
+    }
   }
 };
 T.code = { label: 'Bloc de code', ic: '{}', desc: 'Sombre, boîte avec fichier, ou commande', kw: 'code script commande terminal', make: function () { return { variant: 'dark', name: '', code: '', tall: false }; }, sans: ['normaliser', 'libelle'],
@@ -65,6 +73,26 @@ T.code = { label: 'Bloc de code', ic: '{}', desc: 'Sombre, boîte avec fichier, 
     // bordure de la couleur du fond : sans bordure, Writer ignore le retrait intérieur de la cellule
     var titre = nom ? officeEtiquette(officeTexteSegs(nom), x, { couleur: officeCodeJetons(true).c, marges: 'margin:0pt 0pt 6pt' }) : '';
     return officeTable('<tr>' + officeCellule(titre + officeTabPre(b, 12.5, x.C['code-fg'], officeCodeJetons(true)), 'background:' + x.C['code-bg'] + ';padding:10.5pt 12pt;border:1px solid ' + x.C['code-bg'], '100%') + '</tr>', 'margin:0 0 6pt');
+  },
+  // zone du code : coloration pendant la frappe (paintCode, 07-rendu.js), Tab et Maj+Tab indentent, la coloration défile avec elle
+  saisie: {
+    input: function (el, b) { if (!el.matches('textarea.code-ta')) return false; b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); return true; },
+    keydown: function (el, b, e) {
+      if (!el.matches('textarea.code-ta')) return false;
+      if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        var s = el.selectionStart, en = el.selectionEnd, v = el.value;
+        if (e.shiftKey) {
+          var ls = v.lastIndexOf('\n', s - 1) + 1;
+          if (v.substr(ls, 2) === '  ') { el.setRangeText('', ls, ls + 2, 'end'); }
+        } else el.setRangeText('  ', s, en, 'end');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return true;
+    },
+    scroll: function (el) { if (!el.matches('textarea.code-ta')) return false; var pre = el.previousElementSibling; if (pre) { pre.scrollLeft = el.scrollLeft; pre.scrollTop = el.scrollTop; } return true; },
+    // le nom peut changer le langage deviné : la coloration est repeinte
+    champ: function (el, b) { if (el.dataset.k !== 'name') return; var t = $('.blk[data-id="' + b.id + '"] textarea.code-ta', app); if (t) paintCode(t, b); }
   }
 };
 T.formule = { label: 'Formule', ic: '∑', desc: 'Une formule LaTeX seule, centrée et en grand', kw: 'formule equation maths mathematiques latex tex', make: function () { return { tex: '' }; }, sans: ['reglages', 'normaliser', 'libelle'],
@@ -89,9 +117,18 @@ T.formule = { label: 'Formule', ic: '∑', desc: 'Une formule LaTeX seule, centr
     if (!im) return p + esc('$$' + tex + '$$') + '</p>';
     var t = officeEchelle(im.l, im.h, OFFICE_LARGEUR);
     return p + '<img src="' + esc(im.src) + '" alt="' + esc(tex) + '" width="' + t[0] + '" height="' + t[1] + '"></p>';
+  },
+  // source : l'aperçu la suit sans rendre la page
+  saisie: {
+    input: function (el, b) {
+      if (!el.matches('textarea.formule-ta')) return false;
+      b.tex = el.value; autosize(el);
+      var apercu = el.parentNode.querySelector('.formule-apercu'); if (apercu) apercu.innerHTML = formuleBlocApercu(b.tex, true);
+      session.saisir(); return true;
+    }
   }
 };
-// aperçu d'un bloc formule (rendu, et saisie de la source : 12-saisie.js) ; source vide : une invite en édition, rien en lecture
+// aperçu d'un bloc formule (rendu, et saisie de la source) ; source vide : une invite en édition, rien en lecture
 function formuleBlocApercu(tex, edition) {
   return texEnMathML(tex, 'bloc') || (edition ? '<span class="formule-invite">Tapez une formule LaTeX, par exemple \\frac{a}{b}</span>' : '');
 }
