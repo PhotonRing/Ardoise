@@ -1,6 +1,11 @@
 /* ---------- Saisie ---------- */
 var tlTimers = {};
+// bloc visé par un champ : data-b, sinon le .blk le plus proche (celui du bloc dans un groupe, pas celui du groupe)
+function blocVise(el) { if (el.dataset && el.dataset.b) return byId(el.dataset.b); var k = el.closest && el.closest('.blk'); return k ? byId(k.dataset.id) : null; }
+// gestionnaire evt de la facette saisie du type visé (saisieDe), avant le chemin commun : vrai s'il a traité l'évènement
+function saisieParType(evt, e) { var el = e.target, b = el && el.nodeType === 1 && blocVise(el), f = b && saisieDe(b.type, evt); return !!(f && f(el, b, e)); }
 app.addEventListener('input', function (e) {
+  if (saisieParType('input', e)) return;
   var el = e.target;
   if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
   if (el.matches('textarea.formule-ta')) {
@@ -40,8 +45,9 @@ app.addEventListener('input', function (e) {
   }
   if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
-  if (bl.type === 'step' || bl.type === 'h2' || bl.type === 'h3' || bl.type === 'header' || tousBlocs(doc.blocks).some(function (x) { return x.type === 'query'; }) || (bl.type === 'table' && chLinked(bl.id))) refreshDerivedSoon();
+  if (saisieRelanceDerives(bl)) refreshDerivedSoon();
   session.saisir();
+  var champ = saisieDe(bl.type, 'champ'); if (champ) champ(el, bl, e);   // effets du type, après le modèle et l'étape d'historique
   if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
@@ -50,20 +56,6 @@ app.addEventListener('beforeinput', function (e) {
   if (mode !== 'edit' || (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo')) return;
   e.preventDefault(); if (e.inputType === 'historyUndo') undo(); else redo();
 });
-// réglage d'un bloc par une liste (select[data-act=set] du bloc, ou fenêtre d'une puce de requête, 16-puces-requete.js) ;
-// requête : les filtres (du bloc et des cartes de nombre) se règlent dans la fenêtre de leur puce, 16-puces-requete.js ;
-// « Sans tri » supprime son champ ; dansFenetre : le focus reste dans la fenêtre (pas rendu au bloc)
-function reglerBloc(blk, prop, v, dansFenetre) {
-  holdBar(blk.id); keepView(blk); session.modifier(function () {
-    if (blk.type === 'query' && /^cards\.\d+\./.test(prop) && !(blk.cards && blk.cards.length)) blk.cards = [qDefCard(blk)];   // « sur » d'une carte pas encore enregistrée
-    if (blk.type === 'query' && prop === 'sortBy' && v === '') { delete blk.sortBy; delete blk.sortDir; return; }
-    var avant = blk.src || 'facts';
-    if (prop.indexOf('.') > 0) setPath(blk, prop, v); else blk[prop] = (prop === 'min' || prop === 'height' || prop === 'depth' || prop === 'limit') ? +v : v;
-    // requête : en changeant ce qu'on cherche, une carte de nombre laissée telle quelle prend le réglage par défaut du nouveau type
-    if (blk.type === 'query' && prop === 'src' && v !== 'table' && (blk.view === 'regroupee' || blk.view === 'chaleur')) blk.view = 'table';   // vues propres aux lignes de tableaux
-    if (blk.type === 'query' && prop === 'src' && v !== avant) qCartesNouvelleSource(blk, avant, v);
-  }, dansFenetre ? null : { b: blk.id });
-}
 // nombre d'un réglage de requête ; kbDueN : échéance dans les N jours… du filtre fid
 function reglerNombre(blk, prop, v, fid) {
   var n = Math.max(1, Math.min(999, Math.round(+v) || 1)); holdBar(blk.id);
@@ -71,6 +63,7 @@ function reglerNombre(blk, prop, v, fid) {
 }
 function reglerSousPages(blk, on) { holdBar(blk.id); session.modifier(function () { if (on) blk.sub = true; else delete blk.sub; }); }
 app.addEventListener('change', function (e) {
+  if (saisieParType('change', e)) return;
   var el = e.target;
   if (el.matches('input.q-num[data-prop]')) {
     // nombre d'un filtre de requête (échéance dans les N jours…)
@@ -138,8 +131,9 @@ app.addEventListener('change', function (e) {
   }
   if (el.matches('select[data-act=set]')) reglerBloc(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value);
 });
-app.addEventListener('scroll', function (e) { var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
+app.addEventListener('scroll', function (e) { if (saisieParType('scroll', e)) return; var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
 app.addEventListener('focusout', function (e) {
+  if (saisieParType('focusout', e)) return;
   if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
   if (e.target.matches && e.target.matches('.ch-q')) { var cr0 = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { cr0.hidden = true; }, 150); }
   if (e.target.matches && e.target.matches('.map-q')) { var res = e.target.parentNode.querySelector('.map-res'); setTimeout(function () { res.hidden = true; }, 150); }
@@ -151,6 +145,7 @@ app.addEventListener('focusin', function (e) {
 var lastCell = null;
 
 app.addEventListener('keydown', function (e) {
+  if (saisieParType('keydown', e)) return;
   var el = e.target;
   if (el.matches('textarea.code-ta')) {
     if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
@@ -289,7 +284,7 @@ function caretLine(el, dir) {
 }
 function leaveTable(el, b, dir) {
   // premier champ avant le tableau, ou après lui
-  var all = $$('.fld, textarea.code-ta, textarea.formule-ta', app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
+  var all = $$(CHAMPS_PARCOURUS, app), cells = all.filter(function (x) { return x.dataset.b === b.id && x.hasAttribute('data-cell'); });
   if (!cells.length) return;
   var n = all[all.indexOf(cells[dir < 0 ? 0 : cells.length - 1]) + dir]; if (!n) return;
   n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0);

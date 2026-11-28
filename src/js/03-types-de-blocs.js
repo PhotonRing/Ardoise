@@ -13,6 +13,9 @@ var HORS_GROUPE = { header: 1, footer: 1, h2: 1, h3: 1, step: 1, group: 1 };
 // facette d'un type (rendu, reglages, elements, office, normaliser, libelle) : la fonction inscrite, sinon null (type inconnu, facette
 // absente) ; seul accès des points d'entrée communs à l'inscription. Une facette facultative absente est déclarée dans sans: [...]
 function facette(type, nom) { var t = T[type]; return t && typeof t[nom] === 'function' ? t[nom] : null; }
+// facette saisie (objet facultatif, 12-saisie.js) : gestionnaire evt (input, change, keydown, scroll, focusout, champ) du type, sinon
+// null ; appelé (el, b, e), il rend vrai s'il a traité l'évènement (champ : après la mise à jour du modèle d'un .fld, rendu ignoré)
+function saisieDe(type, evt) { var t = T[type], s = t && t.saisie; return s && typeof s[evt] === 'function' ? s[evt] : null; }
 function mk(type, props) {
   var b = T[type].make(); b.id = uid(); b.type = type;
   if (type === 'group') b.blocks = [mk('texte', {})];   // un groupe neuf contient un bloc texte vide

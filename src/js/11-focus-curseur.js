@@ -70,8 +70,10 @@ function fieldValue(el) {
   if (el.hasAttribute('data-rich')) return sanitize(el.innerHTML);
   return el.textContent.replace(/\s*\n\s*/g, ' ');
 }
+// champs parcourus au clavier, dans l'ordre de la page (nextField, sortie d'un tableau : leaveTable)
+var CHAMPS_PARCOURUS = '.fld, textarea.code-ta, textarea.formule-ta';
 function nextField(el, dir) {
-  var all = $$('.fld, textarea.code-ta, textarea.formule-ta', app).filter(function (x) { return x === el || !ligneMasquee(x); }), i = all.indexOf(el);   // lignes filtrées sautées (14-filtre-lignes.js)
+  var all = $$(CHAMPS_PARCOURUS, app).filter(function (x) { return x === el || !ligneMasquee(x); }), i = all.indexOf(el);   // lignes filtrées sautées (14-filtre-lignes.js)
   var n = all[i + (dir || 1)]; if (n) { n.focus(); if (n.tagName !== 'TEXTAREA') caretTo(n, dir < 0); }
 }
 
