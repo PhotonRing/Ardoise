@@ -7,14 +7,6 @@ function saisieParType(evt, e) { var el = e.target, b = el && el.nodeType === 1 
 app.addEventListener('input', function (e) {
   if (saisieParType('input', e)) return;
   var el = e.target;
-  if (el.matches('textarea.code-ta')) { var b = byId(el.dataset.b); if (b) { b.code = el.value; autosize(el); paintCode(el, b); session.saisir(); } return; }
-  if (el.matches('textarea.formule-ta')) {
-    // bloc formule : l'aperçu suit la source sans rendre la page (06-bloc-medias.js formuleBlocApercu)
-    var blocFormule = byId(el.dataset.b); if (!blocFormule) return;
-    blocFormule.tex = el.value; autosize(el);
-    var apercu = el.parentNode.querySelector('.formule-apercu'); if (apercu) apercu.innerHTML = formuleBlocApercu(blocFormule.tex, true);
-    session.saisir(); return;
-  }
   if (el.matches('.mk-in[data-p=label]')) { var bm = byId(el.dataset.b); bm.markers[+el.dataset.mk].label = el.value; var mm = mapOf(bm.id); if (mm) mm.setMarkers(bm.markers); session.saisir(); return; }
   if (el.matches('.map-q')) { mapSearch(el); return; }
   if (el.matches('.ch-q')) { chSearch(el); return; }
@@ -31,24 +23,11 @@ app.addEventListener('input', function (e) {
   if (!el.classList || !el.classList.contains('fld')) return;
   if (el.textContent === '' && !el.querySelector('img') && !el.hasAttribute('data-texte')) el.innerHTML = '';   // bloc texte : reparerLignes garde une ligne
   var bl = byId(el.dataset.b); if (!bl) return;
-  if (bl.type === 'texte' && lignesDe(el).length === 1 && !el.querySelector('[data-lv], [data-g]') && el.textContent === '/' && /^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) {
-    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré ; même règle que texteVide au clavier
-    slashMenu(el, bl); el.innerHTML = '<div class="lg"><br></div>'; return;
-  }
   setPath(bl, el.dataset.k, fieldValue(el));
-  if (bl.type === 'texte') { el.toggleAttribute('data-vide', texteVide(bl.lignes)); numeroterChamp(el, bl.lignes); }
-  if (bl.type === 'header' && el.dataset.k === 'title' && pageHeader(doc.pages[doc.cur]) === bl) {
-    // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
-    var nomPage = curTitle(), nomPageHTML = rendrePastillesEtFormules(titrePageHTML(doc.pages[doc.cur], doc.cur), doc, false); document.title = titreFenetrePageCourante();
-    var champNom = $('#ui .doc-name'); if (champNom) champNom.textContent = nomPage;
-    $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nomPageHTML) x.innerHTML = nomPageHTML; });
-  }
-  if (bl.type === 'code' && el.dataset.k === 'name') { var tcode = $('.blk[data-id="' + bl.id + '"] textarea.code-ta', app); if (tcode) paintCode(tcode, bl); }
   if (bl.type === 'timeline' && bl.orient === 'h') { clearTimeout(tlTimers[bl.id]); tlTimers[bl.id] = setTimeout(function () { var hb = $('.blk[data-id="' + bl.id + '"] .tl-h', app); if (hb) { var tmp = document.createElement('div'); tmp.innerHTML = rendreFormules(renderBlock(bl, doc, { page: doc.cur, view: 'read' }, null), false); var nh = tmp.querySelector('.tl-h'); if (nh) { hb.replaceWith(nh); Reader.tlFit($('.blk[data-id="' + bl.id + '"]', app)); } } }, 250); }
   if (saisieRelanceDerives(bl)) refreshDerivedSoon();
   session.saisir();
   var champ = saisieDe(bl.type, 'champ'); if (champ) champ(el, bl, e);   // effets du type, après le modèle et l'étape d'historique
-  if (bl.type === 'texte') raccourciTexte(el, e);   // 12-bloc-texte.js
 });
 // annulation native du navigateur (menu, clavier virtuel ou physique sur Android) : passer par l'historique
 // d'Ardoise, sinon les deux mécanismes se mélangent et le texte se défait lettre par lettre ou se duplique
@@ -131,7 +110,7 @@ app.addEventListener('change', function (e) {
   }
   if (el.matches('select[data-act=set]')) reglerBloc(byId(el.closest('.blk').dataset.id), el.dataset.prop, el.value);
 });
-app.addEventListener('scroll', function (e) { if (saisieParType('scroll', e)) return; var t = e.target; if (t && t.matches && t.matches('textarea.code-ta')) { var pre = t.previousElementSibling; if (pre) { pre.scrollLeft = t.scrollLeft; pre.scrollTop = t.scrollTop; } } }, true);
+app.addEventListener('scroll', function (e) { saisieParType('scroll', e); }, true);
 app.addEventListener('focusout', function (e) {
   if (saisieParType('focusout', e)) return;
   if (derivedT && e.target.classList && e.target.classList.contains('fld')) refreshDerived();
@@ -147,18 +126,6 @@ var lastCell = null;
 app.addEventListener('keydown', function (e) {
   if (saisieParType('keydown', e)) return;
   var el = e.target;
-  if (el.matches('textarea.code-ta')) {
-    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      var s = el.selectionStart, en = el.selectionEnd, v = el.value;
-      if (e.shiftKey) {
-        var ls = v.lastIndexOf('\n', s - 1) + 1;
-        if (v.substr(ls, 2) === '  ') { el.setRangeText('', ls, ls + 2, 'end'); }
-      } else el.setRangeText('  ', s, en, 'end');
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    return;
-  }
   if (el.matches('.map-q')) {
     var res = el.parentNode.querySelector('.map-res'), n = (res._items || []).length;
     if (e.key === 'Enter') { e.preventDefault(); if (n) pickResult(el, res._cur || 0); }
@@ -188,7 +155,6 @@ app.addEventListener('keydown', function (e) {
   }
   if (el.matches('input.kb-due-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } else if (e.key === 'Escape') { e.preventDefault(); var bd0 = byId(el.dataset.b); el.value = kbDate(bd0 && getPath(bd0, el.dataset.k)); el.blur(); } return; }
   if (el.matches('.mk-in')) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } return; }
-  if (el.matches('.img-url-in')) { if (e.key === 'Enter') { e.preventDefault(); var bi = byId(el.dataset.b); if (bi) imageUrlAction(bi, el); } return; }
   if (!el.classList || !el.classList.contains('fld')) return;
   var b = byId(el.dataset.b), k = el.dataset.k;
   if (!b) return;
@@ -208,10 +174,6 @@ app.addEventListener('keydown', function (e) {
       if (cc < b.rows[0].length - 1) { focusCell(b, cr, cc + 1, true); return; }
       if (caretAtEnd(el)) addRowAfter(b, cr);
       return;
-    }
-    if (el.hasAttribute('data-nl') && ['header', 'h2', 'h3', 'subtitle', 'step'].indexOf(b.type) >= 0) {
-      if (b.type === 'header' && k !== 'lede' && !(k === 'title' && b.noLede)) { nextField(el, 1); return; }
-      insertAfter(b, 'texte', {}); return;
     }
     nextField(el, 1); return;
   }

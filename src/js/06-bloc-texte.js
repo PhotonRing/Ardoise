@@ -1,6 +1,13 @@
 /* ---------- Famille texte et titres : en-tête, titre de section, sous-section, sous-titre, étape numérotée, texte, pied de page ----------
    Le sous-titre est hérité : le bloc texte le remplace (« Convertir en texte ») ; il reste rendu, modifiable et exporté mais ne
    s'insère plus. */
+// Entrée dans un titre (champ data-nl, hors composition, Maj et data-ml) : champ suivant si auSuivant, sinon un bloc texte après lui
+function entreeTitre(el, b, e, auSuivant) {
+  if (e.key !== 'Enter' || e.isComposing || e.shiftKey || !el.classList.contains('fld') || el.hasAttribute('data-ml') || !el.hasAttribute('data-nl')) return false;
+  e.preventDefault();
+  if (auSuivant) nextField(el, 1); else insertAfter(b, 'texte', {});
+  return true;
+}
 T.header = {
   label: 'En-tête', ic: 'H1', desc: 'Surtitre, grand titre et chapeau', kw: 'titre entete header', make: function () { return { eyebrow: '', title: '', lede: '' }; }, sans: ['normaliser', 'libelle'],
   rendu: function (b, x) {
@@ -25,25 +32,39 @@ T.header = {
     h += '<h1 style="margin:0pt 0pt 6pt;font-family:' + OFFICE_POLICES.texte + ';font-size:' + officePt(40) + ';font-weight:bold;line-height:1.1;color:' + x.C.fg + '">' + x.segs(x.S(b.title), 40) + '</h1>';
     if (!b.noLede && !officeVide(x.S(b.lede))) h += '<p style="' + OFFICE_P + 'font-size:' + officePt(15) + ';color:' + x.C.muted + '">' + x.segs(x.S(b.lede)) + '</p>';
     return h;
+  },
+  saisie: {
+    // Entrée passe au champ suivant, sauf dans le chapeau et dans le titre sans chapeau
+    keydown: function (el, b, e) { var k = el.dataset.k; return entreeTitre(el, b, e, k !== 'lede' && !(k === 'title' && b.noLede)); },
+    champ: function (el, b) {
+      if (el.dataset.k !== 'title' || pageHeader(doc.pages[doc.cur]) !== b) return;
+      // le nom de la page suit son titre en direct : onglet du navigateur, barre d'outils, onglets et sommaire
+      var nomPage = curTitle(), nomPageHTML = rendrePastillesEtFormules(titrePageHTML(doc.pages[doc.cur], doc.cur), doc, false); document.title = titreFenetrePageCourante();
+      var champNom = $('#ui .doc-name'); if (champNom) champNom.textContent = nomPage;
+      $$('.pnav-tabs [data-pg="' + doc.cur + '"], .pnav-side [data-pg="' + doc.cur + '"]', app).forEach(function (x) { if (x.innerHTML !== nomPageHTML) x.innerHTML = nomPageHTML; });
+    }
   }
 };
 T.h2 = {
   label: 'Titre de section', ic: 'H2', desc: 'Titre intermédiaire', kw: 'titre heading', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'],
   rendu: function (b, x) { return x.f('h2', '', 'html', b.html, { ph: 'Titre de section', nl: 1 }); },
   elements: function (b, x) { return [{ t: 'titre', niveau: 1, segs: x.S(b.html) }]; },
-  office: function (b, x) { return officeTxtTitre('h1', 21, x.segs(x.S(b.html), 21), x); }
+  office: function (b, x) { return officeTxtTitre('h1', 21, x.segs(x.S(b.html), 21), x); },
+  saisie: { keydown: entreeTitre }
 };
 T.h3 = {
   label: 'Sous-section', ic: 'H3', desc: 'Niveau sous la section, repris dans le sommaire', kw: 'titre heading sous-section sous section', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'],
   rendu: function (b, x) { return x.f('h3', '', 'html', b.html, { ph: 'Sous-section', nl: 1 }); },
   elements: function (b, x) { return [{ t: 'titre', niveau: 2, segs: x.S(b.html) }]; },
-  office: function (b, x) { return officeTxtTitre('h2', 15, x.segs(x.S(b.html)), x); }
+  office: function (b, x) { return officeTxtTitre('h2', 15, x.segs(x.S(b.html)), x); },
+  saisie: { keydown: entreeTitre }
 };
 T.subtitle = {
   label: 'Sous-titre', ic: 'T', desc: 'Petit titre, hors du sommaire', kw: 'titre sous-titre intertitre', make: function () { return { html: '' }; }, sans: ['reglages', 'normaliser', 'libelle'],
   rendu: function (b, x) { return x.f('p', 'subtitle', 'html', b.html, { ph: 'Sous-titre', nl: 1 }); },
   elements: function (b, x) { return [{ t: 'titre', niveau: 3, segs: x.S(b.html) }]; },
-  office: function (b, x) { return officeTxtTitre('h3', 15, x.segs(x.S(b.html)), x); }
+  office: function (b, x) { return officeTxtTitre('h3', 15, x.segs(x.S(b.html)), x); },
+  saisie: { keydown: entreeTitre }
 };
 T.step = {
   label: 'Étape numérotée', ic: '1.', desc: 'Ouvre une section avec pastille de numéro', kw: 'etape section numero step', make: function () { return { num: '', title: '', nonum: false }; }, sans: ['normaliser', 'libelle'],
@@ -66,7 +87,8 @@ T.step = {
       officeCellule(esc(num), 'background:' + x.accSoft + ';color:' + x.acc + ';font-weight:bold;padding:4.5pt 6.75pt;text-align:center;white-space:nowrap', '6%', 'middle') +
       // retrait du titre : Writer ne l'applique qu'à une cellule bordée (bordure de la couleur du fond)
       officeCellule(titre, 'border:1px solid ' + x.C.surface + ';padding:0pt 0pt 0pt 9pt', '94%', 'middle') + '</tr>', 'margin:0 0 6pt');
-  }
+  },
+  saisie: { keydown: entreeTitre }
 };
 // mêmes éléments dans un ordre quelconque : même valeur (libellé « lignes réordonnées » du bloc texte)
 function libelleTri(t) { return t.map(function (x) { return JSON.stringify(x); }).sort().join('\n'); }
@@ -134,6 +156,15 @@ T.texte = {
         return '<p style="' + marges + '">' + (h || '&nbsp;') + '</p>';
       }
     });
+  },
+  saisie: {
+    // clavier virtuel (Android) : pas de keydown « / », seulement le caractère inséré ; même règle que texteVide au clavier
+    input: function (el, b, e) {
+      if (!el.classList.contains('fld') || lignesDe(el).length !== 1 || el.querySelector('[data-lv], [data-g]') || el.textContent !== '/' || !/^insert(Text|CompositionText)?$/.test(e.inputType || 'insertText')) return false;
+      slashMenu(el, b); el.innerHTML = '<div class="lg"><br></div>'; return true;
+    },
+    // après session.saisir() : raccourciTexte valide d'abord l'étape, la frappe et la transformation en font deux (12-bloc-texte.js)
+    champ: function (el, b, e) { el.toggleAttribute('data-vide', texteVide(b.lignes)); numeroterChamp(el, b.lignes); raccourciTexte(el, e); }
   }
 };
 T.footer = {
